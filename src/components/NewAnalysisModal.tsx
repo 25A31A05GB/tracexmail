@@ -34,6 +34,8 @@ export function NewAnalysisModal({
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingAnalysisRef = useRef<EmailAnalysis | null>(null);
+  const scanAnimationFinishedRef = useRef<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -67,7 +69,17 @@ export function NewAnalysisModal({
         parsedResult = parseRawEml(rawContent, name);
       }
 
+      pendingAnalysisRef.current = parsedResult;
       setPendingAnalysis(parsedResult);
+
+      if (scanAnimationFinishedRef.current && parsedResult) {
+        onAnalysisCreated(parsedResult);
+        setIsScanning(false);
+        setPendingAnalysis(null);
+        pendingAnalysisRef.current = null;
+        scanAnimationFinishedRef.current = false;
+        onClose();
+      }
     } catch (err: any) {
       console.error('[NewAnalysisModal] Parsing error:', err);
       setError(err?.message || 'Forensic analysis encountered an unexpected error.');
@@ -76,12 +88,17 @@ export function NewAnalysisModal({
   };
 
   const handleScanAnimationComplete = () => {
-    if (pendingAnalysis) {
-      onAnalysisCreated(pendingAnalysis);
+    const target = pendingAnalysisRef.current || pendingAnalysis;
+    if (target) {
+      onAnalysisCreated(target);
+      setIsScanning(false);
+      setPendingAnalysis(null);
+      pendingAnalysisRef.current = null;
+      scanAnimationFinishedRef.current = false;
+      onClose();
+    } else {
+      scanAnimationFinishedRef.current = true;
     }
-    setIsScanning(false);
-    setPendingAnalysis(null);
-    onClose();
   };
 
   const handleProcessRaw = () => {

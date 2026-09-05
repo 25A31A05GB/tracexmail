@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent, DragEvent } from 'react';
+import React, { useState, useRef, ChangeEvent, DragEvent, useEffect } from 'react';
 import { 
   Database, 
   Upload, 
@@ -16,7 +16,16 @@ import {
   Copy,
   Trash2,
   AlertTriangle,
-  Check
+  Check,
+  Loader2,
+  RefreshCw,
+  FileWarning,
+  Zap,
+  Globe,
+  Clock,
+  ShieldAlert,
+  RotateCcw,
+  Info
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -44,6 +53,23 @@ export function IngestionPipelineView({
   const [error, setError] = useState<string | null>(null);
   const [diagnosticToast, setDiagnosticToast] = useState<WebSocketAlert | null>(null);
   const [copiedLogs, setCopiedLogs] = useState(false);
+
+  // Pending Analysis & Diagnostic Error States
+  const [isPendingBackend, setIsPendingBackend] = useState<boolean>(false);
+  const [backendStage, setBackendStage] = useState<string>('Initializing pipeline connection...');
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
+  const [diagnosticError, setDiagnosticError] = useState<{
+    title: string;
+    detail: string;
+    code?: string;
+    reasons: string[];
+    rawContent: string;
+    fileName: string;
+    fallbackAvailable: boolean;
+  } | null>(null);
+
+  const pendingAnalysisRef = useRef<EmailAnalysis | null>(null);
+  const scanAnimationFinishedRef = useRef<boolean>(false);
 
   // Diagnostic Log State
   const [diagnosticLogs, setDiagnosticLogs] = useState<string[]>(() => [
@@ -75,10 +101,28 @@ export function IngestionPipelineView({
     }
 
     setError(null);
+    setDiagnosticError(null);
     setFileName(name);
     setIsScanning(true);
+    setIsPendingBackend(true);
+    setElapsedMs(0);
+    setBackendStage('1/4 Transmitting payload to /api/v1/analyze endpoint...');
 
     addLog(`[INGEST] Loaded payload '${name}' (${content.length} bytes). Starting multi-stage telemetry scan...`);
+
+    // Live execution timer interval
+    const startTime = performance.now();
+    const timerInterval = setInterval(() => {
+      const currentElapsed = Math.round(performance.now() - startTime);
+      setElapsedMs(currentElapsed);
+      if (currentElapsed > 3200) {
+        setBackendStage('4/4 Synthesizing case dossier & threat verdict...');
+      } else if (currentElapsed > 1800) {
+        setBackendStage('3/4 Querying Gemini 3.6 AI Intel & Threat Rep APIs...');
+      } else if (currentElapsed > 800) {
+        setBackendStage('2/4 Parsing MIME structure, Received headers, & DKIM signatures...');
+      }
+    }, 100);
 
     let backendResult: any = null;
     let backendFailed = false;
@@ -91,7 +135,6 @@ export function IngestionPipelineView({
       formData.append('filename', name);
       formData.append('source', 'email_upload');
 
-      const startTime = performance.now();
       const res = await apiFetch('/api/v1/analyze', {
         method: 'POST',
         body: formData
@@ -106,7 +149,7 @@ export function IngestionPipelineView({
         let bodyText = '';
         try { bodyText = await res.text(); } catch {}
         failureDetail = `HTTP ${res.status} ${res.statusText}: ${bodyText || 'Backend processing failure'}`;
-        addLog(`[ERROR] Backend analysis failed (${elapsed}ms): ${failureDetail}`);
+        addLog(`[ERROR] Backend analysis engine failed (${elapsed}ms): ${failureDetail}`);
 
         // Trigger visible AlertToast for backend processing failure
         setDiagnosticToast({
@@ -114,7 +157,7 @@ export function IngestionPipelineView({
           timestamp: new Date().toISOString(),
           severity: 'CRITICAL',
           title: 'Backend Analysis Engine Failure',
-          description: `${failureDetail}. Activating client-side cryptographic parser fallback.`,
+          description: `${failureDetail}. Diagnostic error logged.`,
           source: 'ForensicEngine',
           category: 'ANALYSIS_FAILURE',
           sender: name
@@ -131,25 +174,65 @@ export function IngestionPipelineView({
         timestamp: new Date().toISOString(),
         severity: 'CRITICAL',
         title: 'Backend Transport Exception',
-        description: `Failed to communicate with /api/v1/analyze (${failureDetail}). Degraded to local parser.`,
+        description: `Failed to communicate with /api/v1/analyze (${failureDetail}). Diagnostic error logged.`,
         source: 'NetworkTransport',
         category: 'CONNECTION_FAILURE',
         sender: name
       });
+    } finally {
+      clearInterval(timerInterval);
+      setIsPendingBackend(false);
     }
 
     try {
-      let finalAnalysis: EmailAnalysis;
+      let finalAnalysis: EmailAnalysis | null = null;
       if (backendResult?.analysis || backendResult?.case) {
         addLog(`[MAPPER] Mapping backend JSON schema to structured EmailAnalysis object...`);
         finalAnalysis = mapBackendCaseToAnalysis(backendResult.analysis || backendResult, content, name);
-      } else {
-        addLog(`[FALLBACK] Executing client-side RFC822 parser & SHA-256 hash engine...`);
+      } else if (!backendFailed) {
+        // If backend returned OK but no analysis data was present
+        backendFailed = true;
+        failureDetail = 'Backend returned HTTP 200 but contained empty analysis schema object.';
+      }
+
+      if (backendFailed || !finalAnalysis) {
+        // Set Diagnostic Error UI State explaining potential reasons
+        setDiagnosticError({
+          title: 'Diagnostic Error — Analysis Engine Returned No Data',
+          detail: failureDetail || 'Analysis engine request did not yield valid forensic telemetry.',
+          code: 'ERR_FORENSIC_ENGINE_NO_DATA',
+          reasons: [
+            'Processing Delays or Cold Start: High queue volume on analysis worker threads or transient container cold start.',
+            'API Quota or Rate Limitations: External Gemini 3.6 AI Intel or Threat APIs (VirusTotal, MaxMind GeoIP) reached request thresholds.',
+            'RFC822 Header Structure Anomaly: Raw email payload missing mandatory envelope fields (From, Received, Message-ID).',
+            'Network Transport Partition: Disruption in server-side API transport or socket pipeline.'
+          ],
+          rawContent: content,
+          fileName: name,
+          fallbackAvailable: true
+        });
+
+        // Still construct client-side fallback as backup
+        addLog(`[FALLBACK] Constructing client-side cryptographic parser fallback...`);
         finalAnalysis = parseRawEml(content, name);
       }
 
-      addLog(`[TELEMETRY] Analysis compiled. Subject: '${finalAnalysis.subject || finalAnalysis.headers?.subject}'. Threat Score: ${finalAnalysis.threatScore || finalAnalysis.riskScore || 0}/100.`);
-      setPendingAnalysis(finalAnalysis);
+      if (finalAnalysis) {
+        addLog(`[TELEMETRY] Analysis compiled. Subject: '${finalAnalysis.subject || finalAnalysis.headers?.subject}'. Threat Score: ${finalAnalysis.threatScore || finalAnalysis.riskScore || 0}/100.`);
+        pendingAnalysisRef.current = finalAnalysis;
+        setPendingAnalysis(finalAnalysis);
+
+        // If animation already finished while processing, dispatch immediately
+        if (scanAnimationFinishedRef.current && !backendFailed) {
+          addLog(`[DISPATCH] Scan complete signal caught; mounting analysis in workspace...`);
+          onSelectAnalysis(finalAnalysis);
+          onNavigateToOverview();
+          setIsScanning(false);
+          setPendingAnalysis(null);
+          pendingAnalysisRef.current = null;
+          scanAnimationFinishedRef.current = false;
+        }
+      }
     } catch (err: any) {
       const fatalErr = err.message || 'Fatal error mapping forensic telemetry';
       addLog(`[FATAL] Pipeline mapping error: ${fatalErr}`);
@@ -170,12 +253,19 @@ export function IngestionPipelineView({
   };
 
   const handleScanAnimationComplete = () => {
-    if (pendingAnalysis) {
-      onSelectAnalysis(pendingAnalysis);
+    const analysisToSelect = pendingAnalysisRef.current || pendingAnalysis;
+    if (analysisToSelect) {
+      addLog(`[DISPATCH] Animation complete; dispatching selected analysis to workspace view...`);
+      onSelectAnalysis(analysisToSelect);
       onNavigateToOverview();
+      setIsScanning(false);
+      setPendingAnalysis(null);
+      pendingAnalysisRef.current = null;
+      scanAnimationFinishedRef.current = false;
+    } else {
+      // Record animation completed if backend processing is still running
+      scanAnimationFinishedRef.current = true;
     }
-    setIsScanning(false);
-    setPendingAnalysis(null);
   };
 
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -241,6 +331,138 @@ export function IngestionPipelineView({
             </button>
           </div>
         </div>
+
+        {/* 1. Waiting for Analysis Status Component (Pending Backend Call) */}
+        {isPendingBackend && (
+          <div className="bg-[#15120e] border border-[rgba(201,162,39,0.4)] rounded-sm p-5 shadow-lg space-y-3 font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#2c271f]">
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center justify-center w-8 h-8 rounded bg-[rgba(201,162,39,0.15)] border border-[rgba(201,162,39,0.35)]">
+                  <Loader2 className="w-4 h-4 text-[var(--stamp)] animate-spin" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--stamp)]">
+                      WAITING FOR ANALYSIS...
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[rgba(201,162,39,0.4)] font-bold">
+                      PENDING ENGINE
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#b9af9c] mt-0.5 font-sans">
+                    Communicating with backend forensic analysis engine for payload: <span className="font-mono text-[#ede6d8]">{fileName}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-start sm:self-auto text-xs text-emerald-400 font-bold bg-[#0d0b08] px-3 py-1.5 rounded border border-[#2c271f]">
+                <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                <span>{(elapsedMs / 1000).toFixed(1)}s</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-[#b9af9c]">
+                <span className="flex items-center gap-1.5 text-[var(--slate)] font-semibold">
+                  <Cpu className="w-3.5 h-3.5" />
+                  <span>Pipeline Stage:</span>
+                </span>
+                <span className="text-[#ede6d8] font-semibold">{backendStage}</span>
+              </div>
+              {/* Progress bar line */}
+              <div className="w-full h-1.5 bg-[#201c16] rounded-full overflow-hidden border border-[#3a352c]">
+                <div 
+                  className="h-full bg-gradient-to-r from-[var(--slate)] via-[var(--stamp)] to-emerald-400 transition-all duration-200"
+                  style={{ width: `${Math.min(95, Math.max(10, (elapsedMs / 4000) * 100))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. Diagnostic Error Fallback UI Component */}
+        {diagnosticError && (
+          <div className="bg-[#170e0d] border border-rose-800/80 rounded-sm p-5 shadow-lg space-y-4 font-mono">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-rose-950">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded bg-rose-950/80 border border-rose-700/80 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
+                  <FileWarning className="w-5 h-5 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-rose-200">
+                      {diagnosticError.title}
+                    </h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800 font-bold">
+                      {diagnosticError.code || 'ERR_DIAGNOSTIC_FAILURE'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-300 font-sans leading-relaxed">
+                    {diagnosticError.detail}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDiagnosticError(null)}
+                className="text-xs text-rose-400 hover:text-rose-200 underline cursor-pointer self-end sm:self-auto shrink-0"
+              >
+                Dismiss Notice
+              </button>
+            </div>
+
+            {/* Explanation of Potential Reasons */}
+            <div className="bg-[#0f0a0a] border border-rose-900/40 rounded p-3.5 space-y-2 text-xs">
+              <div className="flex items-center gap-2 text-rose-300 font-bold uppercase text-[11px] tracking-wider">
+                <Info className="w-3.5 h-3.5 text-rose-400" />
+                <span>POTENTIAL FAILURE CAUSES &amp; DIAGNOSTICS:</span>
+              </div>
+              <ul className="space-y-1.5 text-rose-200/90 text-[11px] font-sans pl-1">
+                {diagnosticError.reasons.map((reason, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <span className="text-rose-500 font-mono font-bold select-none">•</span>
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Interactive Recovery Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="text-[11px] text-[#b9af9c] font-sans flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Client-side local cryptographic parser is ready as fallback.</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    executePipelineWithAnimation(diagnosticError.rawContent, diagnosticError.fileName);
+                  }}
+                  className="px-3 py-1.5 text-xs bg-[#241e1a] hover:bg-[#2d2621] text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1.5 font-semibold transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[var(--slate)]" />
+                  <span>Retry Backend</span>
+                </button>
+
+                {diagnosticError.fallbackAvailable && (
+                  <button
+                    onClick={() => {
+                      const fallbackAnalysis = parseRawEml(diagnosticError.rawContent, diagnosticError.fileName);
+                      onSelectAnalysis(fallbackAnalysis);
+                      onNavigateToOverview();
+                      setDiagnosticError(null);
+                      addLog(`[FORCE_FALLBACK] User mounted client-side parsed analysis to workspace.`);
+                    }}
+                    className="px-3.5 py-1.5 text-xs bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 rounded border border-emerald-700/80 flex items-center gap-1.5 font-bold transition-all cursor-pointer shadow-sm"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Load Local Fallback Analysis</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="p-3.5 rounded-sm bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-rose-300 text-xs flex items-center gap-2 font-sans">
