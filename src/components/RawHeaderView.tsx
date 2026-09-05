@@ -43,7 +43,9 @@ interface ParsedHeaderItem {
 /**
  * Extracts effective raw header string from EmailAnalysis with zero-fail fallback
  */
-function getEffectiveRawHeaders(analysis: EmailAnalysis): string {
+function getEffectiveRawHeaders(analysis?: EmailAnalysis): string {
+  if (!analysis) return '';
+
   if (analysis.rawHeaders && analysis.rawHeaders.trim().length > 20 && !analysis.rawHeaders.startsWith('No raw headers')) {
     return analysis.rawHeaders.trim();
   }

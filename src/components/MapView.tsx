@@ -53,8 +53,19 @@ export function MapView({ analysis }: MapViewProps) {
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
   const [selectedHopIp, setSelectedHopIp] = useState<string | null>(null);
 
-  const validHops = analysis.hops.filter(
-    (h) => h.lat !== undefined && h.lng !== undefined && !(h.lat === 0 && h.lng === 0)
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
+        <Globe className="w-10 h-10 text-[#7fa3ba] mb-3" />
+        <h3 className="text-base font-bold text-[#ede6d8]">No Analysis Selected</h3>
+        <p className="text-xs text-[#8a8070] mt-1">Please select an analysis to view geographic routing.</p>
+      </div>
+    );
+  }
+
+  const hops = Array.isArray(analysis.hops) ? analysis.hops : [];
+  const validHops = hops.filter(
+    (h) => h?.lat !== undefined && h?.lng !== undefined && !(h?.lat === 0 && h?.lng === 0)
   );
 
   const handleCopyIp = (ip: string) => {

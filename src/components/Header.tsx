@@ -19,7 +19,10 @@ import {
   Loader2,
   Wifi,
   WifiOff,
-  Radio
+  Radio,
+  Compass,
+  HelpCircle,
+  Sparkles
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -44,6 +47,7 @@ interface HeaderProps {
   userLabel?: string;
   onSignOut?: () => void;
   onSwitchRole?: (newRole: UserRole) => void;
+  onOpenWalkthrough?: () => void;
 }
 
 export function Header({
@@ -58,7 +62,8 @@ export function Header({
   role = 'analyst',
   userLabel = 'SA',
   onSignOut,
-  onSwitchRole
+  onSwitchRole,
+  onOpenWalkthrough
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -384,6 +389,17 @@ export function Header({
           >
             <FlaskConical className={`w-3.5 h-3.5 ${showDemoCases ? 'text-amber-400' : 'text-slate-500'}`} />
             <span>Sample Data: <strong className={showDemoCases ? 'text-amber-200 font-bold' : 'text-slate-300 font-semibold'}>{showDemoCases ? 'Active' : 'Hidden'}</strong></span>
+          </button>
+        )}
+
+        {onOpenWalkthrough && (
+          <button
+            onClick={onOpenWalkthrough}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
+            title="Launch Interactive Forensic Walkthrough & Platform Guide"
+          >
+            <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
+            <span className="font-bold tracking-wide">GET STARTED</span>
           </button>
         )}
 

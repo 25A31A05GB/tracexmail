@@ -257,6 +257,30 @@ export function OverviewView({
   onOpenNewModal,
   onOpenReportModal,
 }: OverviewViewProps) {
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--ink)] text-[var(--paper-dim)] space-y-4">
+        <div className="w-12 h-12 rounded-full bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] flex items-center justify-center text-[var(--thread)]">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <div className="text-center space-y-1">
+          <h3 className="text-base font-bold text-[var(--paper)]">No Analysis Selected</h3>
+          <p className="text-xs text-[var(--paper-dim)] max-w-sm font-sans">
+            Please ingest an email file or select a forensic case to inspect detailed evidence telemetry.
+          </p>
+        </div>
+        {onOpenNewModal && (
+          <button
+            onClick={onOpenNewModal}
+            className="btn-primary text-xs font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer"
+          >
+            <span>Ingest Email File</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const stdVerdict = getStandardizedVerdict(analysis);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
@@ -287,8 +311,9 @@ export function OverviewView({
     }
   };
 
-  const originHopRaw = analysis.hops.find((h) => h.isOrigin) || analysis.hops[0];
-  const firstPublicGatewayHop = analysis.hops.find((h) => !h.isPrivate && h.fromIp && !h.isOrigin) || analysis.hops.find((h) => !h.isPrivate && h.fromIp);
+  const safeHops = Array.isArray(analysis.hops) ? analysis.hops : [];
+  const originHopRaw = safeHops.find((h) => h?.isOrigin) || safeHops[0];
+  const firstPublicGatewayHop = safeHops.find((h) => !h?.isPrivate && h?.fromIp && !h?.isOrigin) || safeHops.find((h) => !h?.isPrivate && h?.fromIp);
 
   const effectiveOriginHop = (() => {
     if (!originHopRaw) {
@@ -390,7 +415,7 @@ export function OverviewView({
     if (rawIntel && rawIntel.domain && !rawIntel.error && rawIntel.status !== 'api_error') {
       return rawIntel;
     }
-    const detectedDomain = analysis.headers.fromEmail?.split('@')[1] || analysis.auth?.spf?.domain || 'sender-domain.com';
+    const detectedDomain = analysis.headers?.fromEmail?.split('@')[1] || analysis.auth?.spf?.domain || 'sender-domain.com';
     const isPhish = stdVerdict.isMalicious;
     const hasSpf = Boolean(analysis.auth?.spf?.record);
     const hasDmarc = Boolean(analysis.auth?.dmarc?.policy);
@@ -413,7 +438,7 @@ export function OverviewView({
       dns: rawIntel?.dns || {
         domain: detectedDomain,
         ns: rawIntel?.nameservers || [],
-        a_records: analysis.hops.map(h => h.fromIp).filter(Boolean) as string[],
+        a_records: safeHops.map(h => h.fromIp).filter(Boolean) as string[],
         mx: rawIntel?.mx_records || [],
         mx_records: rawIntel?.dns?.mx_records || [],
         spf: analysis.auth?.spf?.record,
@@ -431,7 +456,8 @@ export function OverviewView({
     };
   })();
 
-  const effectiveEvidenceId = analysis.evidenceId || `EV-${analysis.id.slice(-6).toUpperCase()}`;
+  const safeCaseId = analysis.id || 'case-001';
+  const effectiveEvidenceId = analysis.evidenceId || `EV-${safeCaseId.slice(-6).toUpperCase()}`;
   const effectiveHash = analysis.sha256Hash || analysis.sha256 || analysis.custodyHash || (analysis.rawEml ? sha256Sync(analysis.rawEml) : sha256Sync(analysis.id || JSON.stringify(analysis)));
 
   const handleCopy = (text: string) => {
@@ -1611,10 +1637,10 @@ export function OverviewView({
         {/* Heuristic Flags Summary */}
         <div className="p-4 bg-slate-900/90 border-t border-slate-700 space-y-3">
           <div className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">
-            Heuristic Rule Signals ({analysis.heuristics.filter((h) => h.triggered).length} Triggered)
+            Heuristic Rule Signals ({(analysis.heuristics || []).filter((h) => h.triggered).length} Triggered)
           </div>
           <div className="space-y-1.5">
-            {analysis.heuristics.slice(0, 3).map((h) => (
+            {(analysis.heuristics || []).slice(0, 3).map((h) => (
               <div key={h.id} className="flex items-start gap-2 text-xs">
                 {h.triggered ? (
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />

@@ -27,7 +27,17 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [copiedIocs, setCopiedIocs] = useState<boolean>(false);
-  const [logsState, setLogsState] = useState<ForensicLogEntry[]>(analysis.logs || []);
+  const [logsState, setLogsState] = useState<ForensicLogEntry[]>(analysis?.logs || []);
+
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
+        <Terminal className="w-10 h-10 text-[#7fa3ba] mb-3" />
+        <h3 className="text-base font-bold text-[#ede6d8]">No Analysis Selected</h3>
+        <p className="text-xs text-[#8a8070] mt-1">Please select an analysis to inspect threat logs.</p>
+      </div>
+    );
+  }
   const [isEnrichingVT, setIsEnrichingVT] = useState<boolean>(false);
   const [vtStatusInfo, setVtStatusInfo] = useState<{
     configured: boolean;

@@ -63,6 +63,7 @@ import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
   onNavigateToTab?: (tab: any) => void;
+  onOpenWalkthrough?: () => void;
 }
 
 export interface RegionThreat {
@@ -274,7 +275,7 @@ const getHeatColor = (z: number, severity: string) => {
   return { fill: '#38BDF8', stroke: '#7DD3FC', glow: 'rgba(56, 189, 248, 0.4)' };
 };
 
-export function DashboardView({ onSelectAnalysis, onNavigateToTab }: DashboardViewProps) {
+export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthrough }: DashboardViewProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -756,6 +757,38 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab }: DashboardVi
               </div>
             )}
           </div>
+
+          {/* Interactive Get Started Forensic Walkthrough Launcher Banner */}
+          {onOpenWalkthrough && (
+            <div className="bg-[#181410] border border-[#3a352c] rounded-md p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-[2px] bg-[rgba(201,162,39,0.15)] border border-[rgba(201,162,39,0.35)] flex items-center justify-center shrink-0">
+                  <Compass className="w-5 h-5 text-[var(--stamp)] animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-bold text-sm text-[#ede6d8]">
+                      New to TraceXMail Enclave?
+                    </span>
+                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-[rgba(201,162,39,0.18)] text-[var(--stamp)] border border-[rgba(201,162,39,0.35)] font-bold uppercase">
+                      GUIDED WALKTHROUGH
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#b9af9c] mt-0.5">
+                    Explore the 4 core pillars: SOC Dashboard, Ingestion Decomposition, BGP Hop Traceroute, and Court-Admissible Dossiers.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={onOpenWalkthrough}
+                className="px-4 py-2 rounded-[2px] bg-[rgba(201,162,39,0.2)] hover:bg-[rgba(201,162,39,0.3)] border border-[var(--stamp)] text-[var(--stamp)] hover:text-[#ede6d8] text-xs font-mono font-bold flex items-center gap-2 transition-all cursor-pointer shrink-0 shadow-[0_0_12px_rgba(201,162,39,0.2)]"
+              >
+                <span>LAUNCH WALKTHROUGH</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -179,7 +179,7 @@ async function callGeminiForensics(text: string, metadata?: { from?: string; sub
 
   // @ts-ignore - GoogleGenAI call with JSON configuration
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.6-flash',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -274,7 +274,7 @@ export async function analyzeLinguisticForensics(
           status: 'AVAILABLE',
           evidence_type: 'HYPOTHESIS',
           provider: 'gemini',
-          model_used: 'gemini-2.5-flash',
+          model_used: 'gemini-3.6-flash',
           ...validation.validatedData
         };
       } else {

@@ -1016,7 +1016,7 @@ async function parseRawEmailToAnalysis(
       : torHop
       ? `Anomalous relay detected via Tor Exit Node (${torHop.fromIp || '185.220.101.5'}). Sender: ${from}. Risk score: ${threatScore}/100.`
       : threatScore >= 75
-      ? `High-risk indicators identified in forensic trace (${heuristics.map(h => h.title).slice(0, 2).join(', ')}). Threat score: ${threatScore}/100.`
+      ? `High-risk indicators identified in forensic trace (${combinedHeuristics.map(h => h.title).slice(0, 2).join(', ')}). Threat score: ${threatScore}/100.`
       : `Forensic email analyzed from ${fromDomain}. Threat score: ${threatScore}/100.`,
     source: 'forensic-pipeline',
     read: false,
@@ -2853,7 +2853,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
 
     const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
-    const model = groqKey ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : 'gemini-2.5-flash';
+    const model = groqKey ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : 'gemini-3.6-flash';
 
     // If neither key is configured, return honest explanation
     if (!geminiKey && !groqKey) {
@@ -2872,7 +2872,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       try {
         const ai = new GoogleGenAI({ apiKey: geminiKey });
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.6-flash',
           contents: promptText
         });
         const narrativeText = response.text;
@@ -2880,7 +2880,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
           return res.json({
             ai_narrative: {
               narrative: narrativeText.trim(),
-              model: 'gemini-2.5-flash',
+              model: 'gemini-3.6-flash',
               source: 'TraceXMail AI Forensic Reasoning Engine (Gemini)',
               disclaimer: 'AI-generated narrative summary based on deterministic forensic telemetry. Verify independently before regulatory or legal submission.'
             }

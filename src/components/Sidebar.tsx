@@ -17,7 +17,8 @@ import {
   Share2,
   Building2,
   Users,
-  Lock
+  Lock,
+  Compass
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
@@ -46,9 +47,10 @@ interface SidebarProps {
   alertCount: number;
   wsStatus: ConnectionStatus;
   role?: UserRole;
+  onOpenWalkthrough?: () => void;
 }
 
-export function Sidebar({ activeTab, setActiveTab, alertCount, wsStatus, role = 'analyst' }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, alertCount, wsStatus, role = 'analyst', onOpenWalkthrough }: SidebarProps) {
   const primaryNavItems = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'cases' as const, label: 'Cases', icon: FolderOpen },
@@ -223,8 +225,22 @@ export function Sidebar({ activeTab, setActiveTab, alertCount, wsStatus, role = 
         )}
       </nav>
 
-      {/* Quick Ingest Button in Sidebar */}
-      <div className="p-3">
+      {/* Quick Ingest & Walkthrough Actions in Sidebar */}
+      <div className="p-3 space-y-2">
+        {onOpenWalkthrough && (
+          <motion.button
+            onClick={onOpenWalkthrough}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+            className="w-full py-1.5 px-3 rounded-[2px] text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all bg-[rgba(201,162,39,0.12)] hover:bg-[rgba(201,162,39,0.22)] border border-[rgba(201,162,39,0.35)] text-[var(--stamp)] cursor-pointer shadow-xs"
+            title="Launch Interactive Forensic Walkthrough Overlay"
+          >
+            <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
+            <span>GET STARTED GUIDE</span>
+          </motion.button>
+        )}
+
         <motion.button
           onClick={() => setActiveTab('ingest')}
           disabled={role === 'read_only'}

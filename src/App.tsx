@@ -21,6 +21,7 @@ import { TeamView } from './components/TeamView';
 import { NewAnalysisModal } from './components/NewAnalysisModal';
 import { ReportModal } from './components/ReportModal';
 import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
+import { ForensicWalkthroughModal } from './components/ForensicWalkthroughModal';
 import { AlertToast } from './components/AlertToast';
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
@@ -57,9 +58,28 @@ export default function App() {
   const [authView, setAuthView] = useState<'intro' | 'login' | 'signup'>('intro');
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+
+  // Track session transition to automatically redirect to Email Ingestion tab upon confirmed login
+  const prevSessionUserIdRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    const currentUserId = session?.user?.id || null;
+    if (currentUserId && prevSessionUserIdRef.current !== currentUserId) {
+      setActiveTab('ingest');
+    }
+    prevSessionUserIdRef.current = currentUserId;
+  }, [session?.user?.id]);
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(() => {
+    try {
+      const completed = localStorage.getItem('tracexmail_walkthrough_completed');
+      return completed !== 'true';
+    } catch {
+      return false;
+    }
+  });
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
   const [showDemoCases, setShowDemoCases] = useState<boolean>(() => {
@@ -148,9 +168,13 @@ export default function App() {
           onBackToIntro={() => setAuthView('intro')}
           onRequestAccess={() => setAuthView('signup')}
           onSelectRoleLogin={(selectedRole, options) => {
+            setActiveTab('ingest');
             loginAsRole(selectedRole, options);
           }}
-          onSuccess={() => setAuthView('intro')}
+          onSuccess={() => {
+            setActiveTab('ingest');
+            setAuthView('intro');
+          }}
         />
       );
     }
@@ -160,9 +184,13 @@ export default function App() {
           onBackToLogin={() => setAuthView('login')}
           onBackToIntro={() => setAuthView('intro')}
           onSelectRoleLogin={(selectedRole, options) => {
+            setActiveTab('ingest');
             loginAsRole(selectedRole, options);
           }}
-          onSuccess={() => setAuthView('intro')}
+          onSuccess={() => {
+            setActiveTab('ingest');
+            setAuthView('intro');
+          }}
         />
       );
     }
@@ -197,6 +225,7 @@ export default function App() {
         alertCount={unreadCount}
         wsStatus={wsStatus}
         role={role}
+        onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -208,6 +237,7 @@ export default function App() {
           onOpenNewModal={() => setIsNewModalOpen(true)}
           onOpenReportModal={() => setIsReportModalOpen(true)}
           onOpenPrivacyModal={() => setIsPrivacyModalOpen(true)}
+          onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
           privacyConfig={privacyConfig}
           showDemoCases={showDemoCases}
           onToggleDemoCases={handleToggleDemoCases}
@@ -223,6 +253,7 @@ export default function App() {
             <DashboardView
               onSelectAnalysis={setCurrentAnalysis}
               onNavigateToTab={setActiveTab}
+              onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
             />
           )}
 
@@ -364,6 +395,33 @@ export default function App() {
           config={privacyConfig}
           onChangeConfig={handleUpdatePrivacyConfig}
           currentDate={currentAnalysis?.date}
+        />
+      )}
+
+      {/* Interactive Get Started Forensic Walkthrough Overlay */}
+      {isWalkthroughOpen && (
+        <ForensicWalkthroughModal
+          isOpen={isWalkthroughOpen}
+          onClose={() => setIsWalkthroughOpen(false)}
+          onNavigateToTab={(tab) => {
+            setActiveTab(tab);
+            setIsWalkthroughOpen(false);
+          }}
+          onOpenNewModal={() => {
+            setIsNewModalOpen(true);
+            setIsWalkthroughOpen(false);
+          }}
+          onOpenReportModal={() => {
+            setIsReportModalOpen(true);
+            setIsWalkthroughOpen(false);
+          }}
+          onOpenPrivacyModal={() => {
+            setIsPrivacyModalOpen(true);
+            setIsWalkthroughOpen(false);
+          }}
+          onSelectAnalysis={(analysis) => {
+            setCurrentAnalysis(analysis);
+          }}
         />
       )}
     </div>

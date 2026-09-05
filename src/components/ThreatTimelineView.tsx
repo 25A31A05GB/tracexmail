@@ -152,7 +152,7 @@ export function ThreatTimelineView({
       campaignName: 'Active Targeted Phishing Wave',
       attackVector: curStd.isMalicious ? 'Credential Harvesting & Domain Spoofing' : 'Suspicious Email Communication',
       iocs: analysis.urls.map(u => u.domain).concat(analysis.attachments.map(a => a.filename)),
-      heuristics: analysis.heuristics.map(h => h.title),
+      heuristics: (analysis.heuristics || []).map(h => h.title),
       isCurrentAnalysis: true,
       rawSampleRef: analysis
     };
@@ -197,7 +197,7 @@ export function ThreatTimelineView({
             campaignName: 'Historical Campaign Investigation',
             attackVector: sampleStd.isMalicious ? 'Credential Phishing' : 'Standard Delivery',
             iocs: sample.urls.map(u => u.domain),
-            heuristics: sample.heuristics.map(h => h.title),
+            heuristics: (sample.heuristics || []).map(h => h.title),
             isCurrentAnalysis: false,
             rawSampleRef: sample
           });
