@@ -377,91 +377,41 @@ export function Header({
           )}
         </div>
 
-        {false && onToggleDemoCases && (
-          <button
-            onClick={onToggleDemoCases}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-              showDemoCases
-                ? 'bg-amber-950/70 border-amber-600/80 text-amber-300'
-                : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-400'
-            }`}
-            title={showDemoCases ? 'Sample Datasets Included (Click to toggle)' : 'Live Cases Only (Click to include sample cases)'}
-          >
-            <FlaskConical className={`w-3.5 h-3.5 ${showDemoCases ? 'text-amber-400' : 'text-slate-500'}`} />
-            <span>Sample Data: <strong className={showDemoCases ? 'text-amber-200 font-bold' : 'text-slate-300 font-semibold'}>{showDemoCases ? 'Active' : 'Hidden'}</strong></span>
-          </button>
-        )}
-
+        {/* Investigation Objective Setup Prompt */}
         {onOpenWalkthrough && (
           <button
             onClick={onOpenWalkthrough}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
-            title="Launch Interactive Forensic Walkthrough & Platform Guide"
+            title="Setup Investigation Goal & Tailor Enclave Workspace"
           >
             <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
-            <span className="font-bold tracking-wide">GET STARTED</span>
+            <span className="font-bold tracking-wide">OBJECTIVE</span>
           </button>
         )}
 
+        {/* Privacy & Compliance Button */}
         {onOpenPrivacyModal && (
           <button
             onClick={onOpenPrivacyModal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
               privacyConfig?.maskingEnabled
                 ? 'bg-purple-950/70 border-purple-700 text-purple-200'
-                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                : 'bg-[#221e17] hover:bg-[#2c271f] border-[#3a352c] text-[#ede6d8]'
             }`}
             title="Configure Privacy Safeguards, Retention & PII Masking"
           >
             <Scale className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden lg:inline">Privacy &amp; Compliance</span>
+            <span className="hidden sm:inline font-mono">Privacy &amp; Compliance</span>
             {privacyConfig?.maskingEnabled && (
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
             )}
           </button>
         )}
 
-        <button
-          onClick={handleExportPdf}
-          disabled={exportingPdf}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700/90 hover:border-cyan-500/50 text-xs font-medium text-slate-200 transition-all cursor-pointer disabled:opacity-50"
-          title="Export Evidence Card as PDF Dossier"
-        >
-          {exportingPdf ? (
-            <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-          ) : (
-            <FileText className="w-3.5 h-3.5 text-rose-400" />
-          )}
-          <span className="hidden sm:inline font-sans">Export as PDF</span>
-          <span className="sm:hidden font-sans">PDF</span>
-        </button>
-
-        <button
-          onClick={handleExportPng}
-          disabled={exportingPng}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 border border-slate-700/90 hover:border-cyan-500/50 text-xs font-medium text-slate-200 transition-all cursor-pointer disabled:opacity-50"
-          title="Export Evidence Card as PNG Image"
-        >
-          {exportingPng ? (
-            <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
-          ) : (
-            <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
-          )}
-          <span className="hidden sm:inline font-sans">Export as PNG</span>
-          <span className="sm:hidden font-sans">PNG</span>
-        </button>
-
-        <button
-          onClick={onOpenReportModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition-colors"
-        >
-          <FileDown className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="hidden xl:inline">Export Forensic Report</span>
-        </button>
-
+        {/* New Analysis Button */}
         <button
           onClick={onOpenNewModal}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-xs font-semibold text-white shadow-lg shadow-cyan-950/30 transition-all"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Analysis</span>

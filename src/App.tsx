@@ -22,6 +22,7 @@ import { NewAnalysisModal } from './components/NewAnalysisModal';
 import { ReportModal } from './components/ReportModal';
 import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
 import { ForensicWalkthroughModal } from './components/ForensicWalkthroughModal';
+import { InvestigationObjectiveModal, ObjectiveSelection } from './components/InvestigationObjectiveModal';
 import { AlertToast } from './components/AlertToast';
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
@@ -72,14 +73,23 @@ export default function App() {
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
-  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(() => {
-    try {
-      const completed = localStorage.getItem('tracexmail_walkthrough_completed');
-      return completed !== 'true';
-    } catch {
-      return false;
+  const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState<boolean>(false);
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(false);
+
+  const handleApplyObjective = (selection: ObjectiveSelection) => {
+    // 1. Switch Role
+    if (selection.recommendedRole && switchRole) {
+      switchRole(selection.recommendedRole);
     }
-  });
+    // 2. Set Active Tab
+    setActiveTab(selection.defaultTab);
+    // 3. Configure Privacy Masking if required
+    if (selection.privacyMasking) {
+      const updatedCfg = { ...privacyConfig, maskingEnabled: true };
+      setPrivacyConfig(updatedCfg);
+      savePrivacyConfig(updatedCfg);
+    }
+  };
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
   const [showDemoCases, setShowDemoCases] = useState<boolean>(() => {
@@ -225,7 +235,7 @@ export default function App() {
         alertCount={unreadCount}
         wsStatus={wsStatus}
         role={role}
-        onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
+        onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -237,7 +247,7 @@ export default function App() {
           onOpenNewModal={() => setIsNewModalOpen(true)}
           onOpenReportModal={() => setIsReportModalOpen(true)}
           onOpenPrivacyModal={() => setIsPrivacyModalOpen(true)}
-          onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
+          onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
           privacyConfig={privacyConfig}
           showDemoCases={showDemoCases}
           onToggleDemoCases={handleToggleDemoCases}
@@ -395,6 +405,16 @@ export default function App() {
           config={privacyConfig}
           onChangeConfig={handleUpdatePrivacyConfig}
           currentDate={currentAnalysis?.date}
+        />
+      )}
+
+      {/* Interactive Workspace Objective Setup Questionnaire */}
+      {isObjectiveModalOpen && (
+        <InvestigationObjectiveModal
+          isOpen={isObjectiveModalOpen}
+          onClose={() => setIsObjectiveModalOpen(false)}
+          onApplyObjective={handleApplyObjective}
+          currentRole={role}
         />
       )}
 

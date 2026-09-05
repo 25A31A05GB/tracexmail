@@ -638,40 +638,44 @@ export function OverviewView({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap bg-[#1d2028] p-1.5 rounded border border-[#2A2D34]">
+            <span className="text-[10px] font-mono uppercase text-[#8a8070] px-1.5 font-semibold hidden lg:inline">
+              FORENSIC EXPORTS:
+            </span>
             <button
               onClick={handleExportPdf}
               disabled={exportingPdf}
-              className="px-3 py-1.5 rounded bg-rose-950/60 hover:bg-rose-900/60 border border-rose-700/80 text-xs text-rose-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              className="px-3 py-1.5 rounded bg-[rgba(178,58,46,0.25)] hover:bg-[rgba(178,58,46,0.4)] border border-[var(--thread)] text-xs text-[var(--paper)] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
               title="Export official A4 PDF forensic evidence dossier"
             >
-              <Download className={`w-3.5 h-3.5 text-rose-400 ${exportingPdf ? 'animate-bounce' : ''}`} />
-              <span>{exportingPdf ? 'Building PDF...' : 'Export PDF'}</span>
+              <Download className={`w-3.5 h-3.5 text-[var(--thread)] ${exportingPdf ? 'animate-bounce' : ''}`} />
+              <span>{exportingPdf ? 'Building PDF Dossier...' : 'Export PDF Dossier'}</span>
             </button>
             <button
               onClick={handleExportPng}
               disabled={exportingPng}
-              className="px-3 py-1.5 rounded bg-amber-950/60 hover:bg-amber-900/60 border border-amber-700/80 text-xs text-amber-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              className="px-3 py-1.5 rounded bg-[rgba(201,162,39,0.2)] hover:bg-[rgba(201,162,39,0.35)] border border-[var(--stamp)] text-xs text-[var(--stamp)] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
               title="Export high-DPI PNG evidence card photo"
             >
-              <Download className={`w-3.5 h-3.5 text-amber-400 ${exportingPng ? 'animate-bounce' : ''}`} />
-              <span>{exportingPng ? 'Rendering PNG...' : 'Export PNG'}</span>
+              <Download className={`w-3.5 h-3.5 text-[var(--stamp)] ${exportingPng ? 'animate-bounce' : ''}`} />
+              <span>{exportingPng ? 'Rendering PNG Card...' : 'Export PNG Card'}</span>
             </button>
             {onOpenReportModal && (
               <button
                 onClick={onOpenReportModal}
-                className="px-3 py-1.5 rounded bg-cyan-950/60 hover:bg-cyan-900/60 border border-cyan-700/80 text-xs text-cyan-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                className="px-3 py-1.5 rounded bg-[rgba(127,163,186,0.2)] hover:bg-[rgba(127,163,186,0.35)] border border-[var(--slate)] text-xs text-[var(--slate)] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                title="Export comprehensive Markdown / JSON technical report"
               >
-                <FileCheck2 className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Export forensic report</span>
+                <FileCheck2 className="w-3.5 h-3.5 text-[var(--slate)]" />
+                <span>Export Technical Report</span>
               </button>
             )}
             {onOpenNewModal && (
               <button
                 onClick={onOpenNewModal}
-                className="px-3 py-1.5 rounded bg-cyan-600 hover:bg-cyan-500 border border-cyan-500 text-xs text-white font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                className="px-3 py-1.5 rounded bg-[var(--thread)] hover:bg-[#c94337] border border-[var(--thread)] text-xs text-[#ede6d8] font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
               >
-                <span>+ New analysis</span>
+                <span>+ New Analysis</span>
               </button>
             )}
           </div>
