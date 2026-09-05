@@ -30,12 +30,12 @@ export function SignupView({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!email || !password || !orgName) {
-      setErrorMsg('Please fill in all required fields including organization name.');
+      setErrorMsg('Please fill in your name, organization, email, and password.');
       return;
     }
 
     if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters in length.');
+      setErrorMsg('Password must be at least 6 characters.');
       return;
     }
 
@@ -50,7 +50,7 @@ export function SignupView({
           password,
           options: {
             data: {
-              full_name: fullName.trim() || 'Security Operator',
+              full_name: fullName.trim() || 'Team Member',
               org_name: orgName.trim(),
               organization_name: orgName.trim(),
               role: selectedRole
@@ -59,13 +59,13 @@ export function SignupView({
         });
 
         if (error) {
-          setErrorMsg(error.message || 'Registration request failed.');
+          setErrorMsg(error.message || 'Account registration failed.');
           setLoading(false);
           return;
         }
 
         if (data.user) {
-          setSuccessMsg(`Clearance granted for ${email} with ${selectedRole.toUpperCase()} role. Redirecting to workspace…`);
+          setSuccessMsg(`Account created for ${email}. Opening your workspace…`);
           if (onSuccess) {
             setTimeout(onSuccess, 800);
           }
@@ -73,13 +73,13 @@ export function SignupView({
         }
       }
 
-      // Enclave Direct Clearance Provisioning
-      setSuccessMsg(`Clearance granted for ${email} with ${selectedRole.toUpperCase()} role. Entering workspace…`);
+      // Direct Access Provisioning
+      setSuccessMsg(`Access ready for ${email}. Opening workspace…`);
       setTimeout(() => {
         if (onSelectRoleLogin) {
           onSelectRoleLogin(selectedRole, {
             email: email.trim(),
-            fullName: fullName.trim() || 'Security Operator',
+            fullName: fullName.trim() || 'Team Member',
             orgName: orgName.trim()
           });
         } else if (onSuccess) {
@@ -95,61 +95,40 @@ export function SignupView({
   };
 
   return (
-    <div className="min-h-screen w-screen flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative">
-      {/* Subtle Forensic Background Matrix Grid */}
-      <div 
-        className="absolute inset-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, #3a352c 1px, transparent 0)',
-          backgroundSize: '32px 32px'
-        }}
-      />
-
-      <div className="w-full max-w-[480px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-7 md:p-8 shadow-[0_30px_70px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-95 duration-200 relative z-10">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
+      <div className="w-full max-w-[480px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
         <div className="flex items-center justify-between mb-4 border-b border-[var(--line)] pb-3">
-          {onBackToIntro ? (
+          {handleBack && (
             <button
-              onClick={onBackToIntro}
-              className="text-[var(--paper-dim)] hover:text-[var(--paper)] text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Return to Intro Page"
+              onClick={handleBack}
+              className="text-[var(--paper-dim)] hover:text-[var(--paper)] text-xs flex items-center gap-1.5 transition-colors cursor-pointer bg-transparent border-0 p-0"
+              title="Return to Home"
             >
               <ArrowLeft className="w-3.5 h-3.5 text-[var(--thread)]" />
-              <span>Back to Intro Page</span>
-            </button>
-          ) : (
-            <button
-              onClick={onBackToLogin}
-              className="text-[var(--paper-dim)] hover:text-[var(--paper)] text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Return to sign in"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-[var(--thread)]" />
-              <span>Sign in</span>
+              <span>Back to Home</span>
             </button>
           )}
 
           <button
             onClick={onBackToLogin}
-            className="text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors"
+            className="text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
           >
-            Have clearance? Sign in →
+            Have an account? Sign in →
           </button>
         </div>
 
         {/* Brand Header */}
-        <div className="flex items-center gap-2.5 mb-1.5">
-          <div className="w-5 h-5 rounded-full border-[1.5px] border-[var(--thread)] relative shrink-0">
-            <div className="absolute inset-1 rounded-full bg-[var(--thread)]" />
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="w-5 h-5 rounded-full border-[1.5px] border-[var(--thread)] relative shrink-0 flex items-center justify-center">
+            <div className="w-2 h-2 rounded-full bg-[var(--thread)]" />
           </div>
           <span className="font-display font-bold text-xl text-[var(--paper)] tracking-tight">
-            Provision Enclave Access
-          </span>
-          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] text-[var(--stamp)] border border-[rgba(201,162,39,0.3)] ml-auto">
-            PROVISIONING
+            Create Team Account
           </span>
         </div>
 
-        <div className="text-[var(--paper-dim)] text-[13px] mb-5 font-normal">
-          Request forensic workspace credentials for your team or incident response unit
+        <div className="text-[var(--paper-dim)] text-[13.5px] mb-5">
+          Get access to inspect emails, protect your team, and export verified safety reports.
         </div>
 
         {errorMsg && (
@@ -167,11 +146,11 @@ export function SignupView({
         )}
 
         {!successMsg && (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-2.5">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-name">
-                  Operator Callsign / Name
+                  Your Name
                 </label>
                 <input
                   id="signup-name"
@@ -179,15 +158,15 @@ export function SignupView({
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Agent J. Miller"
+                  placeholder="Jane Smith"
                   disabled={loading}
-                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3 py-2 text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-org">
-                  Organization / Unit
+                  Company / Organization
                 </label>
                 <input
                   id="signup-org"
@@ -195,16 +174,16 @@ export function SignupView({
                   required
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Cyber Defense SOC"
+                  placeholder="Acme Corp"
                   disabled={loading}
-                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3 py-2 text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-email">
-                Official SOC / Work Email
+                Work Email
               </label>
               <input
                 id="signup-email"
@@ -213,15 +192,15 @@ export function SignupView({
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="analyst@defense.sec"
+                placeholder="you@company.com"
                 disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3 py-2 text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
               />
             </div>
 
             <div className="space-y-1">
               <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-password">
-                Passphrase (min 6 characters)
+                Password (min 6 characters)
               </label>
               <input
                 id="signup-password"
@@ -232,20 +211,20 @@ export function SignupView({
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3 py-2 text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
               />
             </div>
 
-            {/* Requested Clearance Role Selection */}
-            <div className="space-y-1.5 pt-1.5">
+            {/* Select Role Tier */}
+            <div className="space-y-1.5 pt-1">
               <label className="block text-xs text-[var(--paper-dim)] font-medium">
-                Requested Clearance Level:
+                Choose Access Role:
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedRole('admin')}
-                  className={`p-2 rounded-[2px] border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
                     selectedRole === 'admin'
                       ? 'bg-[rgba(201,162,39,0.18)] border-[var(--stamp)] text-[var(--paper)]'
                       : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
@@ -253,15 +232,15 @@ export function SignupView({
                 >
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="font-mono text-[10px] font-bold text-[var(--stamp)]">ADMIN</span>
-                    <ShieldAlert className="w-3 h-3 text-[var(--stamp)]" />
+                    <ShieldAlert className="w-3.5 h-3.5 text-[var(--stamp)]" />
                   </div>
-                  <div className="text-[10.5px] truncate font-semibold">SOC Lead</div>
+                  <div className="text-xs truncate font-semibold">Admin</div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedRole('analyst')}
-                  className={`p-2 rounded-[2px] border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
                     selectedRole === 'analyst'
                       ? 'bg-[rgba(127,163,186,0.18)] border-[var(--slate)] text-[var(--paper)]'
                       : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
@@ -269,15 +248,15 @@ export function SignupView({
                 >
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="font-mono text-[10px] font-bold text-[var(--slate)]">ANALYST</span>
-                    <Shield className="w-3 h-3 text-[var(--slate)]" />
+                    <Shield className="w-3.5 h-3.5 text-[var(--slate)]" />
                   </div>
-                  <div className="text-[10.5px] truncate font-semibold">Forensic Tier 2</div>
+                  <div className="text-xs truncate font-semibold">Analyst</div>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setSelectedRole('read_only')}
-                  className={`p-2 rounded-[2px] border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
                     selectedRole === 'read_only'
                       ? 'bg-[rgba(237,230,216,0.14)] border-[var(--paper-dim)] text-[var(--paper)]'
                       : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
@@ -285,9 +264,9 @@ export function SignupView({
                 >
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="font-mono text-[10px] font-bold text-[var(--paper-dim)]">AUDITOR</span>
-                    <Eye className="w-3 h-3 text-[var(--paper-dim)]" />
+                    <Eye className="w-3.5 h-3.5 text-[var(--paper-dim)]" />
                   </div>
-                  <div className="text-[10.5px] truncate font-semibold">Read-Only</div>
+                  <div className="text-xs truncate font-semibold">Auditor</div>
                 </button>
               </div>
             </div>
@@ -295,23 +274,22 @@ export function SignupView({
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full mt-3 text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="btn-primary w-full mt-3 text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 py-2.5 font-semibold"
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-[var(--paper)]" />
-                  <span>Provisioning Clearance…</span>
+                  <span>Setting up account…</span>
                 </>
               ) : (
-                <span>Request &amp; Activate Clearance</span>
+                <span>Create Account &amp; Open Workspace</span>
               )}
             </button>
           </form>
         )}
 
-        <div className="mt-4 text-[11px] font-mono text-[var(--paper-muted)] text-center leading-relaxed">
-          Access is limited to verified security teams.<br />
-          All workspace events are immutably logged in compliance with NIST SP 800-86.
+        <div className="mt-4 text-[11.5px] text-[var(--paper-muted)] text-center font-sans">
+          Fast activation. No credit card required.
         </div>
       </div>
     </div>
