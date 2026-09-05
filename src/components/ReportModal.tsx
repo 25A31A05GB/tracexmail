@@ -47,6 +47,7 @@ import {
 } from '../utils/markdownReport';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
+import { generateForensicPdfDossier } from '../utils/pdfDossierGenerator';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -165,17 +166,28 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
   const handleExportPdf = async () => {
     setExportingPdf(true);
     try {
-      const cardEl = document.querySelector('.evidence-card') as HTMLElement || null;
-      await exportEvidenceAsPdf(cardEl, `TraceXMail-Report-${analysis.id || 'case'}.pdf`, {
-        caseId: analysis.id,
-        evidenceId: analysis.evidenceId || analysis.id,
-        title: analysis.subject,
-        analysis
+      // Directly generate the crisp branded forensic PDF dossier matching the ReportModal telemetry & styling
+      generateForensicPdfDossier({
+        analysis,
+        privacyConfig,
+        enforceMasking,
+        filename: `TraceXMail-Forensic-Dossier-${analysis.id || 'case'}${enforceMasking ? '-MASKED' : ''}.pdf`
       });
     } catch (err) {
-      console.error('Failed PDF export in modal:', err);
+      console.warn('Direct PDF generator failed, falling back to canvas element capture:', err);
+      try {
+        const cardEl = document.querySelector('.evidence-card') as HTMLElement || null;
+        await exportEvidenceAsPdf(cardEl, `TraceXMail-Report-${analysis.id || 'case'}.pdf`, {
+          caseId: analysis.id,
+          evidenceId: analysis.evidenceId || analysis.id,
+          title: analysis.subject,
+          analysis
+        });
+      } catch (fallbackErr) {
+        console.error('Failed PDF fallback export in modal:', fallbackErr);
+      }
     } finally {
-      setExportingPdf(false);
+      setTimeout(() => setExportingPdf(false), 500);
     }
   };
 

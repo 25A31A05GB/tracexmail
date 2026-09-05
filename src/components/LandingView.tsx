@@ -93,13 +93,13 @@ export function LandingView({
               className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[var(--radius)] text-xs font-semibold border border-[var(--line)] hover:border-[var(--paper-dim)] bg-[var(--ink-2)] text-[var(--paper)] transition-all cursor-pointer"
             >
               <Terminal className="w-3.5 h-3.5 text-[var(--slate)]" />
-              <span>SOC Console</span>
+              <span>Operator Sign In</span>
             </button>
             <button
               onClick={onRequestAccess || onOpenConsole}
               className="nav-cta"
             >
-              Request access
+              Request Access
             </button>
           </div>
         </div>
@@ -527,13 +527,13 @@ export function LandingView({
               onClick={onRequestAccess || onOpenConsole}
               className="btn-primary"
             >
-              Request access
+              Request Clearance Access
             </button>
             <button
               onClick={onOpenConsole}
               className="btn-secondary"
             >
-              Open SOC Console
+              Operator Sign In
             </button>
           </div>
         </div>
