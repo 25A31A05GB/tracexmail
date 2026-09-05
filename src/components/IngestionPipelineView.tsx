@@ -11,13 +11,20 @@ import {
   Cpu, 
   Lock, 
   Activity,
-  Sparkles
+  Sparkles,
+  Terminal,
+  Copy,
+  Trash2,
+  AlertTriangle,
+  Check
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { parseRawEml, mapBackendCaseToAnalysis } from '../utils/parser';
 import { apiFetch } from '../lib/api';
 import { ForensicScanAnimationModal } from './ForensicScanAnimationModal';
+import { AlertToast } from './AlertToast';
+import { WebSocketAlert } from '../hooks/useWebSocketAlerts';
 
 interface IngestionPipelineViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -35,49 +42,130 @@ export function IngestionPipelineView({
   const [pendingAnalysis, setPendingAnalysis] = useState<EmailAnalysis | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnosticToast, setDiagnosticToast] = useState<WebSocketAlert | null>(null);
+  const [copiedLogs, setCopiedLogs] = useState(false);
+
+  // Diagnostic Log State
+  const [diagnosticLogs, setDiagnosticLogs] = useState<string[]>(() => [
+    `[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Pipeline initialized. Ready for RFC822 ingestion.`
+  ]);
+
+  const addLog = (msg: string) => {
+    const ts = new Date().toISOString().split('T')[1].slice(0, 8);
+    setDiagnosticLogs(prev => [...prev, `[${ts}] ${msg}`]);
+  };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const executePipelineWithAnimation = async (content: string, name: string) => {
     if (!content.trim()) {
-      setError('Please provide valid raw RFC822 email content or headers.');
+      const errText = 'Please provide valid raw RFC822 email content or headers.';
+      setError(errText);
+      addLog(`[ERROR] Ingestion halted: ${errText}`);
+      setDiagnosticToast({
+        id: `toast_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        severity: 'CRITICAL',
+        title: 'Ingestion Validation Error',
+        description: 'Provided payload is empty or invalid RFC822 header data.',
+        source: 'IngestionPipelineView',
+        category: 'INGESTION_ERROR'
+      });
       return;
     }
+
     setError(null);
     setFileName(name);
     setIsScanning(true);
 
+    addLog(`[INGEST] Loaded payload '${name}' (${content.length} bytes). Starting multi-stage telemetry scan...`);
+
+    let backendResult: any = null;
+    let backendFailed = false;
+    let failureDetail = '';
+
     try {
-      let backendResult: any = null;
-      try {
-        const formData = new FormData();
-        formData.append('raw_email', content);
-        formData.append('filename', name);
-        formData.append('source', 'email_upload');
+      addLog(`[TRANSPORT] Transmitting payload to /api/v1/analyze endpoint...`);
+      const formData = new FormData();
+      formData.append('raw_email', content);
+      formData.append('filename', name);
+      formData.append('source', 'email_upload');
 
-        const res = await apiFetch('/api/v1/analyze', {
-          method: 'POST',
-          body: formData
+      const startTime = performance.now();
+      const res = await apiFetch('/api/v1/analyze', {
+        method: 'POST',
+        body: formData
+      });
+      const elapsed = Math.round(performance.now() - startTime);
+
+      if (res.ok) {
+        backendResult = await res.json();
+        addLog(`[SUCCESS] Backend /api/v1/analyze responded HTTP 200 OK (${elapsed}ms). Case ID: ${backendResult.id || backendResult.case?.id || 'XM-ANALYSIS'}`);
+      } else {
+        backendFailed = true;
+        let bodyText = '';
+        try { bodyText = await res.text(); } catch {}
+        failureDetail = `HTTP ${res.status} ${res.statusText}: ${bodyText || 'Backend processing failure'}`;
+        addLog(`[ERROR] Backend analysis failed (${elapsed}ms): ${failureDetail}`);
+
+        // Trigger visible AlertToast for backend processing failure
+        setDiagnosticToast({
+          id: `toast_err_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          severity: 'CRITICAL',
+          title: 'Backend Analysis Engine Failure',
+          description: `${failureDetail}. Activating client-side cryptographic parser fallback.`,
+          source: 'ForensicEngine',
+          category: 'ANALYSIS_FAILURE',
+          sender: name
         });
-        if (res.ok) {
-          backendResult = await res.json();
-        }
-      } catch (err) {
-        console.warn('[IngestionPipeline] Backend direct call fallback:', err);
       }
+    } catch (err: any) {
+      backendFailed = true;
+      failureDetail = err?.message || 'Network transport or connection failure';
+      addLog(`[ERROR] Connection exception to /api/v1/analyze: ${failureDetail}`);
 
+      // Trigger visible AlertToast for network / exception failure
+      setDiagnosticToast({
+        id: `toast_err_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        severity: 'CRITICAL',
+        title: 'Backend Transport Exception',
+        description: `Failed to communicate with /api/v1/analyze (${failureDetail}). Degraded to local parser.`,
+        source: 'NetworkTransport',
+        category: 'CONNECTION_FAILURE',
+        sender: name
+      });
+    }
+
+    try {
       let finalAnalysis: EmailAnalysis;
       if (backendResult?.analysis || backendResult?.case) {
+        addLog(`[MAPPER] Mapping backend JSON schema to structured EmailAnalysis object...`);
         finalAnalysis = mapBackendCaseToAnalysis(backendResult.analysis || backendResult, content, name);
       } else {
+        addLog(`[FALLBACK] Executing client-side RFC822 parser & SHA-256 hash engine...`);
         finalAnalysis = parseRawEml(content, name);
       }
 
+      addLog(`[TELEMETRY] Analysis compiled. Subject: '${finalAnalysis.subject || finalAnalysis.headers?.subject}'. Threat Score: ${finalAnalysis.threatScore || finalAnalysis.riskScore || 0}/100.`);
       setPendingAnalysis(finalAnalysis);
     } catch (err: any) {
-      console.error('[IngestionPipeline] Error processing email:', err);
-      setError(err.message || 'Error processing email file');
+      const fatalErr = err.message || 'Fatal error mapping forensic telemetry';
+      addLog(`[FATAL] Pipeline mapping error: ${fatalErr}`);
+      setError(fatalErr);
       setIsScanning(false);
+
+      setDiagnosticToast({
+        id: `toast_fatal_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        severity: 'CRITICAL',
+        title: 'Fatal Forensic Ingestion Failure',
+        description: `Failed to construct evidence model: ${fatalErr}. Check RFC822 header formatting.`,
+        source: 'ForensicParser',
+        category: 'PARSER_FAILURE',
+        sender: name
+      });
     }
   };
 
@@ -283,7 +371,79 @@ export function IngestionPipelineView({
             </div>
           )}
         </div>
+
+        {/* Diagnostic Pipeline Terminal Log Panel */}
+        <div className="bg-[#100e0b] border border-[#3a352c] rounded-sm p-4 space-y-3 font-mono shadow-md">
+          <div className="flex items-center justify-between pb-2 border-b border-[#2a251e]">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--slate)]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-[#ede6d8]">
+                PIPELINE DIAGNOSTIC TELEMETRY LOG
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e1b15] text-[#b9af9c] border border-[#3a352c]">
+                {diagnosticLogs.length} EVENTS
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(diagnosticLogs.join('\n'));
+                  setCopiedLogs(true);
+                  setTimeout(() => setCopiedLogs(false), 2000);
+                }}
+                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                title="Copy diagnostic log output to clipboard"
+              >
+                {copiedLogs ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedLogs ? 'Copied' : 'Copy Logs'}</span>
+              </button>
+              <button
+                onClick={() => setDiagnosticLogs([`[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Terminal logs cleared.`])}
+                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                title="Clear diagnostic log terminal"
+              >
+                <Trash2 className="w-3 h-3 text-[var(--thread)]" />
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[#0a0907] border border-[#24201a] rounded p-3 text-[11px] leading-relaxed max-h-52 overflow-y-auto space-y-1 text-[#b9af9c]">
+            {diagnosticLogs.map((log, index) => {
+              const isError = log.includes('[ERROR]') || log.includes('[FATAL]');
+              const isSuccess = log.includes('[SUCCESS]') || log.includes('[COMPLETE]');
+              const isIngest = log.includes('[INGEST]') || log.includes('[TRANSPORT]');
+              return (
+                <div 
+                  key={index} 
+                  className={`flex items-start gap-2 font-mono ${
+                    isError 
+                      ? 'text-rose-400 font-semibold bg-rose-950/20 px-1 py-0.5 rounded' 
+                      : isSuccess 
+                        ? 'text-emerald-400 font-semibold' 
+                        : isIngest 
+                          ? 'text-[var(--slate)]' 
+                          : 'text-[#b9af9c]'
+                  }`}
+                >
+                  <span className="text-[#6b6255] select-none">&gt;</span>
+                  <span className="break-all">{log}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
+
+      {/* Visible Forensic AlertToast Notification for Ingestion / Engine Errors */}
+      <AlertToast
+        alert={diagnosticToast}
+        onDismiss={() => setDiagnosticToast(null)}
+        onInspect={() => {
+          onNavigateToOverview();
+          setDiagnosticToast(null);
+        }}
+      />
     </>
   );
 }
