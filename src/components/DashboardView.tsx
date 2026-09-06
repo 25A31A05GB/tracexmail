@@ -59,6 +59,7 @@ import { SAMPLE_ANALYSES } from '../data/samples';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { NetworkIntelligenceCard } from './NetworkIntelligenceCard';
 import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
@@ -335,6 +336,19 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       ]);
       if (statsData) setStats(statsData);
       if (healthData) setHealth(healthData);
+
+      if (isSupabaseConfigured) {
+        try {
+          const { count, error } = await supabase
+            .from('cases')
+            .select('*', { count: 'exact', head: true });
+          if (!error && typeof count === 'number' && statsData) {
+            setStats(prev => prev ? { ...prev, totalCases: Math.max(prev.totalCases || 0, count) } : statsData);
+          }
+        } catch (e) {
+          console.debug('[DashboardView] Supabase cases count query fallback:', e);
+        }
+      }
     } catch (err) {
       console.error('Failed to load dashboard data', err);
     } finally {

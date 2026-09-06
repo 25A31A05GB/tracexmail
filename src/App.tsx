@@ -35,6 +35,7 @@ import { Loader2 } from 'lucide-react';
 import { OAuthConsentScreen } from './components/OAuthConsentScreen';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
   const publicPath = window.location.pathname;
@@ -77,6 +78,55 @@ export default function App() {
     }
     prevSessionUserIdRef.current = currentUserId;
   }, [session?.user?.id]);
+
+  // Load real persisted case from Supabase to replace hardcoded sample initial state
+  useEffect(() => {
+    if (!session) return;
+    let isMounted = true;
+
+    async function fetchLatestSupabaseCase() {
+      try {
+        if (isSupabaseConfigured) {
+          const { data, error } = await supabase
+            .from('cases')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (!error && data && data.length > 0 && isMounted) {
+            const mapped = mapBackendCaseToAnalysis(data[0]);
+            setCurrentAnalysis(mapped);
+          }
+        }
+      } catch (err) {
+        console.debug('[App] Supabase case sync fallback:', err);
+      }
+    }
+
+    fetchLatestSupabaseCase();
+
+    // Supabase Realtime channel subscription for instant case synchronization
+    if (isSupabaseConfigured) {
+      const channel = supabase
+        .channel('realtime_cases_feed')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cases' }, (payload) => {
+          if (payload.new && isMounted) {
+            console.log('[Supabase Realtime] New forensic case inserted:', payload.new);
+            setCasesRefreshSignal(prev => prev + 1);
+          }
+        })
+        .subscribe();
+
+      return () => {
+        isMounted = false;
+        supabase.removeChannel(channel);
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session]);
   const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);

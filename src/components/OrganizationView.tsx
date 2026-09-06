@@ -13,6 +13,7 @@ import {
   Key
 } from 'lucide-react';
 import { apiClient } from '../lib/api';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface OrganizationViewProps {
   organizationId: string;
@@ -29,6 +30,20 @@ export function OrganizationView({ organizationId }: OrganizationViewProps) {
     setLoadingLogs(true);
     setLogError(null);
     try {
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(25);
+
+        if (!error && data && data.length > 0) {
+          setAuditLogs(data);
+          setLoadingLogs(false);
+          return;
+        }
+      }
+
       const res = await apiClient.get('/compliance/audit-logs?limit=25');
       if (res.data?.entries) {
         setAuditLogs(res.data.entries);

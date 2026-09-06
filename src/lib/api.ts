@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { supabase } from './supabaseClient';
+import { supabase } from './supabase';
 
 const DEFAULT_ORG_ID = 'org_acme_soc_01';
 

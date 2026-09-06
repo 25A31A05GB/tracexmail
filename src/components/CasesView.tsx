@@ -32,6 +32,7 @@ import { useWebSocketAlerts } from '../hooks/useWebSocketAlerts';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { UserRole } from '../hooks/useSession';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface CasesViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -158,6 +159,24 @@ export function CasesView({
     setLoading(true);
     setFetchError(null);
     try {
+      if (isSupabaseConfigured) {
+        let query = supabase
+          .from('cases')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!showDemoCases) {
+          query = query.eq('is_demo', false);
+        }
+
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          setCases(data);
+          setLoading(false);
+          return;
+        }
+      }
+
       const data = await forensicApi.getCases({ 
         exclude_demo: !showDemoCases,
         mask_pii: maskPii ? true : undefined
@@ -168,8 +187,8 @@ export function CasesView({
         setCases([]);
       }
     } catch (err: any) {
-      console.warn('Error fetching cases from backend:', err);
-      setFetchError(err?.message || 'Failed to connect to backend server');
+      console.warn('Error fetching cases from backend/supabase:', err);
+      setFetchError(err?.message || 'Failed to connect to backend database');
       setCases(showDemoCases ? SAMPLE_ANALYSES : []);
     } finally {
       setLoading(false);
@@ -247,6 +266,41 @@ export function CasesView({
         severity: newCaseSeverity,
         organization_id: 'org_acme_soc_01'
       };
+
+      if (isSupabaseConfigured) {
+        try {
+          const { data: sbData, error: sbErr } = await supabase
+            .from('cases')
+            .insert([{
+              id: `case-${Date.now()}`,
+              organization_id: 'org_acme_soc_01',
+              title: payload.title,
+              description: payload.analyst_notes || 'Forensic investigation case initialized.',
+              status: payload.status.toUpperCase(),
+              severity: payload.severity,
+              threat_score: 85,
+              created_at: new Date().toISOString(),
+              tags: ['Forensic'],
+              assigned_user: 'Lead Analyst',
+              is_demo: false,
+              source: 'manual'
+            }])
+            .select()
+            .single();
+
+          if (!sbErr && sbData) {
+            setCases(prev => [sbData, ...prev]);
+            setCreateSuccess(`Case ${sbData.id} successfully initialized in Supabase.`);
+            setTimeout(() => {
+              setIsCreateModalOpen(false);
+              setCreateSuccess(null);
+            }, 1200);
+            return;
+          }
+        } catch (sbEx) {
+          console.debug('[CasesView] Supabase direct insert fallback:', sbEx);
+        }
+      }
 
       const result = await forensicApi.createCase(payload);
       if (result && result.id) {

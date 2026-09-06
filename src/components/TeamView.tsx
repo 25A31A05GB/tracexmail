@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Shield, UserPlus, Key, Mail, CheckCircle2, Lock, Trash2, RefreshCw } from 'lucide-react';
 import { UserRole } from '../hooks/useSession';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface TeamMember {
   id: string;
@@ -24,6 +25,27 @@ export function TeamView() {
   const fetchTeamRoster = async () => {
     try {
       setLoading(true);
+      if (isSupabaseConfigured) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && data && data.length > 0) {
+          const members: TeamMember[] = data.map((p: any) => ({
+            id: p.id,
+            name: p.full_name || p.email?.split('@')[0] || 'Security Analyst',
+            email: p.email || 'analyst@defense.sec',
+            role: (p.role as UserRole) || 'analyst',
+            status: 'ACTIVE',
+            lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Just now'
+          }));
+          setTeam(members);
+          setLoading(false);
+          return;
+        }
+      }
+
       const res = await fetch('/api/team/members');
       if (res.ok) {
         const data = await res.json();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabase';
 import { setSession, SessionUser } from '../lib/api';
 
 export type UserRole = 'admin' | 'analyst' | 'read_only';

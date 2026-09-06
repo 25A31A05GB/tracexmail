@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Loader2, AlertCircle, ArrowLeft, Shield, UserCheck, KeyRound, ShieldAlert, Eye, Lock } from 'lucide-react';
 import { UserRole } from '../hooks/useSession';
 
