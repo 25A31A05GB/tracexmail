@@ -77,6 +77,37 @@ export interface GmailServiceState {
     deliveryStage: 'pre-delivery-hold' | 'post-delivery-alert';
     adminWebhookDispatched: boolean;
   }>;
+  syncedEmails: SyncedGmailEmail[];
+}
+
+export interface SyncedGmailEmail {
+  id: string;
+  messageId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  timestamp: string;
+  threatScore: number;
+  threatCategory: 'MALICIOUS' | 'SUSPICIOUS' | 'CLEAN' | 'CRITICAL';
+  verdict: string;
+  deliveryStage: 'pre-delivery-hold' | 'post-delivery-alert' | 'delivered-clean';
+  actionTaken: 'HOLD_QUARANTINED' | 'INSPECTED_CLEAN' | 'ALERT_DISPATCHED';
+  isQuarantined: boolean;
+  appliedLabel?: string;
+  authResults: {
+    spf: { status: string; details?: string; ip?: string; domain?: string };
+    dkim: { status: string; details?: string; domain?: string };
+    dmarc: { status: string; details?: string; policy?: string };
+    arc?: { status: string; details?: string };
+  };
+  securitySignals: string[];
+  whyNarrative: string;
+  linksCount: number;
+  attachmentsCount: number;
+  rawEmlSnippet?: string;
+  caseId?: string;
+  fullAnalysis?: any;
 }
 
 export const gmailEvents = new EventEmitter();
@@ -122,7 +153,8 @@ const state: GmailServiceState = {
     lastDeliveryStage: null,
     lastQuarantineAt: null
   },
-  quarantineAuditLog: []
+  quarantineAuditLog: [],
+  syncedEmails: []
 };
 
 /**
@@ -820,6 +852,37 @@ export async function handlePubSubPush(body: any): Promise<{
     console.error('[GmailPush] Error handling PubSub push:', err);
     return { success: false };
   }
+}
+
+/**
+ * Records an analyzed synced Gmail message into the real-time buffer and DB.
+ */
+export function recordSyncedEmail(emailData: SyncedGmailEmail) {
+  if (!emailData || !emailData.id) return;
+  // Prevent duplicates by messageId or id
+  const existingIdx = state.syncedEmails.findIndex(e => e.id === emailData.id || (e.messageId && e.messageId === emailData.messageId));
+  if (existingIdx >= 0) {
+    state.syncedEmails[existingIdx] = emailData;
+  } else {
+    state.syncedEmails.unshift(emailData);
+  }
+  if (state.syncedEmails.length > 50) {
+    state.syncedEmails.pop();
+  }
+}
+
+/**
+ * Returns list of all synced & analyzed Gmail messages.
+ */
+export function getSyncedEmails(): SyncedGmailEmail[] {
+  return state.syncedEmails;
+}
+
+/**
+ * Clears synced emails cache.
+ */
+export function clearSyncedEmails() {
+  state.syncedEmails = [];
 }
 
 /**

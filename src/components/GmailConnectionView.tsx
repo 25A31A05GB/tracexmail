@@ -27,15 +27,54 @@ import {
   Key,
   Shield,
   Activity,
-  ArrowUpRight
+  ArrowUpRight,
+  Search,
+  Filter,
+  Eye,
+  AlertTriangle,
+  FileText,
+  ArrowRight,
+  Terminal,
+  ShieldX
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
+import { mapBackendCaseToAnalysis } from '../utils/parser';
 
 const API_URL = (
   (import.meta as any).env?.VITE_API_URL ||
   ''
 ).replace(/\/$/, '');
+
+export interface SyncedEmailItem {
+  id: string;
+  messageId: string;
+  subject: string;
+  from: string;
+  to: string;
+  date: string;
+  timestamp: string;
+  threatScore: number;
+  threatCategory: 'MALICIOUS' | 'SUSPICIOUS' | 'CLEAN' | 'CRITICAL';
+  verdict: string;
+  deliveryStage: 'pre-delivery-hold' | 'post-delivery-alert' | 'delivered-clean';
+  actionTaken: 'HOLD_QUARANTINED' | 'INSPECTED_CLEAN' | 'ALERT_DISPATCHED';
+  isQuarantined: boolean;
+  appliedLabel?: string;
+  authResults: {
+    spf?: { status: string; details?: string; ip?: string; domain?: string };
+    dkim?: { status: string; details?: string; domain?: string };
+    dmarc?: { status: string; details?: string; policy?: string };
+    arc?: { status: string; details?: string };
+  };
+  securitySignals: string[];
+  whyNarrative: string;
+  linksCount: number;
+  attachmentsCount: number;
+  rawEmlSnippet?: string;
+  caseId?: string;
+  fullAnalysis?: any;
+}
 
 interface WatchConfig {
   enabled: boolean;
@@ -139,6 +178,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
 
+  // Synced & Analyzed Emails Stream State
+  const [syncedEmails, setSyncedEmails] = useState<SyncedEmailItem[]>([]);
+  const [loadingSyncedEmails, setLoadingSyncedEmails] = useState<boolean>(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'all' | 'quarantined' | 'suspicious' | 'clean'>('all');
+  const [emailSearchQuery, setEmailSearchQuery] = useState<string>('');
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
+
   const [topicName, setTopicName] = useState<string>('projects/tracexmail-enterprise/topics/inbox-watch');
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
 
@@ -153,6 +199,41 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       unsubscribe();
     };
   }, []);
+
+  const fetchSyncedEmails = async () => {
+    setLoadingSyncedEmails(true);
+    try {
+      const q = new URLSearchParams();
+      if (selectedCategoryFilter !== 'all') q.set('category', selectedCategoryFilter);
+      if (emailSearchQuery.trim()) q.set('search', emailSearchQuery.trim());
+
+      const res = await fetch(`${API_URL}/api/gmail/synced-emails?${q.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.synced_emails) {
+          setSyncedEmails(data.synced_emails);
+        }
+      }
+    } catch (err) {
+      console.warn('[Gmail] Error fetching synced emails:', err);
+    } finally {
+      setLoadingSyncedEmails(false);
+    }
+  };
+
+  const handleInspectEmail = (emailItem: SyncedEmailItem) => {
+    if (onSelectAnalysis) {
+      const mapped = mapBackendCaseToAnalysis(emailItem.fullAnalysis || emailItem);
+      onSelectAnalysis(mapped);
+    }
+    if (onNavigateToOverview) {
+      onNavigateToOverview();
+    }
+  };
+
+  useEffect(() => {
+    fetchSyncedEmails();
+  }, [selectedCategoryFilter]);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -275,6 +356,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         );
         if (onNewCasesProcessed) onNewCasesProcessed();
         fetchStatus();
+        fetchSyncedEmails();
       } else {
         setErrorMsg('Failed to execute Pub/Sub push test.');
       }
@@ -470,6 +552,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           onNewCasesProcessed();
         }
         fetchStatus();
+        fetchSyncedEmails();
 
         setTimeout(() => {
           setSyncing(false);
@@ -1045,6 +1128,379 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           </div>
         </div>
       )}
+
+      {/* Real-Time Synced & Analyzed Gmail Inbound Stream */}
+      <div className="bg-[#1a1713] rounded-xl border border-[#342e26] p-5 space-y-4 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#2e2820] pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+                <Mail className="w-4 h-4" />
+              </span>
+              <h3 className="text-sm font-bold text-[#f4efe6] tracking-tight">
+                Synced & Analyzed Gmail Stream
+              </h3>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Ingestion Stream
+              </span>
+            </div>
+            <p className="text-xs text-[#9d9282]">
+              Real-time forensic telemetry, threat scoring, and pre-delivery gate verdicts for monitored Gmail mailboxes.
+            </p>
+          </div>
+
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={() => handleTriggerPubSubTest(true)}
+              disabled={testingPubSub || syncing}
+              className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Inject an inbound phishing lure to verify real-time quarantine hold"
+            >
+              <Zap className={`w-3.5 h-3.5 text-rose-400 ${testingPubSub ? 'animate-spin' : ''}`} />
+              <span>Simulate Phish Inbound</span>
+            </button>
+
+            <button
+              onClick={() => handleTriggerPubSubTest(false)}
+              disabled={testingPubSub || syncing}
+              className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Inject a clean verified inbound message"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Simulate Clean Inbound</span>
+            </button>
+
+            <button
+              onClick={fetchSyncedEmails}
+              disabled={loadingSyncedEmails}
+              className="px-3 py-1.5 bg-[#25201a] hover:bg-[#2e2820] text-[#f4efe6] border border-[#3e372e] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Refresh synced messages list"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#9d9282] ${loadingSyncedEmails ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filter & Search Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          {/* Filter Tabs */}
+          <div className="flex items-center flex-wrap gap-1.5 bg-[#14120f] p-1 rounded-lg border border-[#2a241d]">
+            <button
+              onClick={() => setSelectedCategoryFilter('all')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                selectedCategoryFilter === 'all'
+                  ? 'bg-[#2a241d] text-[#f4efe6] font-semibold shadow-sm'
+                  : 'text-[#9d9282] hover:text-[#f4efe6]'
+              }`}
+            >
+              All Messages ({syncedEmails.length})
+            </button>
+            <button
+              onClick={() => setSelectedCategoryFilter('quarantined')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                selectedCategoryFilter === 'quarantined'
+                  ? 'bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30'
+                  : 'text-[#9d9282] hover:text-rose-400'
+              }`}
+            >
+              <Lock className="w-3 h-3 text-rose-400" />
+              Quarantined ({syncedEmails.filter(e => e.isQuarantined).length})
+            </button>
+            <button
+              onClick={() => setSelectedCategoryFilter('suspicious')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                selectedCategoryFilter === 'suspicious'
+                  ? 'bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30'
+                  : 'text-[#9d9282] hover:text-amber-400'
+              }`}
+            >
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              Suspicious ({syncedEmails.filter(e => e.threatScore >= 30 && e.threatScore < 70).length})
+            </button>
+            <button
+              onClick={() => setSelectedCategoryFilter('clean')}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                selectedCategoryFilter === 'clean'
+                  ? 'bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30'
+                  : 'text-[#9d9282] hover:text-emerald-400'
+              }`}
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              Clean ({syncedEmails.filter(e => e.threatScore < 30 && !e.isQuarantined).length})
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64">
+            <Search className="w-3.5 h-3.5 text-[#9d9282] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={emailSearchQuery}
+              onChange={(e) => {
+                setEmailSearchQuery(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') fetchSyncedEmails();
+              }}
+              placeholder="Search subject, sender, IOC..."
+              className="w-full bg-[#14120f] border border-[#2a241d] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[#f4efe6] placeholder-[#6b6255] focus:outline-none focus:border-red-500/50"
+            />
+          </div>
+        </div>
+
+        {/* Email Cards Feed */}
+        {loadingSyncedEmails && syncedEmails.length === 0 ? (
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
+            <RefreshCw className="w-6 h-6 text-[#9d9282] animate-spin" />
+            <p className="text-xs text-[#9d9282]">Loading synchronized Gmail messages...</p>
+          </div>
+        ) : syncedEmails.length === 0 ? (
+          <div className="p-8 text-center bg-[#14120f] rounded-xl border border-dashed border-[#342e26] space-y-3">
+            <div className="w-10 h-10 rounded-full bg-slate-800/80 mx-auto flex items-center justify-center text-[#9d9282]">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-[#f4efe6]">No Synced Messages in this View</h4>
+              <p className="text-[11px] text-[#9d9282] max-w-md mx-auto">
+                No analyzed emails match your active filter. You can trigger a live inbox sync or simulate an inbound test.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={handleSyncNow}
+                disabled={syncing}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                <span>Sync Mailbox Now</span>
+              </button>
+              <button
+                onClick={() => handleTriggerPubSubTest(true)}
+                disabled={testingPubSub}
+                className="px-3 py-1.5 bg-[#25201a] hover:bg-[#2e2820] text-[#f4efe6] border border-[#3e372e] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-rose-400" />
+                <span>Simulate Inbound Test</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {syncedEmails.map((email) => {
+              const isExpanded = expandedEmailId === email.id;
+              const isHighThreat = email.threatScore >= 70;
+              const isMediumThreat = email.threatScore >= 30 && email.threatScore < 70;
+
+              return (
+                <div
+                  key={email.id}
+                  className={`bg-[#14120f] rounded-xl border transition-all duration-200 overflow-hidden ${
+                    email.isQuarantined || isHighThreat
+                      ? 'border-rose-900/40 hover:border-rose-700/60 shadow-lg shadow-rose-950/10'
+                      : isMediumThreat
+                      ? 'border-amber-900/40 hover:border-amber-700/60'
+                      : 'border-[#2a241d] hover:border-[#3e372e]'
+                  }`}
+                >
+                  {/* Top Bar: Subject & Verdict Gauge */}
+                  <div className="p-4 space-y-3">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <div className="flex items-center flex-wrap gap-2">
+                          {/* Threat Score Pill */}
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-mono font-bold ${
+                              isHighThreat
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                                : isMediumThreat
+                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                            }`}
+                          >
+                            <Shield className="w-3 h-3" />
+                            <span>{email.threatScore}/100</span>
+                            <span className="text-[10px] opacity-80 uppercase tracking-wider font-sans">
+                              {email.threatCategory || (isHighThreat ? 'MALICIOUS' : isMediumThreat ? 'SUSPICIOUS' : 'CLEAN')}
+                            </span>
+                          </span>
+
+                          {/* Delivery Interception Stage Badge */}
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                              email.deliveryStage === 'pre-delivery-hold' || email.isQuarantined
+                                ? 'bg-rose-950 text-rose-200 border border-rose-700/80 shadow-sm'
+                                : email.deliveryStage === 'post-delivery-alert'
+                                ? 'bg-amber-950 text-amber-200 border border-amber-700/80'
+                                : 'bg-emerald-950 text-emerald-200 border border-emerald-700/80'
+                            }`}
+                          >
+                            {email.deliveryStage === 'pre-delivery-hold' || email.isQuarantined ? (
+                              <>
+                                <Lock className="w-3 h-3 text-rose-400" />
+                                <span>PRE-DELIVERY QUARANTINE HOLD</span>
+                              </>
+                            ) : email.deliveryStage === 'post-delivery-alert' ? (
+                              <>
+                                <AlertCircle className="w-3 h-3 text-amber-400" />
+                                <span>POST-DELIVERY SOC ALERT</span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                <span>INBOX VERIFIED (CLEAN)</span>
+                              </>
+                            )}
+                          </span>
+
+                          {email.appliedLabel && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-purple-950/60 text-purple-300 border border-purple-800/60">
+                              <span>Label:</span>
+                              <span className="font-bold">{email.appliedLabel}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <h4 className="text-sm font-semibold text-[#f4efe6] pt-1 truncate" title={email.subject}>
+                          {email.subject}
+                        </h4>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 text-xs font-mono text-[#9d9282]">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{new Date(email.timestamp || email.date).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Sender, Recipient & Auth Badges Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs bg-[#191612] p-2.5 rounded-lg border border-[#262019]">
+                      <div className="space-y-1 truncate">
+                        <div className="flex items-center gap-1.5 text-[#9d9282]">
+                          <span className="font-mono text-[10px] uppercase font-bold text-[#b5aa9a]">From:</span>
+                          <span className="text-[#f4efe6] font-medium truncate" title={email.from}>{email.from}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[#9d9282]">
+                          <span className="font-mono text-[10px] uppercase font-bold text-[#b5aa9a]">To:</span>
+                          <span className="text-[#d8cfc4] truncate" title={email.to}>{email.to}</span>
+                        </div>
+                      </div>
+
+                      {/* Authentication Status Matrix */}
+                      <div className="flex items-center flex-wrap gap-1.5 md:justify-end">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1 border ${
+                            email.authResults?.spf?.status === 'pass'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          }`}
+                          title={email.authResults?.spf?.details || 'SPF Verification'}
+                        >
+                          {email.authResults?.spf?.status === 'pass' ? <Check className="w-2.5 h-2.5" /> : <ShieldX className="w-2.5 h-2.5" />}
+                          SPF: {(email.authResults?.spf?.status || 'none').toUpperCase()}
+                        </span>
+
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1 border ${
+                            email.authResults?.dkim?.status === 'pass'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          }`}
+                          title={email.authResults?.dkim?.details || 'DKIM Signature Check'}
+                        >
+                          {email.authResults?.dkim?.status === 'pass' ? <Check className="w-2.5 h-2.5" /> : <ShieldX className="w-2.5 h-2.5" />}
+                          DKIM: {(email.authResults?.dkim?.status || 'none').toUpperCase()}
+                        </span>
+
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold inline-flex items-center gap-1 border ${
+                            email.authResults?.dmarc?.status === 'pass'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                          }`}
+                          title={email.authResults?.dmarc?.details || 'DMARC Policy Alignment'}
+                        >
+                          {email.authResults?.dmarc?.status === 'pass' ? <Check className="w-2.5 h-2.5" /> : <ShieldX className="w-2.5 h-2.5" />}
+                          DMARC: {(email.authResults?.dmarc?.status || 'none').toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detected Security Signals / Vectors */}
+                    {email.securitySignals && email.securitySignals.length > 0 && (
+                      <div className="flex items-center flex-wrap gap-1.5 pt-0.5">
+                        <span className="text-[10px] font-mono text-[#9d9282] uppercase tracking-wider">Signals:</span>
+                        {email.securitySignals.map((signal, sIdx) => (
+                          <span
+                            key={sIdx}
+                            className="px-2 py-0.5 rounded text-[10px] font-medium bg-[#221d18] text-[#d8cfc4] border border-[#342e26]"
+                          >
+                            {signal}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* AI Forensic Explainability Narrative */}
+                    {email.whyNarrative && (
+                      <div className="bg-[#191612] p-2.5 rounded-lg border-l-2 border-red-500/80 text-xs text-[#d8cfc4] flex items-start gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block font-mono">
+                            AI Forensic Triage Verdict
+                          </span>
+                          <p className="text-xs text-[#d8cfc4] leading-relaxed">{email.whyNarrative}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Bar */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-[#262019]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleInspectEmail(email)}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                          title="Open full interactive forensic overview (Hop map, DNS intelligence, ML classification)"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Inspect Deep Forensic Analysis</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+
+                        <button
+                          onClick={() => setExpandedEmailId(isExpanded ? null : email.id)}
+                          className="px-2.5 py-1.5 bg-[#1f1b16] hover:bg-[#28231d] text-[#d8cfc4] border border-[#342e26] rounded-lg text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-[#9d9282]" />
+                          <span>{isExpanded ? 'Hide Raw Details' : 'View Headers'}</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] font-mono text-[#9d9282]">
+                        <span>ID: {email.messageId.slice(0, 18)}...</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expandable RFC822 / Raw Details Drawer */}
+                  {isExpanded && (
+                    <div className="bg-[#0f0d0a] p-4 border-t border-[#2a241d] space-y-2 text-xs font-mono">
+                      <div className="flex items-center justify-between text-[11px] text-[#9d9282] pb-1 border-b border-[#221c16]">
+                        <span className="font-bold uppercase tracking-wider text-[#b5aa9a]">RFC822 Header & Ingestion Payload</span>
+                        <span>Message-ID: {email.messageId}</span>
+                      </div>
+                      <pre className="text-[11px] text-slate-300 overflow-x-auto p-3 bg-black/50 rounded border border-[#221c16] max-h-48 leading-relaxed whitespace-pre-wrap">
+                        {email.rawEmlSnippet || `From: ${email.from}\nTo: ${email.to}\nSubject: ${email.subject}\nDate: ${email.date}\nThreat-Score: ${email.threatScore}/100\nVerdict: ${email.verdict}\nDelivery-Stage: ${email.deliveryStage}`}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Quarantine & Gate Settings Drawer */}
       {status?.is_connected && (
