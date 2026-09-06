@@ -169,6 +169,10 @@ export function setGmailUserEmail(email: string) {
 /**
  * Returns current status of Gmail integration and quarantine engine.
  */
+export function getGmailAccessToken(): string | null {
+  return state.accessToken;
+}
+
 export function getGmailStatus(userEmail?: string) {
   if (userEmail && userEmail.includes('@')) {
     state.emailAddress = userEmail.trim();

@@ -535,10 +535,10 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       if (res.ok) {
         const data = await res.json();
         const count = data.processed_cases_count || 0;
-        const stage = data.delivery_stage === 'pre-delivery-hold' ? 'Pre-Delivery Intercepted' : 'Post-Delivery Ingested';
+        const msgText = data.message || `Sync complete: ${count} email(s) evaluated.`;
         
         setSyncProgress(100);
-        setSyncStage(`Sync completed: ${count} email(s) analyzed`);
+        setSyncStage(msgText);
         setLastSyncCompletedAt(new Date());
         setLastSyncDetails({
           count,
@@ -546,7 +546,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           stage: data.delivery_stage
         });
         setSyncCompletedAnim(true);
-        setSyncResult(`Sync complete: ${count} email(s) evaluated (${stage} — ${data.quarantine_status}).`);
+        setSyncResult(msgText);
+
+        if (data.status === 'notice') {
+          setErrorMsg(data.message);
+        } else {
+          setErrorMsg(null);
+        }
         
         if (count > 0 && onNewCasesProcessed) {
           onNewCasesProcessed();

@@ -60,6 +60,7 @@ import PDFDocument from 'pdfkit';
 import axios from 'axios';
 import {
   getGmailStatus,
+  getGmailAccessToken,
   updateQuarantineConfig,
   updateWatchConfig,
   handlePubSubPush,
@@ -3339,22 +3340,25 @@ Link: https://verify-auth-portal.net/login`;
       const authHeader = req.headers.authorization;
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
       const token = req.body?.access_token || bearerToken;
+      const storedToken = getGmailAccessToken();
       const status = getGmailStatus(userEmail);
       
       const effectiveToken = (token && !token.startsWith('mock_') && !token.startsWith('enclave_'))
         ? token
-        : (status.accessToken && !status.accessToken.startsWith('mock_'))
-          ? status.accessToken
+        : (storedToken && !storedToken.startsWith('mock_') && !storedToken.startsWith('enclave_'))
+          ? storedToken
           : null;
 
       let processedCasesCount = 0;
       let lastResult: any = null;
       let syncSource = 'live_gmail_api';
+      let syncMessage = '';
 
       if (effectiveToken) {
-        // Query real Gmail API for latest messages in INBOX
-        console.log('[GmailPoll] Fetching messages from real Gmail API...');
-        const messages = await listGmailMessages(effectiveToken, 'label:INBOX', 5);
+        // Query real Gmail API for latest messages in INBOX or custom query
+        const query = req.body?.query || 'label:INBOX';
+        console.log(`[GmailPoll] Querying live Gmail API for query "${query}"...`);
+        const messages = await listGmailMessages(effectiveToken, query, 10);
 
         if (messages.length > 0) {
           for (const msg of messages) {
@@ -3368,60 +3372,45 @@ Link: https://verify-auth-portal.net/login`;
               processedCasesCount++;
               lastResult = result;
 
-              // Check if high threat -> apply quarantine in real Gmail
+              // Check if high threat -> apply quarantine label in real Gmail account
               if (result.analysis?.threatScore >= 70) {
                 await modifyGmailMessageLabels(msg.id, ['TraceXMail-Quarantine'], ['INBOX'], effectiveToken);
               }
             }
           }
+          syncMessage = `Successfully polled and analyzed ${processedCasesCount} live Gmail message(s) directly from Google Workspace.`;
+        } else {
+          syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
         }
-      }
-
-      // If no live messages fetched from live token (or sandbox evaluation requested)
-      if (processedCasesCount === 0) {
-        syncSource = 'soc_threat_stream';
-        const sampleRaw = `From: "Corporate Security Dispatch" <security-notice@internal-sys-verify.co>
-To: ${status.emailAddress || 'user@tracexmail-enterprise.internal'}
-Subject: URGENT: Mandatory Two-Factor Token Re-enrollment
-Date: ${new Date().toUTCString()}
-Message-ID: <msg-poll-${Date.now()}@internal-sys-verify.co>
-Received: from gateway.internal-sys-verify.co ([185.220.101.8]) by mx.google.com; ${new Date().toUTCString()}
-
-Dear Employee,
-Your multi-factor authentication token has expired. You must immediately verify your access credentials.
-Verification Gateway: https://internal-sys-verify.co/auth/login`;
-
-        const result = await parseRawEmailToAnalysis(sampleRaw, 'inbound_poll_sync.eml', undefined, {
-          isPushInterception: false,
-          deliveryStage: 'post-delivery-alert'
-        });
-
-        processedCasesCount = 1;
-        lastResult = result;
+      } else {
+        syncSource = 'no_live_token';
+        syncMessage = 'No active Google OAuth Access Token connected. Please connect your Gmail account via OAuth or provide an Access Token to analyze real live emails.';
       }
 
       // Broadcast GMAIL_SYNC_COMPLETE event across all connected WebSocket clients
-      if (typeof broadcastWebSocketEvent === 'function' && lastResult) {
+      if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'GMAIL_SYNC_COMPLETE',
           timestamp: new Date().toISOString(),
           processed_count: processedCasesCount,
-          latest_case_id: lastResult.case?.id,
-          delivery_stage: lastResult.case?.delivery_stage || 'post-delivery-alert',
-          quarantine_status: lastResult.case?.quarantine_action || 'AUDITED',
-          subject: lastResult.case?.title || 'Inbound Mailbox Evaluation',
-          sync_source: syncSource
+          latest_case_id: lastResult?.case?.id,
+          delivery_stage: lastResult?.case?.delivery_stage || 'post-delivery-alert',
+          quarantine_status: lastResult?.case?.quarantine_action || 'AUDITED',
+          subject: lastResult?.case?.title || syncMessage,
+          sync_source: syncSource,
+          message: syncMessage
         });
       }
 
       res.json({
-        status: 'ok',
+        status: effectiveToken ? 'ok' : 'notice',
         processed_cases_count: processedCasesCount,
         latest_case_id: lastResult?.case?.id,
         delivery_stage: lastResult?.case?.delivery_stage || 'post-delivery-alert',
         quarantine_status: lastResult?.case?.quarantine_action || 'AUDITED',
         sync_source: syncSource,
-        email_address: status.emailAddress
+        email_address: status.email_address,
+        message: syncMessage
       });
     } catch (err: any) {
       console.error('[GmailPoll] Error during mailbox poll:', err);
