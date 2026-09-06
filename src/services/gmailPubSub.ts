@@ -53,12 +53,15 @@ class GmailPubSubService {
 
   private renewalTimer: any = null;
   private checkIntervalTimer: any = null;
+  private countdownTickerTimer: any = null;
   private listeners: Set<WatchEventListener> = new Set();
   private isRenewing = false;
 
   constructor() {
     // Start periodic check for auto-renewal (checks every 30 minutes)
     this.startPeriodicExpirationCheck();
+    // Start 60-second countdown ticker to continuously update remaining time
+    this.startCountdownTicker();
   }
 
   /**
@@ -81,6 +84,15 @@ class GmailPubSubService {
         console.warn('[GmailPubSub] Error in watch state listener:', err);
       }
     }
+  }
+
+  private startCountdownTicker(): void {
+    if (this.countdownTickerTimer) clearInterval(this.countdownTickerTimer);
+    this.countdownTickerTimer = setInterval(() => {
+      if (this.currentState.active && this.currentState.expiration) {
+        this.notifyListeners();
+      }
+    }, 60 * 1000);
   }
 
   /**
