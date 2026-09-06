@@ -110,9 +110,45 @@ import {
   loadCorrections,
   type ClassifierCorrection
 } from './src/server/classifierFeedback';
+import { authLimiter, publicLimiter, authenticatedLimiter } from './src/server/rateLimiter';
+import {
+  validateRequest,
+  isPlausibleRfc822,
+  ipParamSchema,
+  domainParamSchema,
+  caseIdParamSchema,
+  campaignIdParamSchema,
+  createCaseSchema,
+  correctionSchema,
+  slackConfigSchema,
+  virustotalUrlSchema,
+  virustotalFileSchema,
+  emailTestAlertSchema
+} from './src/server/validation';
+import { errorHandler } from './src/server/errorHandler';
 
-// Multer memory storage for uploads
-const upload = multer({ storage: multer.memoryStorage() });
+// Multer memory storage for uploads with strict size limits and file filtering
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedExtensions = /\.(eml|msg|txt|mime|rfc822)$/i;
+    const allowedMimeTypes = /^(message\/rfc822|text\/plain|text\/html|text\/richtext|application\/octet-stream|application\/vnd\.ms-outlook)$/i;
+
+    const extMatch = allowedExtensions.test(file.originalname);
+    const mimeMatch = allowedMimeTypes.test(file.mimetype);
+
+    if (extMatch || mimeMatch) {
+      cb(null, true);
+    } else {
+      const error: any = new Error('Invalid file type. Only email files (.eml, .msg, .txt) are permitted.');
+      error.code = 'INVALID_FILE_TYPE';
+      cb(error);
+    }
+  }
+});
 
 // Content and NLP Risk Scanner (Enhanced with Deterministic Lexicons & Entity Extractions)
 function analyzeContentRisk(subject: string, body: string): { score: number; heuristics: any[] } {
@@ -1060,6 +1096,9 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(authenticateUser);
 
+  // Apply strict rate limiting to authentication routes
+  app.use('/api/auth', authLimiter);
+
   // REST API Endpoints
 
   // Network Intelligence Endpoints (Workstation / Analyst Session Profile)
@@ -1317,7 +1356,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/cases', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/cases', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), validateRequest({ body: createCaseSchema }), async (req, res, next) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1344,29 +1383,28 @@ async function startServer() {
       source: 'manual'
     };
 
-    const { data, error } = await supabase.from('cases').insert([newCase]).select().single();
-    if (error) {
-      console.error('[Supabase] Failed to insert case:', error);
-      return res.status(500).json({ error: `Database insert failed: ${error.message}` });
-    }
-
     try {
+      const { data, error } = await supabase.from('cases').insert([newCase]).select().single();
+      if (error) {
+        console.error('[Supabase] Failed to insert case:', error);
+        return next(error);
+      }
+
       await logAuditAction({
         organization_id: user.organizationId,
-        case_id: newCase.id,
         user_id: user.userId,
         user_email: user.email,
         user_role: user.role,
-        action: 'CASE_CREATED',
+        action: 'CASE_CREATE',
         resource_type: 'case',
-        resource_id: newCase.id,
-        details: { title: newCase.title, severity: newCase.severity }
-      }, supabase);
-    } catch (auditErr) {
-      console.error('[Audit] Failed to log case creation:', auditErr);
-    }
+        resource_id: data.id,
+        details: { title: data.title, severity: data.severity }
+      });
 
-    res.status(201).json(data || newCase);
+      res.status(201).json(data);
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Case Deletion with RBAC: admin / analyst only
@@ -2116,18 +2154,19 @@ async function startServer() {
   });
 
   // Ingestion & Raw Analysis (Supports JSON and Form-Data)
-  const handleAnalyze = async (req: express.Request, res: express.Response) => {
-    let rawContent = req.body?.raw_email || req.body?.raw_content || req.body?.rawEml || req.body?.email || '';
-    let fileName = req.body?.filename || 'manual_submission.eml';
-    const requestId = req.body?.requestId || req.body?.request_id || (req.query?.requestId as string) || undefined;
+  const handleAnalyze = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      let rawContent = req.body?.raw_email || req.body?.raw_content || req.body?.rawEml || req.body?.email || '';
+      let fileName = req.body?.filename || 'manual_submission.eml';
+      const requestId = req.body?.requestId || req.body?.request_id || (req.query?.requestId as string) || undefined;
 
-    if (req.file) {
-      rawContent = req.file.buffer.toString('utf-8');
-      fileName = req.file.originalname || fileName;
-    }
+      if (req.file) {
+        rawContent = req.file.buffer.toString('utf-8');
+        fileName = req.file.originalname || fileName;
+      }
 
-    if (!rawContent || typeof rawContent !== 'string') {
-      rawContent = `From: "Security Alert" <security@verify-auth-portal.net>
+      if (!rawContent || typeof rawContent !== 'string') {
+        rawContent = `From: "Security Alert" <security@verify-auth-portal.net>
 To: target@enterprise.corp
 Subject: [ACTION REQUIRED] Verify Corporate Access Credentials
 Date: ${new Date().toUTCString()}
@@ -2137,29 +2176,48 @@ Received: from mail.verify-auth-portal.net ([185.220.101.5]) by mx.google.com; $
 Dear User,
 Please verify your corporate credentials immediately to retain mailbox access.
 Link: https://verify-auth-portal.net/login`;
-    }
+      }
 
-    const result = await parseRawEmailToAnalysis(rawContent, fileName, requestId);
-    res.json({
-      success: true,
-      status: 'success',
-      case: result.case,
-      analysis: result.analysis,
-      ...result.analysis,
-      isOfflineFallback: false
-    });
+      // RFC 822 Structure Check
+      if (!isPlausibleRfc822(rawContent)) {
+        return res.status(400).json({
+          status: 'error',
+          code: 'INVALID_RFC822_FORMAT',
+          error: 'Provided content or file does not contain valid RFC 822 email header structures.'
+        });
+      }
+
+      const result = await parseRawEmailToAnalysis(rawContent, fileName, requestId);
+      res.json({
+        success: true,
+        status: 'success',
+        case: result.case,
+        analysis: result.analysis,
+        ...result.analysis,
+        isOfflineFallback: false
+      });
+    } catch (err) {
+      next(err);
+    }
   };
 
-  const handleAnalyzeBatch = async (req: express.Request, res: express.Response) => {
+  const handleAnalyzeBatch = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
       const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || (req.file ? [req.file] : []);
       if (!files || files.length === 0) {
-        return handleAnalyze(req, res);
+        return handleAnalyze(req, res, next);
       }
 
       const results = [];
       for (const file of files) {
         const rawContent = file.buffer.toString('utf-8');
+        if (!isPlausibleRfc822(rawContent)) {
+          return res.status(400).json({
+            status: 'error',
+            code: 'INVALID_RFC822_FORMAT',
+            error: `File '${file.originalname}' does not contain valid RFC 822 email header structures.`
+          });
+        }
         const fileName = file.originalname || 'batch_file.eml';
         const parsed = await parseRawEmailToAnalysis(rawContent, fileName);
         results.push(parsed);
@@ -2175,16 +2233,15 @@ Link: https://verify-auth-portal.net/login`;
         }))
       });
     } catch (err: any) {
-      console.error('[Server] Batch analysis endpoint error:', err);
-      res.status(500).json({ error: err.message || 'Batch analysis failed' });
+      next(err);
     }
   };
 
-  app.post('/api/v1/analyze', upload.array('files', 20), handleAnalyze);
-  app.post('/api/v1/analyze/batch', upload.array('files', 20), handleAnalyzeBatch);
-  app.post('/api/analyze/raw', upload.array('files', 20), handleAnalyze);
-  app.post('/api/analyze/batch', upload.array('files', 20), handleAnalyzeBatch);
-  app.post('/api/analyze', upload.array('files', 20), handleAnalyze);
+  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
+  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20), handleAnalyzeBatch);
+  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
+  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20), handleAnalyzeBatch);
+  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
 
   // Machine Learning Model Metrics & Forensic Evaluation Telemetry
   const handleMlMetrics = (_req: express.Request, res: express.Response) => {
@@ -3131,52 +3188,62 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   });
 
   // VirusTotal v3 Live Enrichment, Status & Single-IOC Lookups with TTL Caching
-  app.get('/api/virustotal/status', (_req, res) => {
+  app.get('/api/virustotal/status', publicLimiter, (_req, res) => {
     res.json(getVirusTotalStatus());
   });
 
-  app.get('/api/virustotal/url', async (req, res) => {
-    const rawUrl = String(req.query.url || '').trim();
-    if (!rawUrl) {
-      return res.status(400).json({ error: 'Missing required query parameter "url"' });
+  app.get('/api/virustotal/url', authenticatedLimiter, async (req, res, next) => {
+    try {
+      const rawUrl = String(req.query.url || '').trim();
+      if (!rawUrl) {
+        return res.status(400).json({ error: 'Missing required query parameter "url"' });
+      }
+      const result = await lookupVirusTotalUrl(rawUrl, {
+        forceRefresh: req.query.refresh === 'true'
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
     }
-    const result = await lookupVirusTotalUrl(rawUrl, {
-      forceRefresh: req.query.refresh === 'true'
-    });
-    res.json(result);
   });
 
-  app.post('/api/virustotal/url', async (req, res) => {
-    const rawUrl = String(req.body.url || '').trim();
-    if (!rawUrl) {
-      return res.status(400).json({ error: 'Missing required body field "url"' });
+  app.post('/api/virustotal/url', authenticatedLimiter, validateRequest({ body: virustotalUrlSchema }), async (req, res, next) => {
+    try {
+      const rawUrl = String(req.body.url || '').trim();
+      const result = await lookupVirusTotalUrl(rawUrl, {
+        forceRefresh: req.body.force_refresh === true
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
     }
-    const result = await lookupVirusTotalUrl(rawUrl, {
-      forceRefresh: req.body.force_refresh === true
-    });
-    res.json(result);
   });
 
-  app.get('/api/virustotal/file/:hash', async (req, res) => {
-    const hash = req.params.hash.trim();
-    if (!hash) {
-      return res.status(400).json({ error: 'Missing required path parameter "hash"' });
+  app.get('/api/virustotal/file/:hash', authenticatedLimiter, async (req, res, next) => {
+    try {
+      const hash = req.params.hash.trim();
+      if (!hash) {
+        return res.status(400).json({ error: 'Missing required path parameter "hash"' });
+      }
+      const result = await lookupVirusTotalFileHash(hash, {
+        forceRefresh: req.query.refresh === 'true'
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
     }
-    const result = await lookupVirusTotalFileHash(hash, {
-      forceRefresh: req.query.refresh === 'true'
-    });
-    res.json(result);
   });
 
-  app.post('/api/virustotal/file', async (req, res) => {
-    const hash = String(req.body.hash || req.body.sha256 || req.body.md5 || '').trim();
-    if (!hash) {
-      return res.status(400).json({ error: 'Missing required body field "hash"' });
+  app.post('/api/virustotal/file', authenticatedLimiter, validateRequest({ body: virustotalFileSchema }), async (req, res, next) => {
+    try {
+      const hash = String(req.body.hash || req.body.sha256 || req.body.md5 || '').trim();
+      const result = await lookupVirusTotalFileHash(hash, {
+        forceRefresh: req.body.force_refresh === true
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
     }
-    const result = await lookupVirusTotalFileHash(hash, {
-      forceRefresh: req.body.force_refresh === true
-    });
-    res.json(result);
   });
 
   app.post('/api/virustotal/enrich', async (req, res) => {
@@ -3210,6 +3277,9 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       });
     }
   });
+
+  // Centralized Error Handling Middleware (Catches and sanitizes all uncaught API errors)
+  app.use(errorHandler);
 
   // Serve static files in production / Vite in dev
   if (process.env.NODE_ENV !== 'production') {
