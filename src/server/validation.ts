@@ -115,19 +115,37 @@ export function isPlausibleRfc822(content: string | Buffer): boolean {
 
 /**
  * Express middleware for post-upload validation of email files and payloads.
- * Checks for RFC 822 structure before any parsing logic runs.
+ * Checks for RFC 822 structure and verifies buffer content before any parsing logic runs.
+ * Rejects invalid files immediately.
  */
 export function postUploadRfc822Validator(req: Request, res: Response, next: NextFunction) {
-  const files: Express.Multer.File[] = (req.files as Express.Multer.File[]) || (req.file ? [req.file] : []);
+  let files: Express.Multer.File[] = [];
+  if (Array.isArray(req.files)) {
+    files = req.files;
+  } else if (req.files && typeof req.files === 'object') {
+    files = Object.values(req.files).flat() as Express.Multer.File[];
+  } else if (req.file) {
+    files = [req.file];
+  }
 
   if (files && files.length > 0) {
     for (const file of files) {
+      if (!file.buffer || file.buffer.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          code: 'INVALID_RFC822_FORMAT',
+          error: `File '${file.originalname || 'upload'}' is empty and cannot be processed as an RFC 822 email.`,
+          filename: file.originalname,
+          details: 'Empty buffer provided.'
+        });
+      }
+
       const validation = validateRFC822EmailContent(file.buffer);
       if (!validation.isValid) {
         return res.status(400).json({
           status: 'error',
           code: 'INVALID_RFC822_FORMAT',
-          error: `File '${file.originalname}' failed RFC 822 structure validation: ${validation.reason}`,
+          error: `File '${file.originalname || 'upload'}' failed RFC 822 structure validation: ${validation.reason}`,
           filename: file.originalname,
           details: validation.reason
         });

@@ -24,7 +24,8 @@ import {
   Download,
   Share2,
   FlaskConical,
-  Trash2
+  Trash2,
+  Radar
 } from 'lucide-react';
 import { forensicApi, CaseItem } from '../lib/api';
 import { EmailAnalysis } from '../types';
@@ -129,11 +130,31 @@ export function CasesView({
   };
 
   // Real-Time WebSocket Alerts Hook
-  const { alerts, lastCreatedCaseId } = useWebSocketAlerts();
+  const { alerts, lastCreatedCaseId, lastCaseUpdate } = useWebSocketAlerts();
+
+  // Real-World Threat Seeding State
+  const [seedingRealWorld, setSeedingRealWorld] = useState<boolean>(false);
+  const [seedSuccessBanner, setSeedSuccessBanner] = useState<string | null>(null);
 
   // Slack Dispatch State
   const [sendingSlackCaseId, setSendingSlackCaseId] = useState<string | null>(null);
   const [slackFeedbackMsg, setSlackFeedbackMsg] = useState<{ id: string; type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleSeedRealWorldCases = async () => {
+    try {
+      setSeedingRealWorld(true);
+      setSeedSuccessBanner(null);
+      const res = await forensicApi.seedRealWorldCases();
+      setSeedSuccessBanner(`Successfully ingested ${res.seeded_cases_count || 5} active real-world threat cases into Supabase.`);
+      await fetchCases();
+      setTimeout(() => setSeedSuccessBanner(null), 6000);
+    } catch (err: any) {
+      console.warn('Error seeding real-world cases:', err);
+      setFetchError(err?.response?.data?.error || err.message || 'Failed to seed real-world cases');
+    } finally {
+      setSeedingRealWorld(false);
+    }
+  };
 
   const handleSendCaseToSlack = async (e: React.MouseEvent, caseItem: any) => {
     e.stopPropagation();
@@ -196,10 +217,10 @@ export function CasesView({
     }
   };
 
-  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert activity
+  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert/case update activity
   useEffect(() => {
     fetchCases();
-  }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii]);
+  }, [alerts, lastCreatedCaseId, lastCaseUpdate, refreshSignal, showDemoCases, maskPii]);
 
   // Real-time Supabase postgres changes channel for cases table
   useEffect(() => {
@@ -605,6 +626,15 @@ export function CasesView({
           {!isReadOnly && (
             <>
               <button
+                onClick={handleSeedRealWorldCases}
+                disabled={seedingRealWorld}
+                className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                title="Populate active incident cases directly from CISA and OpenPhish threat intelligence"
+              >
+                <Radar className={`w-3.5 h-3.5 ${seedingRealWorld ? 'animate-spin' : 'animate-pulse'}`} />
+                <span>{seedingRealWorld ? 'Seeding...' : 'Seed Real-World Threats'}</span>
+              </button>
+              <button
                 onClick={handleOpenCreateModal}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-md transition-colors"
               >
@@ -627,6 +657,22 @@ export function CasesView({
           )}
         </div>
       </div>
+
+      {/* Seed Success Banner */}
+      {seedSuccessBanner && (
+        <div className="bg-emerald-950/40 border border-emerald-800/80 p-3.5 rounded-xl flex items-center justify-between text-xs text-emerald-200 shadow-md animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-semibold">{seedSuccessBanner}</span>
+          </div>
+          <button
+            onClick={() => setSeedSuccessBanner(null)}
+            className="p-1 text-emerald-400 hover:text-emerald-200 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Offline / Connection Warning Banner */}
       {fetchError && (

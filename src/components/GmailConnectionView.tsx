@@ -23,9 +23,12 @@ import {
   Clock,
   Sparkles,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Key,
+  Shield
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
+import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 
 const API_URL = (
   (import.meta as any).env?.VITE_API_URL ||
@@ -68,6 +71,7 @@ interface GmailStatusResponse {
   last_polled_at: string | null;
   polling_interval_seconds: number;
   history_id: string | null;
+  oauth_scopes?: OAuthScopesStatus;
   watch?: WatchConfig;
   quarantine?: QuarantineConfig;
   metrics?: {
@@ -111,6 +115,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [adminWebhookUrl, setAdminWebhookUrl] = useState<string>('');
   const [savingConfig, setSavingConfig] = useState<boolean>(false);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
+
+  // Real Gmail OAuth Token Direct Link
+  const [showDirectTokenConnect, setShowDirectTokenConnect] = useState<boolean>(false);
+  const [directEmail, setDirectEmail] = useState<string>('jayaramsappa09@gmail.com');
+  const [directAccessToken, setDirectAccessToken] = useState<string>('');
+  const [connectingToken, setConnectingToken] = useState<boolean>(false);
+  const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
 
   const [topicName, setTopicName] = useState<string>('projects/tracexmail-enterprise/topics/inbox-watch');
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
@@ -302,6 +313,41 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     }
   };
 
+  const handleDirectTokenConnect = async () => {
+    if (!directAccessToken.trim()) {
+      setErrorMsg('Please provide a valid Google OAuth Access Token.');
+      return;
+    }
+    setConnectingToken(true);
+    setErrorMsg(null);
+    setDirectTokenSuccess(null);
+    try {
+      const res = await fetch(`${API_URL}/api/gmail/connect-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: directAccessToken.trim(),
+          email: directEmail.trim() || 'jayaramsappa09@gmail.com',
+          expires_in_seconds: 3600
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to connect Gmail token');
+      }
+      setDirectTokenSuccess(`Real Gmail account connected: ${directEmail.trim()}. Starting live synchronization...`);
+      setDirectAccessToken('');
+      setShowDirectTokenConnect(false);
+      await fetchStatus();
+      // Immediately run real sync
+      await handleSyncNow();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error connecting real Gmail token');
+    } finally {
+      setConnectingToken(false);
+    }
+  };
+
   const handleConnectGmail = async () => {
     try {
       setErrorMsg('');
@@ -479,62 +525,49 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   }
 
   return (
-    <div className="bg-[#1a1712] border border-[#3a352c] rounded-xl p-6 space-y-5 shadow-md">
-      {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+    <div className="bg-[#181613] border border-[#342e26] rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+      {/* Top Header Card */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2820] pb-5">
+        <div className="flex items-start gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
             <Mail className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base font-semibold text-white">Gmail Real-Time Ingestion & Pre-Delivery Quarantine Gate</h3>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center gap-1">
-                <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
-                Cloud Pub/Sub Push `watch()`
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
-                <Lock className="w-3 h-3 text-amber-400" />
-                Pre-Delivery Hold Active
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h3 className="text-base font-semibold text-[#f4efe6]">Gmail Real-Time Ingestion &amp; Protection</h3>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Protection
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Sub-second inbound email interception via Google Cloud Pub/Sub push notifications. High-risk threats are quarantined before reaching the recipient's inbox.
+            <p className="text-xs text-[#a89d8d] mt-1 max-w-2xl leading-relaxed">
+              Inbound emails are automatically monitored. Threat patterns and phishing attempts are quarantined before reaching your active inbox.
             </p>
           </div>
         </div>
 
         {status?.is_connected ? (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap shrink-0">
             <button
-              onClick={() => handleTriggerPubSubTest(true)}
-              disabled={testingPubSub}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-              title="Dispatches an authentic Google Cloud Pub/Sub push notification payload to verify sub-second inbound interception and quarantine hold"
+              onClick={handleSyncNow}
+              disabled={syncing}
+              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
             >
-              <Radio className={`w-3.5 h-3.5 ${testingPubSub ? 'animate-pulse text-amber-300' : 'text-emerald-300'}`} />
-              <span>{testingPubSub ? 'Triggering Push...' : 'Test Pub/Sub Interception'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              <span>{syncing ? 'Syncing...' : 'Sync Inbox'}</span>
             </button>
             <button
               onClick={() => handleSimulateInboundInterception(true)}
               disabled={simulating}
-              className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-              title="Simulates a high-risk phishing attack hitting the mailbox to demonstrate sub-second pre-delivery hold"
+              className="bg-[#26211a] hover:bg-[#322c22] text-[#f4efe6] border border-[#443c30] px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Simulates a sample phishing test to demonstrate pre-delivery quarantine"
             >
-              <ShieldAlert className={`w-3.5 h-3.5 ${simulating ? 'animate-spin' : ''}`} />
-              <span>{simulating ? 'Intercepting...' : 'Test Quarantine Gate'}</span>
-            </button>
-            <button
-              onClick={handleSyncNow}
-              disabled={syncing}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : 'Poll Sync'}</span>
+              <ShieldAlert className={`w-3.5 h-3.5 text-amber-400 ${simulating ? 'animate-spin' : ''}`} />
+              <span>{simulating ? 'Testing...' : 'Simulate Test Threat'}</span>
             </button>
             <button
               onClick={handleDisconnect}
-              className="bg-slate-800 hover:bg-rose-950 hover:text-rose-300 border border-slate-700 hover:border-rose-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Disconnect</span>
@@ -543,9 +576,9 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         ) : (
           <button
             onClick={handleConnectGmail}
-            className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-md shadow-rose-600/30 transition-colors shrink-0"
+            className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
           >
-            <Zap className="w-4 h-4 fill-white" />
+            <Zap className="w-4 h-4 fill-current" />
             <span>Connect Gmail Account</span>
           </button>
         )}
@@ -553,14 +586,14 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
       {/* Notifications / Alerts */}
       {errorMsg && (
-        <div className="p-3.5 bg-rose-950/60 border border-rose-500/60 rounded-lg text-rose-200 text-xs flex items-center justify-between gap-2.5">
+        <div className="p-4 bg-red-950/30 border border-red-900/40 rounded-xl text-red-200 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
             <span>{errorMsg}</span>
           </div>
           <button
             onClick={() => fetchStatus()}
-            className="px-3 py-1 bg-rose-900 hover:bg-rose-800 text-rose-100 rounded text-xs font-semibold transition-colors"
+            className="px-3 py-1 bg-red-900/50 hover:bg-red-800/60 text-red-100 rounded-lg text-xs font-medium transition-colors"
           >
             Retry
           </button>
@@ -568,11 +601,101 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       )}
 
       {syncResult && (
-        <div className="p-3.5 bg-emerald-950/60 border border-emerald-500/60 rounded-lg text-emerald-200 text-xs flex items-center gap-2.5 font-mono">
+        <div className="p-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl text-emerald-200 text-xs flex items-center gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{syncResult}</span>
         </div>
       )}
+
+      {directTokenSuccess && (
+        <div className="p-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl text-emerald-200 text-xs flex items-center gap-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{directTokenSuccess}</span>
+        </div>
+      )}
+
+      {/* Gmail Configuration Status: Active OAuth Scopes & Refresh Permissions */}
+      <GmailConfigStatus
+        emailAddress={status?.email_address || 'jayaramsappa09@gmail.com'}
+        isConnected={status?.is_connected}
+        oauthScopes={status?.oauth_scopes}
+        onRefreshSuccess={fetchStatus}
+      />
+
+      {/* Real Gmail Account & Direct OAuth Link Panel */}
+      <div className="p-4 bg-[#14120f] border border-[#3a352c] rounded-xl space-y-3 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>Real Gmail Mailbox Integration</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                  LIVE SYNC ENGINE
+                </span>
+              </div>
+              <div className="text-xs text-slate-400">
+                Connected Target: <span className="font-mono text-[var(--paper)] font-bold">{status?.email_address || 'jayaramsappa09@gmail.com'}</span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDirectTokenConnect(!showDirectTokenConnect)}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Shield className="w-3.5 h-3.5 text-amber-400" />
+            <span>{showDirectTokenConnect ? 'Hide Direct Token Input' : 'Configure Live OAuth Token'}</span>
+          </button>
+        </div>
+
+        {showDirectTokenConnect && (
+          <div className="p-3.5 bg-[#1c1813] border border-[#4a4235] rounded-lg space-y-3 animate-in fade-in duration-150">
+            <div className="text-xs text-slate-300 leading-relaxed">
+              To synchronize real emails from your personal or corporate Google account directly (e.g. <span className="font-mono text-amber-300">jayaramsappa09@gmail.com</span>), provide an authorized Google Access Token with <span className="font-mono text-purple-300">gmail.readonly</span> and <span className="font-mono text-purple-300">gmail.modify</span> scopes:
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-mono text-slate-400 mb-1">Gmail Address</label>
+                <input
+                  type="email"
+                  value={directEmail}
+                  onChange={(e) => setDirectEmail(e.target.value)}
+                  placeholder="jayaramsappa09@gmail.com"
+                  className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-mono text-slate-400 mb-1">Google OAuth Access Token</label>
+                <input
+                  type="password"
+                  value={directAccessToken}
+                  onChange={(e) => setDirectAccessToken(e.target.value)}
+                  placeholder="ya29.a0AfH6SM..."
+                  className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={() => setShowDirectTokenConnect(false)}
+                className="px-3 py-1.5 rounded text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDirectTokenConnect}
+                disabled={connectingToken || !directAccessToken.trim()}
+                className="px-4 py-1.5 rounded-md bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer shadow transition-colors"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{connectingToken ? 'Connecting Token...' : 'Connect & Sync Live Mailbox'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Live users.watch() Push Interception & Subscription Expiration Panel */}
       {status?.is_connected && (
@@ -683,47 +806,38 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         </div>
       )}
 
-      {/* Live Metrics Grid */}
+      {/* Clean Metrics Grid */}
       {status?.is_connected && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          <div className="bg-[#14120f] p-3.5 rounded-lg border border-[#3a352c] space-y-1">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block">Connected Mailbox</span>
-            <div className="flex items-center gap-2 text-xs font-mono font-bold text-emerald-400 truncate">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-[#1f1b16] p-4 rounded-xl border border-[#342e26] space-y-1">
+            <span className="text-[11px] text-[#9d9282] block">Monitored Mailbox</span>
+            <div className="flex items-center gap-2 text-xs font-semibold text-[#f4efe6] truncate">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
               <span className="truncate">{status.email_address}</span>
             </div>
           </div>
 
-          <div className="bg-[#14120f] p-3.5 rounded-lg border border-[#3a352c] space-y-1">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block">Real-Time Ingestion Mode</span>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-purple-300 font-semibold truncate">
+          <div className="bg-[#1f1b16] p-4 rounded-xl border border-[#342e26] space-y-1">
+            <span className="text-[11px] text-[#9d9282] block">Monitoring Status</span>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 truncate">
               <Radio className="w-3.5 h-3.5 text-purple-400 shrink-0 animate-pulse" />
-              <span>Pub/Sub `watch()` Active</span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono">
-              Last push: {status.watch?.last_push_received_at ? new Date(status.watch.last_push_received_at).toLocaleTimeString() : 'Active'}
+              <span>Real-Time Push Active</span>
             </div>
           </div>
 
-          <div className="bg-[#14120f] p-3.5 rounded-lg border border-[#3a352c] space-y-1">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block">Pre-Delivery Interceptions</span>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-amber-400 font-bold">
+          <div className="bg-[#1f1b16] p-4 rounded-xl border border-[#342e26] space-y-1">
+            <span className="text-[11px] text-[#9d9282] block">Threats Quarantined</span>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
               <Lock className="w-3.5 h-3.5 text-amber-400" />
-              <span>{status.metrics?.pre_delivery_quarantined || 0} Quarantined</span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono">
-              Threshold: ≥ {status.quarantine?.threshold || 70}/100 Risk Score
+              <span>{status.metrics?.pre_delivery_quarantined || 0} Blocked</span>
             </div>
           </div>
 
-          <div className="bg-[#14120f] p-3.5 rounded-lg border border-[#3a352c] space-y-1">
-            <span className="text-[10px] uppercase font-mono text-slate-400 block">Post-Delivery Alerts</span>
-            <div className="flex items-center gap-1.5 text-xs font-mono text-blue-400 font-semibold">
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-              <span>{status.metrics?.post_delivery_alerts || 0} Audited</span>
-            </div>
-            <div className="text-[10px] text-slate-400 font-mono">
-              Total Ingested: {status.metrics?.total_ingested || 0}
+          <div className="bg-[#1f1b16] p-4 rounded-xl border border-[#342e26] space-y-1">
+            <span className="text-[11px] text-[#9d9282] block">Total Scanned</span>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#f4efe6]">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{status.metrics?.total_ingested || 0} Messages</span>
             </div>
           </div>
         </div>

@@ -63,12 +63,20 @@ const INITIAL_ALERTS: WebSocketAlert[] = [
   }
 ];
 
+export interface CaseUpdateEvent {
+  type: 'CASE_CREATED' | 'CASE_UPDATED' | 'CASE_CLOSED' | 'CASE_DELETED';
+  caseId?: string;
+  case?: any;
+  timestamp: string;
+}
+
 export function useWebSocketAlerts() {
   const [alerts, setAlerts] = useState<WebSocketAlert[]>(INITIAL_ALERTS);
   const [activeToast, setActiveToast] = useState<WebSocketAlert | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [lastCreatedCaseId, setLastCreatedCaseId] = useState<string | null>(null);
+  const [lastCaseUpdate, setLastCaseUpdate] = useState<CaseUpdateEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
 
@@ -163,6 +171,20 @@ export function useWebSocketAlerts() {
           const data = JSON.parse(event.data);
           if (data && data.type === 'CASE_CREATED' && data.case?.id) {
             setLastCreatedCaseId(data.case.id);
+            setLastCaseUpdate({
+              type: 'CASE_CREATED',
+              caseId: data.case.id,
+              case: data.case,
+              timestamp: data.timestamp || new Date().toISOString()
+            });
+          }
+          if (data && (data.type === 'CASE_UPDATED' || data.type === 'CASE_CLOSED' || data.type === 'CASE_DELETED')) {
+            setLastCaseUpdate({
+              type: data.type,
+              caseId: data.caseId || data.case?.id,
+              case: data.case,
+              timestamp: data.timestamp || new Date().toISOString()
+            });
           }
           if (data && data.type === 'GMAIL_SYNC_COMPLETE') {
             if (data.latest_case_id) {
@@ -187,7 +209,7 @@ export function useWebSocketAlerts() {
             };
             addAlert(syncAlert);
           }
-          if (data && (data.title || data.type === 'ALERT')) {
+          if (data && (data.title || data.type === 'ALERT' || data.type === 'THREAT_FEED_ALERT')) {
             const rawAlert = data.alert || data;
             const incoming: WebSocketAlert = {
               id: rawAlert.id || `alt_${Date.now()}`,
@@ -322,6 +344,7 @@ export function useWebSocketAlerts() {
     unreadCount,
     soundEnabled,
     lastCreatedCaseId,
+    lastCaseUpdate,
     setSoundEnabled,
     dismissToast,
     markAsRead,

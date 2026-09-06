@@ -230,121 +230,63 @@ export function Header({
         </div>
 
         {/* Verdict Pill */}
-        <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold ${badge.bg}`}>
+        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${badge.bg}`}>
           <BadgeIcon className="w-3.5 h-3.5" />
           <span>{badge.label}</span>
-          <span className="opacity-80 font-mono">({currentAnalysis.threatScore || 0}/100)</span>
+          <span className="opacity-80 font-mono text-[11px]">({currentAnalysis.threatScore || 0}/100)</span>
         </div>
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-2.5">
-        {/* Connectivity Status Indicator */}
-        <div 
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] border text-[11px] font-mono transition-all duration-300 select-none ${
-            isOnline
-              ? 'bg-[rgba(72,169,117,0.12)] border-[rgba(72,169,117,0.3)] text-[var(--paper)]'
-              : 'bg-[rgba(178,58,46,0.2)] border-[var(--thread)] text-[var(--paper)] animate-pulse'
-          }`}
-          title={isOnline ? 'Network: Enclave Synchronized (Online)' : 'Network: Offline (Operating in local forensic cache)'}
-        >
-          {isOnline ? (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--forensic-green)] shadow-[0_0_6px_rgba(72,169,117,0.6)]" />
-              <Wifi className="w-3 h-3 text-[var(--forensic-green)]" />
-              <span className="hidden md:inline text-[10px] text-[var(--paper-dim)]">ONLINE</span>
-            </>
-          ) : (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--thread)] shadow-[0_0_6px_rgba(178,58,46,0.8)]" />
-              <WifiOff className="w-3 h-3 text-[var(--thread)]" />
-              <span className="text-[10px] text-[var(--thread)] font-bold">OFFLINE</span>
-            </>
-          )}
-        </div>
-
-        {/* Individual Mode Badge & Quick Upgrade Action */}
-        {accountType === 'personal' && (
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] border border-[rgba(201,162,39,0.35)]">
-            <span className="text-[10.5px] font-mono font-bold text-[var(--stamp)]">INDIVIDUAL MODE</span>
-            <button
-              onClick={() => onOpenUpgradeModal && onOpenUpgradeModal('Organization Enterprise Mode')}
-              className="text-[10px] font-semibold text-[var(--paper)] hover:text-[var(--stamp)] bg-transparent border-0 cursor-pointer underline flex items-center gap-0.5 ml-1"
-            >
-              <span>Switch to Org Mode →</span>
-            </button>
-          </div>
-        )}
-
+      <div className="flex items-center gap-3">
         {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
         {onSetViewMode && (
-          <div className="flex items-center rounded bg-[#12100d] p-0.5 border border-[#3a352c] text-[11px] font-mono">
+          <div className="flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">
             <button
               onClick={() => onSetViewMode('simple')}
-              className={`px-2.5 py-1 rounded transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
                 viewMode === 'simple'
-                  ? 'bg-[#2a241b] text-[var(--paper)] border border-[#524838] shadow-xs'
-                  : 'text-[#8a8070] hover:text-[#ede6d8]'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'text-[#9d9282] hover:text-[#f4efe6]'
               }`}
-              title="Switch to Simple View Mode (Clean, executive-focused summary)"
+              title="Clean view"
             >
-              <Eye className="w-3 h-3 text-amber-400" />
-              <span>Simple</span>
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span>Standard</span>
             </button>
             <button
               onClick={() => onSetViewMode('analyst')}
-              className={`px-2.5 py-1 rounded transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
                 viewMode === 'analyst'
-                  ? 'bg-[rgba(127,163,186,0.25)] text-[var(--slate)] border border-[var(--slate)] shadow-xs'
-                  : 'text-[#8a8070] hover:text-[#ede6d8]'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-[#9d9282] hover:text-[#f4efe6]'
               }`}
-              title="Switch to Analyst Console (Full forensic telemetry and raw data)"
+              title="Deep analysis view"
             >
-              <SlidersHorizontal className="w-3 h-3 text-[var(--slate)]" />
-              <span>Analyst Console</span>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+              <span>Analyst</span>
             </button>
           </div>
         )}
 
-        {/* Role-Differentiated Clearance Badge & Avatar */}
+        {/* User Account / Clearance */}
         <div className="relative">
-          <div 
+          <button 
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-2 px-2.5 py-1 rounded-[2px] hover:bg-[#221e17] transition-all cursor-pointer border border-[#3a352c] hover:border-[#8a8070] bg-[#1a1712]"
-            title={`Clearance Level: ${role.toUpperCase()} | User: ${sessionUser?.email || userLabel}`}
+            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
+            title={`Role: ${role.toUpperCase()} | ${sessionUser?.email || userLabel}`}
           >
-            {/* Visual Dynamic Clearance Level Badge */}
-            <div className="flex items-center gap-1.5">
-              <span className={`font-mono text-[10.5px] px-2.5 py-0.5 rounded-[2px] font-bold tracking-wider flex items-center gap-1.5 border transition-all ${
-                role === 'admin'
-                  ? 'bg-[rgba(201,162,39,0.18)] text-[var(--stamp)] border-[var(--stamp)] shadow-[0_0_10px_rgba(201,162,39,0.25)]'
-                  : role === 'read_only'
-                    ? 'bg-[rgba(237,230,216,0.12)] text-[var(--paper-dim)] border-[var(--paper-muted)] shadow-[0_0_8px_rgba(185,175,156,0.2)]'
-                    : 'bg-[rgba(127,163,186,0.18)] text-[var(--slate)] border-[var(--slate)] shadow-[0_0_10px_rgba(127,163,186,0.25)]'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${
-                  role === 'admin' 
-                    ? 'bg-[var(--stamp)] shadow-[0_0_6px_var(--stamp)]' 
-                    : role === 'read_only'
-                      ? 'bg-[var(--paper-dim)] shadow-[0_0_6px_var(--paper-dim)]'
-                      : 'bg-[var(--slate)] shadow-[0_0_6px_var(--slate)]'
-                }`} />
-                <span>
-                  {role === 'admin' ? 'CLEARANCE: GOLD (ADMIN)' : role === 'read_only' ? 'CLEARANCE: SILVER (AUDITOR)' : 'CLEARANCE: STEEL (ANALYST)'}
-                </span>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              <span className="text-xs font-semibold text-[#f4efe6] capitalize">
+                {role === 'admin' ? 'Admin' : 'Analyst'}
               </span>
             </div>
-
-            <div className={`w-7 h-7 rounded-[2px] border flex items-center justify-center text-[11px] font-mono font-bold select-none transition-colors ${
-              role === 'admin'
-                ? 'bg-[rgba(201,162,39,0.2)] border-[var(--stamp)] text-[var(--stamp)]'
-                : role === 'read_only'
-                  ? 'bg-[rgba(237,230,216,0.12)] border-[var(--paper-dim)] text-[var(--paper)]'
-                  : 'bg-[rgba(127,163,186,0.2)] border-[var(--slate)] text-[var(--paper)]'
-            }`}>
-              {userLabel}
+            <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-300">
+              {userLabel.slice(0, 2)}
             </div>
-          </div>
+            <ChevronDown className="w-3 h-3 text-[#9d9282]" />
+          </button>
 
           {userDropdownOpen && (
             <div className="absolute right-0 mt-1 w-64 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_40px_rgba(0,0,0,0.8)] py-1.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
@@ -352,76 +294,32 @@ export function Header({
                 <div className="font-mono text-[10px] uppercase text-[#8a8070]">Operator Identity</div>
                 <div className="truncate text-[#ede6d8] font-semibold mt-0.5">{sessionUser?.email || userLabel}</div>
                 <div className="font-mono text-[10.5px] mt-1 flex items-center justify-between">
-                  <span className="text-[#8a8070]">Mode:</span>
-                  <span className={`font-bold uppercase ${
-                    accountType === 'personal' ? 'text-[var(--slate)]' : 'text-[var(--stamp)]'
-                  }`}>
-                    {accountType === 'personal' ? 'Individual (Single Ingestion)' : 'Organization (Full SOC)'}
+                  <span className="text-[#8a8070]">Organization:</span>
+                  <span className="font-bold text-[var(--stamp)] truncate max-w-[130px]" title={sessionUser?.organizationId || 'Acme Cyber Defense SOC'}>
+                    {accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC'}
                   </span>
                 </div>
-                {accountType === 'personal' && (
-                  <button
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      onOpenUpgradeModal && onOpenUpgradeModal('Organization Enterprise Mode');
-                    }}
-                    className="w-full mt-2 py-1 px-2 rounded-[2px] bg-[var(--stamp)] text-[var(--ink)] font-bold text-[10.5px] hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-1"
-                  >
-                    <span>Switch to Organization Mode →</span>
-                  </button>
-                )}
+                <div className="mt-2 pt-1.5 border-t border-[#3a352c] flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-[#8a8070]">Clearance:</span>
+                  <span className={`font-bold flex items-center gap-1 ${
+                    role === 'admin' ? 'text-[var(--stamp)]' : role === 'analyst' ? 'text-[var(--slate)]' : 'text-[var(--paper-dim)]'
+                  }`}>
+                    <Lock className="w-2.5 h-2.5" />
+                    {role === 'admin' ? 'GOLD (ADMIN)' : role === 'analyst' ? 'STEEL (ANALYST)' : 'SILVER (AUDITOR)'}
+                  </span>
+                </div>
               </div>
 
-              {/* Role Switcher */}
-              {onSwitchRole && (
-                <div className="px-2.5 py-2 space-y-1.5">
-                  <div className="px-1 text-[10px] font-mono text-[#8a8070] uppercase">Switch Enclave Clearance:</div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      onClick={() => {
-                        onSwitchRole('admin');
-                        setUserDropdownOpen(false);
-                      }}
-                      className={`px-1.5 py-1.5 text-[10px] font-mono rounded-[2px] text-center transition-all cursor-pointer ${
-                        role === 'admin' 
-                          ? 'bg-[rgba(201,162,39,0.25)] text-[var(--stamp)] font-bold border border-[var(--stamp)] shadow-[0_0_8px_rgba(201,162,39,0.3)]' 
-                          : 'bg-[#221e17] text-[#8a8070] border border-[#3a352c] hover:text-[#ede6d8]'
-                      }`}
-                      title="Gold Clearance: Full Admin Controls"
-                    >
-                      GOLD (ADMIN)
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSwitchRole('analyst');
-                        setUserDropdownOpen(false);
-                      }}
-                      className={`px-1.5 py-1.5 text-[10px] font-mono rounded-[2px] text-center transition-all cursor-pointer ${
-                        role === 'analyst' 
-                          ? 'bg-[rgba(127,163,186,0.25)] text-[var(--slate)] font-bold border border-[var(--slate)] shadow-[0_0_8px_rgba(127,163,186,0.3)]' 
-                          : 'bg-[#221e17] text-[#8a8070] border border-[#3a352c] hover:text-[#ede6d8]'
-                      }`}
-                      title="Steel Clearance: Full Forensics & Cases"
-                    >
-                      STEEL (ANALYST)
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSwitchRole('read_only');
-                        setUserDropdownOpen(false);
-                      }}
-                      className={`px-1.5 py-1.5 text-[10px] font-mono rounded-[2px] text-center transition-all cursor-pointer ${
-                        role === 'read_only' 
-                          ? 'bg-[rgba(237,230,216,0.18)] text-[var(--paper-dim)] font-bold border border-[var(--paper-muted)] shadow-[0_0_8px_rgba(185,175,156,0.3)]' 
-                          : 'bg-[#221e17] text-[#8a8070] border border-[#3a352c] hover:text-[#ede6d8]'
-                      }`}
-                      title="Silver Clearance: Read-Only Audit & Masked PII"
-                    >
-                      SILVER (AUDITOR)
-                    </button>
-                  </div>
+              {/* Strict Access Verified Notice */}
+              <div className="px-3 py-2 bg-[rgba(0,0,0,0.3)]">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--forensic-green)] font-semibold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[var(--forensic-green)] shrink-0" />
+                  <span>Verified Strict Enclave Access</span>
                 </div>
-              )}
+                <div className="text-[9.5px] text-[#8a8070] mt-0.5 leading-tight">
+                  Tenant tenancy locked to verified organization profile.
+                </div>
+              </div>
 
               {onSignOut && (
                 <div className="py-1">

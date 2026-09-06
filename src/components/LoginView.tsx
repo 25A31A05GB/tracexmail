@@ -112,51 +112,35 @@ export function LoginView({
           const msg = error.message.toLowerCase();
           if (msg.includes('email not confirmed') || msg.includes('unverified') || msg.includes('not verified')) {
             setVerificationPending(true);
-            setErrorMsg('Email verification is required before login. Please click the verification link sent to your email.');
+            setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
             setLoading(false);
             return;
           }
-          setErrorMsg(error.message || 'Invalid email or password. Please double-check your credentials.');
+          setErrorMsg(error.message || 'Authentication Failed: Invalid email or password. Access is strictly denied.');
           setLoading(false);
           return;
         }
 
         if (data.session) {
+          // Check if email confirmed
+          if (!data.user?.email_confirmed_at && data.user?.app_metadata?.provider === 'email') {
+            setVerificationPending(true);
+            setErrorMsg('Access Restricted: Email verification pending. Please verify your email before logging in.');
+            setLoading(false);
+            return;
+          }
+
           if (onSuccess) onSuccess();
           return;
         }
       }
 
-      // 3. Role & Account determination
-      let determinedRole: UserRole = 'analyst';
-      let determinedAccountType: AccountType = 'organization';
-      const lowerEmail = email.toLowerCase();
-
-      if (lowerEmail.includes('admin') || lowerEmail.includes('lead') || lowerEmail.includes('commander')) {
-        determinedRole = 'admin';
-        determinedAccountType = 'organization';
-      } else if (lowerEmail.includes('audit') || lowerEmail.includes('readonly') || lowerEmail.includes('guest')) {
-        determinedRole = 'read_only';
-        determinedAccountType = 'organization';
-      } else if (lowerEmail.includes('personal') || lowerEmail.includes('gmail.com') || lowerEmail.includes('yahoo.com') || lowerEmail.includes('hotmail.com')) {
-        determinedRole = 'analyst';
-        determinedAccountType = 'personal';
-      }
-
-      if (onSelectRoleLogin) {
-        onSelectRoleLogin(determinedRole, {
-          email: email.trim(),
-          fullName: email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-          orgName: determinedAccountType === 'personal' ? 'Personal Sandbox' : 'Security Team',
-          accountType: determinedAccountType,
-          isEmailVerified: true
-        });
-      } else if (onSuccess) {
-        onSuccess();
-      }
+      // If Supabase not configured and not a verified employee
+      setErrorMsg('Authentication Failed: Invalid credentials or account does not exist. Access is strictly restricted to verified users.');
+      setLoading(false);
     } catch (err: any) {
       console.error('[Login] Authentication error:', err);
-      setErrorMsg(err.message || 'An unexpected error occurred during sign in.');
+      setErrorMsg(err.message || 'Authentication Failed: An unexpected error occurred during sign in.');
       setLoading(false);
     }
   };

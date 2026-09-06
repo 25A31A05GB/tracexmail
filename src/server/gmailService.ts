@@ -33,6 +33,16 @@ export interface WatchConfig {
   lastPushReceivedAt: string | null;
 }
 
+export interface OAuthScopeDetail {
+  scope: string;
+  shortName: string;
+  category: string;
+  description: string;
+  granted: boolean;
+  required: boolean;
+  lastVerifiedAt: string | null;
+}
+
 export interface GmailServiceState {
   isConnected: boolean;
   oauthConfigured: boolean;
@@ -42,6 +52,10 @@ export interface GmailServiceState {
   lastPolledAt: string | null;
   pollingIntervalSeconds: number;
   historyId: string | null;
+  activeScopes: string[];
+  scopesGrantedAt: string | null;
+  tokenExpiresAt: number | null;
+  lastRefreshedAt: string | null;
   watch: WatchConfig;
   quarantine: QuarantineConfig;
   metrics: {
@@ -71,12 +85,20 @@ export const gmailEvents = new EventEmitter();
 const state: GmailServiceState = {
   isConnected: true, // Connected by default with simulated / configured account
   oauthConfigured: true,
-  emailAddress: process.env.GMAIL_USER_EMAIL || 'security-audit@tracexmail-enterprise.internal',
+  emailAddress: process.env.GMAIL_USER_EMAIL || 'jayaramsappa09@gmail.com',
   accessToken: 'mock_oauth2_access_token_encrypted',
   refreshToken: 'mock_oauth2_refresh_token_encrypted',
   lastPolledAt: new Date().toISOString(),
   pollingIntervalSeconds: 20,
   historyId: '9845210',
+  activeScopes: [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ],
+  scopesGrantedAt: new Date(Date.now() - 3600 * 1000).toISOString(),
+  tokenExpiresAt: Date.now() + 3600 * 1000,
+  lastRefreshedAt: new Date().toISOString(),
   watch: {
     enabled: true,
     topicName: process.env.GMAIL_PUBSUB_TOPIC || 'projects/tracexmail-enterprise/topics/inbox-watch',
@@ -132,6 +154,53 @@ const state: GmailServiceState = {
  * Returns current status of Gmail integration and quarantine engine.
  */
 export function getGmailStatus() {
+  const isReadonlyGranted = state.activeScopes.some(s => s.includes('gmail.readonly') || s === 'gmail.readonly');
+  const isModifyGranted = state.activeScopes.some(s => s.includes('gmail.modify') || s === 'gmail.modify');
+  const isUserInfoGranted = state.activeScopes.some(s => s.includes('userinfo.email') || s === 'userinfo.email');
+
+  const isExpired = state.tokenExpiresAt ? Date.now() > state.tokenExpiresAt : false;
+  let tokenStatus: 'active' | 'expiring_soon' | 'expired' | 'missing_scopes' | 'disconnected' = 'active';
+
+  if (!state.isConnected) {
+    tokenStatus = 'disconnected';
+  } else if (isExpired) {
+    tokenStatus = 'expired';
+  } else if (!isReadonlyGranted || !isModifyGranted) {
+    tokenStatus = 'missing_scopes';
+  } else if (state.tokenExpiresAt && state.tokenExpiresAt - Date.now() < 15 * 60 * 1000) {
+    tokenStatus = 'expiring_soon';
+  }
+
+  const scopesBreakdown: OAuthScopeDetail[] = [
+    {
+      scope: 'https://www.googleapis.com/auth/gmail.readonly',
+      shortName: 'gmail.readonly',
+      category: 'Ingestion & Header Forensics',
+      description: 'Allows reading raw RFC 822 email headers, MIME parts, attachments, and metadata for threat scoring & SPF/DKIM verification.',
+      granted: isReadonlyGranted,
+      required: true,
+      lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
+    },
+    {
+      scope: 'https://www.googleapis.com/auth/gmail.modify',
+      shortName: 'gmail.modify',
+      category: 'Quarantine & Label Remediation',
+      description: 'Allows applying the TraceXMail-Quarantine label and removing malicious items from INBOX to prevent employee execution.',
+      granted: isModifyGranted,
+      required: true,
+      lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
+    },
+    {
+      scope: 'https://www.googleapis.com/auth/userinfo.email',
+      shortName: 'userinfo.email',
+      category: 'Identity & Enclave Access',
+      description: 'Allows mapping mailbox identity and associating threat cases to the authorized tenant administrator.',
+      granted: isUserInfoGranted,
+      required: false,
+      lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
+    }
+  ];
+
   return {
     is_connected: state.isConnected,
     oauth_configured: state.oauthConfigured,
@@ -139,6 +208,18 @@ export function getGmailStatus() {
     last_polled_at: state.lastPolledAt,
     polling_interval_seconds: state.pollingIntervalSeconds,
     history_id: state.historyId,
+    oauth_scopes: {
+      active_scopes: state.activeScopes,
+      has_readonly: isReadonlyGranted,
+      has_modify: isModifyGranted,
+      has_userinfo: isUserInfoGranted,
+      token_status: tokenStatus,
+      last_refreshed_at: state.lastRefreshedAt,
+      scopes_granted_at: state.scopesGrantedAt,
+      token_expires_at: state.tokenExpiresAt,
+      expires_in_seconds: state.tokenExpiresAt ? Math.max(0, Math.floor((state.tokenExpiresAt - Date.now()) / 1000)) : 3600,
+      scopes_breakdown: scopesBreakdown
+    },
     watch: {
       enabled: state.watch.enabled,
       active: state.watch.active,
@@ -217,6 +298,42 @@ export function updateWatchConfig(config: Partial<WatchConfig>, orgId: string = 
   }
 
   return state.watch;
+}
+
+/**
+ * Refreshes the OAuth permissions state, renewing expiration timestamps and ensuring standard scopes.
+ */
+export function refreshOAuthPermissionsState(options?: {
+  scopes?: string[];
+  expiresInSeconds?: number;
+}): string[] {
+  state.activeScopes = options?.scopes || [
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/userinfo.email'
+  ];
+  state.scopesGrantedAt = new Date().toISOString();
+  state.lastRefreshedAt = new Date().toISOString();
+  state.tokenExpiresAt = Date.now() + (options?.expiresInSeconds || 3600) * 1000;
+  state.isConnected = true;
+  state.oauthConfigured = true;
+  return state.activeScopes;
+}
+
+/**
+ * Toggles a scope for testing/simulation of degraded permissions.
+ */
+export function toggleOAuthScopeSimulation(scopeName: 'gmail.readonly' | 'gmail.modify' | 'userinfo.email', grant: boolean): string[] {
+  const fullScope = scopeName.startsWith('http') ? scopeName : `https://www.googleapis.com/auth/${scopeName}`;
+  if (grant) {
+    if (!state.activeScopes.some(s => s.includes(scopeName))) {
+      state.activeScopes.push(fullScope);
+    }
+  } else {
+    state.activeScopes = state.activeScopes.filter(s => !s.includes(scopeName));
+  }
+  state.lastRefreshedAt = new Date().toISOString();
+  return state.activeScopes;
 }
 
 /**
@@ -386,6 +503,131 @@ export async function fetchGmailMessageRaw(messageId: string, accessToken?: stri
   } catch (err: any) {
     console.warn(`[GmailFetch] Failed fetching raw message ${messageId}:`, err?.message);
     return null;
+  }
+}
+
+/**
+ * Ensures a quarantine label exists in the user's real Gmail account.
+ * Creates it if not present and returns the label ID.
+ */
+export async function ensureGmailLabel(labelName: string, accessToken: string): Promise<string | null> {
+  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+    return null;
+  }
+
+  try {
+    // 1. Check existing labels
+    const listRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      timeout: 8000
+    });
+
+    const existing = (listRes.data?.labels || []).find(
+      (l: any) => l.name?.toLowerCase() === labelName.toLowerCase()
+    );
+    if (existing) {
+      return existing.id;
+    }
+
+    // 2. Create the label
+    const createRes = await axios.post(
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+      {
+        name: labelName,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show',
+        color: {
+          textColor: '#ffffff',
+          backgroundColor: '#cc3a21'
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 8000
+      }
+    );
+
+    return createRes.data?.id || null;
+  } catch (err: any) {
+    console.warn(`[GmailLabel] Could not ensure label ${labelName}:`, err?.response?.data || err?.message);
+    return null;
+  }
+}
+
+/**
+ * Modifies labels on a live Gmail message (e.g. adding Quarantine label, removing INBOX).
+ */
+export async function modifyGmailMessageLabels(
+  messageId: string,
+  addLabelNames: string[],
+  removeLabelNames: string[],
+  accessToken: string
+): Promise<boolean> {
+  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+    return false;
+  }
+
+  try {
+    const addLabelIds: string[] = [];
+    for (const name of addLabelNames) {
+      const id = await ensureGmailLabel(name, accessToken);
+      if (id) addLabelIds.push(id);
+    }
+
+    const removeLabelIds: string[] = [];
+    if (removeLabelNames.includes('INBOX')) {
+      removeLabelIds.push('INBOX');
+    }
+
+    await axios.post(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+      {
+        addLabelIds,
+        removeLabelIds
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
+      }
+    );
+    console.log(`[GmailModify] Successfully modified labels on message ${messageId} (added: ${addLabelNames.join(', ')}, removed: ${removeLabelNames.join(', ')})`);
+    return true;
+  } catch (err: any) {
+    console.warn(`[GmailModify] Failed modifying labels for message ${messageId}:`, err?.response?.data || err?.message);
+    return false;
+  }
+}
+
+/**
+ * Lists message IDs from the user's real Gmail mailbox.
+ */
+export async function listGmailMessages(
+  accessToken: string,
+  query: string = 'label:INBOX',
+  maxResults: number = 10
+): Promise<Array<{ id: string; threadId: string }>> {
+  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+    return [];
+  }
+
+  try {
+    const res = await axios.get(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 10000
+      }
+    );
+    return res.data?.messages || [];
+  } catch (err: any) {
+    console.warn('[GmailList] Failed listing messages from Gmail API:', err?.response?.data || err?.message);
+    return [];
   }
 }
 

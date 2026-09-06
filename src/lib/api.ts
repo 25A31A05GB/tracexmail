@@ -416,6 +416,32 @@ export const forensicApi = {
     return res.data;
   },
 
+  triageCase: async (caseId: string, payload: { status?: string; severity?: string; tags?: string[]; assigned_user?: string; analyst_notes?: string; analyst_verdict?: string }): Promise<any> => {
+    const res = await apiClient.post(`/cases/${caseId}/triage`, payload);
+    return res.data;
+  },
+
+  seedRealWorldCases: async (): Promise<{ status: string; seeded_cases_count: number; cases: CaseItem[] }> => {
+    const res = await apiClient.post('/cases/real-world/seed');
+    return res.data;
+  },
+
+  // Real-World Threat Feeds
+  getRealWorldThreatFeeds: async (): Promise<{ status: string; count: number; feeds: any[]; sources: string[]; last_synced: string }> => {
+    const res = await apiClient.get('/threat-feeds/real-world');
+    return res.data;
+  },
+
+  syncRealWorldThreatFeeds: async (): Promise<{ status: string; synced_count: number; alerts: any[]; timestamp: string }> => {
+    const res = await apiClient.post('/threat-feeds/sync');
+    return res.data;
+  },
+
+  convertThreatFeedToCase: async (threatId: string): Promise<any> => {
+    const res = await apiClient.post('/threat-feeds/convert-to-case', { threat_id: threatId });
+    return res.data;
+  },
+
   closeCase: async (caseId: string, payload: { analyst_verdict?: string; analyst_notes?: string; close_reason?: string; resolution_type?: string }): Promise<any> => {
     const res = await apiClient.post(`/cases/${caseId}/close`, payload);
     return res.data;

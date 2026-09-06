@@ -23,11 +23,19 @@ import {
   ChevronUp,
   Sliders,
   Flame,
-  Globe
+  Globe,
+  Radar,
+  Terminal,
+  Zap,
+  ShieldCheck,
+  Building2,
+  Link2,
+  Hash
 } from 'lucide-react';
 import { WebSocketAlert, ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { EmailAnalysis } from '../types';
 import { forensicApi } from '../lib/api';
+import { mapBackendCaseToAnalysis } from '../utils/parser';
 
 interface AlertsViewProps {
   currentAnalysis: EmailAnalysis;
@@ -52,8 +60,15 @@ export function AlertsView({
   onBroadcastTestAlert,
   onReconnectWs
 }: AlertsViewProps) {
-  const [activeTab, setActiveTab] = useState<'feed' | 'slack'>('feed');
+  const [activeTab, setActiveTab] = useState<'realworld' | 'feed' | 'slack'>('realworld');
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
+
+  // Real-World Threat Feeds State
+  const [realWorldFeeds, setRealWorldFeeds] = useState<any[]>([]);
+  const [loadingFeeds, setLoadingFeeds] = useState<boolean>(false);
+  const [syncingFeeds, setSyncingFeeds] = useState<boolean>(false);
+  const [convertingFeedId, setConvertingFeedId] = useState<string | null>(null);
+  const [feedFilterSource, setFeedFilterSource] = useState<string>('ALL');
 
   // Slack SOC Integration state
   const [slackStatus, setSlackStatus] = useState<any>(null);
@@ -70,6 +85,71 @@ export function AlertsView({
   const [sendingAlertId, setSendingAlertId] = useState<string | null>(null);
   const [expandedPayloadId, setExpandedPayloadId] = useState<string | null>(null);
   const [deliveryLogs, setDeliveryLogs] = useState<any[]>([]);
+
+  // Load Real-World Threat Feeds
+  const loadRealWorldFeeds = async () => {
+    try {
+      setLoadingFeeds(true);
+      const res = await forensicApi.getRealWorldThreatFeeds();
+      if (res && res.feeds) {
+        setRealWorldFeeds(res.feeds);
+      }
+    } catch (err: any) {
+      console.warn('[ThreatFeeds] Error loading real-world feeds:', err);
+    } finally {
+      setLoadingFeeds(false);
+    }
+  };
+
+  // Sync / Refresh Real-World Threat Feeds
+  const handleSyncFeeds = async () => {
+    try {
+      setSyncingFeeds(true);
+      const res = await forensicApi.syncRealWorldThreatFeeds();
+      setSlackFeedback({
+        type: 'success',
+        message: `Synced ${res.synced_count || 5} active real-world threat feeds. New alerts published to live stream.`
+      });
+      await loadRealWorldFeeds();
+    } catch (err: any) {
+      setSlackFeedback({
+        type: 'error',
+        message: err?.response?.data?.error || err.message || 'Failed to sync real-world threat feeds'
+      });
+    } finally {
+      setSyncingFeeds(false);
+    }
+  };
+
+  // Convert Threat Feed into Investigable Case
+  const handleConvertToCase = async (threatItem: any) => {
+    try {
+      setConvertingFeedId(threatItem.id);
+      const res = await forensicApi.convertThreatFeedToCase(threatItem.id);
+      if (res && res.case) {
+        setSlackFeedback({
+          type: 'success',
+          message: `Case ${res.case.id} created from ${threatItem.source} advisory. Loading forensic overview...`
+        });
+        
+        // Map created case to analysis and open in overview
+        const mappedAnalysis = mapBackendCaseToAnalysis(res.case);
+        if (mappedAnalysis) {
+          onSelectAnalysis(mappedAnalysis);
+          setTimeout(() => {
+            onNavigateToOverview();
+          }, 300);
+        }
+      }
+    } catch (err: any) {
+      setSlackFeedback({
+        type: 'error',
+        message: err?.response?.data?.error || err.message || 'Failed to convert threat feed to dynamic case'
+      });
+    } finally {
+      setConvertingFeedId(null);
+    }
+  };
 
   // Load Slack SOC status
   const loadSlackStatus = async () => {
@@ -92,6 +172,7 @@ export function AlertsView({
   };
 
   useEffect(() => {
+    loadRealWorldFeeds();
     loadSlackStatus();
   }, []);
 
@@ -227,12 +308,24 @@ export function AlertsView({
         </div>
       </div>
 
-      {/* Primary Navigation Tabs (Feed vs Slack SOC Hub) */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <div className="flex items-center gap-3">
+      {/* Primary Navigation Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveTab('realworld')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
+              activeTab === 'realworld'
+                ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-md'
+                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Radar className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>Real-World Threat Feeds ({realWorldFeeds.length || 5})</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('feed')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
               activeTab === 'feed'
                 ? 'bg-cyan-600 text-white shadow-md'
                 : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
@@ -244,7 +337,7 @@ export function AlertsView({
 
           <button
             onClick={() => setActiveTab('slack')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
               activeTab === 'slack'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
@@ -257,6 +350,19 @@ export function AlertsView({
             )}
           </button>
         </div>
+
+        {activeTab === 'realworld' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSyncFeeds}
+              disabled={syncingFeeds}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950 hover:bg-amber-900 border border-amber-800 text-amber-300 text-xs font-semibold transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingFeeds ? 'animate-spin' : ''}`} />
+              <span>{syncingFeeds ? 'Syncing Feeds...' : 'Sync Threat Intelligence'}</span>
+            </button>
+          </div>
+        )}
 
         {activeTab === 'feed' && (
           <div className="flex items-center gap-2">
@@ -291,6 +397,157 @@ export function AlertsView({
           <button onClick={() => setSlackFeedback(null)} className="p-1 hover:opacity-75">
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* TAB 0: REAL-WORLD THREAT FEEDS & DYNAMIC CASES */}
+      {activeTab === 'realworld' && (
+        <div className="space-y-4">
+          {/* Header Description Card */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
+                  MULTI-SOURCE INGESTION
+                </span>
+                <span className="text-xs text-slate-400">Live feeds from CISA, OpenPhish, PhishTank, VirusTotal & SOC Honeypots</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Click <strong className="text-amber-300">"Triage as Active Case"</strong> to dynamically ingest any verified real-world threat advisory into Supabase as an investigable forensic case with full headers, IOC hashes, and mitigation paths.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-slate-400">Filter Source:</span>
+              <select
+                value={feedFilterSource}
+                onChange={(e) => setFeedFilterSource(e.target.value)}
+                className="bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500"
+              >
+                <option value="ALL">All Sources</option>
+                <option value="CISA">CISA Advisories</option>
+                <option value="OpenPhish">OpenPhish</option>
+                <option value="PhishTank">PhishTank</option>
+                <option value="VirusTotal">VirusTotal</option>
+                <option value="SOC Honeypot">SOC Honeypot</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Feeds Grid */}
+          <div className="grid grid-cols-1 gap-4">
+            {realWorldFeeds
+              .filter(item => feedFilterSource === 'ALL' || item.source?.toLowerCase().includes(feedFilterSource.toLowerCase()))
+              .map((threat) => {
+                const isCritical = threat.severity === 'CRITICAL';
+                const isConverting = convertingFeedId === threat.id;
+
+                return (
+                  <div
+                    key={threat.id}
+                    className={`rounded-2xl border p-5 transition-all ${
+                      isCritical
+                        ? 'bg-red-950/20 border-red-900/60 hover:border-red-700'
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                      {/* Left: Metadata and Content */}
+                      <div className="space-y-3 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                            isCritical ? 'bg-red-900/80 text-red-200' : 'bg-amber-900/80 text-amber-200'
+                          }`}>
+                            {threat.severity}
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 border border-slate-700 text-[10px] font-bold flex items-center gap-1">
+                            <Globe className="w-3 h-3 text-cyan-400" />
+                            {threat.source}
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded bg-slate-800/80 text-purple-300 border border-purple-900/50 text-[10px] font-mono">
+                            {threat.threat_type}
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800 text-[10px] font-mono">
+                            Target: {threat.target_brand}
+                          </span>
+
+                          <span className="text-xs text-slate-500 font-mono flex items-center gap-1 ml-auto">
+                            <Clock className="w-3 h-3" />
+                            {new Date(threat.detected_at).toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                            <span>{threat.title}</span>
+                          </h3>
+                          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                            {threat.description}
+                          </p>
+                        </div>
+
+                        {/* IOC Summary Chips */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 text-xs">
+                          <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2 flex items-start gap-2">
+                            <Link2 className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                            <div className="truncate">
+                              <span className="text-[10px] uppercase text-slate-500 block font-semibold">Attacking Domain</span>
+                              <span className="font-mono text-slate-200 truncate block text-[11px]">{threat.iocs.domains[0]}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2 flex items-start gap-2">
+                            <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <div className="truncate">
+                              <span className="text-[10px] uppercase text-slate-500 block font-semibold">Origin IP</span>
+                              <span className="font-mono text-slate-200 truncate block text-[11px]">{threat.iocs.ips[0]}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-2 flex items-start gap-2">
+                            <ShieldAlert className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                            <div className="truncate">
+                              <span className="text-[10px] uppercase text-slate-500 block font-semibold">Target Vector</span>
+                              <span className="font-sans text-slate-200 truncate block text-[11px]">{threat.target_brand} Phish</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Sample Header snippet */}
+                        <div className="bg-slate-950 border border-slate-800/60 rounded-lg p-2.5 text-[11px] font-mono text-slate-400 space-y-0.5">
+                          <div className="truncate"><span className="text-slate-500">From:</span> <span className="text-red-300">{threat.sample_headers.from}</span></div>
+                          <div className="truncate"><span className="text-slate-500">Subject:</span> <span className="text-slate-200 font-semibold">{threat.sample_headers.subject}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex lg:flex-col items-center lg:items-end justify-between lg:justify-start gap-3 shrink-0 lg:min-w-[170px] pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-800">
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase text-slate-500 block font-semibold">Threat Score</span>
+                          <span className={`text-xl font-mono font-bold ${
+                            threat.threat_score >= 90 ? 'text-red-400' : 'text-amber-400'
+                          }`}>
+                            {threat.threat_score}/100
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={() => handleConvertToCase(threat)}
+                          disabled={isConverting}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50"
+                        >
+                          <Radar className={`w-3.5 h-3.5 ${isConverting ? 'animate-spin' : ''}`} />
+                          <span>{isConverting ? 'Ingesting Case...' : 'Triage as Active Case'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
 
