@@ -163,6 +163,29 @@ export function useWebSocketAlerts() {
           if (data && data.type === 'CASE_CREATED' && data.case?.id) {
             setLastCreatedCaseId(data.case.id);
           }
+          if (data && data.type === 'GMAIL_SYNC_COMPLETE') {
+            if (data.latest_case_id) {
+              setLastCreatedCaseId(data.latest_case_id);
+            }
+            const syncAlert: WebSocketAlert = {
+              id: `sync_${Date.now()}`,
+              case_id: data.latest_case_id,
+              timestamp: data.timestamp || new Date().toISOString(),
+              severity: data.quarantine_status === 'HOLD_QUARANTINED' ? 'HIGH' : 'INFO',
+              title: data.quarantine_status === 'HOLD_QUARANTINED'
+                ? 'Gmail Auto-Sync: Pre-Delivery Threat Intercepted'
+                : 'Gmail Mailbox Sync Complete',
+              description: data.quarantine_status === 'HOLD_QUARANTINED'
+                ? `Sync evaluated ${data.processed_count || 1} email(s). Quarantined high-risk item: "${data.subject || 'Suspicious Email'}" before delivery.`
+                : `Successfully polled mailbox. ${data.processed_count || 1} email(s) ingested and verified (${data.delivery_stage || 'post-delivery-alert'} - ${data.quarantine_status || 'AUDITED'}).`,
+              source: 'gmail-sync-engine',
+              read: false,
+              threat_score: data.quarantine_status === 'HOLD_QUARANTINED' ? 88 : 15,
+              category: 'GMAIL_SYNC',
+              subject: data.subject
+            };
+            addAlert(syncAlert);
+          }
           if (data && (data.title || data.type === 'ALERT')) {
             const rawAlert = data.alert || data;
             const incoming: WebSocketAlert = {

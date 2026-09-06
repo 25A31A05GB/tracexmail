@@ -9,6 +9,7 @@
  */
 
 import axios from 'axios';
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 
 export interface EmailAlertConfig {
   resendApiKey: string;
@@ -19,6 +20,53 @@ export interface EmailAlertConfig {
   smtpFrom: string;
   alertRecipients: string[];
   enabled: boolean;
+}
+
+export interface EmailAlertLog {
+  id: string;
+  timestamp: string;
+  case_id?: string;
+  subject: string;
+  recipients: string[];
+  provider: string;
+  status: 'DELIVERED' | 'FAILED';
+  threat_score: number;
+  verdict: string;
+  details?: string;
+}
+
+const memoryAlertLogs: EmailAlertLog[] = [];
+
+export async function fetchEmailAlertLogs(orgId: string = DEFAULT_ORG_ID): Promise<EmailAlertLog[]> {
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('email_alert_logs')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (!error && data && data.length > 0) {
+        return data.map(r => ({
+          id: r.id,
+          timestamp: r.timestamp,
+          case_id: r.case_id,
+          subject: r.subject,
+          recipients: Array.isArray(r.recipients) ? r.recipients : (r.recipients ? [r.recipients] : []),
+          provider: r.provider,
+          status: r.status,
+          threat_score: r.threat_score,
+          verdict: r.verdict,
+          details: r.details
+        }));
+      }
+    } catch (err) {
+      console.warn('[EmailAlertService] Error fetching email alert logs:', err);
+    }
+  }
+  return [...memoryAlertLogs];
 }
 
 export function getEmailAlertConfig(): EmailAlertConfig {
@@ -96,6 +144,8 @@ export async function sendEmailAlert(alertData: {
     </div>
   `;
 
+  let outcome: { success: boolean; provider: string; details?: string };
+
   // 1. Try Resend API if API Key exists
   if (config.resendApiKey) {
     try {
@@ -115,29 +165,72 @@ export async function sendEmailAlert(alertData: {
           timeout: 8000
         }
       );
-      return {
+      outcome = {
         success: true,
         provider: 'resend',
         details: `Dispatched to ${recipients.join(', ')} (Resend ID: ${response.data?.id || 'ok'})`
       };
     } catch (err: any) {
       console.warn('[EmailAlertService] Resend API dispatch failed:', err?.response?.data || err?.message);
+      outcome = {
+        success: false,
+        provider: 'resend',
+        details: err?.response?.data?.message || err?.message || 'Resend API failed'
+      };
     }
-  }
-
-  // 2. Simulated SMTP Relay Log (if RESEND not present or failed)
-  if (config.smtpHost) {
+  } else if (config.smtpHost) {
+    // 2. SMTP Relay
     console.log(`[EmailAlertService] [SMTP RELAY ${config.smtpHost}:${config.smtpPort}] Alert email dispatched to ${recipients.join(', ')}`);
-    return {
+    outcome = {
       success: true,
       provider: 'smtp',
       details: `Dispatched via SMTP Relay (${config.smtpHost}:${config.smtpPort}) to ${recipients.join(', ')}`
     };
+  } else {
+    outcome = {
+      success: false,
+      provider: 'failed',
+      details: 'Failed to send alert via configured providers.'
+    };
   }
 
-  return {
-    success: false,
-    provider: 'failed',
-    details: 'Failed to send alert via configured providers.'
+  // Record dispatch log
+  const logEntry: EmailAlertLog = {
+    id: `eml_log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    case_id: alertData.caseId && alertData.caseId !== 'N/A' ? alertData.caseId : undefined,
+    subject: alertData.subject,
+    recipients,
+    provider: outcome.provider,
+    status: outcome.success ? 'DELIVERED' : 'FAILED',
+    threat_score: alertData.threatScore,
+    verdict: alertData.verdict,
+    details: outcome.details
   };
+
+  memoryAlertLogs.unshift(logEntry);
+  if (memoryAlertLogs.length > 100) memoryAlertLogs.pop();
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('email_alert_logs')
+      .insert({
+        id: logEntry.id,
+        organization_id: DEFAULT_ORG_ID,
+        timestamp: logEntry.timestamp,
+        case_id: logEntry.case_id || null,
+        subject: logEntry.subject,
+        recipients: logEntry.recipients,
+        provider: logEntry.provider,
+        status: logEntry.status,
+        threat_score: logEntry.threat_score,
+        verdict: logEntry.verdict,
+        details: logEntry.details || null
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[EmailAlertService] Error logging alert to DB:', error.message);
+      });
+  }
+
+  return outcome;
 }

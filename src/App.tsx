@@ -32,6 +32,9 @@ import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
 import { PrivacyConfig, loadPrivacyConfig, savePrivacyConfig } from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
 import { Loader2 } from 'lucide-react';
+import { OAuthConsentScreen } from './components/OAuthConsentScreen';
+import { forensicApi } from './lib/api';
+import { mapBackendCaseToAnalysis } from './utils/parser';
 
 export default function App() {
   const publicPath = window.location.pathname;
@@ -42,6 +45,10 @@ export default function App() {
 
   if (publicPath === '/terms') {
     return <LegalPage type="terms" />;
+  }
+
+  if (publicPath === '/oauth/consent' || publicPath === '/oauth/authorize') {
+    return <OAuthConsentScreen />;
   }
 
   // Real Supabase Auth & RBAC hook
@@ -156,9 +163,33 @@ export default function App() {
     setCasesRefreshSignal(prev => prev + 1);
   };
 
-  const handleToastInspect = (alert: WebSocketAlert) => {
-    const matchingSample = SAMPLE_ANALYSES.find(s => s.id === alert.case_id) || SAMPLE_ANALYSES[0];
-    setCurrentAnalysis(matchingSample);
+  const handleToastInspect = async (alert: WebSocketAlert) => {
+    if (alert.case_id) {
+      const matchingSample = SAMPLE_ANALYSES.find(s => s.id === alert.case_id);
+      if (matchingSample) {
+        setCurrentAnalysis(matchingSample);
+        setActiveTab('overview');
+        return;
+      }
+      try {
+        const fetchedCase = await forensicApi.getCase(alert.case_id);
+        if (fetchedCase) {
+          const mapped = mapBackendCaseToAnalysis(fetchedCase);
+          setCurrentAnalysis(mapped);
+          setActiveTab('overview');
+          return;
+        }
+      } catch (err) {
+        console.warn('Could not fetch specific case from backend, opening cases list:', err);
+      }
+    }
+    // If it's a general Gmail sync completion without a specific case or fallback
+    if (alert.category === 'GMAIL_SYNC') {
+      setActiveTab('cases');
+      setCasesRefreshSignal(prev => prev + 1);
+      return;
+    }
+    setCurrentAnalysis(SAMPLE_ANALYSES[0]);
     setActiveTab('overview');
   };
 

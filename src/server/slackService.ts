@@ -1,3 +1,6 @@
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
+import { encryptToken, decryptToken } from '../utils/crypto';
+
 export interface SlackConfig {
   botToken: string;
   channelId: string;
@@ -46,15 +49,145 @@ export function getSlackConfig(): SlackConfig {
   };
 }
 
-export function updateSlackConfig(updates: Partial<SlackConfig>): SlackConfig {
+export function updateSlackConfig(updates: Partial<SlackConfig>, orgId: string = DEFAULT_ORG_ID): SlackConfig {
   slackConfig = {
     ...slackConfig,
     ...updates
   };
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    const encryptedBotToken = updates.botToken ? encryptToken(updates.botToken) : undefined;
+    const encryptedWebhookUrl = updates.webhookUrl ? encryptToken(updates.webhookUrl) : undefined;
+
+    const row: any = {
+      id: `slack_cfg_${orgId}`,
+      organization_id: orgId,
+      channel_id: slackConfig.channelId,
+      min_severity: slackConfig.minSeverity,
+      auto_send_alerts: slackConfig.autoSendAlerts,
+      username: slackConfig.username || 'TraceXMail SOC Engine',
+      updated_at: new Date().toISOString()
+    };
+    if (encryptedBotToken !== undefined) row.bot_token_encrypted = encryptedBotToken;
+    if (encryptedWebhookUrl !== undefined) row.webhook_url_encrypted = encryptedWebhookUrl;
+
+    supabase.from('slack_config')
+      .upsert(row, { onConflict: 'organization_id' })
+      .then(({ error }) => {
+        if (error) console.warn('[SlackService] Error persisting slack_config to DB:', error.message);
+      });
+  }
+
   return getSlackConfig();
 }
 
+export async function syncSlackConfigFromDb(orgId: string = DEFAULT_ORG_ID): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('slack_config')
+      .select('*')
+      .eq('organization_id', orgId)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    if (data.channel_id) slackConfig.channelId = data.channel_id;
+    if (data.min_severity) slackConfig.minSeverity = data.min_severity;
+    if (typeof data.auto_send_alerts === 'boolean') slackConfig.autoSendAlerts = data.auto_send_alerts;
+    if (data.username) slackConfig.username = data.username;
+    if (data.bot_token_encrypted) {
+      try {
+        slackConfig.botToken = decryptToken(data.bot_token_encrypted);
+      } catch (err) {
+        console.warn('[SlackService] Error decrypting bot token from DB:', err);
+      }
+    }
+    if (data.webhook_url_encrypted) {
+      try {
+        slackConfig.webhookUrl = decryptToken(data.webhook_url_encrypted);
+      } catch (err) {
+        console.warn('[SlackService] Error decrypting webhook URL from DB:', err);
+      }
+    }
+    console.log('[SlackService] Synchronized slack_config from Supabase for org:', orgId);
+  } catch (err) {
+    console.warn('[SlackService] Failed syncing slack_config from DB:', err);
+  }
+}
+
+// Initial sync
+syncSlackConfigFromDb().catch(() => {});
+
+export function recordDeliveryLog(log: SlackDeliveryLog, orgId: string = DEFAULT_ORG_ID) {
+  deliveryLogs.unshift(log);
+  if (deliveryLogs.length > 100) deliveryLogs.pop();
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('slack_delivery_logs')
+      .insert({
+        id: log.id,
+        organization_id: orgId,
+        timestamp: log.timestamp,
+        case_id: log.case_id && log.case_id !== 'N/A' ? log.case_id : null,
+        alert_id: log.alert_id,
+        subject: log.subject,
+        severity: log.severity,
+        threat_score: log.threat_score,
+        status: log.status,
+        status_code: log.status_code || null,
+        error: log.error || null,
+        bot_token_masked: log.bot_token_masked || null,
+        channel_id: log.channel_id || null,
+        webhook_url_masked: log.webhook_url_masked || null,
+        payload_preview: log.payload_preview || null
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[SlackService] Error writing delivery log to DB:', error.message);
+      });
+  }
+}
+
 export function getSlackDeliveries(): SlackDeliveryLog[] {
+  return [...deliveryLogs];
+}
+
+export async function fetchSlackDeliveries(orgId: string = DEFAULT_ORG_ID): Promise<SlackDeliveryLog[]> {
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('slack_delivery_logs')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (!error && data && data.length > 0) {
+        return data.map(r => ({
+          id: r.id,
+          timestamp: r.timestamp,
+          case_id: r.case_id,
+          alert_id: r.alert_id,
+          subject: r.subject,
+          severity: r.severity,
+          threat_score: r.threat_score,
+          status: r.status,
+          status_code: r.status_code,
+          error: r.error,
+          bot_token_masked: r.bot_token_masked,
+          channel_id: r.channel_id,
+          webhook_url_masked: r.webhook_url_masked,
+          payload_preview: r.payload_preview
+        }));
+      }
+    } catch (err) {
+      console.warn('[SlackService] Failed fetching slack delivery logs from Supabase:', err);
+    }
+  }
   return [...deliveryLogs];
 }
 
@@ -386,6 +519,7 @@ export async function sendSlackSecurityAlert(
       status: 'DISABLED',
       error: 'Missing SLACK_BOT_TOKEN or SLACK_CHANNEL_ID'
     };
+    recordDeliveryLog(log);
     return log;
   }
 
@@ -459,8 +593,7 @@ export async function sendSlackSecurityAlert(
           channel_id: channelId,
           payload_preview: { text, blocks }
         };
-        deliveryLogs.unshift(log);
-        if (deliveryLogs.length > 100) deliveryLogs.pop();
+        recordDeliveryLog(log);
         return log;
       } else {
         const reason = data.error || `HTTP ${response.status} ${response.statusText}`;
@@ -480,8 +613,7 @@ export async function sendSlackSecurityAlert(
           channel_id: channelId,
           payload_preview: { text, blocks }
         };
-        deliveryLogs.unshift(log);
-        if (deliveryLogs.length > 100) deliveryLogs.pop();
+        recordDeliveryLog(log);
         return log;
       }
     } else {
@@ -507,8 +639,7 @@ export async function sendSlackSecurityAlert(
           webhook_url_masked: maskWebhookUrl(webhookUrl!),
           payload_preview: { text, blocks }
         };
-        deliveryLogs.unshift(log);
-        if (deliveryLogs.length > 100) deliveryLogs.pop();
+        recordDeliveryLog(log);
         return log;
       } else {
         const errBody = await response.text();
@@ -527,8 +658,7 @@ export async function sendSlackSecurityAlert(
           webhook_url_masked: maskWebhookUrl(webhookUrl!),
           payload_preview: { text, blocks }
         };
-        deliveryLogs.unshift(log);
-        if (deliveryLogs.length > 100) deliveryLogs.pop();
+        recordDeliveryLog(log);
         return log;
       }
     }
@@ -549,8 +679,7 @@ export async function sendSlackSecurityAlert(
       channel_id: channelId,
       payload_preview: { text, blocks }
     };
-    deliveryLogs.unshift(log);
-    if (deliveryLogs.length > 100) deliveryLogs.pop();
+    recordDeliveryLog(log);
     return log;
   }
 }

@@ -25,7 +25,8 @@ import {
   Clock,
   ShieldAlert,
   RotateCcw,
-  Info
+  Info,
+  Mail
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -34,17 +35,22 @@ import { apiFetch } from '../lib/api';
 import { ForensicScanAnimationModal } from './ForensicScanAnimationModal';
 import { AlertToast } from './AlertToast';
 import { WebSocketAlert } from '../hooks/useWebSocketAlerts';
+import { GmailConnectionView } from './GmailConnectionView';
 
 interface IngestionPipelineViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
   onNavigateToOverview: () => void;
+  defaultTab?: 'paste' | 'upload' | 'batch' | 'gmail';
+  onNewCasesProcessed?: () => void;
 }
 
 export function IngestionPipelineView({
   onSelectAnalysis,
-  onNavigateToOverview
+  onNavigateToOverview,
+  defaultTab = 'paste',
+  onNewCasesProcessed
 }: IngestionPipelineViewProps) {
-  const [activeTab, setActiveTab] = useState<'paste' | 'upload' | 'batch'>('paste');
+  const [activeTab, setActiveTab] = useState<'paste' | 'upload' | 'batch' | 'gmail'>(defaultTab);
   const [rawText, setRawText] = useState('');
   const [fileName, setFileName] = useState('raw_email.eml');
   const [isScanning, setIsScanning] = useState(false);
@@ -516,6 +522,20 @@ export function IngestionPipelineView({
               <Cpu className="w-3.5 h-3.5 text-[var(--stamp)]" />
               <span>Forensic Preset Cases</span>
             </button>
+            <button
+              onClick={() => setActiveTab('gmail')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'gmail'
+                  ? 'border-[#d97706] text-[var(--paper)]'
+                  : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-[#d97706]" />
+              <span className="flex items-center gap-1.5">
+                <span>Gmail Live Auto-Sync</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </span>
+            </button>
           </div>
 
           {activeTab === 'paste' && (
@@ -599,6 +619,12 @@ export function IngestionPipelineView({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'gmail' && (
+            <div className="pt-2">
+              <GmailConnectionView onNewCasesProcessed={onNewCasesProcessed} />
             </div>
           )}
         </div>

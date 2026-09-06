@@ -57,12 +57,15 @@ import { parse as parseHtml } from 'node-html-parser';
 import { GoogleGenAI } from '@google/genai';
 import { authenticate } from 'mailauth';
 import PDFDocument from 'pdfkit';
+import axios from 'axios';
 import {
   getGmailStatus,
   updateQuarantineConfig,
   updateWatchConfig,
   handlePubSubPush,
   getQuarantineAuditLog,
+  fetchQuarantineAuditLogs,
+  saveGmailConnectionToDb,
   disconnectGmail,
   processInboundQuarantineGate,
   startGmailWatch,
@@ -74,6 +77,7 @@ import {
   getSlackConfig,
   updateSlackConfig,
   getSlackDeliveries,
+  fetchSlackDeliveries,
   dispatchSlackCaseAlert,
   sendTestSlackAlert,
   sendSlackSecurityAlert,
@@ -95,12 +99,13 @@ import {
   type UserContext,
   type AuthenticatedRequest
 } from './src/server/compliance';
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
   handlePingNetwork,
   handleGetBandwidthPayload
 } from './src/server/networkIntelligenceService';
-import { sendEmailAlert, getEmailAlertConfig } from './src/server/emailAlertService';
+import { sendEmailAlert, getEmailAlertConfig, fetchEmailAlertLogs } from './src/server/emailAlertService';
 
 import {
   recordCorrectionIfDiscrepancy,
@@ -114,6 +119,7 @@ import { authLimiter, publicLimiter, authenticatedLimiter } from './src/server/r
 import {
   validateRequest,
   isPlausibleRfc822,
+  postUploadRfc822Validator,
   ipParamSchema,
   domainParamSchema,
   caseIdParamSchema,
@@ -127,26 +133,55 @@ import {
 } from './src/server/validation';
 import { errorHandler } from './src/server/errorHandler';
 
-// Multer memory storage for uploads with strict size limits and file filtering
+// Strict set of allowed email MIME types
+const ALLOWED_EMAIL_MIME_TYPES = new Set([
+  'message/rfc822',
+  'message/delivery-status',
+  'message/disposition-notification',
+  'message/global',
+  'message/global-delivery-status',
+  'message/global-headers',
+  'text/rfc822-headers',
+  'application/vnd.ms-outlook',
+  'application/x-msg',
+  'application/msg',
+  'text/plain',
+  'application/octet-stream' // Permitted only in combination with email extensions (.eml, .msg, .rfc822, .mime, .txt)
+]);
+
+// Multer memory storage for uploads with strict 20MB size limits and email MIME filtering
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 20 * 1024 * 1024, // Strict 20MB limit per file
+    files: 20, // Max 20 files per batch
+    fieldSize: 20 * 1024 * 1024,
+    fields: 30,
+    parts: 100
   },
   fileFilter: (_req, file, cb) => {
     const allowedExtensions = /\.(eml|msg|txt|mime|rfc822)$/i;
-    const allowedMimeTypes = /^(message\/rfc822|text\/plain|text\/html|text\/richtext|application\/octet-stream|application\/vnd\.ms-outlook)$/i;
+    const normalizedMime = (file.mimetype || '').toLowerCase().trim();
 
-    const extMatch = allowedExtensions.test(file.originalname);
-    const mimeMatch = allowedMimeTypes.test(file.mimetype);
-
-    if (extMatch || mimeMatch) {
-      cb(null, true);
-    } else {
-      const error: any = new Error('Invalid file type. Only email files (.eml, .msg, .txt) are permitted.');
+    // 1. Strictly reject non-email MIME types
+    if (!ALLOWED_EMAIL_MIME_TYPES.has(normalizedMime)) {
+      const error: any = new Error(
+        `Rejected non-email MIME type '${file.mimetype}'. Only email MIME types (e.g., message/rfc822, application/vnd.ms-outlook, text/plain) are permitted.`
+      );
       error.code = 'INVALID_FILE_TYPE';
-      cb(error);
+      return cb(error);
     }
+
+    // 2. Reject non-email file extensions
+    if (!allowedExtensions.test(file.originalname)) {
+      const error: any = new Error(
+        `Rejected file with invalid extension '${file.originalname}'. Only email files (.eml, .msg, .txt, .mime, .rfc822) are permitted.`
+      );
+      error.code = 'INVALID_FILE_TYPE';
+      return cb(error);
+    }
+
+    cb(null, true);
   }
 });
 
@@ -2237,11 +2272,11 @@ Link: https://verify-auth-portal.net/login`;
     }
   };
 
-  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
-  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20), handleAnalyzeBatch);
-  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
-  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20), handleAnalyzeBatch);
-  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20), handleAnalyze);
+  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
 
   // Machine Learning Model Metrics & Forensic Evaluation Telemetry
   const handleMlMetrics = (_req: express.Request, res: express.Response) => {
@@ -2557,18 +2592,212 @@ Link: https://verify-auth-portal.net/login`;
     res.json(getGmailStatus());
   });
 
+  function escapeHtml(str: string): string {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // 2. Start Gmail OAuth Flow
-  app.get('/api/gmail/oauth/start', (_req, res) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID || 'tracexmail-soc-client';
-    const redirectUri = `${_req.protocol}://${_req.get('host')}/oauth/gmail/callback`;
-    const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify');
+  app.get(['/api/gmail/oauth/start', '/api/auth/url'], (req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/oauth/gmail/callback`;
+    const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
 
     // Return authorization URL
     res.json({
       status: 'ok',
       url: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`,
-      scopes: ['gmail.readonly', 'gmail.modify'],
+      redirect_uri: redirectUri,
+      scopes: ['gmail.readonly', 'gmail.modify', 'userinfo.email'],
       mode: 'real-time-pubsub-push'
+    });
+  });
+
+  // 2b. Gmail OAuth Callback (RFC 6749 Compliant Popup Receiver)
+  app.get(['/oauth/gmail/callback', '/api/oauth/gmail/callback', '/auth/callback', '/api/v1/gmail/callback'], async (req, res) => {
+    const code = req.query.code as string | undefined;
+    const error = req.query.error as string | undefined;
+
+    if (error || !code) {
+      const errorMsg = error || 'Missing authorization code from Google OAuth response';
+      return res.status(400).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><meta charset="utf-8"><title>Gmail Authorization Failed</title></head>
+          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #ef4444; padding: 40px; text-align: center;">
+            <h2 style="margin-bottom: 8px;">Authorization Failed</h2>
+            <p style="color: #94a3b8; font-size: 14px;">${escapeHtml(errorMsg)}</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'GMAIL_OAUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
+                setTimeout(() => window.close(), 2500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+
+    const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/oauth/gmail/callback`;
+
+    try {
+      let accessToken = 'mock_oauth2_access_token_encrypted';
+      let refreshToken = 'mock_oauth2_refresh_token_encrypted';
+      let expiresIn = 3600;
+      let emailAddress = 'security-soc@acmedefense.sec';
+
+      if (clientId && clientSecret) {
+        // Live token exchange with Google OAuth2 servers
+        const tokenResp = await axios.post('https://oauth2.googleapis.com/token', {
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code'
+        });
+        accessToken = tokenResp.data.access_token;
+        refreshToken = tokenResp.data.refresh_token || refreshToken;
+        expiresIn = tokenResp.data.expires_in || 3600;
+
+        try {
+          const userResp = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+          });
+          if (userResp.data?.email) {
+            emailAddress = userResp.data.email;
+          }
+        } catch (e) {
+          console.warn('[GmailOAuth] Could not fetch user profile email:', e);
+        }
+      } else {
+        emailAddress = (req.query.email as string) || 'analyst@acmedefense.sec';
+      }
+
+      // Persist connection & encrypted tokens in Supabase `gmail_connections`
+      await saveGmailConnectionToDb({
+        orgId: DEFAULT_ORG_ID,
+        emailAddress,
+        accessToken,
+        refreshToken,
+        expiresInSeconds: expiresIn,
+        isConnected: true
+      });
+
+      console.log(`[GmailOAuth] Successfully connected Gmail mailbox: ${emailAddress}`);
+
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+          <head><meta charset="utf-8"><title>Gmail Connection Established</title></head>
+          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #5fae82; padding: 40px; text-align: center;">
+            <h2 style="margin-bottom: 8px;">Gmail Connected Successfully</h2>
+            <p style="color: #94a3b8; font-size: 14px;">Account: <strong style="color: #e2e8f0;">${escapeHtml(emailAddress)}</strong></p>
+            <p style="color: #64748b; font-size: 12px; margin-top: 16px;">This popup window will close automatically...</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({
+                  type: 'GMAIL_OAUTH_SUCCESS',
+                  email: ${JSON.stringify(emailAddress)},
+                  connected: true
+                }, '*');
+                setTimeout(() => window.close(), 1200);
+              } else {
+                window.location.href = '/';
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    } catch (err: any) {
+      console.error('[GmailOAuth] Code exchange error:', err?.response?.data || err?.message);
+      const errorDesc = err?.response?.data?.error_description || err?.message || 'Failed exchanging authorization code for tokens';
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head><meta charset="utf-8"><title>OAuth Error</title></head>
+          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #ef4444; padding: 40px; text-align: center;">
+            <h2 style="margin-bottom: 8px;">Authorization Error</h2>
+            <p style="color: #94a3b8; font-size: 14px;">${escapeHtml(errorDesc)}</p>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'GMAIL_OAUTH_ERROR', error: ${JSON.stringify(errorDesc)} }, '*');
+                setTimeout(() => window.close(), 2500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // 2c. Generic OAuth 2.0 Authorization Endpoint (Consent decision handler)
+  app.post('/api/oauth/v1/authorize', (req, res) => {
+    const { client_id, redirect_uri, state, scope, response_type, user_id, user_email, decision } = req.body;
+
+    if (!redirect_uri) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is required' });
+    }
+
+    if (decision === 'deny') {
+      const url = new URL(redirect_uri);
+      url.searchParams.set('error', 'access_denied');
+      url.searchParams.set('error_description', 'The user denied the consent request');
+      if (state) url.searchParams.set('state', state);
+      return res.json({ redirect_url: url.toString() });
+    }
+
+    // Generate secure authorization code
+    const authCode = `auth_${Buffer.from(`${client_id}:${Date.now()}:${Math.random()}`).toString('base64url').substring(0, 32)}`;
+
+    const targetUrl = new URL(redirect_uri);
+    targetUrl.searchParams.set('code', authCode);
+    if (state) targetUrl.searchParams.set('state', state);
+
+    res.json({
+      status: 'authorized',
+      code: authCode,
+      redirect_url: targetUrl.toString(),
+      user: { id: user_id, email: user_email },
+      scope: scope || 'read:profile'
+    });
+  });
+
+  // 2d. Generic OAuth 2.0 Token Exchange Endpoint (/oauth/token)
+  app.post(['/api/oauth/v1/token', '/oauth/token'], (req, res) => {
+    const { grant_type, code, client_id, client_secret, redirect_uri } = req.body;
+
+    if (grant_type !== 'authorization_code') {
+      return res.status(400).json({
+        error: 'unsupported_grant_type',
+        error_description: 'Only authorization_code grant type is supported'
+      });
+    }
+
+    if (!code) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'authorization code is missing'
+      });
+    }
+
+    const accessToken = `atk_${Buffer.from(`access:${client_id || 'client'}:${Date.now()}`).toString('base64url').substring(0, 48)}`;
+    const refreshToken = `rtk_${Buffer.from(`refresh:${client_id || 'client'}:${Date.now()}`).toString('base64url').substring(0, 48)}`;
+
+    res.json({
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expires_in: 3600,
+      refresh_token: refreshToken,
+      scope: 'read:profile read:cases',
+      created_at: Math.floor(Date.now() / 1000)
     });
   });
 
@@ -2651,6 +2880,19 @@ Verification Gateway: https://internal-sys-verify.co/auth/login`;
         isPushInterception: false,
         deliveryStage: 'post-delivery-alert'
       });
+
+      // Broadcast GMAIL_SYNC_COMPLETE event across all connected WebSocket clients
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'GMAIL_SYNC_COMPLETE',
+          timestamp: new Date().toISOString(),
+          processed_count: 1,
+          latest_case_id: result.case?.id,
+          delivery_stage: result.case?.delivery_stage || 'post-delivery-alert',
+          quarantine_status: result.case?.quarantine_action || 'AUDITED',
+          subject: result.case?.title || 'URGENT: Mandatory Two-Factor Token Re-enrollment'
+        });
+      }
 
       res.json({
         status: 'ok',
@@ -2846,9 +3088,14 @@ Thanks!`;
     res.json({ status: 'ok', quarantine: updated });
   });
 
-  // 11. Get Quarantine Audit Log
-  app.get('/api/gmail/quarantine/logs', (_req, res) => {
-    res.json({ logs: getQuarantineAuditLog() });
+  // 11. Get Quarantine Audit Log (with Supabase DB persistence fallback)
+  app.get('/api/gmail/quarantine/logs', async (_req, res) => {
+    try {
+      const logs = await fetchQuarantineAuditLogs();
+      res.json({ logs });
+    } catch (err: any) {
+      res.json({ logs: getQuarantineAuditLog() });
+    }
   });
 
   // 12. Update Watch Configuration
@@ -3111,8 +3358,146 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   app.post('/api/slack/test', handleSlackTest);
   app.post('/api/alerts/slack/test', handleSlackTest);
 
-  app.get('/api/slack/deliveries', (_req, res) => {
-    res.json(getSlackDeliveries());
+  app.get('/api/slack/deliveries', async (_req, res) => {
+    try {
+      const deliveries = await fetchSlackDeliveries();
+      res.json(deliveries);
+    } catch (err: any) {
+      res.json(getSlackDeliveries());
+    }
+  });
+
+  // Email Alert Delivery Logs from Supabase email_alert_logs
+  app.get(['/api/alerts/email/logs', '/api/email/logs'], async (_req, res) => {
+    try {
+      const logs = await fetchEmailAlertLogs();
+      res.json({ logs });
+    } catch (err: any) {
+      console.warn('[EmailAlertLogsAPI] Error fetching email logs:', err);
+      res.json({ logs: [] });
+    }
+  });
+
+  // In-memory fallback cache for team invitations
+  const memoryInvitations: any[] = [];
+
+  // Team & RBAC Management Endpoints (wired to profiles and team_invitations in Supabase)
+  app.get('/api/team/members', async (_req, res) => {
+    const defaultRoster = [
+      { id: 'mem_001', name: 'Robert Simmons', email: 'r.simmons@acmedefense.sec', role: 'admin', status: 'ACTIVE', lastActive: 'Just now' },
+      { id: 'mem_002', name: 'Jane Lopez', email: 'j.lopez@acmedefense.sec', role: 'analyst', status: 'ACTIVE', lastActive: '12m ago' },
+      { id: 'mem_003', name: 'Thomas Adams', email: 't.adams@compliance-audit.org', role: 'read_only', status: 'ACTIVE', lastActive: '2h ago' },
+      { id: 'mem_004', name: 'Elena Rostova', email: 'e.rostova@acmedefense.sec', role: 'analyst', status: 'ACTIVE', lastActive: '1d ago' }
+    ];
+
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      return res.json([...memoryInvitations, ...defaultRoster]);
+    }
+
+    try {
+      const [{ data: profiles, error: profErr }, { data: invitations, error: invErr }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('organization_id', DEFAULT_ORG_ID),
+        supabase.from('team_invitations').select('*').eq('organization_id', DEFAULT_ORG_ID).eq('status', 'PENDING')
+      ]);
+
+      const members: any[] = [];
+      if (profiles && profiles.length > 0) {
+        profiles.forEach(p => {
+          members.push({
+            id: p.id,
+            name: p.full_name || p.email?.split('@')[0] || 'Security Operator',
+            email: p.email,
+            role: p.role || 'analyst',
+            status: 'ACTIVE',
+            lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
+          });
+        });
+      } else {
+        members.push(...defaultRoster);
+      }
+
+      if (invitations && invitations.length > 0) {
+        invitations.forEach(inv => {
+          members.push({
+            id: inv.id,
+            name: inv.email.split('@')[0],
+            email: inv.email,
+            role: inv.role,
+            status: 'PENDING',
+            lastActive: 'Invitation Dispatched'
+          });
+        });
+      } else {
+        // Include any memory invitations if DB table is unpopulated
+        members.unshift(...memoryInvitations);
+      }
+
+      res.json(members);
+    } catch (err: any) {
+      console.error('[TeamAPI] Error fetching team members:', err);
+      res.json([...memoryInvitations, ...defaultRoster]);
+    }
+  });
+
+  app.post('/api/team/invite', async (req, res) => {
+    const { email, role, name } = req.body || {};
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+
+    const inviteRole = role || 'analyst';
+    const inviteId = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const token = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const invitationObj = {
+      id: inviteId,
+      name: name || email.split('@')[0],
+      email: email.trim(),
+      role: inviteRole,
+      status: 'PENDING',
+      lastActive: 'Invitation Dispatched'
+    };
+
+    memoryInvitations.unshift(invitationObj);
+
+    const supabase = getSupabaseAdminClient();
+    if (supabase) {
+      supabase
+        .from('team_invitations')
+        .insert({
+          id: inviteId,
+          organization_id: DEFAULT_ORG_ID,
+          email: email.trim(),
+          role: inviteRole,
+          token,
+          expires_at: expiresAt,
+          status: 'PENDING'
+        })
+        .then(({ error }) => {
+          if (error) console.warn('[TeamAPI] Error inserting team_invitation to DB:', error.message);
+        });
+    }
+
+    res.json({
+      status: 'success',
+      invitation: invitationObj
+    });
+  });
+
+  app.delete('/api/team/invite/:id', async (req, res) => {
+    const inviteId = req.params.id;
+    const memIdx = memoryInvitations.findIndex(i => i.id === inviteId);
+    if (memIdx >= 0) memoryInvitations.splice(memIdx, 1);
+
+    const supabase = getSupabaseAdminClient();
+    if (supabase) {
+      await supabase
+        .from('team_invitations')
+        .update({ status: 'REVOKED' })
+        .eq('id', inviteId)
+        .eq('organization_id', DEFAULT_ORG_ID);
+    }
+    res.json({ status: 'success', revoked: inviteId });
   });
 
   app.post('/api/slack/send-case/:caseId', async (req, res) => {

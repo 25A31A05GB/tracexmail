@@ -26,7 +26,8 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
@@ -46,6 +47,7 @@ export type NavTab =
   | 'headers'
   | 'alerts'
   | 'ingest'
+  | 'gmail'
   | 'organization'
   | 'team';
 
@@ -154,6 +156,7 @@ export function Sidebar({
     { id: 'graph', label: 'Relationship Graph', icon: Share2 },
     { id: 'timeline', label: 'Threat Timeline', icon: Clock },
     { id: 'ingest', label: 'Email Ingestion', icon: Database, readOnlyDisabled: role === 'read_only' },
+    { id: 'gmail', label: 'Gmail Live Auto-Sync', icon: Mail, readOnlyDisabled: role === 'read_only' },
     { id: 'hops', label: 'Hop Traceroute', icon: Network },
     { id: 'map', label: 'Geographic Map', icon: MapPin },
     { id: 'logs', label: 'Analysis Log', icon: Terminal },

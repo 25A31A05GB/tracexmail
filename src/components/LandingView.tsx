@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
 
@@ -16,6 +17,7 @@ export function LandingView({
   onSelectCase
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -37,21 +39,21 @@ export function LandingView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',-apple-system,BlinkMacSystemFont,sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative overflow-x-hidden">
+    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',-apple-system,BlinkMacSystemFont,sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative">
       
       <div id="top" />
 
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-[#14120f] border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8 h-16 flex items-center justify-between">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-[22px] h-[22px] border-[1.5px] border-[#b23a2e] rounded-full relative shrink-0">
               <div className="absolute inset-[5px] rounded-full bg-[#b23a2e]" />
             </div>
-            <span className="font-['Fraunces',serif] text-[19px] font-semibold text-[#ede6d8]">
+            <span className="font-['Fraunces',serif] text-[18px] sm:text-[19px] font-semibold text-[#ede6d8]">
               TraceXMail
             </span>
-            <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] tracking-wide ml-1">
+            <span className="hidden sm:inline-block font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] tracking-wide ml-1">
               CASE-XM-01
             </span>
           </div>
@@ -80,68 +82,131 @@ export function LandingView({
             </button>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={onOpenConsole}
-              className="text-[#b9af9c] hover:text-[#ede6d8] text-[14.5px] bg-transparent border-none cursor-pointer transition-colors"
+              className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] sm:text-[14.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
             >
               Sign in
             </button>
             <button
               onClick={onRequestAccess || onOpenConsole}
-              className="bg-[#ede6d8] hover:bg-white text-[#14120f] px-4 py-2 rounded-[3px] text-[14px] font-semibold transition-colors cursor-pointer"
+              className="hidden sm:inline-block bg-[#ede6d8] hover:bg-white text-[#14120f] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-colors cursor-pointer"
             >
               Request access
             </button>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 text-[#b9af9c] hover:text-[#ede6d8] hover:bg-[#1d1a15] rounded-[3px] transition-colors cursor-pointer"
+              aria-label="Toggle Navigation Menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-4 flex flex-col gap-2">
+            <button
+              onClick={() => { scrollToSection('pipeline'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              How it works
+            </button>
+            <button
+              onClick={() => { scrollToSection('product'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              Product
+            </button>
+            <button
+              onClick={() => { scrollToSection('exhibits'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              Under the hood
+            </button>
+            <button
+              onClick={() => { scrollToSection('roles'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              For your team
+            </button>
+            <button
+              onClick={() => { scrollToSection('team'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              Team
+            </button>
+            <button
+              onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              Pricing
+            </button>
+            <button
+              onClick={() => { scrollToSection('faq'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              FAQ
+            </button>
+            <div className="pt-3 border-t border-[#3a352c] flex flex-col gap-2">
+              <button
+                onClick={() => { (onRequestAccess || onOpenConsole)(); setMobileMenuOpen(false); }}
+                className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
+              >
+                Request access
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="py-20 lg:py-24 border-b border-[#3a352c] relative overflow-hidden bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center relative z-10">
+      <section className="py-12 sm:py-16 lg:py-24 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center relative z-10">
           <div>
-            <h1 className="font-['Fraunces',serif] text-[34px] sm:text-[44px] lg:text-[52px] font-medium leading-[1.08] text-[#ede6d8] tracking-tight max-w-[12ch]">
+            <h1 className="font-['Fraunces',serif] text-[28px] xs:text-[34px] sm:text-[44px] lg:text-[50px] font-medium leading-[1.12] text-[#ede6d8] tracking-tight max-w-xl">
               Every phishing email leaves a trail. We follow it to the source.
             </h1>
-            <p className="mt-6 max-w-[46ch] text-[#b9af9c] text-[16.5px] leading-relaxed">
+            <p className="mt-4 sm:mt-6 max-w-lg text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
               TraceXMail reconstructs an email's real path: headers, authentication, hops, and infrastructure, turned into evidence your SOC can act on and defend in front of whoever asks how you know.
             </p>
 
-            <div className="flex flex-wrap items-center gap-3.5 mt-8">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5 mt-6 sm:mt-8">
               <button
                 onClick={onRequestAccess || onOpenConsole}
-                className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg"
+                className="w-full sm:w-auto text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3 sm:py-3.5 rounded-[3px] font-semibold text-[14.5px] sm:text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg"
               >
                 Request access
               </button>
               <button
                 onClick={() => scrollToSection('pipeline')}
-                className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer"
+                className="w-full sm:w-auto text-center px-6 py-3 sm:py-3.5 rounded-[3px] font-medium text-[14.5px] sm:text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer"
               >
                 Walk through a trace
               </button>
             </div>
 
-            <div className="mt-8 text-[13.5px] text-[#b9af9c] max-w-[40ch] border-l-2 border-[#3a352c] pl-3.5">
+            <div className="mt-6 sm:mt-8 text-[13px] sm:text-[13.5px] text-[#b9af9c] max-w-md border-l-2 border-[#3a352c] pl-3.5">
               Built for security teams who need to prove what happened, not guess at it.
             </div>
 
-            <div className="flex flex-wrap gap-2.5 mt-6">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] border border-[#3a352c] px-2.5 py-1 rounded-[3px]">
+            <div className="flex flex-wrap gap-2 mt-5 sm:mt-6">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
                 Real SPF/DKIM/DMARC verification
               </span>
-              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] border border-[#3a352c] px-2.5 py-1 rounded-[3px]">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
                 MaxMind GeoLite2 attribution
               </span>
-              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] border border-[#3a352c] px-2.5 py-1 rounded-[3px]">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
                 SHA-256 evidence hashing
               </span>
             </div>
           </div>
 
-          {/* Evidence Board Visual (Cork + Pinned Cards) */}
-          <div className="relative h-[440px] rounded-[6px] border border-[#3d2f1f] bg-[repeating-radial-gradient(circle_at_12%_18%,rgba(0,0,0,0.10)_0px,rgba(0,0,0,0.10)_1px,transparent_2px,transparent_34px),repeating-radial-gradient(circle_at_70%_62%,rgba(0,0,0,0.08)_0px,rgba(0,0,0,0.08)_1px,transparent_2px,transparent_41px),linear-gradient(155deg,#2e2318,#241b12_55%,#1d1610)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55),0_40px_90px_-30px_rgba(0,0,0,0.7)] select-none">
+          {/* Evidence Board Visual (Responsive Cork + Pinned Cards) */}
+          <div className="w-full max-w-[500px] mx-auto relative h-[380px] sm:h-[440px] rounded-[6px] border border-[#3d2f1f] bg-[repeating-radial-gradient(circle_at_12%_18%,rgba(0,0,0,0.10)_0px,rgba(0,0,0,0.10)_1px,transparent_2px,transparent_34px),repeating-radial-gradient(circle_at_70%_62%,rgba(0,0,0,0.08)_0px,rgba(0,0,0,0.08)_1px,transparent_2px,transparent_41px),linear-gradient(155deg,#2e2318,#241b12_55%,#1d1610)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55),0_40px_90px_-30px_rgba(0,0,0,0.7)] select-none overflow-hidden">
             {/* SVG Connecting Thread Paths */}
             <svg className="absolute inset-0 w-full h-full drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] pointer-events-none" viewBox="0 0 400 440">
               <path
@@ -174,55 +239,55 @@ export function LandingView({
             </svg>
 
             {/* Card 1: Tor Exit Node */}
-            <div className="absolute top-[14%] left-[22%] -translate-x-1/2 -rotate-4 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
+            <div className="absolute top-[12%] left-[22%] -translate-x-1/2 -rotate-4 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
               <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[168px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] font-medium text-[#2a2620]">185.220.101.5</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#7a2e26] mt-1 tracking-wider font-semibold">TOR EXIT NODE</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-2 overflow-hidden">
+              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">185.220.101.5</div>
+                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TOR EXIT NODE</div>
+                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
                   <div className="h-full bg-[#b23a2e] w-[92%]" />
                 </div>
               </div>
             </div>
 
             {/* Card 2: SPF Softfail */}
-            <div className="absolute top-[6%] left-[60%] -translate-x-1/2 rotate-3 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(1)}>
+            <div className="absolute top-[6%] left-[64%] sm:left-[60%] -translate-x-1/2 rotate-3 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(1)}>
               <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[168px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] font-medium text-[#2a2620]">SPF · SOFTFAIL</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#7a2e26] mt-1 tracking-wider font-semibold">UNAUTHORIZED SENDER</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-2 overflow-hidden">
+              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">SPF · SOFTFAIL</div>
+                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">UNAUTHORIZED SENDER</div>
+                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
                   <div className="h-full bg-[#b23a2e] w-[70%]" />
                 </div>
               </div>
             </div>
 
             {/* Card 3: ASN Bulgaria */}
-            <div className="absolute top-[34%] left-[82%] -translate-x-1/2 -rotate-2 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(2)}>
+            <div className="absolute top-[36%] left-[72%] sm:left-[76%] -translate-x-1/2 -rotate-2 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(2)}>
               <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[168px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] font-medium text-[#2a2620]">AS200548</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#7a2e26] mt-1 tracking-wider font-semibold">BULGARIA · ZETTAHOST</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-2 overflow-hidden">
+              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">AS200548</div>
+                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">BULGARIA · ZETTAHOST</div>
+                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
                   <div className="h-full bg-[#b23a2e] w-[55%]" />
                 </div>
               </div>
             </div>
 
             {/* Card 4: Typosquat Domain */}
-            <div className="absolute top-[58%] left-[34%] -translate-x-1/2 rotate-[2.5deg] shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
+            <div className="absolute top-[60%] left-[28%] sm:left-[32%] -translate-x-1/2 rotate-[2.5deg] shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
               <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[168px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10.5px] font-medium text-[#2a2620] truncate">paypal-secure-update.com</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#7a2e26] mt-1 tracking-wider font-semibold">TYPOSQUAT DOMAIN</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-2 overflow-hidden">
+              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10.5px] font-medium text-[#2a2620] truncate">paypal-secure-update.com</div>
+                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TYPOSQUAT DOMAIN</div>
+                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
                   <div className="h-full bg-[#b23a2e] w-[88%]" />
                 </div>
               </div>
             </div>
 
             {/* Stamp Overlay */}
-            <div className="absolute bottom-6 right-8 w-32 h-32 rounded-full flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[12px] font-bold tracking-wider text-[#b23a2e] bg-[radial-gradient(circle,transparent_58%,rgba(178,58,46,0.10)_60%,transparent_62%)] shadow-[0_0_0_2.5px_#b23a2e,0_0_0_5px_transparent,0_0_0_6.5px_rgba(178,58,46,0.35)] -rotate-12 transform hover:rotate-0 transition-transform">
+            <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-wider text-[#b23a2e] bg-[radial-gradient(circle,transparent_58%,rgba(178,58,46,0.10)_60%,transparent_62%)] shadow-[0_0_0_2px_#b23a2e,0_0_0_4px_transparent,0_0_0_5.5px_rgba(178,58,46,0.35)] -rotate-12 transform hover:rotate-0 transition-transform">
               VERDICT<br />PHISHING<br />CONFIRMED
             </div>
           </div>
@@ -231,7 +296,7 @@ export function LandingView({
 
       {/* Problem Section */}
       <section className="py-16 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
               The gap attackers count on
@@ -265,7 +330,7 @@ export function LandingView({
 
       {/* Proof Band */}
       <section className="py-10 border-b border-[#3a352c] bg-[#1d1a15] text-center">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-[#b9af9c] text-[14.5px] max-w-[60ch] mx-auto m-0 leading-relaxed">
             Trained and validated against the <strong className="text-[#ede6d8] font-semibold">Nazario Phishing Corpus</strong> and the <strong className="text-[#ede6d8] font-semibold">Enron Email Corpus</strong>: real attacks and real legitimate mail, not synthetic examples.
           </p>
@@ -274,7 +339,7 @@ export function LandingView({
 
       {/* 6-Stage Pipeline Section */}
       <section id="pipeline" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               From inbox to verdict
@@ -362,7 +427,7 @@ export function LandingView({
 
       {/* Product Section / Interactive Mockup */}
       <section id="product" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               What your analysts actually open
@@ -421,7 +486,7 @@ export function LandingView({
                 </div>
 
                 <div className="border border-[#232833] rounded-[6px] overflow-hidden bg-[#12151c]">
-                  <div className="grid grid-cols-12 gap-3 px-3.5 py-2.5 text-[10.5px] uppercase tracking-wider text-[#5b6470] font-semibold border-b border-[#232833] bg-[#0f1219]">
+                  <div className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-2.5 text-[10.5px] uppercase tracking-wider text-[#5b6470] font-semibold border-b border-[#232833] bg-[#0f1219]">
                     <div className="col-span-3 sm:col-span-2">Case</div>
                     <div className="col-span-6 sm:col-span-7">Subject</div>
                     <div className="col-span-3 sm:col-span-2">Severity</div>
@@ -431,16 +496,16 @@ export function LandingView({
                   {/* Row 1 */}
                   <div
                     onClick={() => handleCaseClick(0)}
-                    className="grid grid-cols-12 gap-3 px-3.5 py-3 text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors"
+                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
                   >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11.5px] font-bold">
+                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
                       CASE-2291
                     </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium">
+                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
                       Urgent: Updated Direct Deposit Routing
                     </div>
                     <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[10px] px-2 py-0.5 rounded bg-[#e8836f]/15 text-[#e8836f] font-bold">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#e8836f]/15 text-[#e8836f] font-bold">
                         CRITICAL
                       </span>
                     </div>
@@ -452,16 +517,16 @@ export function LandingView({
                   {/* Row 2 */}
                   <div
                     onClick={() => handleCaseClick(1)}
-                    className="grid grid-cols-12 gap-3 px-3.5 py-3 text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors"
+                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
                   >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11.5px] font-bold">
+                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
                       CASE-2288
                     </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium">
+                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
                       Action Required: Verify Office 365 Password
                     </div>
                     <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[10px] px-2 py-0.5 rounded bg-[#e6b678]/15 text-[#e6b678] font-bold">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#e6b678]/15 text-[#e6b678] font-bold">
                         HIGH
                       </span>
                     </div>
@@ -473,16 +538,16 @@ export function LandingView({
                   {/* Row 3 */}
                   <div
                     onClick={() => handleCaseClick(2)}
-                    className="grid grid-cols-12 gap-3 px-3.5 py-3 text-[12.5px] items-center hover:bg-[#1a1e27] cursor-pointer transition-colors"
+                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
                   >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11.5px] font-bold">
+                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
                       CASE-2281
                     </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium">
+                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
                       Your document is waiting for signature
                     </div>
                     <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[10px] px-2 py-0.5 rounded bg-[#7fb2e8]/15 text-[#7fb2e8] font-bold">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#7fb2e8]/15 text-[#7fb2e8] font-bold">
                         MEDIUM
                       </span>
                     </div>
@@ -503,7 +568,7 @@ export function LandingView({
 
       {/* Exhibits Section */}
       <section id="exhibits" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               What's actually doing the work
@@ -571,8 +636,8 @@ export function LandingView({
 
       {/* Honesty Callout */}
       <section className="py-20 bg-[#26221b] border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8 flex flex-col md:flex-row items-center gap-12">
-          <div className="w-[152px] h-[152px] rounded-full text-[#c9a227] flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[13.5px] font-bold leading-tight p-2.5 rotate-6 shrink-0 shadow-[0_0_0_2.5px_#c9a227,0_0_0_6px_rgba(201,162,39,0.30)]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-8 sm:gap-12">
+          <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-[152px] md:h-[152px] rounded-full text-[#c9a227] flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[12.5px] md:text-[13.5px] font-bold leading-tight p-2.5 rotate-6 shrink-0 shadow-[0_0_0_2px_#c9a227,0_0_0_5px_rgba(201,162,39,0.30)]">
             UNKNOWN<br />IS A VALID<br />RESULT
           </div>
 
@@ -589,7 +654,7 @@ export function LandingView({
 
       {/* Roles Section */}
       <section id="roles" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               Built around who's actually looking at it
@@ -647,7 +712,7 @@ export function LandingView({
 
       {/* Team Section */}
       <section id="team" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               The people behind the case file
@@ -747,7 +812,7 @@ export function LandingView({
 
       {/* Why We Built This Section */}
       <section className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               Why we built this
@@ -778,7 +843,7 @@ export function LandingView({
 
       {/* Pricing Section */}
       <section id="pricing" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-12">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               Pricing
@@ -862,7 +927,7 @@ export function LandingView({
 
       {/* FAQ Section */}
       <section id="faq" className="py-20 border-b border-[#3a352c]">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[640px] mb-8">
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               Questions we get asked
@@ -965,7 +1030,7 @@ export function LandingView({
 
       {/* Final Call to Action */}
       <section className="py-24">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] lg:text-[40px] font-medium text-[#ede6d8] max-w-[16ch]">
             Stop guessing where a threat came from.
           </h2>
@@ -991,7 +1056,7 @@ export function LandingView({
 
       {/* Footer */}
       <footer className="border-t border-[#3a352c] py-9">
-        <div className="max-w-[1180px] mx-auto px-6 sm:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[13.5px] text-[#b9af9c]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[13.5px] text-[#b9af9c]">
           <div className="flex items-center gap-2.5">
             <div className="w-4 h-4 rounded-full border border-[#b23a2e] relative shrink-0">
               <div className="absolute inset-[3px] rounded-full bg-[#b23a2e]" />

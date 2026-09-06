@@ -302,7 +302,7 @@ export function ForensicScanAnimationModal({
                         {stage.name}
                       </span>
                       {isFinished && elapsed > 0 && (
-                        <span className="text-[10px] font-mono text-[var(--forensic-green)]">
+                        <span className="text-[10px] font-mono text-[var(--forensic-green)] font-semibold">
                           +{elapsed}ms
                         </span>
                       )}
@@ -310,19 +310,35 @@ export function ForensicScanAnimationModal({
                     <p className="text-xs text-[var(--paper-dim)] mt-0.5 leading-relaxed">
                       {stage.description}
                     </p>
+
+                    {/* Active Stage Real-Time Micro-Progress Bar */}
+                    {isCurrent && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="w-full bg-[#14120f] h-1.5 rounded-full overflow-hidden border border-[#3a352c]/70">
+                          <div
+                            className="h-full bg-gradient-to-r from-[var(--stamp)] to-[var(--forensic-green)] transition-all duration-75 ease-out rounded-full shadow-[0_0_8px_rgba(201,162,39,0.5)]"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono text-[var(--stamp)] shrink-0 font-bold">
+                          {progress}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Status Badge */}
                 <div className="shrink-0 pt-0.5">
                   {isFinished ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[rgba(72,169,117,0.15)] text-[var(--forensic-green)] border border-[rgba(72,169,117,0.3)] uppercase">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[rgba(72,169,117,0.15)] text-[var(--forensic-green)] border border-[rgba(72,169,117,0.3)] uppercase flex items-center gap-1 shadow-sm">
+                      <CheckCircle2 className="w-3 h-3" />
                       VERIFIED
                     </span>
                   ) : isCurrent ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[rgba(201,162,39,0.15)] text-[var(--stamp)] border border-[rgba(201,162,39,0.3)] uppercase animate-pulse flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--stamp)]" />
-                      {progress}%
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[rgba(201,162,39,0.15)] text-[var(--stamp)] border border-[rgba(201,162,39,0.3)] uppercase animate-pulse flex items-center gap-1.5 shadow-[0_0_12px_rgba(201,162,39,0.2)]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--stamp)] animate-ping" />
+                      PROCESSING
                     </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono text-[var(--paper-muted)] bg-[#221e17] border border-[#3a352c] uppercase">

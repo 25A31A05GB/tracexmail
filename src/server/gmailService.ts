@@ -12,6 +12,8 @@
 
 import axios from 'axios';
 import { EventEmitter } from 'events';
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
+import { encryptToken, decryptToken } from '../utils/crypto';
 
 export interface QuarantineConfig {
   enabled: boolean;
@@ -164,12 +166,29 @@ export function getGmailStatus() {
 /**
  * Updates the Quarantine / Hold configuration.
  */
-export function updateQuarantineConfig(config: Partial<QuarantineConfig>) {
+export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId: string = DEFAULT_ORG_ID) {
   if (typeof config.enabled === 'boolean') state.quarantine.enabled = config.enabled;
   if (typeof config.threshold === 'number') state.quarantine.threshold = Math.max(0, Math.min(100, config.threshold));
   if (config.quarantineLabelName) state.quarantine.quarantineLabelName = config.quarantineLabelName;
   if (typeof config.removeInboxLabel === 'boolean') state.quarantine.removeInboxLabel = config.removeInboxLabel;
   if (typeof config.adminWebhookUrl === 'string') state.quarantine.adminWebhookUrl = config.adminWebhookUrl;
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('gmail_connections')
+      .update({
+        quarantine_enabled: state.quarantine.enabled,
+        quarantine_threshold: state.quarantine.threshold,
+        quarantine_label_name: state.quarantine.quarantineLabelName,
+        remove_inbox_label: state.quarantine.removeInboxLabel,
+        admin_webhook_url: state.quarantine.adminWebhookUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('organization_id', orgId)
+      .then(({ error }) => {
+        if (error) console.warn('[GmailService] Error updating quarantine config in DB:', error.message);
+      });
+  }
 
   return state.quarantine;
 }
@@ -177,10 +196,25 @@ export function updateQuarantineConfig(config: Partial<QuarantineConfig>) {
 /**
  * Updates Cloud Pub/Sub Watch configuration.
  */
-export function updateWatchConfig(config: Partial<WatchConfig>) {
+export function updateWatchConfig(config: Partial<WatchConfig>, orgId: string = DEFAULT_ORG_ID) {
   if (typeof config.enabled === 'boolean') state.watch.enabled = config.enabled;
   if (config.topicName) state.watch.topicName = config.topicName;
   if (config.subscription) state.watch.subscription = config.subscription;
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('gmail_connections')
+      .update({
+        watch_enabled: state.watch.enabled,
+        watch_topic_name: state.watch.topicName,
+        watch_subscription: state.watch.subscription,
+        updated_at: new Date().toISOString()
+      })
+      .eq('organization_id', orgId)
+      .then(({ error }) => {
+        if (error) console.warn('[GmailService] Error updating watch config in DB:', error.message);
+      });
+  }
 
   return state.watch;
 }
@@ -434,8 +468,7 @@ export async function processInboundQuarantineGate(params: {
   state.metrics.totalIngested++;
   state.metrics.lastDeliveryStage = deliveryStage;
 
-  // Append to audit log
-  state.quarantineAuditLog.unshift({
+  const logEntry = {
     id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
     timestamp: new Date().toISOString(),
     messageId: params.messageId,
@@ -446,11 +479,55 @@ export async function processInboundQuarantineGate(params: {
     action: actionTaken,
     deliveryStage,
     adminWebhookDispatched: adminWebhookSent
-  });
+  };
 
-  // Keep audit log to 100 entries
+  // Append to in-memory audit log
+  state.quarantineAuditLog.unshift(logEntry);
   if (state.quarantineAuditLog.length > 100) {
     state.quarantineAuditLog.pop();
+  }
+
+  // Persist to Supabase quarantine_audit_log and update metrics in gmail_connections
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('quarantine_audit_log')
+      .insert({
+        id: logEntry.id,
+        organization_id: DEFAULT_ORG_ID,
+        timestamp: logEntry.timestamp,
+        message_id: logEntry.messageId,
+        subject: logEntry.subject,
+        from_address: logEntry.from,
+        threat_score: logEntry.threatScore,
+        verdict: logEntry.verdict,
+        action: logEntry.action,
+        delivery_stage: logEntry.deliveryStage,
+        admin_webhook_dispatched: logEntry.adminWebhookDispatched,
+        applied_label: appliedLabel,
+        raw_details: {
+          isQuarantined: isQuarantineTriggered,
+          threshold: state.quarantine.threshold
+        }
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[GmailQuarantine] Error writing to quarantine_audit_log in DB:', error.message);
+      });
+
+    supabase.from('gmail_connections')
+      .update({
+        metrics: {
+          total_ingested: state.metrics.totalIngested,
+          pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+          post_delivery_alerts: state.metrics.postDeliveryAlerts,
+          last_delivery_stage: deliveryStage,
+          last_quarantine_at: state.metrics.lastQuarantineAt
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('organization_id', DEFAULT_ORG_ID)
+      .then(({ error }) => {
+        if (error) console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
+      });
   }
 
   return {
@@ -516,20 +593,202 @@ export async function handlePubSubPush(body: any): Promise<{
 }
 
 /**
- * Returns the quarantine audit log.
+ * Returns the quarantine audit log (in-memory fast cache).
  */
 export function getQuarantineAuditLog() {
   return state.quarantineAuditLog;
 }
 
 /**
+ * Fetches durable quarantine audit logs from Supabase with in-memory fallback.
+ */
+export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('quarantine_audit_log')
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('timestamp', { ascending: false })
+        .limit(100);
+
+      if (!error && data && data.length > 0) {
+        return data.map(r => ({
+          id: r.id,
+          timestamp: r.timestamp,
+          messageId: r.message_id,
+          subject: r.subject,
+          from: r.from_address,
+          threatScore: r.threat_score,
+          verdict: r.verdict,
+          action: r.action,
+          deliveryStage: r.delivery_stage,
+          adminWebhookDispatched: r.admin_webhook_dispatched
+        }));
+      }
+    } catch (err) {
+      console.warn('[GmailService] Failed fetching quarantine audit logs from Supabase:', err);
+    }
+  }
+  return state.quarantineAuditLog;
+}
+
+/**
+ * Saves Gmail Connection with encrypted tokens into Supabase `gmail_connections` table.
+ */
+export async function saveGmailConnectionToDb(params: {
+  orgId?: string;
+  emailAddress: string;
+  accessToken?: string;
+  refreshToken?: string;
+  expiresInSeconds?: number;
+  isConnected?: boolean;
+}): Promise<boolean> {
+  const orgId = params.orgId || DEFAULT_ORG_ID;
+  const supabase = getSupabaseAdminClient();
+
+  state.isConnected = params.isConnected ?? true;
+  state.emailAddress = params.emailAddress;
+  if (params.accessToken) state.accessToken = params.accessToken;
+  if (params.refreshToken) state.refreshToken = params.refreshToken;
+
+  if (!supabase) return true;
+
+  try {
+    const encryptedAccess = params.accessToken ? encryptToken(params.accessToken) : undefined;
+    const encryptedRefresh = params.refreshToken ? encryptToken(params.refreshToken) : undefined;
+    const tokenExpiresAt = params.expiresInSeconds
+      ? new Date(Date.now() + params.expiresInSeconds * 1000).toISOString()
+      : undefined;
+
+    const row: any = {
+      id: `gconn_${orgId}`,
+      organization_id: orgId,
+      email_address: params.emailAddress,
+      is_connected: params.isConnected ?? true,
+      ...(encryptedAccess && { access_token_encrypted: encryptedAccess }),
+      ...(encryptedRefresh && { refresh_token_encrypted: encryptedRefresh }),
+      ...(tokenExpiresAt && { token_expires_at: tokenExpiresAt }),
+      watch_enabled: state.watch.enabled,
+      watch_active: state.watch.active,
+      watch_topic_name: state.watch.topicName,
+      watch_subscription: state.watch.subscription,
+      watch_expiration: state.watch.expiration ? new Date(state.watch.expiration).toISOString() : null,
+      history_id: state.historyId,
+      quarantine_enabled: state.quarantine.enabled,
+      quarantine_threshold: state.quarantine.threshold,
+      quarantine_label_name: state.quarantine.quarantineLabelName,
+      remove_inbox_label: state.quarantine.removeInboxLabel,
+      admin_webhook_url: state.quarantine.adminWebhookUrl,
+      metrics: {
+        total_ingested: state.metrics.totalIngested,
+        pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+        post_delivery_alerts: state.metrics.postDeliveryAlerts,
+        last_delivery_stage: state.metrics.lastDeliveryStage,
+        last_quarantine_at: state.metrics.lastQuarantineAt
+      },
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('gmail_connections')
+      .upsert(row, { onConflict: 'organization_id,email_address' });
+
+    if (error) {
+      console.warn('[GmailService] Failed upserting to gmail_connections:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.error('[GmailService] Error saving connection to DB:', err?.message);
+    return false;
+  }
+}
+
+/**
+ * Loads and decrypts Gmail Connection from Supabase `gmail_connections` table.
+ */
+export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('gmail_connections')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    state.isConnected = data.is_connected ?? true;
+    state.emailAddress = data.email_address || state.emailAddress;
+    if (data.access_token_encrypted) {
+      try {
+        state.accessToken = decryptToken(data.access_token_encrypted);
+      } catch (err) {
+        console.warn('[GmailService] Failed decrypting access token:', err);
+      }
+    }
+    if (data.refresh_token_encrypted) {
+      try {
+        state.refreshToken = decryptToken(data.refresh_token_encrypted);
+      } catch (err) {
+        console.warn('[GmailService] Failed decrypting refresh token:', err);
+      }
+    }
+    if (data.watch_topic_name) state.watch.topicName = data.watch_topic_name;
+    if (data.watch_subscription) state.watch.subscription = data.watch_subscription;
+    if (typeof data.watch_enabled === 'boolean') state.watch.enabled = data.watch_enabled;
+    if (typeof data.watch_active === 'boolean') state.watch.active = data.watch_active;
+    if (data.watch_expiration) state.watch.expiration = new Date(data.watch_expiration).getTime();
+    if (data.history_id) state.historyId = data.history_id;
+    if (typeof data.quarantine_enabled === 'boolean') state.quarantine.enabled = data.quarantine_enabled;
+    if (typeof data.quarantine_threshold === 'number') state.quarantine.threshold = data.quarantine_threshold;
+    if (data.quarantine_label_name) state.quarantine.quarantineLabelName = data.quarantine_label_name;
+    if (typeof data.remove_inbox_label === 'boolean') state.quarantine.removeInboxLabel = data.remove_inbox_label;
+    if (data.admin_webhook_url) state.quarantine.adminWebhookUrl = data.admin_webhook_url;
+    if (data.metrics) {
+      state.metrics.totalIngested = data.metrics.total_ingested ?? state.metrics.totalIngested;
+      state.metrics.preDeliveryQuarantined = data.metrics.pre_delivery_quarantined ?? state.metrics.preDeliveryQuarantined;
+      state.metrics.postDeliveryAlerts = data.metrics.post_delivery_alerts ?? state.metrics.postDeliveryAlerts;
+      state.metrics.lastDeliveryStage = data.metrics.last_delivery_stage ?? state.metrics.lastDeliveryStage;
+      state.metrics.lastQuarantineAt = data.metrics.last_quarantine_at ?? state.metrics.lastQuarantineAt;
+    }
+    console.log('[GmailService] Synchronized connection state from Supabase for org:', orgId);
+  } catch (err) {
+    console.warn('[GmailService] Failed syncing gmail_connections from DB:', err);
+  }
+}
+
+// Kick off initial sync asynchronously
+syncGmailConnectionFromDb().catch(() => {});
+
+/**
  * Disconnects Gmail account.
  */
-export function disconnectGmail() {
+export function disconnectGmail(orgId: string = DEFAULT_ORG_ID) {
   state.isConnected = false;
   state.emailAddress = null;
   state.accessToken = null;
   state.refreshToken = null;
   state.watch.active = false;
+
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    supabase.from('gmail_connections')
+      .update({
+        is_connected: false,
+        watch_active: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('organization_id', orgId)
+      .then(({ error }) => {
+        if (error) console.warn('[GmailService] Error updating disconnected status in DB:', error.message);
+      });
+  }
+
   return { success: true };
 }

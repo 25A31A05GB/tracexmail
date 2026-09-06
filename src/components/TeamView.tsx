@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Users, Shield, UserPlus, Key, Mail, CheckCircle2, Lock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Shield, UserPlus, Key, Mail, CheckCircle2, Lock, Trash2, RefreshCw } from 'lucide-react';
 import { UserRole } from '../hooks/useSession';
 
 interface TeamMember {
@@ -11,70 +11,80 @@ interface TeamMember {
   lastActive: string;
 }
 
-const INITIAL_TEAM: TeamMember[] = [
-  {
-    id: 'mem_001',
-    name: 'Robert Simmons',
-    email: 'r.simmons@acmedefense.sec',
-    role: 'admin',
-    status: 'ACTIVE',
-    lastActive: 'Just now'
-  },
-  {
-    id: 'mem_002',
-    name: 'Jane Lopez',
-    email: 'j.lopez@acmedefense.sec',
-    role: 'analyst',
-    status: 'ACTIVE',
-    lastActive: '12m ago'
-  },
-  {
-    id: 'mem_003',
-    name: 'Thomas Adams',
-    email: 't.adams@compliance-audit.org',
-    role: 'read_only',
-    status: 'ACTIVE',
-    lastActive: '2h ago'
-  },
-  {
-    id: 'mem_004',
-    name: 'Elena Rostova',
-    email: 'e.rostova@acmedefense.sec',
-    role: 'analyst',
-    status: 'ACTIVE',
-    lastActive: '1d ago'
-  }
-];
-
 export function TeamView() {
-  const [team, setTeam] = useState<TeamMember[]>(INITIAL_TEAM);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<UserRole>('analyst');
   const [inviteName, setInviteName] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInvite = (e: React.FormEvent) => {
+  const fetchTeamRoster = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/team/members');
+      if (res.ok) {
+        const data = await res.json();
+        setTeam(data);
+      }
+    } catch (err) {
+      console.warn('[TeamView] Error fetching roster:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeamRoster();
+  }, []);
+
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail) return;
 
-    const newMember: TeamMember = {
-      id: `mem_${Date.now()}`,
-      name: inviteName || inviteEmail.split('@')[0],
-      email: inviteEmail.trim(),
-      role: inviteRole,
-      status: 'PENDING',
-      lastActive: 'Invitation Sent'
-    };
+    try {
+      setIsSubmitting(true);
+      const res = await fetch('/api/team/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: inviteName || inviteEmail.split('@')[0],
+          email: inviteEmail.trim(),
+          role: inviteRole
+        })
+      });
 
-    setTeam(prev => [newMember, ...prev]);
-    setInviteSuccess(`Clearance credential invite dispatched to ${inviteEmail} with role: ${inviteRole.toUpperCase()}`);
-    setInviteEmail('');
-    setInviteName('');
-    setTimeout(() => {
-      setInviteSuccess(null);
-      setInviteOpen(false);
-    }, 2500);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.invitation) {
+          setTeam(prev => [data.invitation, ...prev]);
+        }
+        setInviteSuccess(`Clearance credential invite dispatched to ${inviteEmail} with role: ${inviteRole.toUpperCase()}`);
+        setInviteEmail('');
+        setInviteName('');
+        setTimeout(() => {
+          setInviteSuccess(null);
+          setInviteOpen(false);
+        }, 2500);
+      }
+    } catch (err) {
+      console.error('[TeamView] Invite failed:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    try {
+      const res = await fetch(`/api/team/invite/${inviteId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setTeam(prev => prev.filter(m => m.id !== inviteId));
+      }
+    } catch (err) {
+      console.error('[TeamView] Revoke failed:', err);
+    }
   };
 
   return (
@@ -152,8 +162,17 @@ export function TeamView() {
 
       {/* Team Roster Table */}
       <div className="bg-[#12151c] border border-[#232833] rounded-xl overflow-hidden">
-        <div className="p-4 border-b border-[#232833]">
+        <div className="p-4 border-b border-[#232833] flex items-center justify-between">
           <h3 className="font-semibold text-sm text-[#e7ebf1]">Active Organization Roster</h3>
+          <button
+            onClick={fetchTeamRoster}
+            disabled={loading}
+            className="flex items-center gap-1.5 text-xs text-[#7d8794] hover:text-[#e7ebf1] transition-colors cursor-pointer px-2 py-1 rounded bg-[#171b24] border border-[#232833]"
+            title="Refresh Roster from Supabase"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
         </div>
 
         <div className="overflow-x-auto">
@@ -165,6 +184,7 @@ export function TeamView() {
                 <th className="p-3">Clearance Tier</th>
                 <th className="p-3">Status</th>
                 <th className="p-3">Last Activity</th>
+                <th className="p-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a1e27] text-[#7d8794]">
@@ -198,6 +218,18 @@ export function TeamView() {
                     </span>
                   </td>
                   <td className="p-3 font-mono text-[#4f5763]">{mem.lastActive}</td>
+                  <td className="p-3 text-right">
+                    {mem.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleRevokeInvite(mem.id)}
+                        className="inline-flex items-center gap-1 text-[11px] text-[#e06c75] hover:text-[#f87171] transition-colors cursor-pointer px-2 py-0.5 rounded hover:bg-[#e06c75]/10"
+                        title="Revoke Invitation"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Revoke</span>
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
