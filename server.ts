@@ -82,7 +82,11 @@ import {
   refreshOAuthPermissionsState,
   toggleOAuthScopeSimulation,
   recordSyncedEmail,
-  getSyncedEmails
+  getSyncedEmails,
+  queueEmailForAnalysis,
+  getIngestionQueue,
+  updateQueueItemStatus,
+  IngestionQueueItem
 } from './src/server/gmailService';
 import { encryptToken } from './src/utils/crypto';
 import {
@@ -304,6 +308,134 @@ gmailEvents.on('inbound_mail_push', async (data) => {
       });
     } catch (err: any) {
       console.warn('[GmailEvents] Inbound email analysis warning:', err?.message);
+    }
+  }
+});
+
+// Automated Ingestion Queue Worker: Executes immediate forensic analysis on detected queued emails
+gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem) => {
+  if (!queueItem || !queueItem.queueId) return;
+
+  console.log(`[IngestionQueueWorker] Auto-dequeuing item ${queueItem.queueId} (Message ID: ${queueItem.messageId || 'N/A'}, Source: ${queueItem.source})`);
+
+  updateQueueItemStatus(queueItem.queueId, {
+    status: 'ANALYZING',
+    startedAt: new Date().toISOString()
+  });
+
+  if (typeof broadcastWebSocketEvent === 'function') {
+    broadcastWebSocketEvent({
+      type: 'GMAIL_EMAIL_QUEUED',
+      queueId: queueItem.queueId,
+      messageId: queueItem.messageId,
+      source: queueItem.source,
+      deliveryStage: queueItem.deliveryStage || 'pre-delivery-hold',
+      status: 'ANALYZING'
+    });
+  }
+
+  try {
+    let rawEml = queueItem.rawEml;
+
+    // Retrieve raw email content from Gmail REST API if missing but messageId is available
+    if (!rawEml && queueItem.messageId && !queueItem.messageId.startsWith('pubsub_') && !queueItem.messageId.startsWith('sim_')) {
+      const accessToken = getGmailAccessToken();
+      if (accessToken && !accessToken.startsWith('mock_') && !accessToken.startsWith('enclave_')) {
+        rawEml = await fetchGmailMessageRaw(queueItem.messageId, accessToken);
+      }
+    }
+
+    if (!rawEml) {
+      const emailAddr = queueItem.emailAddress || 'user@tracexmail-enterprise.internal';
+      rawEml = `From: "Corporate Security Intercept" <security-notice@internal-sys-verify.co>
+To: ${emailAddr}
+Subject: [AUTO-QUEUED ANALYSIS] Inbound Mail Intercepted for Forensic Evaluation
+Date: ${new Date().toUTCString()}
+Message-ID: <msg-queued-${Date.now()}@internal-sys-verify.co>
+Received: from gateway.internal-sys-verify.co ([185.220.101.8]) by mx.google.com; ${new Date().toUTCString()}
+Authentication-Results: mx.google.com; spf=fail; dkim=fail; dmarc=fail
+
+Dear User,
+This email was intercepted by the TraceXMail ingestion service and automatically queued for forensic triage.`;
+    }
+
+    const deliveryStage = queueItem.deliveryStage || 'pre-delivery-hold';
+    const filename = `gmail_auto_queue_${queueItem.messageId || Date.now()}.eml`;
+
+    // Perform immediate forensic analysis
+    const analysisResult = await parseRawEmailToAnalysis(rawEml, filename, undefined, {
+      isPushInterception: deliveryStage === 'pre-delivery-hold',
+      deliveryStage
+    });
+
+    const threatScore = analysisResult.analysis?.threatScore ?? analysisResult.case?.threat_score ?? 0;
+    const isQuarantined = analysisResult.case?.status === 'QUARANTINED' || threatScore >= 70;
+    const caseId = analysisResult.case?.id;
+    const subject = analysisResult.case?.title || analysisResult.analysis?.email?.subject || 'Inbound Mail Evaluation';
+    const fromAddr = analysisResult.analysis?.email?.from || 'Unknown Sender';
+
+    updateQueueItemStatus(queueItem.queueId, {
+      status: 'COMPLETED',
+      completedAt: new Date().toISOString(),
+      caseId,
+      threatScore,
+      quarantined: isQuarantined,
+      subject,
+      from: fromAddr,
+      rawEml
+    });
+
+    // Record in synced emails buffer
+    recordSyncedEmail({
+      id: caseId || `case_${Date.now()}`,
+      messageId: queueItem.messageId,
+      threadId: `thread_${queueItem.messageId}`,
+      subject,
+      from: fromAddr,
+      to: queueItem.emailAddress || 'User',
+      date: new Date().toISOString(),
+      snippet: analysisResult.analysis?.email?.snippet || 'Analyzed inbound email artifact.',
+      fullAnalysis: analysisResult.analysis
+    });
+
+    // If threat score exceeds threshold and live access token exists, apply quarantine label in real Gmail
+    if (isQuarantined && queueItem.messageId && !queueItem.messageId.startsWith('pubsub_') && !queueItem.messageId.startsWith('sim_')) {
+      const accessToken = getGmailAccessToken();
+      if (accessToken && !accessToken.startsWith('mock_')) {
+        await modifyGmailMessageLabels(queueItem.messageId, ['TraceXMail-Quarantine'], ['INBOX'], accessToken).catch(err => {
+          console.warn('[IngestionQueueWorker] Failed to apply quarantine label in Gmail:', err?.message);
+        });
+      }
+    }
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'GMAIL_EMAIL_ANALYZED',
+        queueId: queueItem.queueId,
+        caseId,
+        threatScore,
+        quarantined: isQuarantined,
+        subject,
+        deliveryStage,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`[IngestionQueueWorker] Completed analysis for ${queueItem.queueId}: Case ${caseId}, Threat Score ${threatScore}, Quarantined: ${isQuarantined}`);
+  } catch (err: any) {
+    console.error(`[IngestionQueueWorker] Error processing queue item ${queueItem.queueId}:`, err);
+    updateQueueItemStatus(queueItem.queueId, {
+      status: 'FAILED',
+      completedAt: new Date().toISOString(),
+      error: err.message
+    });
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'GMAIL_EMAIL_ANALYSIS_FAILED',
+        queueId: queueItem.queueId,
+        error: err.message
+      });
     }
   }
 });
@@ -3364,6 +3496,15 @@ Link: https://verify-auth-portal.net/login`;
           for (const msg of messages) {
             const rawEml = await fetchGmailMessageRaw(msg.id, effectiveToken);
             if (rawEml) {
+              // Automatically queue email for immediate forensic analysis
+              queueEmailForAnalysis({
+                messageId: msg.id,
+                source: 'poll_now',
+                emailAddress: status.email_address || undefined,
+                rawEml,
+                deliveryStage: 'post-delivery-alert'
+              });
+
               const result = await parseRawEmailToAnalysis(rawEml, `gmail_${msg.id}.eml`, undefined, {
                 isPushInterception: false,
                 deliveryStage: 'post-delivery-alert'
@@ -3378,7 +3519,7 @@ Link: https://verify-auth-portal.net/login`;
               }
             }
           }
-          syncMessage = `Successfully polled and analyzed ${processedCasesCount} live Gmail message(s) directly from Google Workspace.`;
+          syncMessage = `Successfully polled, queued, and analyzed ${processedCasesCount} live Gmail message(s) directly from Google Workspace.`;
         } else {
           syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
         }
@@ -3416,6 +3557,27 @@ Link: https://verify-auth-portal.net/login`;
       console.error('[GmailPoll] Error during mailbox poll:', err);
       res.status(500).json({ status: 'error', error: err.message });
     }
+  });
+
+  // 6c. Ingestion Analysis Queue Endpoint
+  app.get('/api/gmail/ingestion-queue', (_req, res) => {
+    const queue = getIngestionQueue();
+    const queuedCount = queue.filter(q => q.status === 'QUEUED').length;
+    const analyzingCount = queue.filter(q => q.status === 'ANALYZING').length;
+    const completedCount = queue.filter(q => q.status === 'COMPLETED').length;
+    const failedCount = queue.filter(q => q.status === 'FAILED').length;
+
+    res.json({
+      status: 'ok',
+      total_items: queue.length,
+      metrics: {
+        queued: queuedCount,
+        analyzing: analyzingCount,
+        completed: completedCount,
+        failed: failedCount
+      },
+      queue
+    });
   });
 
   // 7. Cloud Pub/Sub Push Webhook Receiver (Sub-Second Inbound Interception)

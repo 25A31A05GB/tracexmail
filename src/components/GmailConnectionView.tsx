@@ -35,7 +35,9 @@ import {
   FileText,
   ArrowRight,
   Terminal,
-  ShieldX
+  ShieldX,
+  Layers,
+  Loader2
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
@@ -189,6 +191,33 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
 
   const pushWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/gmail/pubsub/push` : '/api/gmail/pubsub/push';
+
+  // Ingestion Analysis Queue State
+  const [ingestionQueue, setIngestionQueue] = useState<any[]>([]);
+  const [loadingQueue, setLoadingQueue] = useState<boolean>(false);
+
+  const fetchQueue = async () => {
+    try {
+      setLoadingQueue(true);
+      const res = await fetch(`${API_URL}/api/gmail/ingestion-queue`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.queue) {
+          setIngestionQueue(data.queue);
+        }
+      }
+    } catch (err) {
+      console.warn('[GmailConnectionView] Error fetching queue:', err);
+    } finally {
+      setLoadingQueue(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchQueue();
+    const interval = setInterval(fetchQueue, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Subscribe to gmailPubSub state changes
   useEffect(() => {
@@ -905,6 +934,116 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           <span>{directTokenSuccess}</span>
         </div>
       )}
+
+      {/* Automated Ingestion Queue & Immediate Forensic Triage Card */}
+      <div className="p-4 bg-[#14120f] border border-[#3a352c] rounded-xl space-y-3.5 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white flex items-center gap-2">
+                <span>Automated Ingestion &amp; Forensic Analysis Queue</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  LIVE QUEUE DETECTOR
+                </span>
+              </div>
+              <div className="text-xs text-slate-400">
+                New emails detected by Gmail sync are automatically queued for immediate forensic analysis upon arrival
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={fetchQueue}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${loadingQueue ? 'animate-spin' : ''}`} />
+            <span>Refresh Queue</span>
+          </button>
+        </div>
+
+        {ingestionQueue.length === 0 ? (
+          <div className="p-4 bg-[#1c1813] border border-[#2a251e] rounded-lg text-center text-xs text-stone-400 flex flex-col items-center justify-center gap-1.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 opacity-70" />
+            <span>Analysis queue is clear. Incoming Gmail sync emails will automatically queue here upon detection.</span>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {ingestionQueue.map((item) => (
+              <div
+                key={item.queueId}
+                className="p-3 bg-[#1b1712] border border-[#2e2820] hover:border-[#423a2f] rounded-lg text-xs flex items-center justify-between gap-3 transition-all"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="shrink-0">
+                    {item.status === 'QUEUED' && (
+                      <span className="px-2 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-mono text-[10px] font-bold flex items-center gap-1">
+                        <Clock className="w-3 h-3 animate-spin" />
+                        QUEUED
+                      </span>
+                    )}
+                    {item.status === 'ANALYZING' && (
+                      <span className="px-2 py-1 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded font-mono text-[10px] font-bold flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        ANALYZING
+                      </span>
+                    )}
+                    {item.status === 'COMPLETED' && (
+                      <span className="px-2 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-mono text-[10px] font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        ANALYZED
+                      </span>
+                    )}
+                    {item.status === 'FAILED' && (
+                      <span className="px-2 py-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded font-mono text-[10px] font-bold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-red-400" />
+                        FAILED
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="text-slate-200 font-medium truncate flex items-center gap-2">
+                      <span className="truncate">{item.subject || item.messageId || 'Inbound Mail Artifact'}</span>
+                      {item.source && (
+                        <span className="px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded text-[9px] font-mono uppercase">
+                          {item.source}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-stone-400 font-mono flex items-center gap-2 mt-0.5">
+                      <span>Queue ID: {item.queueId}</span>
+                      <span>•</span>
+                      <span>Queued: {new Date(item.queuedAt).toLocaleTimeString()}</span>
+                      {item.threatScore !== undefined && (
+                        <>
+                          <span>•</span>
+                          <span className={item.threatScore >= 70 ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>
+                            Score: {item.threatScore}/100
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {item.caseId && (
+                  <button
+                    onClick={() => {
+                      if (onNavigateToOverview) onNavigateToOverview();
+                    }}
+                    className="px-2.5 py-1 bg-purple-950/40 hover:bg-purple-900/50 border border-purple-800/40 text-purple-200 text-[11px] rounded-md font-mono shrink-0 transition-colors cursor-pointer"
+                  >
+                    View Case →
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Gmail Configuration Status: Active OAuth Scopes & Refresh Permissions */}
       <GmailConfigStatus

@@ -110,7 +110,73 @@ export interface SyncedGmailEmail {
   fullAnalysis?: any;
 }
 
+export interface IngestionQueueItem {
+  queueId: string;
+  messageId: string;
+  source: 'gmail_sync_loop' | 'pubsub_push' | 'poll_now' | 'simulation';
+  queuedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  status: 'QUEUED' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
+  rawEml?: string;
+  emailAddress?: string;
+  subject?: string;
+  from?: string;
+  to?: string;
+  deliveryStage?: 'pre-delivery-hold' | 'post-delivery-alert';
+  caseId?: string;
+  threatScore?: number;
+  quarantined?: boolean;
+  error?: string;
+}
+
 export const gmailEvents = new EventEmitter();
+
+// In-Memory Queue Store
+const ingestionQueue: IngestionQueueItem[] = [];
+
+/**
+ * Automatically queues a newly detected email for forensic analysis.
+ */
+export function queueEmailForAnalysis(item: Omit<IngestionQueueItem, 'queueId' | 'queuedAt' | 'status'>): IngestionQueueItem {
+  const queueId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const queueItem: IngestionQueueItem = {
+    ...item,
+    queueId,
+    queuedAt: new Date().toISOString(),
+    status: 'QUEUED'
+  };
+
+  ingestionQueue.unshift(queueItem);
+  if (ingestionQueue.length > 100) {
+    ingestionQueue.pop();
+  }
+
+  state.metrics.totalIngested++;
+
+  // Emit event for real-time background analysis execution
+  gmailEvents.emit('email_queued_for_analysis', queueItem);
+  return queueItem;
+}
+
+/**
+ * Updates status and metadata of a queued ingestion item.
+ */
+export function updateQueueItemStatus(queueId: string, updates: Partial<IngestionQueueItem>) {
+  const item = ingestionQueue.find(q => q.queueId === queueId);
+  if (item) {
+    Object.assign(item, updates);
+    gmailEvents.emit('queue_item_updated', item);
+  }
+  return item;
+}
+
+/**
+ * Returns current snapshot of the ingestion analysis queue.
+ */
+export function getIngestionQueue(): IngestionQueueItem[] {
+  return ingestionQueue;
+}
 
 // In-Memory State
 const state: GmailServiceState = {
@@ -837,6 +903,15 @@ export async function handlePubSubPush(body: any): Promise<{
     state.historyId = historyId;
     state.lastPolledAt = new Date().toISOString();
 
+    // Queue immediately for automated forensic analysis pipeline
+    queueEmailForAnalysis({
+      messageId: body?.message?.messageId || `pubsub_${historyId}`,
+      source: 'pubsub_push',
+      emailAddress,
+      rawEml: body?.rawEmail,
+      deliveryStage: 'pre-delivery-hold'
+    });
+
     // Emit event for real-time listeners
     gmailEvents.emit('inbound_mail_push', {
       emailAddress,
@@ -1125,6 +1200,15 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
           const raw = await fetchGmailMessageRaw(msg.id, state.accessToken || undefined);
           if (raw) {
             fetchedCount++;
+            // Queue immediately for automated forensic analysis
+            queueEmailForAnalysis({
+              messageId: msg.id,
+              source: 'gmail_sync_loop',
+              emailAddress: state.emailAddress || undefined,
+              rawEml: raw,
+              deliveryStage: 'pre-delivery-hold'
+            });
+
             gmailEvents.emit('inbound_mail_push', {
               emailAddress: state.emailAddress,
               messageId: msg.id,
