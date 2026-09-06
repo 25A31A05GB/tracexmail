@@ -587,7 +587,7 @@ export default function App() {
               {effectiveTab === 'gmail' && (
                 <GmailConnectionView
                   onSelectAnalysis={handleAnalysisCreated}
-                  currentUserEmail={user?.email || session?.user?.email || 'jayramsappa537@gmail.com'}
+                  currentUserEmail={user?.email || session?.user?.email || ''}
                 />
               )}
 

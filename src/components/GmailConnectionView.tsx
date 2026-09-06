@@ -92,7 +92,7 @@ interface GmailConnectionViewProps {
   currentUserEmail?: string;
 }
 
-export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onNavigateToOverview, currentUserEmail = 'jayramsappa537@gmail.com' }: GmailConnectionViewProps) {
+export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onNavigateToOverview, currentUserEmail = '' }: GmailConnectionViewProps) {
   const [status, setStatus] = useState<GmailStatusResponse | null>(null);
   const [pubSubState, setPubSubState] = useState<WatchSubscriptionState>(() => gmailPubSub.getState());
   const [loading, setLoading] = useState<boolean>(true);
@@ -134,7 +134,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   // Real Gmail OAuth Token Direct Link
   const [showDirectTokenConnect, setShowDirectTokenConnect] = useState<boolean>(false);
-  const [directEmail, setDirectEmail] = useState<string>(currentUserEmail || 'jayramsappa537@gmail.com');
+  const [directEmail, setDirectEmail] = useState<string>(currentUserEmail || '');
   const [directAccessToken, setDirectAccessToken] = useState<string>('');
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
@@ -160,12 +160,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
-      const res = await fetch(`${API_URL}/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`, {
+      const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
+      const url = targetEmail
+        ? `${API_URL}/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`
+        : `${API_URL}/api/gmail/status`;
+      const res = await fetch(url, {
         signal: controller.signal,
-        headers: {
+        headers: targetEmail ? {
           'x-user-email': targetEmail
-        }
+        } : {}
       });
 
       if (!res.ok) {
@@ -338,11 +341,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       setErrorMsg('Please provide a valid Google OAuth Access Token.');
       return;
     }
+    const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address;
+    if (!targetEmail) {
+      setErrorMsg('Please provide your Gmail email address to associate with this connection.');
+      return;
+    }
     setConnectingToken(true);
     setErrorMsg(null);
     setDirectTokenSuccess(null);
     try {
-      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
       const res = await fetch(`${API_URL}/api/gmail/connect-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -429,7 +436,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     }, 280);
 
     try {
-      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
+      const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
       const res = await fetch(`${API_URL}/api/gmail/poll-now`, {
         method: 'POST',
         headers: {
@@ -812,7 +819,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
       {/* Gmail Configuration Status: Active OAuth Scopes & Refresh Permissions */}
       <GmailConfigStatus
-        emailAddress={status?.email_address || currentUserEmail || 'jayramsappa537@gmail.com'}
+        emailAddress={status?.email_address || currentUserEmail || ''}
         isConnected={status?.is_connected}
         oauthScopes={status?.oauth_scopes}
         onRefreshSuccess={fetchStatus}
@@ -827,13 +834,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             </div>
             <div>
               <div className="text-sm font-semibold text-white flex items-center gap-2">
-                <span>Real Gmail Mailbox Integration</span>
+                <span>Personal &amp; Enterprise Mailbox Integration</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
-                  LIVE SYNC ENGINE
+                  {status?.is_connected ? 'LIVE SYNC ENGINE' : 'AUTH REQUIRED'}
                 </span>
               </div>
               <div className="text-xs text-slate-400">
-                Connected Target: <span className="font-mono text-[var(--paper)] font-bold">{status?.email_address || currentUserEmail || 'jayramsappa537@gmail.com'}</span>
+                Connected Target: <span className="font-mono text-[var(--paper)] font-bold">{status?.email_address || currentUserEmail || 'No user account connected'}</span>
               </div>
             </div>
           </div>
@@ -842,23 +849,23 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Shield className="w-3.5 h-3.5 text-amber-400" />
-            <span>{showDirectTokenConnect ? 'Hide Direct Token Input' : 'Configure Live OAuth Token'}</span>
+            <span>{showDirectTokenConnect ? 'Hide Manual Token' : 'Connect via Google Access Token'}</span>
           </button>
         </div>
 
         {showDirectTokenConnect && (
           <div className="p-3.5 bg-[#1c1813] border border-[#4a4235] rounded-lg space-y-3 animate-in fade-in duration-150">
             <div className="text-xs text-slate-300 leading-relaxed">
-              To synchronize real emails from your personal or corporate Google account directly (e.g. <span className="font-mono text-amber-300">{currentUserEmail || 'jayramsappa537@gmail.com'}</span>), provide an authorized Google Access Token with <span className="font-mono text-purple-300">gmail.readonly</span> and <span className="font-mono text-purple-300">gmail.modify</span> scopes:
+              To monitor your own Google account directly, provide your Gmail address and an authorized Google OAuth Access Token with <span className="font-mono text-purple-300">gmail.readonly</span> and <span className="font-mono text-purple-300">gmail.modify</span> scopes:
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-mono text-slate-400 mb-1">Gmail Address</label>
+                <label className="block text-[11px] font-mono text-slate-400 mb-1">Your Gmail Address</label>
                 <input
                   type="email"
                   value={directEmail}
                   onChange={(e) => setDirectEmail(e.target.value)}
-                  placeholder={currentUserEmail || 'jayramsappa537@gmail.com'}
+                  placeholder={currentUserEmail || 'user@example.com'}
                   className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
                 />
               </div>

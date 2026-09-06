@@ -54,8 +54,8 @@ interface GmailConfigStatusProps {
 }
 
 export function GmailConfigStatus({
-  emailAddress = 'jayramsappa537@gmail.com',
-  isConnected = true,
+  emailAddress = '',
+  isConnected = false,
   oauthScopes: initialScopes,
   onRefreshSuccess,
   className = ''
@@ -219,7 +219,7 @@ export function GmailConfigStatus({
             <div className="flex items-center gap-3 text-xs text-[#9d9282] mt-1.5 flex-wrap">
               <span className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-[#b5aa99]" />
-                <span className="text-[#f4efe6] font-medium">{emailAddress || 'jayramsappa537@gmail.com'}</span>
+                <span className="text-[#f4efe6] font-medium">{emailAddress || 'No account connected'}</span>
               </span>
               <span className="text-[#453f35]">•</span>
               <span className="flex items-center gap-1 text-[#b5aa99]">

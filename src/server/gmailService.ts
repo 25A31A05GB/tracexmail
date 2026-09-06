@@ -83,30 +83,30 @@ export const gmailEvents = new EventEmitter();
 
 // In-Memory State
 const state: GmailServiceState = {
-  isConnected: true, // Connected by default with simulated / configured account
-  oauthConfigured: true,
-  emailAddress: process.env.GMAIL_USER_EMAIL || 'jayramsappa537@gmail.com',
-  accessToken: 'mock_oauth2_access_token_encrypted',
-  refreshToken: 'mock_oauth2_refresh_token_encrypted',
-  lastPolledAt: new Date().toISOString(),
+  isConnected: Boolean(process.env.GMAIL_USER_EMAIL && process.env.GMAIL_ACCESS_TOKEN),
+  oauthConfigured: Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID),
+  emailAddress: process.env.GMAIL_USER_EMAIL || null,
+  accessToken: process.env.GMAIL_ACCESS_TOKEN || null,
+  refreshToken: process.env.GMAIL_REFRESH_TOKEN || null,
+  lastPolledAt: null,
   pollingIntervalSeconds: 20,
-  historyId: '9845210',
-  activeScopes: [
+  historyId: null,
+  activeScopes: process.env.GMAIL_USER_EMAIL ? [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/userinfo.email'
-  ],
-  scopesGrantedAt: new Date(Date.now() - 3600 * 1000).toISOString(),
-  tokenExpiresAt: Date.now() + 3600 * 1000,
-  lastRefreshedAt: new Date().toISOString(),
+  ] : [],
+  scopesGrantedAt: null,
+  tokenExpiresAt: null,
+  lastRefreshedAt: null,
   watch: {
-    enabled: true,
+    enabled: false,
     topicName: process.env.GMAIL_PUBSUB_TOPIC || 'projects/tracexmail-enterprise/topics/inbox-watch',
     subscription: 'projects/tracexmail-enterprise/subscriptions/tracexmail-inbox-sub',
-    active: true,
-    expiration: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days default
-    historyId: '9845210',
-    lastPushReceivedAt: new Date().toISOString()
+    active: false,
+    expiration: null,
+    historyId: null,
+    lastPushReceivedAt: null
   },
   quarantine: {
     enabled: true,
@@ -116,38 +116,13 @@ const state: GmailServiceState = {
     adminWebhookUrl: process.env.SOC_ADMIN_WEBHOOK_URL || ''
   },
   metrics: {
-    totalIngested: 14,
-    preDeliveryQuarantined: 5,
-    postDeliveryAlerts: 9,
-    lastDeliveryStage: 'pre-delivery-hold',
-    lastQuarantineAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    totalIngested: 0,
+    preDeliveryQuarantined: 0,
+    postDeliveryAlerts: 0,
+    lastDeliveryStage: null,
+    lastQuarantineAt: null
   },
-  quarantineAuditLog: [
-    {
-      id: 'log-quar-101',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-      messageId: '<msg-dhl-spoofed-8831@tracexmail.internal>',
-      subject: 'URGENT: DHL Parcel Tracking Exception #99321',
-      from: 'tracking-update@dhl-express-security.co',
-      threatScore: 94,
-      verdict: 'MALICIOUS PHISH',
-      action: 'HOLD_QUARANTINED',
-      deliveryStage: 'pre-delivery-hold',
-      adminWebhookDispatched: true
-    },
-    {
-      id: 'log-quar-102',
-      timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-      messageId: '<msg-wire-transfer-4412@tracexmail.internal>',
-      subject: 'SWIFT Wire Transfer Verification - Confidential',
-      from: 'cfo-exec@target-company-financials.com',
-      threatScore: 88,
-      verdict: 'SUSPICIOUS BEC',
-      action: 'HOLD_QUARANTINED',
-      deliveryStage: 'pre-delivery-hold',
-      adminWebhookDispatched: true
-    }
-  ]
+  quarantineAuditLog: []
 };
 
 /**
