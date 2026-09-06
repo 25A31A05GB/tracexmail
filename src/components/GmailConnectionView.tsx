@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Mail,
   CheckCircle2,
@@ -25,7 +25,9 @@ import {
   ToggleLeft,
   ToggleRight,
   Key,
-  Shield
+  Shield,
+  Activity,
+  ArrowUpRight
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
@@ -87,9 +89,10 @@ interface GmailConnectionViewProps {
   onNewCasesProcessed?: () => void;
   onSelectAnalysis?: (analysis: any) => void;
   onNavigateToOverview?: () => void;
+  currentUserEmail?: string;
 }
 
-export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onNavigateToOverview }: GmailConnectionViewProps) {
+export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onNavigateToOverview, currentUserEmail = 'jayramsappa537@gmail.com' }: GmailConnectionViewProps) {
   const [status, setStatus] = useState<GmailStatusResponse | null>(null);
   const [pubSubState, setPubSubState] = useState<WatchSubscriptionState>(() => gmailPubSub.getState());
   const [loading, setLoading] = useState<boolean>(true);
@@ -101,6 +104,19 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [renewingWatch, setRenewingWatch] = useState<boolean>(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Real-time Progress Indicator & WebSocket Sync state
+  const [syncProgress, setSyncProgress] = useState<number>(0);
+  const [syncStage, setSyncStage] = useState<string>('Enclave Idle');
+  const [lastSyncCompletedAt, setLastSyncCompletedAt] = useState<Date | null>(null);
+  const [lastSyncDetails, setLastSyncDetails] = useState<{
+    count: number;
+    status: string;
+    subject?: string;
+    stage?: string;
+  } | null>(null);
+  const [syncCompletedAnim, setSyncCompletedAnim] = useState<boolean>(false);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Quarantine & Gate Settings state
   const [showConfig, setShowConfig] = useState<boolean>(false);
@@ -118,7 +134,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   // Real Gmail OAuth Token Direct Link
   const [showDirectTokenConnect, setShowDirectTokenConnect] = useState<boolean>(false);
-  const [directEmail, setDirectEmail] = useState<string>('jayaramsappa09@gmail.com');
+  const [directEmail, setDirectEmail] = useState<string>(currentUserEmail || 'jayramsappa537@gmail.com');
   const [directAccessToken, setDirectAccessToken] = useState<string>('');
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
@@ -144,8 +160,12 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const res = await fetch(`${API_URL}/api/gmail/status`, {
+      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
+      const res = await fetch(`${API_URL}/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`, {
         signal: controller.signal,
+        headers: {
+          'x-user-email': targetEmail
+        }
       });
 
       if (!res.ok) {
@@ -322,12 +342,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setErrorMsg(null);
     setDirectTokenSuccess(null);
     try {
+      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
       const res = await fetch(`${API_URL}/api/gmail/connect-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           access_token: directAccessToken.trim(),
-          email: directEmail.trim() || 'jayaramsappa09@gmail.com',
+          email: targetEmail,
           expires_in_seconds: 3600
         })
       });
@@ -335,7 +356,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       if (!res.ok) {
         throw new Error(data.error || 'Failed to connect Gmail token');
       }
-      setDirectTokenSuccess(`Real Gmail account connected: ${directEmail.trim()}. Starting live synchronization...`);
+      setDirectTokenSuccess(`Real Gmail account connected: ${targetEmail}. Starting live synchronization...`);
       setDirectAccessToken('');
       setShowDirectTokenConnect(false);
       await fetchStatus();
@@ -380,27 +401,82 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   };
 
   const handleSyncNow = async () => {
+    if (syncing) return;
     setSyncing(true);
+    setSyncCompletedAnim(false);
     setSyncResult(null);
     setErrorMsg(null);
+    setSyncProgress(15);
+    setSyncStage('Connecting to Gmail Enclave API...');
+
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+
+    // Smooth real-time progress steps during sync
+    progressIntervalRef.current = setInterval(() => {
+      setSyncProgress((prev) => {
+        if (prev < 40) {
+          setSyncStage('Querying latest Gmail inbound messages...');
+          return prev + 10;
+        } else if (prev < 75) {
+          setSyncStage('Scanning headers & cryptographic signatures (SPF/DKIM)...');
+          return prev + 8;
+        } else if (prev < 90) {
+          setSyncStage('Evaluating threat heuristics & quarantine rules...');
+          return prev + 4;
+        }
+        return prev;
+      });
+    }, 280);
+
     try {
-      const res = await fetch(`${API_URL}/api/gmail/poll-now`, { method: 'POST' });
+      const targetEmail = directEmail.trim() || currentUserEmail || 'jayramsappa537@gmail.com';
+      const res = await fetch(`${API_URL}/api/gmail/poll-now`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': targetEmail
+        },
+        body: JSON.stringify({
+          user_email: targetEmail
+        })
+      });
+
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+
       if (res.ok) {
         const data = await res.json();
         const count = data.processed_cases_count || 0;
         const stage = data.delivery_stage === 'pre-delivery-hold' ? 'Pre-Delivery Intercepted' : 'Post-Delivery Ingested';
+        
+        setSyncProgress(100);
+        setSyncStage(`Sync completed: ${count} email(s) analyzed`);
+        setLastSyncCompletedAt(new Date());
+        setLastSyncDetails({
+          count,
+          status: data.quarantine_status || 'AUDITED',
+          stage: data.delivery_stage
+        });
+        setSyncCompletedAnim(true);
         setSyncResult(`Sync complete: ${count} email(s) evaluated (${stage} — ${data.quarantine_status}).`);
+        
         if (count > 0 && onNewCasesProcessed) {
           onNewCasesProcessed();
         }
         fetchStatus();
+
+        setTimeout(() => {
+          setSyncing(false);
+          setTimeout(() => setSyncCompletedAnim(false), 3500);
+        }, 750);
       } else {
+        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+        setSyncing(false);
         setErrorMsg('Failed to sync Gmail mailbox.');
       }
     } catch (e: any) {
-      setErrorMsg('Error during sync: ' + e.message);
-    } finally {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       setSyncing(false);
+      setErrorMsg('Error during sync: ' + e.message);
     }
   };
 
@@ -498,9 +574,47 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       }
     };
 
+    const handleWsSyncComplete = (event: any) => {
+      const detail = event?.detail || event;
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+      setSyncProgress(100);
+      setSyncStage(`Live sync completed: ${detail?.processed_count || 1} email(s) analyzed`);
+      setLastSyncCompletedAt(new Date());
+      setLastSyncDetails({
+        count: detail?.processed_count || 1,
+        status: detail?.quarantine_status || 'AUDITED',
+        subject: detail?.subject,
+        stage: detail?.delivery_stage
+      });
+      setSyncCompletedAnim(true);
+      
+      const count = detail?.processed_count || 1;
+      const stage = detail?.delivery_stage === 'pre-delivery-hold' ? 'Pre-Delivery Intercepted' : 'Post-Delivery Ingested';
+      setSyncResult(`WebSocket Sync: ${count} email(s) evaluated (${stage} — ${detail?.quarantine_status || 'AUDITED'}).`);
+      
+      if (onNewCasesProcessed) {
+        onNewCasesProcessed();
+      }
+      fetchStatus();
+
+      setTimeout(() => {
+        setSyncing(false);
+        setTimeout(() => setSyncCompletedAnim(false), 3500);
+      }, 750);
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+    window.addEventListener('GMAIL_SYNC_COMPLETE', handleWsSyncComplete);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('GMAIL_SYNC_COMPLETE', handleWsSyncComplete);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, [onNewCasesProcessed]);
 
   const handleDisconnect = async () => {
     if (!confirm('Are you sure you want to disconnect this Gmail account?')) return;
@@ -535,10 +649,22 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h3 className="text-base font-semibold text-[#f4efe6]">Gmail Real-Time Ingestion &amp; Protection</h3>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Protection
-              </span>
+              {syncing ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950/80 text-amber-300 border border-amber-500/40 animate-pulse shadow-sm shadow-amber-500/10">
+                  <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
+                  <span>Syncing ({Math.round(syncProgress)}%)</span>
+                </span>
+              ) : syncCompletedAnim || (lastSyncCompletedAt && Date.now() - new Date(lastSyncCompletedAt).getTime() < 120000) ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 transition-all shadow-sm shadow-emerald-500/10">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Synced Just Now {lastSyncDetails ? `• ${lastSyncDetails.count} verified` : ''}</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Live Protection</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-[#a89d8d] mt-1 max-w-2xl leading-relaxed">
               Inbound emails are automatically monitored. Threat patterns and phishing attempts are quarantined before reaching your active inbox.
@@ -551,15 +677,31 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             <button
               onClick={handleSyncNow}
               disabled={syncing}
-              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+              className={`font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all relative overflow-hidden ${
+                syncing
+                  ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 bg-[length:200%_auto] text-stone-950 ring-2 ring-amber-400/60 shadow-lg shadow-amber-500/25 animate-pulse cursor-wait'
+                  : syncCompletedAnim
+                  ? 'bg-emerald-500 text-stone-950 ring-2 ring-emerald-400/60 shadow-lg shadow-emerald-500/20'
+                  : 'bg-amber-500 hover:bg-amber-400 active:scale-95 text-stone-950 hover:shadow-md'
+              }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{syncing ? 'Syncing...' : 'Sync Inbox'}</span>
+              {syncCompletedAnim ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-stone-950" />
+              ) : (
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              )}
+              <span>
+                {syncing
+                  ? `Syncing (${Math.round(syncProgress)}%)...`
+                  : syncCompletedAnim
+                  ? 'Synced!'
+                  : 'Sync Inbox'}
+              </span>
             </button>
             <button
               onClick={() => handleSimulateInboundInterception(true)}
-              disabled={simulating}
-              className="bg-[#26211a] hover:bg-[#322c22] text-[#f4efe6] border border-[#443c30] px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              disabled={simulating || syncing}
+              className="bg-[#26211a] hover:bg-[#322c22] disabled:opacity-50 text-[#f4efe6] border border-[#443c30] px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
               title="Simulates a sample phishing test to demonstrate pre-delivery quarantine"
             >
               <ShieldAlert className={`w-3.5 h-3.5 text-amber-400 ${simulating ? 'animate-spin' : ''}`} />
@@ -567,6 +709,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             </button>
             <button
               onClick={handleDisconnect}
+              disabled={syncing}
               className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -583,6 +726,59 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           </button>
         )}
       </div>
+
+      {/* Real-time Sync Progress Indicator Bar */}
+      {(syncing || syncCompletedAnim) && (
+        <div className="p-4 bg-[#1b1712] border border-amber-500/30 rounded-xl space-y-3 transition-all duration-300 shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 font-medium text-[#f4efe6]">
+              {syncCompletedAnim ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <RefreshCw className="w-4 h-4 text-amber-400 animate-spin shrink-0" />
+              )}
+              <span>{syncStage}</span>
+            </div>
+            <div className="flex items-center gap-2 font-mono">
+              <span className={`text-xs font-bold ${syncCompletedAnim ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {Math.round(syncProgress)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Animated Progress Bar */}
+          <div className="w-full bg-[#0e0c0a] rounded-full h-2 overflow-hidden border border-[#332b21]">
+            <div
+              className={`h-full transition-all duration-300 ease-out rounded-full ${
+                syncCompletedAnim
+                  ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.7)]'
+                  : 'bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.6)]'
+              }`}
+              style={{ width: `${Math.min(100, Math.max(8, syncProgress))}%` }}
+            />
+          </div>
+
+          {/* Real-time Step Flow */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] font-mono">
+            <div className={`flex items-center gap-1.5 ${syncProgress >= 20 ? 'text-amber-300 font-semibold' : 'text-[#6b6255]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${syncProgress >= 20 ? 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]' : 'bg-[#4a4237]'}`} />
+              <span className="truncate">1. Enclave Handshake</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${syncProgress >= 50 ? 'text-amber-300 font-semibold' : 'text-[#6b6255]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${syncProgress >= 50 ? 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]' : 'bg-[#4a4237]'}`} />
+              <span className="truncate">2. Inbound Query</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${syncProgress >= 80 ? 'text-amber-300 font-semibold' : 'text-[#6b6255]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${syncProgress >= 80 ? 'bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]' : 'bg-[#4a4237]'}`} />
+              <span className="truncate">3. Threat Heuristics</span>
+            </div>
+            <div className={`flex items-center gap-1.5 ${syncProgress >= 100 ? 'text-emerald-400 font-semibold' : 'text-[#6b6255]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${syncProgress >= 100 ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.8)]' : 'bg-[#4a4237]'}`} />
+              <span className="truncate">4. Ingestion Complete</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notifications / Alerts */}
       {errorMsg && (
@@ -616,7 +812,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
       {/* Gmail Configuration Status: Active OAuth Scopes & Refresh Permissions */}
       <GmailConfigStatus
-        emailAddress={status?.email_address || 'jayaramsappa09@gmail.com'}
+        emailAddress={status?.email_address || currentUserEmail || 'jayramsappa537@gmail.com'}
         isConnected={status?.is_connected}
         oauthScopes={status?.oauth_scopes}
         onRefreshSuccess={fetchStatus}
@@ -637,7 +833,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                 </span>
               </div>
               <div className="text-xs text-slate-400">
-                Connected Target: <span className="font-mono text-[var(--paper)] font-bold">{status?.email_address || 'jayaramsappa09@gmail.com'}</span>
+                Connected Target: <span className="font-mono text-[var(--paper)] font-bold">{status?.email_address || currentUserEmail || 'jayramsappa537@gmail.com'}</span>
               </div>
             </div>
           </div>
@@ -653,7 +849,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         {showDirectTokenConnect && (
           <div className="p-3.5 bg-[#1c1813] border border-[#4a4235] rounded-lg space-y-3 animate-in fade-in duration-150">
             <div className="text-xs text-slate-300 leading-relaxed">
-              To synchronize real emails from your personal or corporate Google account directly (e.g. <span className="font-mono text-amber-300">jayaramsappa09@gmail.com</span>), provide an authorized Google Access Token with <span className="font-mono text-purple-300">gmail.readonly</span> and <span className="font-mono text-purple-300">gmail.modify</span> scopes:
+              To synchronize real emails from your personal or corporate Google account directly (e.g. <span className="font-mono text-amber-300">{currentUserEmail || 'jayramsappa537@gmail.com'}</span>), provide an authorized Google Access Token with <span className="font-mono text-purple-300">gmail.readonly</span> and <span className="font-mono text-purple-300">gmail.modify</span> scopes:
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -662,7 +858,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                   type="email"
                   value={directEmail}
                   onChange={(e) => setDirectEmail(e.target.value)}
-                  placeholder="jayaramsappa09@gmail.com"
+                  placeholder={currentUserEmail || 'jayramsappa537@gmail.com'}
                   className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
                 />
               </div>

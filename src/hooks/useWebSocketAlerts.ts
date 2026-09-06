@@ -190,6 +190,9 @@ export function useWebSocketAlerts() {
             if (data.latest_case_id) {
               setLastCreatedCaseId(data.latest_case_id);
             }
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('GMAIL_SYNC_COMPLETE', { detail: data }));
+            }
             const syncAlert: WebSocketAlert = {
               id: `sync_${Date.now()}`,
               case_id: data.latest_case_id,

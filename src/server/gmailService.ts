@@ -85,7 +85,7 @@ export const gmailEvents = new EventEmitter();
 const state: GmailServiceState = {
   isConnected: true, // Connected by default with simulated / configured account
   oauthConfigured: true,
-  emailAddress: process.env.GMAIL_USER_EMAIL || 'jayaramsappa09@gmail.com',
+  emailAddress: process.env.GMAIL_USER_EMAIL || 'jayramsappa537@gmail.com',
   accessToken: 'mock_oauth2_access_token_encrypted',
   refreshToken: 'mock_oauth2_refresh_token_encrypted',
   lastPolledAt: new Date().toISOString(),
@@ -151,9 +151,22 @@ const state: GmailServiceState = {
 };
 
 /**
+ * Sets the active user email address dynamically.
+ */
+export function setGmailUserEmail(email: string) {
+  if (email && email.includes('@')) {
+    state.emailAddress = email.trim();
+  }
+}
+
+/**
  * Returns current status of Gmail integration and quarantine engine.
  */
-export function getGmailStatus() {
+export function getGmailStatus(userEmail?: string) {
+  if (userEmail && userEmail.includes('@')) {
+    state.emailAddress = userEmail.trim();
+  }
+
   const isReadonlyGranted = state.activeScopes.some(s => s.includes('gmail.readonly') || s === 'gmail.readonly');
   const isModifyGranted = state.activeScopes.some(s => s.includes('gmail.modify') || s === 'gmail.modify');
   const isUserInfoGranted = state.activeScopes.some(s => s.includes('userinfo.email') || s === 'userinfo.email');

@@ -57,6 +57,7 @@ export default function App() {
   // Real Supabase Auth, RBAC, and Account Tiers hook
   const { 
     session, 
+    user,
     profile, 
     role, 
     accountType,
@@ -586,6 +587,7 @@ export default function App() {
               {effectiveTab === 'gmail' && (
                 <GmailConnectionView
                   onSelectAnalysis={handleAnalysisCreated}
+                  currentUserEmail={user?.email || session?.user?.email || 'jayramsappa537@gmail.com'}
                 />
               )}
 

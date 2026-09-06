@@ -54,7 +54,7 @@ interface GmailConfigStatusProps {
 }
 
 export function GmailConfigStatus({
-  emailAddress = 'jayaramsappa09@gmail.com',
+  emailAddress = 'jayramsappa537@gmail.com',
   isConnected = true,
   oauthScopes: initialScopes,
   onRefreshSuccess,
@@ -71,7 +71,12 @@ export function GmailConfigStatus({
   const fetchScopesStatus = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/gmail/status`);
+      const url = emailAddress 
+        ? `${API_URL}/api/gmail/status?user_email=${encodeURIComponent(emailAddress)}`
+        : `${API_URL}/api/gmail/status`;
+      const res = await fetch(url, {
+        headers: emailAddress ? { 'x-user-email': emailAddress } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.oauth_scopes) {
@@ -214,7 +219,7 @@ export function GmailConfigStatus({
             <div className="flex items-center gap-3 text-xs text-[#9d9282] mt-1.5 flex-wrap">
               <span className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-[#b5aa99]" />
-                <span className="text-[#f4efe6] font-medium">{emailAddress || 'jayaramsappa09@gmail.com'}</span>
+                <span className="text-[#f4efe6] font-medium">{emailAddress || 'jayramsappa537@gmail.com'}</span>
               </span>
               <span className="text-[#453f35]">•</span>
               <span className="flex items-center gap-1 text-[#b5aa99]">

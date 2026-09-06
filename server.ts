@@ -2907,8 +2907,9 @@ Link: https://verify-auth-portal.net/login`;
   // ==========================================
 
   // 1. Get Gmail Integration & Quarantine Status
-  app.get('/api/gmail/status', (_req, res) => {
-    res.json(getGmailStatus());
+  app.get('/api/gmail/status', (req, res) => {
+    const userEmail = (req.query.user_email as string) || (req.headers['x-user-email'] as string);
+    res.json(getGmailStatus(userEmail));
   });
 
   function escapeHtml(str: string): string {
@@ -3301,10 +3302,11 @@ Link: https://verify-auth-portal.net/login`;
   // 6b. Gmail Real Live Sync / Polling
   app.post('/api/gmail/poll-now', async (req, res) => {
     try {
+      const userEmail = req.body?.user_email || req.body?.email || (req.headers['x-user-email'] as string);
       const authHeader = req.headers.authorization;
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
       const token = req.body?.access_token || bearerToken;
-      const status = getGmailStatus();
+      const status = getGmailStatus(userEmail);
       
       const effectiveToken = (token && !token.startsWith('mock_') && !token.startsWith('enclave_'))
         ? token
