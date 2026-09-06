@@ -1976,58 +1976,76 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
         <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+              </span>
               <AlertTriangle className="w-4 h-4 text-amber-400" />
               <h2 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-                Recent Threat Detections
+                Live Threat Stream ({alerts.length})
               </h2>
             </div>
             {onNavigateToTab && (
               <button
                 onClick={() => onNavigateToTab('alerts')}
-                className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer"
+                className="text-xs text-blue-400 hover:text-blue-300 font-semibold cursor-pointer flex items-center gap-1"
               >
-                Alert Console →
+                <span>Alert Console →</span>
               </button>
             )}
           </div>
 
-          <div className="space-y-3">
-            {(stats?.recent_alerts || [
-              {
-                id: 'ALT-C4B821',
-                title: 'Critical BEC & Display Name Spoof Detected',
-                description: 'CEO impersonation lure with typo-squatted sender domain and wire transfer request.',
-                severity: 'CRITICAL',
-                status: 'NEW'
-              },
-              {
-                id: 'ALT-8F92A0',
-                title: 'SPF / DMARC Domain Alignment Failure',
-                description: 'Originating IP from Moscow (AS44050) failed envelope sender validation.',
-                severity: 'HIGH',
-                status: 'NEW'
-              },
-              {
-                id: 'ALT-3E12D7',
-                title: 'Deceptive Redirect Chain (3 Hops)',
-                description: 'Hyperlink anchor text mismatch targeting credentials harvesting endpoint.',
-                severity: 'HIGH',
-                status: 'ACKNOWLEDGED'
-              }
-            ]).map((alt, i) => (
-              <div key={i} className="p-3 bg-slate-950/60 border border-slate-800 rounded-lg">
+          <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+            {alerts.slice(0, 8).map((alt, i) => (
+              <div 
+                key={alt.id || i} 
+                onClick={() => {
+                  if (alt.case_id) {
+                    const match = SAMPLE_ANALYSES.find(s => s.id === alt.case_id);
+                    if (match && onSelectAnalysis) {
+                      onSelectAnalysis(match);
+                      onNavigateToTab?.('overview');
+                    } else {
+                      onNavigateToTab?.('cases');
+                    }
+                  } else {
+                    onNavigateToTab?.('alerts');
+                  }
+                }}
+                className="p-3 bg-slate-950/70 hover:bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 rounded-lg transition-all cursor-pointer group"
+              >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono border ${
-                    alt.severity === 'CRITICAL'
-                      ? 'bg-rose-950/80 border-rose-600 text-rose-300'
-                      : 'bg-amber-950/80 border-amber-600 text-amber-300'
-                  }`}>
-                    {alt.severity}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono border ${
+                      alt.severity === 'CRITICAL'
+                        ? 'bg-rose-950/80 border-rose-600 text-rose-300'
+                        : alt.severity === 'HIGH'
+                        ? 'bg-amber-950/80 border-amber-600 text-amber-300'
+                        : 'bg-blue-950/80 border-blue-600 text-blue-300'
+                    }`}>
+                      {alt.severity}
+                    </span>
+                    {alt.threat_score !== undefined && (
+                      <span className="text-[10px] font-mono text-amber-400 font-semibold">
+                        {alt.threat_score}/100
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    {alt.id}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">{alt.id}</span>
                 </div>
-                <div className="text-xs font-semibold text-slate-200">{alt.title}</div>
-                <div className="text-[11px] text-slate-400 mt-0.5 truncate">{alt.description}</div>
+                <div className="text-xs font-semibold text-slate-200 group-hover:text-blue-300 transition-colors">
+                  {alt.title}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-2">
+                  {alt.description}
+                </div>
+                {alt.subject && (
+                  <div className="text-[10px] text-cyan-400 font-mono mt-1 truncate">
+                    Subject: {alt.subject}
+                  </div>
+                )}
               </div>
             ))}
           </div>

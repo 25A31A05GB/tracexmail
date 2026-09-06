@@ -18,8 +18,14 @@ import {
   ChevronUp,
   Server,
   Copy,
-  Check
+  Check,
+  Calendar,
+  Clock,
+  Sparkles,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
+import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 
 const API_URL = (
   (import.meta as any).env?.VITE_API_URL ||
@@ -75,16 +81,20 @@ interface GmailStatusResponse {
 
 interface GmailConnectionViewProps {
   onNewCasesProcessed?: () => void;
+  onSelectAnalysis?: (analysis: any) => void;
+  onNavigateToOverview?: () => void;
 }
 
-export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionViewProps) {
+export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onNavigateToOverview }: GmailConnectionViewProps) {
   const [status, setStatus] = useState<GmailStatusResponse | null>(null);
+  const [pubSubState, setPubSubState] = useState<WatchSubscriptionState>(() => gmailPubSub.getState());
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [simulating, setSimulating] = useState<boolean>(false);
   const [testingPubSub, setTestingPubSub] = useState<boolean>(false);
   const [startingWatch, setStartingWatch] = useState<boolean>(false);
+  const [renewingWatch, setRenewingWatch] = useState<boolean>(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -106,6 +116,16 @@ export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionView
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
 
   const pushWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/gmail/pubsub/push` : '/api/gmail/pubsub/push';
+
+  // Subscribe to gmailPubSub state changes
+  useEffect(() => {
+    const unsubscribe = gmailPubSub.subscribe((newState) => {
+      setPubSubState(newState);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -132,6 +152,7 @@ export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionView
       if (data.watch?.topic_name) {
         setTopicName(data.watch.topic_name);
       }
+      await gmailPubSub.fetchStatus();
       setErrorMsg(null);
     } catch (e: any) {
       if (e?.name === 'AbortError') {
@@ -150,28 +171,46 @@ export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionView
     setStartingWatch(true);
     setErrorMsg(null);
     try {
-      const endpoint = enable ? `${API_URL}/api/gmail/watch/start` : `${API_URL}/api/gmail/watch/stop`;
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topicName })
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setSyncResult(
-          enable
-            ? `⚡ Gmail watch() registered! Pub/Sub subscriber listening on ${topicName}`
-            : 'Gmail watch() stopped.'
-        );
-        fetchStatus();
+      if (enable) {
+        const res = await gmailPubSub.startWatch({ topicName });
+        if (res.success !== false) {
+          setSyncResult(
+            `⚡ Gmail users.watch() active! Pub/Sub subscriber listening on ${topicName}`
+          );
+        } else {
+          throw new Error(res.error || 'Failed to activate Gmail watch');
+        }
       } else {
-        throw new Error(data.error || 'Failed to toggle watch');
+        const res = await gmailPubSub.stopWatch();
+        if (res.success !== false) {
+          setSyncResult('Gmail users.watch() stopped.');
+        } else {
+          throw new Error(res.error || 'Failed to stop Gmail watch');
+        }
       }
+      fetchStatus();
     } catch (err: any) {
       setErrorMsg('Error updating Gmail watch: ' + err.message);
     } finally {
       setStartingWatch(false);
+    }
+  };
+
+  const handleManualRenewWatch = async () => {
+    setRenewingWatch(true);
+    setErrorMsg(null);
+    try {
+      const res = await gmailPubSub.startWatch({ topicName });
+      if (res.success !== false) {
+        setSyncResult(`⚡ Gmail users.watch() subscription successfully renewed!`);
+        fetchStatus();
+      } else {
+        throw new Error(res.error || 'Failed to renew watch subscription');
+      }
+    } catch (err: any) {
+      setErrorMsg('Renewal error: ' + err.message);
+    } finally {
+      setRenewingWatch(false);
     }
   };
 
@@ -353,12 +392,63 @@ export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionView
   useEffect(() => {
     fetchStatus();
 
+    // Handle OAuth redirection query parameters (?gmail_auth=success or error)
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const gmailAuth = searchParams.get('gmail_auth');
+      const authEmail = searchParams.get('email');
+      const authError = searchParams.get('error');
+
+      if (gmailAuth === 'success') {
+        setErrorMsg(null);
+        setSyncResult(`Gmail mailbox connected successfully${authEmail ? ` (${authEmail})` : ''}.`);
+        fetchStatus();
+        handleSyncNow();
+
+        // If running inside an OAuth popup window, signal opener and close
+        if (window.opener && window.opener !== window) {
+          try {
+            window.opener.postMessage({
+              type: 'GMAIL_OAUTH_SUCCESS',
+              email: authEmail,
+              connected: true
+            }, '*');
+            setTimeout(() => window.close(), 600);
+          } catch {}
+        }
+
+        // Clean up URL parameters cleanly
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } else if (gmailAuth === 'error') {
+        const errorDesc = authError || 'Gmail authorization encountered an error.';
+        setErrorMsg(errorDesc);
+
+        if (window.opener && window.opener !== window) {
+          try {
+            window.opener.postMessage({
+              type: 'GMAIL_OAUTH_ERROR',
+              error: errorDesc
+            }, '*');
+            setTimeout(() => window.close(), 1500);
+          } catch {}
+        }
+
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    } catch (err) {
+      console.warn('[GmailConnectionView] Error processing URL parameters:', err);
+    }
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data && event.data.type === 'GMAIL_OAUTH_SUCCESS') {
         setErrorMsg(null);
-        setSyncResult('Gmail account connected successfully.');
+        setSyncResult(`Gmail account connected successfully${event.data.email ? ` (${event.data.email})` : ''}.`);
         fetchStatus();
         handleSyncNow();
+      } else if (event.data && event.data.type === 'GMAIL_OAUTH_ERROR') {
+        setErrorMsg(`Gmail OAuth Error: ${event.data.error || 'Failed to authenticate.'}`);
       }
     };
 
@@ -481,6 +571,115 @@ export function GmailConnectionView({ onNewCasesProcessed }: GmailConnectionView
         <div className="p-3.5 bg-emerald-950/60 border border-emerald-500/60 rounded-lg text-emerald-200 text-xs flex items-center gap-2.5 font-mono">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{syncResult}</span>
+        </div>
+      )}
+
+      {/* Live users.watch() Push Interception & Subscription Expiration Panel */}
+      {status?.is_connected && (
+        <div className="p-4 bg-[#14120f] border border-purple-900/50 rounded-xl space-y-3.5 shadow-sm">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-purple-950/80 border border-purple-800/80 flex items-center justify-center shrink-0 mt-0.5">
+                <Radio className={`w-4 h-4 ${pubSubState.active ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-sm font-bold text-white tracking-wide">
+                    Gmail Push Interception (<span className="font-mono text-purple-300">users.watch()</span>)
+                  </h4>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center gap-1.5 ${
+                      pubSubState.active
+                        ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        pubSubState.active ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'
+                      }`}
+                    />
+                    {pubSubState.active ? 'SUBSCRIPTION ACTIVE' : 'SUBSCRIPTION INACTIVE'}
+                  </span>
+                  {pubSubState.isExpiringSoon && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/80 border border-amber-600 text-amber-300">
+                      EXPIRING SOON
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Direct Google Cloud Pub/Sub push subscription enables sub-second inbound interception and pre-delivery hold before mailbox arrival.
+                </p>
+              </div>
+            </div>
+
+            {/* Interactive Toggle Switch */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => handleToggleWatch(!pubSubState.active)}
+                disabled={startingWatch}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  pubSubState.active ? 'bg-purple-600' : 'bg-slate-700'
+                } ${startingWatch ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={pubSubState.active ? 'Click to stop users.watch()' : 'Click to activate users.watch()'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    pubSubState.active ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span className="text-xs font-mono font-semibold text-slate-200 select-none">
+                {pubSubState.active ? 'ENABLED' : 'DISABLED'}
+              </span>
+            </div>
+          </div>
+
+          {/* Expiration & Renewal Schedule Sub-bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2.5 border-t border-slate-800/80 text-xs">
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+              <Calendar className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Expiration Date</span>
+                <span className="text-xs font-mono font-semibold text-slate-200 truncate">
+                  {pubSubState.expirationDateFormatted ||
+                    (status?.watch?.expiration
+                      ? new Date(status.watch.expiration).toUTCString()
+                      : 'Not Subscribed (Inactive)')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <div className="truncate">
+                <span className="text-[10px] text-slate-400 uppercase font-mono block">Time Remaining</span>
+                <span className="text-xs font-mono font-semibold text-amber-300 truncate">
+                  {pubSubState.timeRemaining || (pubSubState.active ? '7 days validity' : 'N/A')}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+              <div className="flex items-center gap-2 truncate">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <div className="truncate">
+                  <span className="text-[10px] text-slate-400 uppercase font-mono block">Auto-Renewal Logic</span>
+                  <span className="text-[11px] text-emerald-400 font-mono">24h Proactive Window</span>
+                </div>
+              </div>
+              {pubSubState.active && (
+                <button
+                  onClick={handleManualRenewWatch}
+                  disabled={renewingWatch || startingWatch}
+                  className="px-2 py-1 bg-purple-950 hover:bg-purple-900 border border-purple-700/80 text-purple-200 rounded text-[10px] font-semibold cursor-pointer transition-colors shrink-0"
+                  title="Force immediate subscription renewal via users.watch()"
+                >
+                  {renewingWatch ? 'Renewing...' : 'Renew Now'}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

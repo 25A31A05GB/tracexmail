@@ -47,6 +47,8 @@ interface HeaderProps {
   onToggleDemoCases?: () => void;
   role?: UserRole;
   userLabel?: string;
+  accountType?: 'personal' | 'organization';
+  onOpenUpgradeModal?: (featureName?: string) => void;
   onSignOut?: () => void;
   onSwitchRole?: (newRole: UserRole) => void;
   onOpenWalkthrough?: () => void;
@@ -65,6 +67,8 @@ export function Header({
   onToggleDemoCases,
   role = 'analyst',
   userLabel = 'SA',
+  accountType = 'organization',
+  onOpenUpgradeModal,
   onSignOut,
   onSwitchRole,
   onOpenWalkthrough,
@@ -259,6 +263,19 @@ export function Header({
           )}
         </div>
 
+        {/* Individual Mode Badge & Quick Upgrade Action */}
+        {accountType === 'personal' && (
+          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] border border-[rgba(201,162,39,0.35)]">
+            <span className="text-[10.5px] font-mono font-bold text-[var(--stamp)]">INDIVIDUAL MODE</span>
+            <button
+              onClick={() => onOpenUpgradeModal && onOpenUpgradeModal('Organization Enterprise Mode')}
+              className="text-[10px] font-semibold text-[var(--paper)] hover:text-[var(--stamp)] bg-transparent border-0 cursor-pointer underline flex items-center gap-0.5 ml-1"
+            >
+              <span>Switch to Org Mode →</span>
+            </button>
+          </div>
+        )}
+
         {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
         {onSetViewMode && (
           <div className="flex items-center rounded bg-[#12100d] p-0.5 border border-[#3a352c] text-[11px] font-mono">
@@ -334,14 +351,25 @@ export function Header({
               <div className="px-3 py-2 text-[11px] text-[#8a8070]">
                 <div className="font-mono text-[10px] uppercase text-[#8a8070]">Operator Identity</div>
                 <div className="truncate text-[#ede6d8] font-semibold mt-0.5">{sessionUser?.email || userLabel}</div>
-                <div className="font-mono text-[10.5px] mt-1 flex items-center gap-1.5">
-                  <span className="text-[#8a8070]">Tier:</span>
+                <div className="font-mono text-[10.5px] mt-1 flex items-center justify-between">
+                  <span className="text-[#8a8070]">Mode:</span>
                   <span className={`font-bold uppercase ${
-                    role === 'admin' ? 'text-[var(--stamp)]' : role === 'read_only' ? 'text-[var(--paper-dim)]' : 'text-[var(--slate)]'
+                    accountType === 'personal' ? 'text-[var(--slate)]' : 'text-[var(--stamp)]'
                   }`}>
-                    {role === 'admin' ? 'Gold (Admin - Full Access)' : role === 'read_only' ? 'Silver (Auditor - Masked)' : 'Steel (Forensic Analyst)'}
+                    {accountType === 'personal' ? 'Individual (Single Ingestion)' : 'Organization (Full SOC)'}
                   </span>
                 </div>
+                {accountType === 'personal' && (
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      onOpenUpgradeModal && onOpenUpgradeModal('Organization Enterprise Mode');
+                    }}
+                    className="w-full mt-2 py-1 px-2 rounded-[2px] bg-[var(--stamp)] text-[var(--ink)] font-bold text-[10.5px] hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-1"
+                  >
+                    <span>Switch to Organization Mode →</span>
+                  </button>
+                )}
               </div>
 
               {/* Role Switcher */}

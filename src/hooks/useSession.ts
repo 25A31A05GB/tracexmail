@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { setSession, SessionUser } from '../lib/api';
 
 export type UserRole = 'admin' | 'analyst' | 'read_only';
+export type AccountType = 'personal' | 'organization';
 
 export interface UserProfile {
   id: string;
@@ -11,6 +12,9 @@ export interface UserProfile {
   role?: UserRole;
   full_name?: string;
   email?: string;
+  employee_id?: string;
+  account_type?: AccountType;
+  email_verified?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -20,11 +24,15 @@ export interface EnclaveLocalSession {
   user: {
     id: string;
     email: string;
+    email_confirmed_at?: string;
     user_metadata: {
       full_name: string;
       org_name: string;
       organization_name: string;
       role: UserRole;
+      account_type?: AccountType;
+      employee_id?: string;
+      email_verified?: boolean;
     };
   };
   profile: UserProfile;
@@ -36,12 +44,16 @@ export interface UseSessionReturn {
   profile: UserProfile | null;
   role: UserRole;
   organizationId: string;
+  accountType: AccountType;
+  isEmailVerified: boolean;
   loading: boolean;
   userLabel: string;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  loginAsRole: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string }) => void;
+  loginAsRole: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => void;
   switchRole: (newRole: UserRole) => void;
+  switchAccountType: (newType: AccountType, orgName?: string) => void;
+  upgradeToOrganization: (orgName: string) => Promise<void>;
 }
 
 const STORAGE_KEY = 'tracexmail_enclave_session';
@@ -217,7 +229,7 @@ export function useSession(): UseSessionReturn {
     setSession(null, null);
   }, []);
 
-  const loginAsRole = useCallback((newRole: UserRole, options?: { email?: string; fullName?: string; orgName?: string }) => {
+  const loginAsRole = useCallback((newRole: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => {
     const roleTitles: Record<UserRole, { title: string; defaultEmail: string }> = {
       admin: { title: 'SOC Lead (Commander)', defaultEmail: 'admin@tracexmail.sec' },
       analyst: { title: 'Senior Forensic Analyst', defaultEmail: 'analyst@tracexmail.sec' },
@@ -226,15 +238,20 @@ export function useSession(): UseSessionReturn {
 
     const email = options?.email || roleTitles[newRole].defaultEmail;
     const fullName = options?.fullName || roleTitles[newRole].title;
-    const orgName = options?.orgName || 'Acme Cyber Defense SOC';
+    const orgName = options?.orgName || (options?.accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC');
+    const accountType: AccountType = options?.accountType || (newRole === 'admin' ? 'organization' : 'organization');
+    const isVerified = options?.isEmailVerified ?? true;
     const userId = `usr_${newRole}_${Date.now()}`;
 
     const localProf: UserProfile = {
       id: userId,
-      organization_id: 'org_acme_soc_01',
+      organization_id: accountType === 'personal' ? 'org_personal_user' : 'org_acme_soc_01',
       role: newRole,
       full_name: fullName,
       email,
+      employee_id: options?.employeeId,
+      account_type: accountType,
+      email_verified: isVerified,
       created_at: new Date().toISOString()
     };
 
@@ -243,11 +260,15 @@ export function useSession(): UseSessionReturn {
       user: {
         id: userId,
         email,
+        email_confirmed_at: isVerified ? new Date().toISOString() : undefined,
         user_metadata: {
           full_name: fullName,
           org_name: orgName,
           organization_name: orgName,
-          role: newRole
+          role: newRole,
+          account_type: accountType,
+          employee_id: options?.employeeId,
+          email_verified: isVerified
         }
       },
       profile: localProf
@@ -266,7 +287,7 @@ export function useSession(): UseSessionReturn {
     const sessionUser: SessionUser = {
       userId,
       email,
-      organizationId: 'org_acme_soc_01',
+      organizationId: accountType === 'personal' ? 'org_personal_user' : 'org_acme_soc_01',
       role: newRole,
       label: fullName,
       authMethod: 'enclave_token'
@@ -279,11 +300,41 @@ export function useSession(): UseSessionReturn {
     const currentEmail = user?.email || 'analyst@tracexmail.sec';
     const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Operator';
     const orgName = user?.user_metadata?.org_name || 'Acme Cyber Defense SOC';
+    const currentAccType: AccountType = profile?.account_type || user?.user_metadata?.account_type || 'organization';
 
     loginAsRole(newRole, {
       email: currentEmail,
       fullName: currentName,
-      orgName
+      orgName,
+      accountType: currentAccType
+    });
+  }, [session, user, profile, loginAsRole]);
+
+  const switchAccountType = useCallback((newType: AccountType, orgName?: string) => {
+    if (!session) return;
+    const currentEmail = user?.email || 'analyst@tracexmail.sec';
+    const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Operator';
+    const currentRole = (profile?.role as UserRole) || (user?.user_metadata?.role as UserRole) || 'analyst';
+
+    loginAsRole(currentRole, {
+      email: currentEmail,
+      fullName: currentName,
+      orgName: orgName || (newType === 'organization' ? 'Enterprise Cyber SOC' : 'Personal Sandbox'),
+      accountType: newType
+    });
+  }, [session, user, profile, loginAsRole]);
+
+  const upgradeToOrganization = useCallback(async (orgName: string) => {
+    if (!session) return;
+    const currentEmail = user?.email || 'admin@defense.sec';
+    const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Organization Lead';
+    
+    // Switch to Admin role in organization mode
+    loginAsRole('admin', {
+      email: currentEmail,
+      fullName: currentName,
+      orgName: orgName.trim() || 'Enterprise Cyber SOC',
+      accountType: 'organization'
     });
   }, [session, user, profile, loginAsRole]);
 
@@ -303,6 +354,16 @@ export function useSession(): UseSessionReturn {
     user?.user_metadata?.organization_id || 
     'org_acme_soc_01';
 
+  const accountType: AccountType = (profile?.account_type as AccountType) ||
+    (user?.user_metadata?.account_type as AccountType) ||
+    (role === 'admin' ? 'organization' : 'organization');
+
+  const isEmailVerified: boolean = Boolean(
+    (user as any)?.email_confirmed_at || 
+    user?.user_metadata?.email_verified !== false ||
+    profile?.email_verified !== false
+  );
+
   // Compute initials or short user label
   const userLabel = profile?.full_name 
     ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
@@ -316,11 +377,15 @@ export function useSession(): UseSessionReturn {
     profile,
     role,
     organizationId,
+    accountType,
+    isEmailVerified,
     loading,
     userLabel,
     signOut,
     refreshProfile,
     loginAsRole,
-    switchRole
+    switchRole,
+    switchAccountType,
+    upgradeToOrganization
   };
 }

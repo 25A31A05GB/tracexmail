@@ -71,8 +71,12 @@ import {
   startGmailWatch,
   stopGmailWatch,
   fetchGmailMessageRaw,
-  gmailEvents
+  gmailEvents,
+  startAutoSyncLoop,
+  stopAutoSyncLoop,
+  runAutoSyncCycle
 } from './src/server/gmailService';
+import { encryptToken } from './src/utils/crypto';
 import {
   getSlackConfig,
   updateSlackConfig,
@@ -249,6 +253,33 @@ function analyzeContentRisk(subject: string, body: string): { score: number; heu
 
 // Global WebSocket broadcaster
 let broadcastWebSocketEvent: (eventData: any) => void = () => {};
+
+// Gmail event listeners for auto-sync and real-time push ingestion
+gmailEvents.on('sync_cycle_completed', (payload) => {
+  try {
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'GMAIL_SYNC_COMPLETE',
+        ...payload
+      });
+    }
+  } catch (err: any) {
+    console.warn('[GmailEvents] Sync cycle broadcast error:', err?.message);
+  }
+});
+
+gmailEvents.on('inbound_mail_push', async (data) => {
+  if (data?.rawEmail) {
+    try {
+      await parseRawEmailToAnalysis(data.rawEmail, 'gmail_inbound_sync.eml', undefined, {
+        isPushInterception: true,
+        deliveryStage: 'pre-delivery-hold'
+      });
+    } catch (err: any) {
+      console.warn('[GmailEvents] Inbound email analysis warning:', err?.message);
+    }
+  }
+});
 
 // Central Alert Broadcaster (WebSocket + Real-Time Slack Security Alerts)
 async function broadcastAlert(alert: any, extraData?: any) {
@@ -1097,7 +1128,31 @@ async function parseRawEmailToAnalysis(
     subject: subject
   };
 
-  // 3. Broadcast real-time alert via WebSockets + Slack Security Alerts
+  // 3. Persist alert to Supabase alerts table if connected
+  if (supabase) {
+    try {
+      await supabase.from('alerts').insert([{
+        id: newAlert.id,
+        organization_id: options?.organizationId || DEFAULT_ORG_ID,
+        case_id: newId,
+        timestamp: newAlert.timestamp,
+        severity: newAlert.severity,
+        title: newAlert.title,
+        description: newAlert.description,
+        source: newAlert.source,
+        read: false,
+        threat_score: newAlert.threat_score,
+        category: newAlert.category,
+        sender: newAlert.sender,
+        subject: newAlert.subject,
+        is_demo: false
+      }]);
+    } catch (alertDbErr) {
+      console.warn('[Supabase] Failed to persist alert to DB:', alertDbErr);
+    }
+  }
+
+  // 4. Broadcast real-time alert via WebSockets + Slack Security Alerts
   broadcastAlert(newAlert, {
     caseItem: newCaseItem,
     evidenceId,
@@ -2605,7 +2660,7 @@ Link: https://verify-auth-portal.net/login`;
   app.get(['/api/gmail/oauth/start', '/api/auth/url'], (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/oauth/gmail/callback`;
+    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
     const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
 
     // Return authorization URL
@@ -2618,35 +2673,44 @@ Link: https://verify-auth-portal.net/login`;
     });
   });
 
-  // 2b. Gmail OAuth Callback (RFC 6749 Compliant Popup Receiver)
-  app.get(['/oauth/gmail/callback', '/api/oauth/gmail/callback', '/auth/callback', '/api/v1/gmail/callback'], async (req, res) => {
-    const code = req.query.code as string | undefined;
-    const error = req.query.error as string | undefined;
+  // 2b. Gmail OAuth Callback Route (/api/v1/gmail/callback)
+  // Handles code exchange, stores encrypted tokens in gmail_connections via Supabase service-role,
+  // starts auto-sync loop, and redirects back to application with success/error query params.
+  const handleGmailOAuthCallback = async (req: express.Request, res: express.Response) => {
+    const code = (req.query.code as string | undefined) || (req.body?.code as string | undefined);
+    const error = (req.query.error as string | undefined) || (req.body?.error as string | undefined);
+    const errorDesc = (req.query.error_description as string | undefined) || (req.body?.error_description as string | undefined) || error;
+    const orgId = (req.query.org_id as string | undefined) || (req.body?.org_id as string | undefined) || DEFAULT_ORG_ID;
+    const returnBase = (req.query.state as string | undefined) || '/';
+
+    // Helper to construct redirection URL
+    const getRedirectUrl = (params: Record<string, string>) => {
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      let target: URL;
+      try {
+        target = new URL(returnBase.startsWith('http') ? returnBase : `${baseUrl}${returnBase.startsWith('/') ? returnBase : `/${returnBase}`}`);
+      } catch {
+        target = new URL(`${baseUrl}/`);
+      }
+      for (const [k, v] of Object.entries(params)) {
+        target.searchParams.set(k, v);
+      }
+      return target.pathname + target.search;
+    };
 
     if (error || !code) {
-      const errorMsg = error || 'Missing authorization code from Google OAuth response';
-      return res.status(400).send(`
-        <!DOCTYPE html>
-        <html>
-          <head><meta charset="utf-8"><title>Gmail Authorization Failed</title></head>
-          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #ef4444; padding: 40px; text-align: center;">
-            <h2 style="margin-bottom: 8px;">Authorization Failed</h2>
-            <p style="color: #94a3b8; font-size: 14px;">${escapeHtml(errorMsg)}</p>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'GMAIL_OAUTH_ERROR', error: ${JSON.stringify(errorMsg)} }, '*');
-                setTimeout(() => window.close(), 2500);
-              }
-            </script>
-          </body>
-        </html>
-      `);
+      const failureReason = errorDesc || 'Missing authorization code from Google OAuth callback';
+      console.warn('[GmailOAuthCallback] Authorization failed or code missing:', failureReason);
+      return res.redirect(getRedirectUrl({
+        gmail_auth: 'error',
+        error: failureReason
+      }));
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/oauth/gmail/callback`;
+    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
 
     try {
       let accessToken = 'mock_oauth2_access_token_encrypted';
@@ -2655,7 +2719,7 @@ Link: https://verify-auth-portal.net/login`;
       let emailAddress = 'security-soc@acmedefense.sec';
 
       if (clientId && clientSecret) {
-        // Live token exchange with Google OAuth2 servers
+        // Exchange authorization code for tokens with Google OAuth 2.0 endpoint
         const tokenResp = await axios.post('https://oauth2.googleapis.com/token', {
           code,
           client_id: clientId,
@@ -2663,27 +2727,61 @@ Link: https://verify-auth-portal.net/login`;
           redirect_uri: redirectUri,
           grant_type: 'authorization_code'
         });
+
         accessToken = tokenResp.data.access_token;
         refreshToken = tokenResp.data.refresh_token || refreshToken;
         expiresIn = tokenResp.data.expires_in || 3600;
 
         try {
           const userResp = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` }
+            headers: { Authorization: `Bearer ${accessToken}` },
+            timeout: 5000
           });
           if (userResp.data?.email) {
             emailAddress = userResp.data.email;
           }
-        } catch (e) {
-          console.warn('[GmailOAuth] Could not fetch user profile email:', e);
+        } catch (e: any) {
+          console.warn('[GmailOAuthCallback] Could not retrieve user email from userinfo endpoint:', e?.message);
         }
       } else {
-        emailAddress = (req.query.email as string) || 'analyst@acmedefense.sec';
+        emailAddress = (req.query.email as string) || (req.body?.email as string) || 'analyst@acmedefense.sec';
       }
 
-      // Persist connection & encrypted tokens in Supabase `gmail_connections`
+      // 1. Store encrypted tokens into `gmail_connections` table via Supabase service-role client
+      const supabaseAdmin = getSupabaseAdminClient();
+      const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+      const encryptedAccessToken = encryptToken(accessToken);
+      const encryptedRefreshToken = encryptToken(refreshToken);
+
+      if (supabaseAdmin) {
+        const connectionRow = {
+          id: `gconn_${orgId}_${Buffer.from(emailAddress).toString('hex').substring(0, 10)}`,
+          organization_id: orgId,
+          email_address: emailAddress,
+          is_connected: true,
+          access_token_encrypted: encryptedAccessToken,
+          refresh_token_encrypted: encryptedRefreshToken,
+          token_expires_at: tokenExpiresAt,
+          watch_enabled: true,
+          watch_active: true,
+          quarantine_enabled: true,
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: dbError } = await supabaseAdmin
+          .from('gmail_connections')
+          .upsert(connectionRow, { onConflict: 'organization_id,email_address' });
+
+        if (dbError) {
+          console.warn('[GmailOAuthCallback] Supabase service-role upsert warning:', dbError.message);
+        } else {
+          console.log(`[GmailOAuthCallback] Stored encrypted tokens in 'gmail_connections' table via Supabase service-role for ${emailAddress}`);
+        }
+      }
+
+      // 2. Synchronize connection state in the Gmail service memory store
       await saveGmailConnectionToDb({
-        orgId: DEFAULT_ORG_ID,
+        orgId,
         emailAddress,
         accessToken,
         refreshToken,
@@ -2691,52 +2789,51 @@ Link: https://verify-auth-portal.net/login`;
         isConnected: true
       });
 
-      console.log(`[GmailOAuth] Successfully connected Gmail mailbox: ${emailAddress}`);
+      // 3. Trigger the start of the automated Gmail sync loop
+      startAutoSyncLoop(30);
 
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-          <head><meta charset="utf-8"><title>Gmail Connection Established</title></head>
-          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #5fae82; padding: 40px; text-align: center;">
-            <h2 style="margin-bottom: 8px;">Gmail Connected Successfully</h2>
-            <p style="color: #94a3b8; font-size: 14px;">Account: <strong style="color: #e2e8f0;">${escapeHtml(emailAddress)}</strong></p>
-            <p style="color: #64748b; font-size: 12px; margin-top: 16px;">This popup window will close automatically...</p>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({
-                  type: 'GMAIL_OAUTH_SUCCESS',
-                  email: ${JSON.stringify(emailAddress)},
-                  connected: true
-                }, '*');
-                setTimeout(() => window.close(), 1200);
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-          </body>
-        </html>
-      `);
+      // 4. Asynchronously initiate Gmail Cloud Pub/Sub watch push if topic configured
+      startGmailWatch({ accessToken }).catch(err => {
+        console.warn('[GmailOAuthCallback] Initial watch registration warning:', err?.message);
+      });
+
+      // 5. Broadcast real-time connection event across connected WebSocket clients
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'GMAIL_OAUTH_SUCCESS',
+          timestamp: new Date().toISOString(),
+          email: emailAddress,
+          connected: true,
+          auto_sync_active: true
+        });
+      }
+
+      console.log(`[GmailOAuthCallback] Gmail connection verified and active for ${emailAddress}. Redirecting with success.`);
+
+      // 6. Redirect user back to the application with success query parameters
+      const successRedirectUrl = getRedirectUrl({
+        gmail_auth: 'success',
+        email: emailAddress,
+        status: 'connected'
+      });
+
+      return res.redirect(successRedirectUrl);
     } catch (err: any) {
-      console.error('[GmailOAuth] Code exchange error:', err?.response?.data || err?.message);
-      const errorDesc = err?.response?.data?.error_description || err?.message || 'Failed exchanging authorization code for tokens';
-      res.status(500).send(`
-        <!DOCTYPE html>
-        <html>
-          <head><meta charset="utf-8"><title>OAuth Error</title></head>
-          <body style="font-family: ui-sans-serif, system-ui, sans-serif; background: #0b0d12; color: #ef4444; padding: 40px; text-align: center;">
-            <h2 style="margin-bottom: 8px;">Authorization Error</h2>
-            <p style="color: #94a3b8; font-size: 14px;">${escapeHtml(errorDesc)}</p>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'GMAIL_OAUTH_ERROR', error: ${JSON.stringify(errorDesc)} }, '*');
-                setTimeout(() => window.close(), 2500);
-              }
-            </script>
-          </body>
-        </html>
-      `);
+      console.error('[GmailOAuthCallback] Code exchange or persistence failure:', err?.response?.data || err?.message);
+      const errorDetail = err?.response?.data?.error_description || err?.message || 'Failed exchanging authorization code for tokens';
+      
+      const errorRedirectUrl = getRedirectUrl({
+        gmail_auth: 'error',
+        error: errorDetail
+      });
+
+      return res.redirect(errorRedirectUrl);
     }
-  });
+  };
+
+  // Mount callback route for GET and POST (supporting /api/v1/gmail/callback and legacy aliases)
+  app.get(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback', '/auth/callback'], handleGmailOAuthCallback);
+  app.post(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback'], handleGmailOAuthCallback);
 
   // 2c. Generic OAuth 2.0 Authorization Endpoint (Consent decision handler)
   app.post('/api/oauth/v1/authorize', (req, res) => {
@@ -3378,8 +3475,19 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     }
   });
 
-  // In-memory fallback cache for team invitations
+  // In-memory fallback cache for team invitations and provisioned employees
   const memoryInvitations: any[] = [];
+  const provisionedEmployees: Array<{
+    id: string;
+    employeeId: string;
+    name: string;
+    email: string;
+    passwordHash: string;
+    role: string;
+    status: string;
+    created_at: string;
+    orgId: string;
+  }> = [];
 
   // Team & RBAC Management Endpoints (wired to profiles and team_invitations in Supabase)
   app.get('/api/team/members', async (_req, res) => {
@@ -3392,7 +3500,15 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
 
     const supabase = getSupabaseAdminClient();
     if (!supabase) {
-      return res.json([...memoryInvitations, ...defaultRoster]);
+      const activeProvisioned = provisionedEmployees.map(emp => ({
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        role: emp.role,
+        status: emp.status,
+        lastActive: 'Provisioned Active'
+      }));
+      return res.json([...activeProvisioned, ...memoryInvitations, ...defaultRoster]);
     }
 
     try {
@@ -3402,18 +3518,33 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       ]);
 
       const members: any[] = [];
+      
+      // Include any newly provisioned employees in memory
+      provisionedEmployees.forEach(emp => {
+        members.push({
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          role: emp.role,
+          status: emp.status,
+          lastActive: 'Provisioned Active'
+        });
+      });
+
       if (profiles && profiles.length > 0) {
         profiles.forEach(p => {
-          members.push({
-            id: p.id,
-            name: p.full_name || p.email?.split('@')[0] || 'Security Operator',
-            email: p.email,
-            role: p.role || 'analyst',
-            status: 'ACTIVE',
-            lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
-          });
+          if (!members.some(m => m.email?.toLowerCase() === p.email?.toLowerCase())) {
+            members.push({
+              id: p.id,
+              name: p.full_name || p.email?.split('@')[0] || 'Security Operator',
+              email: p.email,
+              role: p.role || 'analyst',
+              status: 'ACTIVE',
+              lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
+            });
+          }
         });
-      } else {
+      } else if (members.length === 0) {
         members.push(...defaultRoster);
       }
 
@@ -3438,6 +3569,119 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       console.error('[TeamAPI] Error fetching team members:', err);
       res.json([...memoryInvitations, ...defaultRoster]);
     }
+  });
+
+  // Provision new Employee Account with credentials (ID & Password) for Organization
+  app.post('/api/team/create-employee', async (req, res) => {
+    const { name, email, password, role, employeeId, organizationId } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const assignedRole = role || 'analyst';
+    const assignedName = name || email.split('@')[0];
+    const assignedEmpId = employeeId || `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orgId = organizationId || DEFAULT_ORG_ID;
+    const userId = `emp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // Store in local secure employee registry
+    const employeeRecord = {
+      id: userId,
+      employeeId: assignedEmpId,
+      name: assignedName,
+      email: email.trim().toLowerCase(),
+      passwordHash: password, // In production stored as salted bcrypt/argon2
+      role: assignedRole,
+      status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+      orgId
+    };
+
+    const existingIdx = provisionedEmployees.findIndex(e => e.email === employeeRecord.email);
+    if (existingIdx >= 0) {
+      provisionedEmployees[existingIdx] = employeeRecord;
+    } else {
+      provisionedEmployees.unshift(employeeRecord);
+    }
+
+    // Provision into Supabase Auth & profiles table if available
+    const supabaseAdmin = getSupabaseAdminClient();
+    if (supabaseAdmin) {
+      try {
+        // 1. Create auth user
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: email.trim(),
+          password: password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: assignedName,
+            employee_id: assignedEmpId,
+            role: assignedRole,
+            organization_id: orgId,
+            account_type: 'organization'
+          }
+        });
+
+        const finalUserId = authUser?.user?.id || userId;
+
+        // 2. Insert into profiles
+        await supabaseAdmin.from('profiles').upsert({
+          id: finalUserId,
+          organization_id: orgId,
+          email: email.trim().toLowerCase(),
+          full_name: assignedName,
+          role: assignedRole,
+          account_type: 'organization',
+          updated_at: new Date().toISOString()
+        });
+      } catch (err: any) {
+        console.warn('[TeamAPI] Supabase Admin employee creation notice:', err.message);
+      }
+    }
+
+    res.json({
+      status: 'success',
+      employee: {
+        id: userId,
+        employeeId: assignedEmpId,
+        name: assignedName,
+        email: email.trim(),
+        role: assignedRole,
+        tempPassword: password,
+        status: 'ACTIVE',
+        created_at: employeeRecord.created_at
+      }
+    });
+  });
+
+  // Verify employee credentials during sign in
+  app.post('/api/team/verify-employee-auth', (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ authenticated: false, error: 'Email and password required' });
+    }
+
+    const lowerEmail = email.trim().toLowerCase();
+    const matchedEmployee = provisionedEmployees.find(
+      emp => emp.email === lowerEmail && emp.passwordHash === password
+    );
+
+    if (matchedEmployee) {
+      return res.json({
+        authenticated: true,
+        user: {
+          id: matchedEmployee.id,
+          employeeId: matchedEmployee.employeeId,
+          name: matchedEmployee.name,
+          email: matchedEmployee.email,
+          role: matchedEmployee.role,
+          orgName: 'Acme Cyber Defense SOC',
+          organizationId: matchedEmployee.orgId
+        }
+      });
+    }
+
+    return res.status(401).json({ authenticated: false, error: 'Invalid employee credentials' });
   });
 
   app.post('/api/team/invite', async (req, res) => {

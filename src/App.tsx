@@ -16,8 +16,10 @@ import { ThreatLogView } from './components/ThreatLogView';
 import { RawHeaderView } from './components/RawHeaderView';
 import { AlertsView } from './components/AlertsView';
 import { IngestionPipelineView } from './components/IngestionPipelineView';
+import { GmailConnectionView } from './components/GmailConnectionView';
 import { OrganizationView } from './components/OrganizationView';
 import { TeamView } from './components/TeamView';
+import { ModeUpgradeModal } from './components/ModeUpgradeModal';
 import { NewAnalysisModal } from './components/NewAnalysisModal';
 import { ReportModal } from './components/ReportModal';
 import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
@@ -31,7 +33,7 @@ import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
 import { PrivacyConfig, loadPrivacyConfig, savePrivacyConfig } from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
 import { OAuthConsentScreen } from './components/OAuthConsentScreen';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
@@ -52,21 +54,34 @@ export default function App() {
     return <OAuthConsentScreen />;
   }
 
-  // Real Supabase Auth & RBAC hook
+  // Real Supabase Auth, RBAC, and Account Tiers hook
   const { 
     session, 
     profile, 
     role, 
+    accountType,
+    isEmailVerified,
     organizationId, 
     loading: authLoading, 
     signOut, 
     loginAsRole, 
-    switchRole 
+    switchRole,
+    upgradeToOrganization,
+    switchAccountType 
   } = useSession();
 
   const [authView, setAuthView] = useState<'intro' | 'login' | 'signup'>('intro');
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<NavTab>('ingest');
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [upgradeTargetFeature, setUpgradeTargetFeature] = useState<string>('Enterprise SOC Suite');
+  const [verificationChecking, setVerificationChecking] = useState<boolean>(false);
+  const [verificationResent, setVerificationResent] = useState<boolean>(false);
+
+  const handleOpenUpgradeModal = (featureName?: string) => {
+    if (featureName) setUpgradeTargetFeature(featureName);
+    setIsUpgradeModalOpen(true);
+  };
 
   // Track session transition to automatically redirect to Email Ingestion tab upon confirmed login
   const prevSessionUserIdRef = React.useRef<string | null>(null);
@@ -324,10 +339,104 @@ export default function App() {
     );
   }
 
+  // Strict Login Check: Email verification barrier
+  if (session && !isEmailVerified) {
+    const userEmail = session.user?.email || 'your account email';
+    return (
+      <div className="min-h-screen w-screen bg-[#0b0d12] flex flex-col items-center justify-center p-4 text-[#e7ebf1] font-sans select-text">
+        <div className="w-full max-w-md bg-[#16130f] border border-[#3a352c] rounded-[2px] p-6 shadow-[0_25px_60px_rgba(0,0,0,0.8)] space-y-5 text-center">
+          <div className="w-12 h-12 rounded-full bg-[rgba(201,162,39,0.15)] border border-[var(--stamp)] text-[var(--stamp)] flex items-center justify-center mx-auto">
+            <MailCheck className="w-6 h-6" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="font-display font-bold text-xl text-[#ede6d8]">
+              Verify Your Email Address
+            </h2>
+            <p className="text-xs text-[#b9af9c] leading-relaxed">
+              A cryptographic verification confirmation was sent to <span className="font-mono text-[var(--stamp)] font-semibold">{userEmail}</span>. Please verify your email to unlock your forensic workspace.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-[2px] bg-[#1a1712] border border-[#2c271f] text-left text-xs space-y-1 text-[#8a8070]">
+            <div className="flex items-center gap-1.5 text-[var(--stamp)] font-semibold text-[11px]">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Cryptographic Enclave Mandate</span>
+            </div>
+            <p className="text-[10.5px]">
+              Email confirmation ensures that forensic audit logs, chain-of-custody tokens, and team investigations are attributed to verified analysts.
+            </p>
+          </div>
+
+          {verificationResent && (
+            <div className="p-2 rounded-[2px] bg-emerald-950/40 border border-emerald-800 text-emerald-400 text-xs font-mono">
+              Verification email resent! Please check your inbox and spam folder.
+            </div>
+          )}
+
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={async () => {
+                setVerificationChecking(true);
+                try {
+                  if (isSupabaseConfigured) {
+                    const { data } = await supabase.auth.getUser();
+                    if (data?.user?.email_confirmed_at) {
+                      window.location.reload();
+                    } else {
+                      alert('Email is not verified yet. Please click the link in your email or try Resend.');
+                    }
+                  } else {
+                    window.location.reload();
+                  }
+                } catch (e) {
+                  console.error(e);
+                } finally {
+                  setVerificationChecking(false);
+                }
+              }}
+              disabled={verificationChecking}
+              className="w-full btn-primary py-2 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {verificationChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              <span>Check Verification Status</span>
+            </button>
+
+            <button
+              onClick={async () => {
+                try {
+                  if (session.user?.email && isSupabaseConfigured) {
+                    await supabase.auth.resend({ type: 'signup', email: session.user.email });
+                    setVerificationResent(true);
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
+              className="w-full btn-secondary py-2 text-xs cursor-pointer text-[#ede6d8]"
+            >
+              Resend Verification Email
+            </button>
+
+            <button
+              onClick={() => signOut()}
+              className="w-full text-xs text-[#8a8070] hover:text-[#b23a2e] py-1 transition-colors cursor-pointer bg-transparent border-0 flex items-center justify-center gap-1 mt-2"
+            >
+              <LogOut className="w-3 h-3" />
+              <span>Sign out / Return to Login</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Ensure non-admins cannot access admin tabs
   const effectiveTab = (activeTab === 'organization' || activeTab === 'team') && role !== 'admin'
     ? 'dashboard'
     : activeTab;
+
+  const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers'].includes(effectiveTab);
 
   return (
     <div className="flex h-screen w-screen bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
@@ -338,6 +447,8 @@ export default function App() {
         alertCount={unreadCount}
         wsStatus={wsStatus}
         role={role}
+        accountType={accountType}
+        onOpenUpgradeModal={handleOpenUpgradeModal}
         onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
         viewMode={viewMode}
       />
@@ -357,6 +468,8 @@ export default function App() {
           onToggleDemoCases={handleToggleDemoCases}
           role={role}
           userLabel={userInitials}
+          accountType={accountType}
+          onOpenUpgradeModal={handleOpenUpgradeModal}
           onSignOut={signOut}
           onSwitchRole={switchRole}
           viewMode={viewMode}
@@ -365,119 +478,172 @@ export default function App() {
 
         {/* View Switcher Container */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {effectiveTab === 'dashboard' && (
-            <DashboardView
-              onSelectAnalysis={setCurrentAnalysis}
-              onNavigateToTab={setActiveTab}
-              onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
-              viewMode={viewMode}
-            />
-          )}
-
-          {effectiveTab === 'cases' && (
-            <CasesView
-              onSelectAnalysis={setCurrentAnalysis}
-              onNavigateToOverview={() => setActiveTab('overview')}
-              onOpenNewModal={() => setIsNewModalOpen(true)}
-              refreshSignal={casesRefreshSignal}
-              showDemoCases={showDemoCases}
-              onToggleDemoCases={handleToggleDemoCases}
-              role={role}
-            />
-          )}
-
-          {effectiveTab === 'campaigns' && (
-            <CampaignsView />
-          )}
-
-          {effectiveTab === 'search' && (
-            <SearchView
-              onSelectAnalysis={setCurrentAnalysis}
-              onNavigateToOverview={() => setActiveTab('overview')}
-              showDemoCases={showDemoCases}
-              currentAnalysis={currentAnalysis}
-              onToggleDemoCases={handleToggleDemoCases}
-            />
-          )}
-
-          {effectiveTab === 'overview' && (
-            <OverviewView
-              analysis={currentAnalysis}
-              onNavigateToMap={() => setActiveTab('map')}
-              onNavigateToLogs={() => setActiveTab('logs')}
-              onNavigateToHeaders={() => setActiveTab('headers')}
-              onNavigateToTimeline={() => setActiveTab('timeline')}
-              onNavigateToGraph={() => setActiveTab('graph')}
-              onOpenNewModal={() => setIsNewModalOpen(true)}
-              onOpenReportModal={() => setIsReportModalOpen(true)}
-              viewMode={viewMode}
-            />
-          )}
-
-          {effectiveTab === 'graph' && (
-            <div className="flex-1 p-6 overflow-hidden flex flex-col h-full bg-[#0b0d12]">
-              <RelationshipGraphView
-                analysis={currentAnalysis}
-                caseId={currentAnalysis?.id}
-              />
+          {isPersonalRestrictedTab ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0b0d12]">
+              <div className="max-w-lg p-6 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] space-y-4">
+                <div className="w-12 h-12 rounded-full bg-[rgba(201,162,39,0.15)] border border-[var(--stamp)] text-[var(--stamp)] flex items-center justify-center mx-auto">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="font-display font-bold text-lg text-[#ede6d8]">
+                  Organization Mode Required
+                </h3>
+                <p className="text-xs text-[#b9af9c] leading-relaxed">
+                  You are currently in <strong>Individual Mode</strong>, which is focused on single email analysis and raw RFC822 ingestion. To get more analysis, live threat alerts, organization employee management, and historical case archives, switch to Organization Mode.
+                </p>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => setActiveTab('ingest')}
+                    className="btn-secondary text-xs px-3 py-2 cursor-pointer"
+                  >
+                    Return to Email Ingestion
+                  </button>
+                  <button
+                    onClick={() => handleOpenUpgradeModal('Full Enterprise SOC Module')}
+                    className="btn-primary text-xs px-4 py-2 cursor-pointer flex items-center gap-1.5 font-bold"
+                  >
+                    <span>Switch to Org Mode</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              {effectiveTab === 'dashboard' && (
+                <DashboardView
+                  onSelectAnalysis={setCurrentAnalysis}
+                  onNavigateToTab={setActiveTab}
+                  onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
+                  viewMode={viewMode}
+                />
+              )}
 
-          {effectiveTab === 'timeline' && (
-            <ThreatTimelineView
-              analysis={currentAnalysis}
-              onSelectAnalysis={setCurrentAnalysis}
-              onNavigateToOverview={() => setActiveTab('overview')}
-              showDemoCases={showDemoCases}
-            />
-          )}
+              {effectiveTab === 'cases' && (
+                <CasesView
+                  onSelectAnalysis={setCurrentAnalysis}
+                  onNavigateToOverview={() => setActiveTab('overview')}
+                  onOpenNewModal={() => setIsNewModalOpen(true)}
+                  refreshSignal={casesRefreshSignal}
+                  showDemoCases={showDemoCases}
+                  onToggleDemoCases={handleToggleDemoCases}
+                  role={role}
+                />
+              )}
 
-          {effectiveTab === 'ingest' && (
-            <IngestionPipelineView
-              onSelectAnalysis={handleAnalysisCreated}
-              onNavigateToOverview={() => setActiveTab('overview')}
-            />
-          )}
+              {effectiveTab === 'campaigns' && (
+                <CampaignsView />
+              )}
 
-          {effectiveTab === 'hops' && (
-            <HopTracerouteView analysis={currentAnalysis} />
-          )}
+              {effectiveTab === 'search' && (
+                <SearchView
+                  onSelectAnalysis={setCurrentAnalysis}
+                  onNavigateToOverview={() => setActiveTab('overview')}
+                  showDemoCases={showDemoCases}
+                  currentAnalysis={currentAnalysis}
+                  onToggleDemoCases={handleToggleDemoCases}
+                />
+              )}
 
-          {effectiveTab === 'map' && (
-            <MapView analysis={currentAnalysis} />
-          )}
+              {effectiveTab === 'overview' && (
+                <OverviewView
+                  analysis={currentAnalysis}
+                  onNavigateToMap={() => setActiveTab('map')}
+                  onNavigateToLogs={() => setActiveTab('logs')}
+                  onNavigateToHeaders={() => setActiveTab('headers')}
+                  onNavigateToTimeline={() => setActiveTab('timeline')}
+                  onNavigateToGraph={() => setActiveTab('graph')}
+                  onOpenNewModal={() => setIsNewModalOpen(true)}
+                  onOpenReportModal={() => setIsReportModalOpen(true)}
+                  viewMode={viewMode}
+                />
+              )}
 
-          {effectiveTab === 'logs' && (
-            <ThreatLogView analysis={currentAnalysis} />
-          )}
+              {effectiveTab === 'graph' && (
+                <div className="flex-1 p-6 overflow-hidden flex flex-col h-full bg-[#0b0d12]">
+                  <RelationshipGraphView
+                    analysis={currentAnalysis}
+                    caseId={currentAnalysis?.id}
+                  />
+                </div>
+              )}
 
-          {effectiveTab === 'headers' && (
-            <RawHeaderView analysis={currentAnalysis} />
-          )}
+              {effectiveTab === 'timeline' && (
+                <ThreatTimelineView
+                  analysis={currentAnalysis}
+                  onSelectAnalysis={setCurrentAnalysis}
+                  onNavigateToOverview={() => setActiveTab('overview')}
+                  showDemoCases={showDemoCases}
+                />
+              )}
 
-          {effectiveTab === 'alerts' && (
-            <AlertsView
-              currentAnalysis={currentAnalysis}
-              onSelectAnalysis={setCurrentAnalysis}
-              onNavigateToOverview={() => setActiveTab('overview')}
-              liveAlerts={liveAlerts}
-              wsStatus={wsStatus}
-              soundEnabled={soundEnabled}
-              onToggleSound={() => setSoundEnabled(!soundEnabled)}
-              onBroadcastTestAlert={broadcastTestAlert}
-              onReconnectWs={reconnectWs}
-            />
-          )}
+              {effectiveTab === 'ingest' && (
+                <IngestionPipelineView
+                  onSelectAnalysis={handleAnalysisCreated}
+                  onNavigateToOverview={() => setActiveTab('overview')}
+                />
+              )}
 
-          {effectiveTab === 'organization' && role === 'admin' && (
-            <OrganizationView organizationId={organizationId || 'org_acme_soc_01'} />
-          )}
+              {effectiveTab === 'gmail' && (
+                <GmailConnectionView
+                  onSelectAnalysis={handleAnalysisCreated}
+                />
+              )}
 
-          {effectiveTab === 'team' && role === 'admin' && (
-            <TeamView />
+              {effectiveTab === 'hops' && (
+                <HopTracerouteView analysis={currentAnalysis} />
+              )}
+
+              {effectiveTab === 'map' && (
+                <MapView analysis={currentAnalysis} />
+              )}
+
+              {effectiveTab === 'logs' && (
+                <ThreatLogView analysis={currentAnalysis} />
+              )}
+
+              {effectiveTab === 'headers' && (
+                <RawHeaderView analysis={currentAnalysis} />
+              )}
+
+              {effectiveTab === 'alerts' && (
+                <AlertsView
+                  currentAnalysis={currentAnalysis}
+                  onSelectAnalysis={setCurrentAnalysis}
+                  onNavigateToOverview={() => setActiveTab('overview')}
+                  liveAlerts={liveAlerts}
+                  wsStatus={wsStatus}
+                  soundEnabled={soundEnabled}
+                  onToggleSound={() => setSoundEnabled(!soundEnabled)}
+                  onBroadcastTestAlert={broadcastTestAlert}
+                  onReconnectWs={reconnectWs}
+                />
+              )}
+
+              {effectiveTab === 'organization' && role === 'admin' && (
+                <OrganizationView organizationId={organizationId || 'org_acme_soc_01'} />
+              )}
+
+              {effectiveTab === 'team' && role === 'admin' && (
+                <TeamView />
+              )}
+            </>
           )}
         </div>
       </main>
+
+      {/* Mode Upgrade Modal (Individual -> Organization) */}
+      {isUpgradeModalOpen && (
+        <ModeUpgradeModal
+          isOpen={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
+          onUpgrade={async (newOrgName) => {
+            if (upgradeToOrganization) {
+              await upgradeToOrganization(newOrgName);
+            }
+          }}
+          featureName={upgradeTargetFeature}
+        />
+      )}
 
       {/* Real-time WebSocket Alert Toast */}
       <AlertToast

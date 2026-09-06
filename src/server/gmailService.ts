@@ -770,6 +770,7 @@ syncGmailConnectionFromDb().catch(() => {});
  * Disconnects Gmail account.
  */
 export function disconnectGmail(orgId: string = DEFAULT_ORG_ID) {
+  stopAutoSyncLoop();
   state.isConnected = false;
   state.emailAddress = null;
   state.accessToken = null;
@@ -792,3 +793,107 @@ export function disconnectGmail(orgId: string = DEFAULT_ORG_ID) {
 
   return { success: true };
 }
+
+// Automated Inbox Sync Loop
+let autoSyncTimer: NodeJS.Timeout | null = null;
+let isSyncCycleActive = false;
+
+/**
+ * Runs a single polling cycle to query and evaluate new unread emails from the connected Gmail account.
+ */
+export async function runAutoSyncCycle(): Promise<{ count: number; error?: string }> {
+  if (isSyncCycleActive) return { count: 0 };
+  isSyncCycleActive = true;
+  try {
+    state.lastPolledAt = new Date().toISOString();
+
+    const isLiveToken = Boolean(
+      state.accessToken &&
+      state.accessToken !== 'mock_oauth2_access_token_encrypted' &&
+      !state.accessToken.startsWith('mock_')
+    );
+
+    let fetchedCount = 0;
+    if (isLiveToken) {
+      try {
+        const listResp = await axios.get(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+          {
+            headers: { Authorization: `Bearer ${state.accessToken}` },
+            timeout: 8000
+          }
+        );
+        const messages = listResp.data?.messages || [];
+        for (const msg of messages) {
+          const raw = await fetchGmailMessageRaw(msg.id, state.accessToken || undefined);
+          if (raw) {
+            fetchedCount++;
+            gmailEvents.emit('inbound_mail_push', {
+              emailAddress: state.emailAddress,
+              messageId: msg.id,
+              rawEmail: raw,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (apiErr: any) {
+        console.warn('[GmailSyncLoop] Error fetching messages from Gmail API:', apiErr?.response?.data || apiErr?.message);
+      }
+    }
+
+    gmailEvents.emit('sync_cycle_completed', {
+      timestamp: state.lastPolledAt,
+      emailAddress: state.emailAddress,
+      fetchedCount
+    });
+
+    return { count: fetchedCount };
+  } catch (err: any) {
+    return { count: 0, error: err?.message };
+  } finally {
+    isSyncCycleActive = false;
+  }
+}
+
+/**
+ * Starts automated periodic polling loop for Gmail ingestion.
+ */
+export function startAutoSyncLoop(intervalSeconds: number = 30): void {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+  }
+
+  state.pollingIntervalSeconds = intervalSeconds;
+  console.log(`[GmailService] Auto-sync loop started: polling every ${intervalSeconds}s for ${state.emailAddress || 'connected mailbox'}`);
+
+  // Trigger immediate initial cycle
+  runAutoSyncCycle().catch(err => {
+    console.warn('[GmailService] Initial sync cycle warning:', err?.message);
+  });
+
+  autoSyncTimer = setInterval(() => {
+    if (!state.isConnected) {
+      stopAutoSyncLoop();
+      return;
+    }
+    runAutoSyncCycle().catch(err => {
+      console.warn('[GmailService] Periodic sync cycle warning:', err?.message);
+    });
+  }, intervalSeconds * 1000);
+
+  if (autoSyncTimer.unref) {
+    autoSyncTimer.unref();
+  }
+}
+
+/**
+ * Stops the automated polling loop.
+ */
+export function stopAutoSyncLoop(): void {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+    console.log('[GmailService] Auto-sync loop stopped');
+  }
+}
+

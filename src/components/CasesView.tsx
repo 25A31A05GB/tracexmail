@@ -23,7 +23,8 @@ import {
   Tag,
   Download,
   Share2,
-  FlaskConical
+  FlaskConical,
+  Trash2
 } from 'lucide-react';
 import { forensicApi, CaseItem } from '../lib/api';
 import { EmailAnalysis } from '../types';
@@ -200,6 +201,22 @@ export function CasesView({
     fetchCases();
   }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii]);
 
+  // Real-time Supabase postgres changes channel for cases table
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const channel = supabase
+      .channel('cases_table_live_stream')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
+        fetchCases();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [showDemoCases, maskPii]);
+
   // Periodic safety net polling interval (30s)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -207,6 +224,40 @@ export function CasesView({
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleQuickStatusChange = async (caseItem: any, newStatus: string) => {
+    const caseId = caseItem.id;
+    setCases(prev => prev.map(c => (c.id === caseId ? { ...c, status: newStatus } : c)));
+    if (selectedCaseDetail?.id === caseId) {
+      setSelectedCaseDetail((prev: any) => ({ ...prev, status: newStatus }));
+    }
+    try {
+      await forensicApi.updateCase(caseId, { status: newStatus });
+      if (isSupabaseConfigured) {
+        await supabase.from('cases').update({ status: newStatus.toUpperCase() }).eq('id', caseId);
+      }
+    } catch (e) {
+      console.warn('Error syncing quick status change:', e);
+    }
+  };
+
+  const handleDeleteCase = async (e: React.MouseEvent, caseItem: any) => {
+    e.stopPropagation();
+    const caseId = caseItem.id;
+    if (!window.confirm(`Are you sure you want to remove case "${caseItem.title || caseId}"?`)) return;
+    setCases(prev => prev.filter(c => c.id !== caseId));
+    if (selectedCaseDetail?.id === caseId) {
+      setSelectedCaseDetail(null);
+    }
+    try {
+      await forensicApi.deleteCase(caseId);
+      if (isSupabaseConfigured) {
+        await supabase.from('cases').delete().eq('id', caseId);
+      }
+    } catch (e) {
+      console.warn('Error deleting case from database:', e);
+    }
+  };
 
   const handleInspectCase = (caseItem: any) => {
     // If it's a full EmailAnalysis object
@@ -814,22 +865,31 @@ export function CasesView({
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] uppercase font-semibold border ${
+                        <select
+                          value={status}
+                          onChange={(e) => handleQuickStatusChange(c, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`px-2 py-1 rounded text-[10px] uppercase font-semibold border cursor-pointer focus:outline-none ${
                             status === 'open'
                               ? 'bg-blue-950/80 border-blue-600 text-blue-300'
-                              : status === 'investigating'
+                              : status === 'investigating' || status === 'in_progress'
                               ? 'bg-purple-950/80 border-purple-600 text-purple-300'
                               : status === 'escalated'
                               ? 'bg-rose-950/80 border-rose-600 text-rose-300'
-                              : 'bg-slate-800 border-slate-700 text-slate-400'
+                              : status === 'resolved'
+                              ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                              : 'bg-slate-800 border-slate-700 text-slate-300'
                           }`}
                         >
-                          {status}
-                        </span>
+                          <option value="open">OPEN</option>
+                          <option value="investigating">INVESTIGATING</option>
+                          <option value="escalated">ESCALATED</option>
+                          <option value="resolved">RESOLVED</option>
+                          <option value="quarantined">QUARANTINED</option>
+                        </select>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
                           {slackFeedbackMsg?.id === c.id && (
                             <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
                               slackFeedbackMsg.type === 'success' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
@@ -864,6 +924,13 @@ export function CasesView({
                           >
                             <span>Inspect</span>
                             <ArrowUpRight className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteCase(e, c)}
+                            title="Delete or archive case"
+                            className="p-1.5 bg-slate-800/80 hover:bg-rose-950 hover:text-rose-400 text-slate-400 border border-slate-700 hover:border-rose-800/60 rounded-lg text-xs cursor-pointer transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </td>

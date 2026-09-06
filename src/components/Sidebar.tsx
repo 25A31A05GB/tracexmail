@@ -32,6 +32,7 @@ import {
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { UserRole } from '../hooks/useSession';
+import { Sparkles, Building2 as OrgIcon, ShieldCheck } from 'lucide-react';
 
 export type NavTab = 
   | 'dashboard'
@@ -57,6 +58,8 @@ interface SidebarProps {
   alertCount: number;
   wsStatus: ConnectionStatus;
   role?: UserRole;
+  accountType?: 'personal' | 'organization';
+  onOpenUpgradeModal?: (featureName?: string) => void;
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
 }
@@ -67,6 +70,8 @@ export function Sidebar({
   alertCount,
   wsStatus,
   role = 'analyst',
+  accountType = 'organization',
+  onOpenUpgradeModal,
   onOpenWalkthrough,
   viewMode = 'simple'
 }: SidebarProps) {
@@ -171,26 +176,69 @@ export function Sidebar({
   const isWsConnected = (wsStatus as string)?.toLowerCase() === 'connected';
   const isWsReconnecting = (wsStatus as string)?.toLowerCase() === 'reconnecting' || (wsStatus as string)?.toLowerCase() === 'connecting';
 
+  const handleTabClick = (tabId: NavTab, label: string) => {
+    // If in personal mode and clicking an enterprise-only feature
+    const personalAllowedTabs: NavTab[] = ['ingest', 'overview', 'hops', 'map', 'headers', 'logs'];
+    if (accountType === 'personal' && !personalAllowedTabs.includes(tabId)) {
+      if (onOpenUpgradeModal) {
+        onOpenUpgradeModal(label);
+        return;
+      }
+    }
+    setActiveTab(tabId);
+  };
+
   return (
     <aside id="app-sidebar" className="w-64 bg-[#1a1712] border-r border-[#3a352c] flex flex-col shrink-0 select-none">
       {/* Brand Header with Exact Forensic Identity */}
       <button
-        onClick={() => setActiveTab('dashboard')}
-        className="p-5 flex items-center gap-3 border-b border-[#3a352c] text-left hover:bg-[#221e17] transition-colors cursor-pointer"
+        onClick={() => handleTabClick('dashboard', 'Dashboard')}
+        className="p-4 flex items-center gap-3 border-b border-[#3a352c] text-left hover:bg-[#221e17] transition-colors cursor-pointer"
         title="TraceXMail Workspace Dashboard"
       >
         <div className="w-[24px] h-[24px] border-[1.5px] border-[var(--thread)] rounded-full relative shrink-0">
           <div className="absolute inset-[5px] rounded-full bg-[var(--thread)]" />
         </div>
-        <div>
-          <span className="font-display font-bold text-xl tracking-tight text-[#ede6d8] block leading-none">
-            TraceXMail
-          </span>
-          <span className="text-[10.5px] text-[#b9af9c] font-mono tracking-wider">
-            CASE-XM-01
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <span className="font-display font-bold text-lg tracking-tight text-[#ede6d8] block leading-none">
+              TraceXMail
+            </span>
+            {accountType === 'personal' ? (
+              <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[rgba(127,163,186,0.2)] text-[var(--slate)] border border-[var(--slate)]/40 font-bold">
+                INDIVIDUAL
+              </span>
+            ) : (
+              <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[var(--stamp)]/40 font-bold">
+                ORGANIZATION
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-[#b9af9c] font-mono tracking-wider">
+            {accountType === 'personal' ? 'SINGLE EMAIL ANALYSIS' : 'FULL SOC SUITE'}
           </span>
         </div>
       </button>
+
+      {/* Account Type Notice for Personal Users */}
+      {accountType === 'personal' && (
+        <div className="mx-3 mt-3 p-2.5 rounded-[2px] bg-[rgba(201,162,39,0.1)] border border-[rgba(201,162,39,0.3)] text-xs space-y-1.5">
+          <div className="flex items-center gap-1.5 text-[var(--stamp)] font-semibold text-[11px]">
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span>Individual Mode</span>
+          </div>
+          <p className="text-[10.5px] text-[var(--paper-dim)] leading-tight">
+            Email Ingestion &amp; single-message forensic triage active.
+          </p>
+          <button
+            onClick={() => onOpenUpgradeModal && onOpenUpgradeModal('Organization Full SOC Access')}
+            className="w-full text-center py-1 rounded-[2px] bg-[var(--stamp)] text-[var(--ink)] font-bold text-[10.5px] hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-1"
+          >
+            <OrgIcon className="w-3 h-3" />
+            <span>Switch to Org Mode</span>
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 space-y-4 mt-3 overflow-y-auto">
@@ -202,20 +250,24 @@ export function Sidebar({
           {alwaysVisibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
+            const isRestrictedForPersonal = accountType === 'personal' && !['overview'].includes(item.id);
+
             return (
               <motion.button
                 key={item.id}
                 id={`nav-btn-${item.id}`}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => handleTabClick(item.id, item.label)}
                 whileHover={{ x: 3 }}
                 whileTap={{ scale: 0.98 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 className={`relative w-full px-3 py-2 rounded-md font-sans text-xs flex items-center gap-2.5 cursor-pointer text-left transition-colors duration-200 ${
                   isActive
                     ? 'text-[#ede6d8] font-semibold'
-                    : item.isLocked
-                      ? 'text-[#4f5763] hover:text-[#7d8794]'
-                      : 'text-[#b9af9c] hover:text-[#ede6d8]'
+                    : isRestrictedForPersonal
+                      ? 'text-[#7d8794] hover:text-[#ede6d8]'
+                      : item.isLocked
+                        ? 'text-[#4f5763] hover:text-[#7d8794]'
+                        : 'text-[#b9af9c] hover:text-[#ede6d8]'
                 }`}
               >
                 {isActive && (
@@ -227,7 +279,12 @@ export function Sidebar({
                 )}
                 <Icon className={`relative z-10 w-4 h-4 transition-colors duration-200 ${isActive ? 'text-[#e8836f]' : 'text-[#8a8070]'}`} />
                 <span className="relative z-10 flex-1">{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && !item.isLocked && (
+                {isRestrictedForPersonal && (
+                  <span className="relative z-10 text-[9px] font-mono px-1 py-0.2 rounded bg-[rgba(201,162,39,0.15)] text-[var(--stamp)]">
+                    ORG
+                  </span>
+                )}
+                {item.badge !== undefined && item.badge > 0 && !item.isLocked && !isRestrictedForPersonal && (
                   <span className="relative z-10 bg-[#b23a2e] text-[#ede6d8] text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full animate-pulse">
                     {item.badge}
                   </span>
@@ -262,20 +319,24 @@ export function Sidebar({
               {forensicNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
+                const isRestrictedForPersonal = accountType === 'personal' && ['campaigns', 'graph', 'timeline', 'gmail'].includes(item.id);
+
                 return (
                   <motion.button
                     key={item.id}
                     id={`nav-btn-${item.id}`}
-                    onClick={() => setActiveTab(item.id)}
+                    onClick={() => handleTabClick(item.id, item.label)}
                     whileHover={{ x: 3 }}
                     whileTap={{ scale: 0.98 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                     className={`relative w-full px-3 py-2 rounded-md font-sans text-xs flex items-center gap-2.5 cursor-pointer text-left transition-colors duration-200 ${
                       isActive
                         ? 'text-[#ede6d8] font-semibold'
-                        : item.readOnlyDisabled
-                          ? 'text-[#4f5763] hover:text-[#7d8794]'
-                          : 'text-[#8a8070] hover:text-[#ede6d8]'
+                        : isRestrictedForPersonal
+                          ? 'text-[#7d8794] hover:text-[#ede6d8]'
+                          : item.readOnlyDisabled
+                            ? 'text-[#4f5763] hover:text-[#7d8794]'
+                            : 'text-[#8a8070] hover:text-[#ede6d8]'
                     }`}
                   >
                     {isActive && (
@@ -287,7 +348,12 @@ export function Sidebar({
                     )}
                     <Icon className={`relative z-10 w-4 h-4 transition-colors duration-200 ${isActive ? 'text-[#7fa3ba]' : item.readOnlyDisabled ? 'text-[#4f5763]' : 'text-[#6b6255]'}`} />
                     <span className="relative z-10 flex-1">{item.label}</span>
-                    {item.badge && (
+                    {isRestrictedForPersonal && (
+                      <span className="relative z-10 text-[9px] font-mono px-1 py-0.2 rounded bg-[rgba(201,162,39,0.15)] text-[var(--stamp)]">
+                        ORG
+                      </span>
+                    )}
+                    {item.badge && !isRestrictedForPersonal && (
                       <span className="relative z-10 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
                         {item.badge}
                       </span>
@@ -299,12 +365,12 @@ export function Sidebar({
           )}
         </div>
 
-        {/* Admin Navigation Section (Visible ONLY for admin role) */}
-        {role === 'admin' && (
+        {/* Admin Navigation Section (Visible ONLY for admin role in Organization Mode) */}
+        {role === 'admin' && accountType === 'organization' && (
           <div className="space-y-1 pt-2 border-t border-[#3a352c]/50">
             <div className="px-3 pb-1 text-[10px] font-mono font-medium text-[#c9a227] uppercase tracking-wider flex items-center justify-between">
-              <span>Admin</span>
-              <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">ENCLAVE</span>
+              <span>Admin &amp; Employees</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">ORG ROOT</span>
             </div>
             {adminNavItems.map((item) => {
               const Icon = item.icon;
@@ -313,7 +379,7 @@ export function Sidebar({
                 <motion.button
                   key={item.id}
                   id={`nav-btn-${item.id}`}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleTabClick(item.id, item.label)}
                   whileHover={{ x: 3 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 25 }}
