@@ -130,30 +130,39 @@ export function Sidebar({
     };
   }, []);
 
+  interface NavItem {
+    id: NavTab;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    badge?: number;
+    isLocked?: boolean;
+    readOnlyDisabled?: boolean;
+  }
+
   // Tier 1: Always Visible Navigation Items
-  const alwaysVisibleNavItems = [
-    { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'cases' as const, label: 'Cases', icon: FolderOpen },
-    { id: 'search' as const, label: 'Search', icon: Search },
-    { id: 'overview' as const, label: 'Message Overview', icon: Activity },
-    { id: 'alerts' as const, label: 'Live Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
+  const alwaysVisibleNavItems: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'cases', label: 'Cases', icon: FolderOpen },
+    { id: 'search', label: 'Search', icon: Search },
+    { id: 'overview', label: 'Message Overview', icon: Activity },
+    { id: 'alerts', label: 'Live Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
   ];
 
   // Tier 2: Collapsible Forensic Tools Items
-  const forensicNavItems = [
-    { id: 'campaigns' as const, label: 'Campaigns', icon: Layers },
-    { id: 'graph' as const, label: 'Relationship Graph', icon: Share2 },
-    { id: 'timeline' as const, label: 'Threat Timeline', icon: Clock },
-    { id: 'ingest' as const, label: 'Email Ingestion', icon: Database, readOnlyDisabled: role === 'read_only' },
-    { id: 'hops' as const, label: 'Hop Traceroute', icon: Network },
-    { id: 'map' as const, label: 'Geographic Map', icon: MapPin },
-    { id: 'logs' as const, label: 'Analysis Log', icon: Terminal },
-    { id: 'headers' as const, label: 'Raw RFC822 / EML', icon: FileText },
+  const forensicNavItems: NavItem[] = [
+    { id: 'campaigns', label: 'Campaigns', icon: Layers },
+    { id: 'graph', label: 'Relationship Graph', icon: Share2 },
+    { id: 'timeline', label: 'Threat Timeline', icon: Clock },
+    { id: 'ingest', label: 'Email Ingestion', icon: Database, readOnlyDisabled: role === 'read_only' },
+    { id: 'hops', label: 'Hop Traceroute', icon: Network },
+    { id: 'map', label: 'Geographic Map', icon: MapPin },
+    { id: 'logs', label: 'Analysis Log', icon: Terminal },
+    { id: 'headers', label: 'Raw RFC822 / EML', icon: FileText },
   ];
 
-  const adminNavItems = [
-    { id: 'organization' as const, label: 'Organization', icon: Building2 },
-    { id: 'team' as const, label: 'Team & access', icon: Users },
+  const adminNavItems: NavItem[] = [
+    { id: 'organization', label: 'Organization', icon: Building2 },
+    { id: 'team', label: 'Team & access', icon: Users },
   ];
 
   const isWsConnected = (wsStatus as string)?.toLowerCase() === 'connected';
