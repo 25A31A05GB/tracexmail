@@ -22,7 +22,9 @@ import {
   Radio,
   Compass,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  Eye,
+  SlidersHorizontal
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -48,6 +50,8 @@ interface HeaderProps {
   onSignOut?: () => void;
   onSwitchRole?: (newRole: UserRole) => void;
   onOpenWalkthrough?: () => void;
+  viewMode?: 'simple' | 'analyst';
+  onSetViewMode?: (mode: 'simple' | 'analyst') => void;
 }
 
 export function Header({
@@ -63,7 +67,9 @@ export function Header({
   userLabel = 'SA',
   onSignOut,
   onSwitchRole,
-  onOpenWalkthrough
+  onOpenWalkthrough,
+  viewMode = 'simple',
+  onSetViewMode
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -252,6 +258,36 @@ export function Header({
             </>
           )}
         </div>
+
+        {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
+        {onSetViewMode && (
+          <div className="flex items-center rounded bg-[#12100d] p-0.5 border border-[#3a352c] text-[11px] font-mono">
+            <button
+              onClick={() => onSetViewMode('simple')}
+              className={`px-2.5 py-1 rounded transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${
+                viewMode === 'simple'
+                  ? 'bg-[#2a241b] text-[var(--paper)] border border-[#524838] shadow-xs'
+                  : 'text-[#8a8070] hover:text-[#ede6d8]'
+              }`}
+              title="Switch to Simple View Mode (Clean, executive-focused summary)"
+            >
+              <Eye className="w-3 h-3 text-amber-400" />
+              <span>Simple</span>
+            </button>
+            <button
+              onClick={() => onSetViewMode('analyst')}
+              className={`px-2.5 py-1 rounded transition-all cursor-pointer font-semibold flex items-center gap-1.5 ${
+                viewMode === 'analyst'
+                  ? 'bg-[rgba(127,163,186,0.25)] text-[var(--slate)] border border-[var(--slate)] shadow-xs'
+                  : 'text-[#8a8070] hover:text-[#ede6d8]'
+              }`}
+              title="Switch to Analyst Console (Full forensic telemetry and raw data)"
+            >
+              <SlidersHorizontal className="w-3 h-3 text-[var(--slate)]" />
+              <span>Analyst Console</span>
+            </button>
+          </div>
+        )}
 
         {/* Role-Differentiated Clearance Badge & Avatar */}
         <div className="relative">

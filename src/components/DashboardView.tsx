@@ -64,6 +64,7 @@ interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
   onNavigateToTab?: (tab: any) => void;
   onOpenWalkthrough?: () => void;
+  viewMode?: 'simple' | 'analyst';
 }
 
 export interface RegionThreat {
@@ -275,7 +276,7 @@ const getHeatColor = (z: number, severity: string) => {
   return { fill: '#38BDF8', stroke: '#7DD3FC', glow: 'rgba(56, 189, 248, 0.4)' };
 };
 
-export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthrough }: DashboardViewProps) {
+export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthrough, viewMode = 'simple' }: DashboardViewProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -283,6 +284,11 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   const [selectedGeoCategory, setSelectedGeoCategory] = useState<'ALL' | 'BEC' | 'HARVESTING' | 'MALWARE' | 'EXPLOIT'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<RegionThreat | null>(REGIONAL_THREATS_DATA[0]);
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string>(SAMPLE_ANALYSES[0]?.id || 'sample-paypal-phish');
+  const [isForensicConsoleExpanded, setIsForensicConsoleExpanded] = useState<boolean>(viewMode === 'analyst');
+
+  useEffect(() => {
+    setIsForensicConsoleExpanded(viewMode === 'analyst');
+  }, [viewMode]);
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
     try {
       return localStorage.getItem('tracexmail_dashboard_minimized') === 'true';
@@ -925,27 +931,65 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
         </div>
       </div>
 
-      {/* ANALYST FORENSIC TRIAGE CONSOLE: Fraud Score, Spoofing, Trace Path, Geolocation & Attribution */}
-      {(() => {
-        const focusVerdict = getStandardizedVerdict(activeFocusAnalysis);
-        const focusOriginHop = activeFocusAnalysis.hops?.find(h => h.isOrigin) || activeFocusAnalysis.hops?.[0];
-        const originIp = focusOriginHop?.fromIp || '185.220.101.5';
-        const isSpfPass = activeFocusAnalysis.auth?.spf?.status === 'PASS';
-        const isDkimPass = activeFocusAnalysis.auth?.dkim?.status === 'PASS';
-        const isDmarcPass = activeFocusAnalysis.auth?.dmarc?.status === 'PASS';
-        const hasReplyDiverter = Boolean(activeFocusAnalysis.replyTo || activeFocusAnalysis.headers?.replyTo);
-        // FLAG FOR ATTRIBUTION ENGINE REVIEW: Attribution confidence currently derives from ML confidence score. Preserving algorithm as required.
-        const attributionConfidence = activeFocusAnalysis.mlConfidence 
-          ? (activeFocusAnalysis.mlConfidence * 100).toFixed(1) 
-          : '98.4';
+      {/* ANALYST FORENSIC TRIAGE CONSOLE ACCORDION */}
+      <div className="bg-[#1a1712] border border-[#3a352c] rounded-xl p-4 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-950/80 border border-blue-600/50 flex items-center justify-center text-blue-400">
+              <Activity className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Forensic Triage Console &amp; Deep Telemetry</span>
+                <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                  {isForensicConsoleExpanded ? 'Expanded' : 'Collapsed'}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                Full 5-panel breakdown: Fraud Score, Spoofing, Trace Path, Geolocation &amp; ML Attribution
+              </p>
+            </div>
+          </div>
 
-        const handleFocusInspect = (targetTab: string) => {
-          if (onSelectAnalysis) onSelectAnalysis(activeFocusAnalysis);
-          if (onNavigateToTab) onNavigateToTab(targetTab);
-        };
+          <button
+            onClick={() => setIsForensicConsoleExpanded(prev => !prev)}
+            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-slate-200 font-mono font-semibold flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto"
+          >
+            {isForensicConsoleExpanded ? (
+              <>
+                <ChevronUp className="w-4 h-4 text-blue-400" />
+                <span>Hide Full Forensic Console</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-4 h-4 text-blue-400" />
+                <span>Show Full Forensic Console</span>
+              </>
+            )}
+          </button>
+        </div>
 
-        return (
-          <div className="bg-[#1a1712] border border-[#3a352c] rounded-xl p-5 shadow-xl space-y-5">
+        {isForensicConsoleExpanded && (
+          <div className="pt-3 border-t border-slate-800 animate-in fade-in duration-200">
+            {(() => {
+              const focusVerdict = getStandardizedVerdict(activeFocusAnalysis);
+              const focusOriginHop = activeFocusAnalysis.hops?.find(h => h.isOrigin) || activeFocusAnalysis.hops?.[0];
+              const originIp = focusOriginHop?.fromIp || '185.220.101.5';
+              const isSpfPass = activeFocusAnalysis.auth?.spf?.status === 'PASS';
+              const isDkimPass = activeFocusAnalysis.auth?.dkim?.status === 'PASS';
+              const isDmarcPass = activeFocusAnalysis.auth?.dmarc?.status === 'PASS';
+              const hasReplyDiverter = Boolean(activeFocusAnalysis.replyTo || activeFocusAnalysis.headers?.replyTo);
+              const attributionConfidence = activeFocusAnalysis.mlConfidence 
+                ? (activeFocusAnalysis.mlConfidence * 100).toFixed(1) 
+                : '98.4';
+
+              const handleFocusInspect = (targetTab: string) => {
+                if (onSelectAnalysis) onSelectAnalysis(activeFocusAnalysis);
+                if (onNavigateToTab) onNavigateToTab(targetTab);
+              };
+
+              return (
+                <div className="bg-[#1a1712] rounded-xl space-y-5">
             {/* Console Header & Case Selector */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/80 pb-4">
               <div className="flex items-center gap-3">
@@ -1235,6 +1279,9 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           </div>
         );
       })()}
+          </div>
+        )}
+      </div>
 
       {/* Bulk Email File Threat Comparison Bar Chart Section */}
       <BulkThreatComparisonSummary

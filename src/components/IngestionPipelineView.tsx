@@ -219,12 +219,14 @@ export function IngestionPipelineView({
 
       if (finalAnalysis) {
         addLog(`[TELEMETRY] Analysis compiled. Subject: '${finalAnalysis.subject || finalAnalysis.headers?.subject}'. Threat Score: ${finalAnalysis.threatScore || finalAnalysis.riskScore || 0}/100.`);
+        console.log('📊 [IngestionPipelineView] Email analysis object constructed:', finalAnalysis);
         pendingAnalysisRef.current = finalAnalysis;
         setPendingAnalysis(finalAnalysis);
 
         // If animation already finished while processing, dispatch immediately
         if (scanAnimationFinishedRef.current && !backendFailed) {
           addLog(`[DISPATCH] Scan complete signal caught; mounting analysis in workspace...`);
+          console.log('🚀 [IngestionPipelineView] Auto-dispatching analysis to App state:', finalAnalysis.id);
           onSelectAnalysis(finalAnalysis);
           onNavigateToOverview();
           setIsScanning(false);
@@ -256,6 +258,12 @@ export function IngestionPipelineView({
     const analysisToSelect = pendingAnalysisRef.current || pendingAnalysis;
     if (analysisToSelect) {
       addLog(`[DISPATCH] Animation complete; dispatching selected analysis to workspace view...`);
+      console.log('🚀 [IngestionPipelineView] handleScanAnimationComplete dispatching analysis:', {
+        id: analysisToSelect.id,
+        subject: analysisToSelect.subject || analysisToSelect.headers?.subject,
+        threatScore: analysisToSelect.threatScore ?? analysisToSelect.riskScore,
+        analysisObject: analysisToSelect
+      });
       onSelectAnalysis(analysisToSelect);
       onNavigateToOverview();
       setIsScanning(false);
@@ -264,6 +272,7 @@ export function IngestionPipelineView({
       scanAnimationFinishedRef.current = false;
     } else {
       // Record animation completed if backend processing is still running
+      console.log('⏳ [IngestionPipelineView] Scan animation completed before backend processing finished.');
       scanAnimationFinishedRef.current = true;
     }
   };

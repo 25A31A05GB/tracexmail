@@ -245,6 +245,7 @@ interface OverviewViewProps {
   onNavigateToGraph?: () => void;
   onOpenNewModal?: () => void;
   onOpenReportModal?: () => void;
+  viewMode?: 'simple' | 'analyst';
 }
 
 export function OverviewView({
@@ -256,6 +257,7 @@ export function OverviewView({
   onNavigateToGraph,
   onOpenNewModal,
   onOpenReportModal,
+  viewMode = 'simple'
 }: OverviewViewProps) {
   if (!analysis) {
     return (
@@ -282,13 +284,39 @@ export function OverviewView({
   }
 
   const stdVerdict = getStandardizedVerdict(analysis);
+
+  // Diagnostic logging on analysis update/mount
+  useEffect(() => {
+    if (analysis) {
+      console.log('🔬 [OverviewView] Mounting/Rendering Analysis Data:', {
+        id: analysis.id,
+        subject: analysis.subject || analysis.headers?.subject,
+        from: analysis.headers?.from,
+        to: analysis.headers?.to,
+        threatScore: analysis.threatScore ?? analysis.riskScore,
+        verdict: stdVerdict.verdict,
+        spf: analysis.authResults?.spf?.status || analysis.authResults?.spf,
+        dkim: analysis.authResults?.dkim?.status || analysis.authResults?.dkim,
+        dmarc: analysis.authResults?.dmarc?.status || analysis.authResults?.dmarc,
+        hopsCount: analysis.hops?.length || 0,
+        urlsCount: analysis.urls?.length || 0,
+        attachmentsCount: analysis.attachments?.length || 0,
+        hasAiNarrative: Boolean(analysis.ai_narrative || analysis.aiNarrative),
+        fullAnalysisObject: analysis
+      });
+    }
+  }, [analysis, stdVerdict.verdict]);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
   const [reverifying, setReverifying] = useState<boolean>(false);
   const [originAssessmentOpen, setOriginAssessmentOpen] = useState<boolean>(false);
   const [isEvidenceTagOpen, setIsEvidenceTagOpen] = useState<boolean>(false);
   const [overviewMode, setOverviewMode] = useState<'card' | 'workspace'>('card');
-  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(true);
+  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst');
+
+  useEffect(() => {
+    setIsTechnicalExpanded(viewMode === 'analyst');
+  }, [viewMode]);
   const [auditResult, setAuditResult] = useState<{
     verified: boolean;
     recomputedHash: string;

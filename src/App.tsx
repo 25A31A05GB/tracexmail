@@ -92,6 +92,21 @@ export default function App() {
   };
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'simple' | 'analyst'>(() => {
+    try {
+      return (localStorage.getItem('tracexmail_view_mode') as 'simple' | 'analyst') || 'simple';
+    } catch {
+      return 'simple';
+    }
+  });
+
+  const handleToggleViewMode = (mode: 'simple' | 'analyst') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('tracexmail_view_mode', mode);
+    } catch {}
+  };
+
   const [showDemoCases, setShowDemoCases] = useState<boolean>(() => {
     try {
       return localStorage.getItem('tracexmail_show_demo_cases') === 'true';
@@ -129,6 +144,13 @@ export default function App() {
   } = useWebSocketAlerts();
 
   const handleAnalysisCreated = (newAnalysis: EmailAnalysis) => {
+    console.log('📥 [App.tsx] handleAnalysisCreated received new analysis:', {
+      id: newAnalysis?.id,
+      subject: newAnalysis?.subject || newAnalysis?.headers?.subject,
+      threatScore: newAnalysis?.threatScore ?? newAnalysis?.riskScore,
+      from: newAnalysis?.headers?.from,
+      fullObject: newAnalysis
+    });
     setCurrentAnalysis(newAnalysis);
     setActiveTab('overview');
     setCasesRefreshSignal(prev => prev + 1);
@@ -236,6 +258,7 @@ export default function App() {
         wsStatus={wsStatus}
         role={role}
         onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
+        viewMode={viewMode}
       />
 
       {/* Main Content Area */}
@@ -255,6 +278,8 @@ export default function App() {
           userLabel={userInitials}
           onSignOut={signOut}
           onSwitchRole={switchRole}
+          viewMode={viewMode}
+          onSetViewMode={handleToggleViewMode}
         />
 
         {/* View Switcher Container */}
@@ -264,6 +289,7 @@ export default function App() {
               onSelectAnalysis={setCurrentAnalysis}
               onNavigateToTab={setActiveTab}
               onOpenWalkthrough={() => setIsWalkthroughOpen(true)}
+              viewMode={viewMode}
             />
           )}
 
@@ -303,6 +329,7 @@ export default function App() {
               onNavigateToGraph={() => setActiveTab('graph')}
               onOpenNewModal={() => setIsNewModalOpen(true)}
               onOpenReportModal={() => setIsReportModalOpen(true)}
+              viewMode={viewMode}
             />
           )}
 

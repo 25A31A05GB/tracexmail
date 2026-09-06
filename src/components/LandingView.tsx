@@ -81,22 +81,10 @@ export function LandingView({
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium">
             <button
-              onClick={() => scrollToSection('simulator')}
-              className="text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer bg-transparent border-0 py-1"
-            >
-              Live Simulator
-            </button>
-            <button
               onClick={() => scrollToSection('how-it-works')}
               className="text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer bg-transparent border-0 py-1"
             >
               How It Works
-            </button>
-            <button
-              onClick={() => scrollToSection('xray')}
-              className="text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer bg-transparent border-0 py-1"
-            >
-              Header X-Ray
             </button>
             <button
               onClick={() => scrollToSection('examples')}
@@ -105,10 +93,10 @@ export function LandingView({
               Threat Cases
             </button>
             <button
-              onClick={() => scrollToSection('features')}
+              onClick={onOpenConsole}
               className="text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer bg-transparent border-0 py-1"
             >
-              Capabilities
+              Try Console
             </button>
           </nav>
 
