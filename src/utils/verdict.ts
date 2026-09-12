@@ -103,11 +103,12 @@ export function getStandardizedVerdict(analysis?: Partial<EmailAnalysis> | null)
       : hasMaliciousTextLabel);
 
   const isClean =
-    isScoreLow ||
-    ((rawVerdict.includes('LEGIT') || rawVerdict.includes('CLEAN') || rawVerdict.includes('PASS') || rawVerdict.includes('SAFE')) &&
-    !isMalicious &&
-    !isUncertain &&
-    (!hasScore || score < 35));
+    !hasMaliciousTextLabel &&
+    (isScoreLow ||
+      ((rawVerdict.includes('LEGIT') || rawVerdict.includes('CLEAN') || rawVerdict.includes('PASS') || rawVerdict.includes('SAFE')) &&
+      !isMalicious &&
+      !isUncertain &&
+      (!hasScore || score < 35)));
 
   const isSuspicious = !isClean && !isMalicious;
   const isSafe = isClean;
@@ -119,13 +120,13 @@ export function getStandardizedVerdict(analysis?: Partial<EmailAnalysis> | null)
     : 'SAFE';
 
   // 4. Primary standardized display verdict
-  let verdict = isScoreLow ? 'LEGITIMATE' : (analysis?.threatVerdict || analysis?.verdict || analysis?.classification);
+  let verdict = (isScoreLow && !hasMaliciousTextLabel) ? 'LEGITIMATE' : (analysis?.threatVerdict || analysis?.verdict || analysis?.classification);
   if (isUncertain) {
     verdict = 'UNCERTAIN';
   } else if (
     !verdict ||
-    (isScoreLow && (verdict.includes('PHISH') || verdict.includes('MALICIOUS'))) ||
-    (!isMalicious && (verdict.toUpperCase().includes('PHISH') || verdict.toUpperCase().includes('MALICIOUS') || verdict.toUpperCase().includes('FRAUD') || verdict.toUpperCase().includes('IMPERSONAT')))
+    (!isMalicious && (verdict.toUpperCase().includes('PHISH') || verdict.toUpperCase().includes('MALICIOUS') || verdict.toUpperCase().includes('FRAUD') || verdict.toUpperCase().includes('IMPERSONAT'))) ||
+    (isScoreLow && !hasMaliciousTextLabel && (verdict.includes('PHISH') || verdict.includes('MALICIOUS')))
   ) {
     verdict = isMalicious ? 'MALICIOUS PHISH' : isSuspicious ? 'SUSPICIOUS' : 'LEGITIMATE';
   }

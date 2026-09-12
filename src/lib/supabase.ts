@@ -22,26 +22,55 @@ export let supabase: SupabaseClient = createClient(
   }
 );
 
-// If client-side VITE_ variables are missing, attempt runtime fetch of public config from server
-if (typeof window !== 'undefined' && !isSupabaseConfigured) {
-  fetch('/api/auth/status')
-    .then(r => r.json())
-    .then(data => {
+let configuredSupabaseUrl: string = clientEnvUrl;
+
+export function getIsSupabaseConfigured(): boolean {
+  return isSupabaseConfigured && !configuredSupabaseUrl.includes('placeholder');
+}
+
+let initPromise: Promise<boolean> | null = null;
+
+/**
+ * Ensures the Supabase client is configured, fetching from /api/auth/status if needed.
+ */
+export async function ensureSupabaseClient(): Promise<boolean> {
+  if (isSupabaseConfigured && configuredSupabaseUrl && !configuredSupabaseUrl.includes('placeholder')) {
+    return true;
+  }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    try {
+      const res = await fetch('/api/auth/status');
+      const data = await res.json();
       if (data?.supabaseUrl && data?.supabaseAnonKey && data.supabaseUrl.startsWith('http')) {
+        configuredSupabaseUrl = data.supabaseUrl;
         supabase = createClient(data.supabaseUrl, data.supabaseAnonKey, {
           auth: {
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true,
-            storage: window.localStorage,
+            storage: typeof window !== 'undefined' ? window.localStorage : undefined,
           },
         });
         isSupabaseConfigured = true;
+        return true;
       }
-    })
-    .catch(() => {
-      // Offline or network error; fallback remains placeholder
-    });
+    } catch {
+      // ignore
+    }
+    return isSupabaseConfigured;
+  })();
+
+  return initPromise;
+}
+
+// If client-side VITE_ variables are missing, attempt runtime fetch of public config from server
+if (typeof window !== 'undefined' && !isSupabaseConfigured) {
+  ensureSupabaseClient().catch(() => {});
 }
 
 export default supabase;

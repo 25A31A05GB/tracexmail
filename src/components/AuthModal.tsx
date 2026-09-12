@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Chrome, Loader2 } from 'lucide-react';
+import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { signInWithGoogleOAuth } from '../lib/supabaseGoogleAuth';
+import { GoogleAuthButton } from './GoogleAuthButton';
 import { initializeSession, SessionUser, signOutUser } from '../lib/api';
 
 interface AuthModalProps {
@@ -19,7 +19,6 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [organizationId, setOrganizationId] = useState('org_acme_soc_01');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
@@ -34,27 +33,6 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    setErrorMessage(null);
-    try {
-      const res = await signInWithGoogleOAuth();
-      if (!res.success) {
-        setErrorMessage(res.error || 'Google authentication failed.');
-      } else {
-        setSuccessMessage('Signed in with Google successfully.');
-        await initializeSession();
-        setTimeout(() => {
-          onClose();
-        }, 800);
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed initiating Google sign in.');
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -304,25 +282,19 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
               </div>
 
               {/* Google OAuth Option */}
-              <button
+              <GoogleAuthButton
                 id="modal-google-auth-btn"
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={googleLoading || loading}
-                className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-lg text-xs text-slate-200 font-medium flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {googleLoading ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
-                    <span>Connecting to Google…</span>
-                  </>
-                ) : (
-                  <>
-                    <Chrome className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Continue with Google</span>
-                  </>
-                )}
-              </button>
+                mode={mode === 'signup' ? 'signup' : 'continue'}
+                variant="primary"
+                onSuccess={async () => {
+                  setSuccessMessage('Signed in with Google successfully.');
+                  await initializeSession();
+                  setTimeout(() => {
+                    onClose();
+                  }, 800);
+                }}
+                onError={(err) => setErrorMessage(err)}
+              />
 
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
                 <div className="flex-1 h-px bg-slate-800" />

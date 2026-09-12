@@ -59,8 +59,10 @@ export function PlainLanguageSummaryCard({
   // 1. One-Sentence Plain-Language Explanation of What Was Detected
   let plainExplanation = '';
   if (isMalicious) {
-    if (isTyposquat && targetBrand) {
-      plainExplanation = `This email is pretending to be from ${targetBrand}, but the sender's domain (${fromDomain}) is a deceptive lookalike registered to trick you.`;
+    if (isTyposquat) {
+      plainExplanation = targetBrand
+        ? `This email is pretending to be from ${targetBrand}, but the sender's domain (${fromDomain}) is a deceptive lookalike registered to trick you.`
+        : `This email domain (${fromDomain}) is a deceptive lookalike registered to trick recipients.`;
     } else if (hasSuspiciousUrls) {
       const dest = suspiciousUrls[0].domain || 'an external unknown host';
       plainExplanation = `This email contains deceptive links that point to an untrusted server (${dest}) to harvest credentials.`;
@@ -68,10 +70,8 @@ export function PlainLanguageSummaryCard({
       plainExplanation = `This email originated from an anonymized relay or suspicious hosting provider (${anomalousHop.city || 'unverified region'}, ${anomalousHop.country || 'anomalous network'}) rather than an authorized enterprise mail server.`;
     } else if (hasDangerousAtts) {
       plainExplanation = `This email includes dangerous file attachments (${dangerousAtts[0].filename}) engineered to execute malicious scripts or malware.`;
-    } else if (!isTyposquat && !hasSuspiciousUrls && !anomalousHop && !hasDangerousAtts) {
-      plainExplanation = `This email was flagged by automated classification as potentially malicious, but no specific technical evidence (spoofed domain, malicious links, dangerous attachments, or anomalous routing) was found — manual review is recommended before taking action.`;
     } else {
-      plainExplanation = `This email exhibits strong indicators of a targeted phishing or wire fraud lure designed to compromise credentials.`;
+      plainExplanation = `This email was flagged by automated classification as potentially malicious, but no specific technical evidence (spoofed domain, malicious links, dangerous attachments, or anomalous routing) was found — manual review is recommended before taking action.`;
     }
   } else if (isSuspicious) {
     plainExplanation = `This email exhibits irregular routing or sender configuration anomalies that warrant caution before interacting with its contents.`;
