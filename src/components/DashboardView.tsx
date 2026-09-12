@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldAlert,
   Activity,
@@ -818,7 +819,12 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Active Cases</span>
             <ShieldAlert className="w-4 h-4 text-rose-400" />
@@ -829,9 +835,14 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           <div className="text-[11px] text-rose-400/90 font-mono mt-1 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 inline" /> 2 Critical Wire BEC Lures
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Threat Campaigns</span>
             <Layers className="w-4 h-4 text-purple-400" />
@@ -842,9 +853,14 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           <div className="text-[11px] text-purple-400/90 font-mono mt-1">
             Unattributed Threat Clusters
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Ingested RFC 822</span>
             <Database className="w-4 h-4 text-blue-400" />
@@ -855,9 +871,14 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           <div className="text-[11px] text-blue-400/90 font-mono mt-1">
             Nazario & Enron Corpus Verified
           </div>
-        </div>
+        </motion.div>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
+        >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Avg Threat Score</span>
             <Zap className="w-4 h-4 text-amber-400" />
@@ -868,7 +889,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           <div className="text-[11px] text-slate-400 font-mono mt-1">
             Threat Intelligence &amp; Behavioral Analysis
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* PRIORITIZED ACTIVE CASES & THREAT SCORE MATRIX */}
@@ -897,12 +918,16 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {SAMPLE_ANALYSES.map((sample) => {
+          {SAMPLE_ANALYSES.map((sample, idx) => {
             const verdictInfo = getStandardizedVerdict(sample);
             const isSelected = selectedAnalysisId === sample.id;
             return (
-              <div
+              <motion.div
                 key={sample.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.22, delay: Math.min(idx * 0.04, 0.35), ease: [0.16, 1, 0.3, 1] }}
+                whileHover={{ y: -2 }}
                 onClick={() => {
                   setSelectedAnalysisId(sample.id);
                   if (onSelectAnalysis) onSelectAnalysis(sample);
@@ -945,7 +970,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -1067,7 +1092,12 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               
               {/* 1. FRAUD SCORE & VERDICT */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.05 }}
+                className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono">1. Fraud Score</span>
@@ -1101,10 +1131,15 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     <span className="text-cyan-400 font-bold">{attributionConfidence}%</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* 2. SPOOFING INDICATORS */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.1 }}
+                className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono">2. Spoofing Indicators</span>
@@ -1148,10 +1183,15 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
 
               {/* 3. SENDER TRACE PATH (HOP PIPELINE) */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.15 }}
+                className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono">3. Sender Trace Path</span>
@@ -1198,10 +1238,15 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
               {/* 4. GEOLOCATION MAP & IP COORDINATES */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.2 }}
+                className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono">4. Geolocation Map</span>
@@ -1244,10 +1289,15 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     <ArrowRight className="w-3 h-3" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
               {/* 5. ATTRIBUTION CONFIDENCE */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: 0.25 }}
+                className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-center justify-between text-slate-400 mb-2">
                     <span className="text-[11px] font-bold uppercase tracking-wider font-mono">5. Attribution</span>
@@ -1293,7 +1343,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
 
             </div>
           </div>

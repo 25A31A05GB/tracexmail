@@ -1,4 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldAlert,
   Shield,
@@ -852,7 +853,13 @@ export function CasesView({
                   const suggestedCount = c.suggested_members?.length || 0;
 
                   return (
-                    <tr key={c.id || i} className="hover:bg-slate-800/40 transition-colors">
+                    <motion.tr
+                      key={c.id || i}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.3), ease: [0.16, 1, 0.3, 1] }}
+                      className="hover:bg-slate-800/40 transition-colors"
+                    >
                       <td className="py-3.5 px-4 font-bold text-blue-400">
                         <div className="flex items-center gap-1.5">
                           <Layers className="w-3.5 h-3.5 text-blue-500" />
@@ -1013,7 +1020,7 @@ export function CasesView({
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })
               )}
@@ -1023,28 +1030,35 @@ export function CasesView({
       </div>
 
       {/* CREATE CASE MODAL */}
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in font-mono">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/80">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-950/80 border border-emerald-600/60 rounded-lg text-emerald-400">
-                  <FolderPlus className="w-5 h-5" />
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm font-mono">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-emerald-950/80 border border-emerald-600/60 rounded-lg text-emerald-400">
+                    <FolderPlus className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">Create Forensic Investigation Case</h3>
+                    <p className="text-xs text-slate-400">Group related fraudulent emails into a tracked campaign</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">Create Forensic Investigation Case</h3>
-                  <p className="text-xs text-slate-400">Group related fraudulent emails into a tracked campaign</p>
-                </div>
+                <button
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <form onSubmit={handleCreateCaseSubmit} className="p-6 overflow-y-auto space-y-5 text-xs">
+              <form onSubmit={handleCreateCaseSubmit} className="p-6 overflow-y-auto space-y-5 text-xs">
               {createSuccess && (
                 <div className="p-3 bg-emerald-950/80 border border-emerald-600 text-emerald-300 rounded-lg flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
@@ -1242,14 +1256,22 @@ export function CasesView({
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
 
       {/* CASE DETAIL / CAMPAIGN MANAGEMENT DRAWER */}
-      {selectedCaseDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in font-mono">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+      <AnimatePresence>
+        {selectedCaseDetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm font-mono">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 15 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
             <div className="flex items-center justify-between p-5 border-b border-slate-800 bg-slate-950/80">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 bg-blue-950/80 border border-blue-600/60 rounded-lg text-blue-400">
@@ -1509,9 +1531,10 @@ export function CasesView({
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
+    </AnimatePresence>
     </div>
   );
 }
