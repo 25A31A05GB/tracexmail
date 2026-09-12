@@ -39,7 +39,7 @@
       "destination": "/security/index.html"
     },
     {
-      "source": "/((?!privacy|terms|cookies|domains|contact|security|api|.*\\..*).*)",
+      "source": "/((?!api|privacy|terms|cookies|domains|contact|security|assets).*)",
       "destination": "/index.html"
     }
   ],
