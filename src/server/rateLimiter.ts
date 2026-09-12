@@ -13,13 +13,13 @@ export const getRateLimitConfig = () => ({
   authBackoffFactor: Number(process.env.RATE_LIMIT_AUTH_BACKOFF_FACTOR) || 2, // doubles each time: 2s, 4s, 8s, 16s...
   authMaxDelaySec: Number(process.env.RATE_LIMIT_AUTH_MAX_DELAY_SEC) || 300, // max 5 minutes delay
 
-  // Public Endpoints (moderate)
+  // Public Endpoints (moderate - sized for multi-tab SOC dashboard polling)
   publicWindowMs: Number(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS) || 15 * 60 * 1000,
-  publicMax: Number(process.env.RATE_LIMIT_PUBLIC_MAX) || 100,
+  publicMax: Number(process.env.RATE_LIMIT_PUBLIC_MAX) || 300,
 
-  // Authenticated User Endpoints (looser)
+  // Authenticated User Endpoints (high volume for active analyst workflows)
   authedWindowMs: Number(process.env.RATE_LIMIT_AUTHED_WINDOW_MS) || 15 * 60 * 1000,
-  authedMax: Number(process.env.RATE_LIMIT_AUTHED_MAX) || 1000
+  authedMax: Number(process.env.RATE_LIMIT_AUTHED_MAX) || 2000
 });
 
 // -----------------------------------------------------------------------------

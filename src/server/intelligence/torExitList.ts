@@ -10,7 +10,11 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 
-const TOR_EXIT_URL = 'https://check.torproject.org/torbulkexitlist';
+const TOR_EXIT_URLS = [
+  'https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst',
+  'https://check.torproject.org/torbulkexitlist'
+];
+const TOR_EXIT_URL = TOR_EXIT_URLS[0];
 const LOCAL_FALLBACK_FILE = path.join(process.cwd(), 'data/threat-lists/tor-exit-list.txt');
 const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -84,49 +88,53 @@ function loadLocalFallback() {
 }
 
 /**
- * Fetches the live Tor bulk exit list from check.torproject.org.
+ * Fetches the live Tor bulk exit list from authoritative mirrors.
  */
 export async function refreshTorExitList(): Promise<void> {
-  try {
-    const response = await axios.get(TOR_EXIT_URL, {
-      timeout: 10000,
-      headers: { 'User-Agent': 'TraceXMail-SOC-Forensics/2.5' }
-    });
-
-    if (response.data && typeof response.data === 'string') {
-      const newIps = new Set<string>();
-      const lines = response.data.split(/\r?\n/);
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#') && /^[0-9a-fA-F:.]+$/.test(trimmed)) {
-          newIps.add(trimmed.toLowerCase());
+  for (const url of TOR_EXIT_URLS) {
+    try {
+      const response = await axios.get(url, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          'Accept': 'text/plain,*/*'
         }
-      }
+      });
 
-      if (newIps.size > 0) {
-        torExitIps.clear();
-        for (const ip of newIps) {
-          torExitIps.add(ip);
-        }
-
-        // Persist to local cache
-        try {
-          const dir = path.dirname(LOCAL_FALLBACK_FILE);
-          if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+      if (response.data && typeof response.data === 'string') {
+        const newIps = new Set<string>();
+        const lines = response.data.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#') && /^[0-9a-fA-F:.]+$/.test(trimmed)) {
+            newIps.add(trimmed.toLowerCase());
           }
-          fs.writeFileSync(LOCAL_FALLBACK_FILE, Array.from(newIps).join('\n'), 'utf8');
-        } catch {}
+        }
 
-        console.log(`[TorExitList] Successfully synced ${torExitIps.size} live Tor exit nodes from check.torproject.org.`);
-        return;
+        if (newIps.size > 0) {
+          torExitIps.clear();
+          for (const ip of newIps) {
+            torExitIps.add(ip);
+          }
+
+          // Persist to local cache
+          try {
+            const dir = path.dirname(LOCAL_FALLBACK_FILE);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(LOCAL_FALLBACK_FILE, Array.from(newIps).join('\n'), 'utf8');
+          } catch {}
+
+          return;
+        }
       }
+    } catch {
+      // Continue to next mirror or fallback
     }
-  } catch (err: any) {
-    console.warn('[TorExitList] Live sync failed (check.torproject.org):', err?.message, '- Using local cache.');
   }
 
-  // If live fetch failed and memory is empty, ensure fallback is loaded
+  // If live fetch was unavailable, ensure fallback is loaded
   if (torExitIps.size === 0) {
     loadLocalFallback();
   }

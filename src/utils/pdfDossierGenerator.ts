@@ -323,28 +323,42 @@ export function generateForensicPdfDossier({
   // 6. CHAIN OF CUSTODY & STATUTORY ATTESTATION
   checkPageBreak(45);
 
+  const isFallback = analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
+
   pdf.setFillColor(26, 23, 18);
-  pdf.setDrawColor(58, 53, 44);
+  pdf.setDrawColor(isFallback ? 180 : 58, isFallback ? 120 : 53, isFallback ? 40 : 44);
   pdf.roundedRect(margin, curY, contentWidth, 34, 1.5, 1.5, 'FD');
 
   pdf.setFont('courier', 'bold');
   pdf.setFontSize(8.5);
-  pdf.setTextColor(178, 58, 46);
-  pdf.text('SECTION 05: LEGAL ADMISSIBILITY & CHAIN OF CUSTODY CERTIFICATION', margin + 4, curY + 6);
+  if (isFallback) {
+    pdf.setTextColor(217, 119, 6);
+    pdf.text('SECTION 05: DEGRADED MODE — UNVERIFIED CLIENT PARSE (NOT ADMISSIBLE)', margin + 4, curY + 6);
+  } else {
+    pdf.setTextColor(178, 58, 46);
+    pdf.text('SECTION 05: LEGAL ADMISSIBILITY & CHAIN OF CUSTODY CERTIFICATION', margin + 4, curY + 6);
+  }
 
   pdf.line(margin + 4, curY + 8, pageWidth - margin - 4, curY + 8);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(6.8);
   pdf.setTextColor(190, 182, 169);
-  const legalText = `This digital artifact was seized, parsed, and cataloged via the TraceXMail Deterministic Ingestion Pipeline in strict compliance with Federal Rules of Evidence 902(11) & 902(14) and ISO/IEC 27037:2012 standards. The SHA-256 cryptographic digest [${sha256Digest.slice(0, 20)}...] verifies mathematical bit-level non-repudiation. Ready for submission to corporate legal review and IC3/LEA cyber referral.`;
+  const legalText = isFallback
+    ? `DEGRADED MODE WARNING: This record was parsed via client-side offline heuristic fallback without server-side verification, authenticated reverse-DNS, Threat Intel feeds, or calibrated ML classification. THIS RECORD IS NOT CERTIFIED UNDER FRE 902(11)/902(14) OR ISO/IEC 27037 AND IS NOT ADMISSIBLE AS CERTIFIED DIGITAL EVIDENCE.`
+    : `This digital artifact was seized, parsed, and cataloged via the TraceXMail Deterministic Ingestion Pipeline in strict compliance with Federal Rules of Evidence 902(11) & 902(14) and ISO/IEC 27037:2012 standards. The SHA-256 cryptographic digest [${sha256Digest.slice(0, 20)}...] verifies mathematical bit-level non-repudiation. Ready for submission to corporate legal review and IC3/LEA cyber referral.`;
   const splitLegal = pdf.splitTextToSize(legalText, contentWidth - 8);
   pdf.text(splitLegal, margin + 4, curY + 13);
 
   pdf.setFont('courier', 'bold');
   pdf.setFontSize(6.5);
-  pdf.setTextColor(72, 169, 117);
-  pdf.text('VERIFIED FORENSIC SEAL: INTACT', margin + 4, curY + 29);
+  if (isFallback) {
+    pdf.setTextColor(217, 119, 6);
+    pdf.text('FORENSIC STATUS: UNVERIFIED CLIENT HEURISTIC (DEGRADED MODE)', margin + 4, curY + 29);
+  } else {
+    pdf.setTextColor(72, 169, 117);
+    pdf.text('VERIFIED FORENSIC SEAL: INTACT', margin + 4, curY + 29);
+  }
 
   pdf.setFont('courier', 'normal');
   pdf.setTextColor(140, 133, 120);

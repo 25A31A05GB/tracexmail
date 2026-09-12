@@ -1,4 +1,9 @@
 {
+  "build": {
+    "env": {
+      "VITE_WS_URL": "wss://tracexmail-l6c7.onrender.com/ws/alerts"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",

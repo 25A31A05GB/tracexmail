@@ -157,8 +157,19 @@ export function useWebSocketAlerts() {
     setStatus('connecting');
 
     try {
+      // Prioritize VITE_WS_URL if defined at build/runtime
+      const envWsUrl = (import.meta as any).env?.VITE_WS_URL;
+      const configuredWsUrl = typeof envWsUrl === 'string' && envWsUrl.trim() !== ''
+        ? envWsUrl.trim()
+        : null;
+
+      // In production deployed on Vercel, connect to Render backend if no custom env is set
+      const isVercel = window.location.host.includes('vercel.app');
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/alerts`;
+      const sameOriginWsUrl = `${protocol}//${window.location.host}/ws/alerts`;
+      const renderBackendWsUrl = 'wss://tracexmail-l6c7.onrender.com/ws/alerts';
+
+      const wsUrl = configuredWsUrl || (isVercel ? renderBackendWsUrl : sameOriginWsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

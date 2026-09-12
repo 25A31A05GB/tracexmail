@@ -1,7 +1,9 @@
 /**
- * Real-World Threat Feeds & Dynamic Cases Intelligence Service
- * Aggregates live CISA Advisories, OpenPhish feeds, PhishTank lures, VirusTotal IOCs,
- * and handles live dynamic case generation and real-time WebSocket distribution.
+ * TraceXMail Curated Threat Scenario Library & Benchmark Intelligence Service
+ * 
+ * Provides a vetted catalog of real-world attack archetypes and IOC campaign signatures
+ * modeled after historical CISA Alerts, OpenPhish lures, PhishTank patterns, and
+ * VirusTotal campaign indicators for SOC simulation, testing, and dynamic incident generation.
  */
 
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';

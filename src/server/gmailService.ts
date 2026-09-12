@@ -13,7 +13,7 @@
 import axios from 'axios';
 import { EventEmitter } from 'events';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
-import { encryptToken, decryptToken } from '../utils/crypto';
+import { encryptToken, decryptToken } from './compliance';
 
 export interface QuarantineConfig {
   enabled: boolean;

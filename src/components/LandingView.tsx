@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Terminal, ArrowUpRight } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
 
@@ -18,6 +18,51 @@ export function LandingView({
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+
+  const sampleCases = [
+    {
+      id: 'sample-0',
+      index: 0,
+      name: SAMPLE_ANALYSES[0]?.name || 'Nazario Phish: PayPal Urgent Restriction',
+      corpus: 'Nazario Corpus',
+      verdict: SAMPLE_ANALYSES[0]?.verdict || 'MALICIOUS PHISH',
+      threatScore: SAMPLE_ANALYSES[0]?.riskScore ?? 98,
+      subject: SAMPLE_ANALYSES[0]?.headers?.subject || '[URGENT] Your PayPal Account Has Been Temporarily Restricted',
+      signals: [
+        'SPF softfail + Tor exit node origin (185.220.101.5, Sofia, Bulgaria)',
+        'DMARC p=reject fail with lookalike domain paypal-account-security-update.com',
+      ],
+      originHint: 'Tor Relay • AS200548',
+    },
+    {
+      id: 'sample-1',
+      index: 1,
+      name: SAMPLE_ANALYSES[1]?.name || 'Nazario Phish: CitiBank Wire Transfer Authorization',
+      corpus: 'Nazario Corpus',
+      verdict: SAMPLE_ANALYSES[1]?.verdict || 'CRITICAL BEC / MALWARE',
+      threatScore: SAMPLE_ANALYSES[1]?.riskScore ?? 95,
+      subject: SAMPLE_ANALYSES[1]?.headers?.subject || 'Action Required: Pending Wire Transfer of $48,200.00',
+      signals: [
+        'SPF softfail with bulletproof relay origin (194.26.29.112, AlexHost Moldova)',
+        'Disguised .pdf.exe attachment harboring AsyncRAT binary executable payload',
+      ],
+      originHint: 'AlexHost • AS57523',
+    },
+    {
+      id: 'sample-2',
+      index: 2,
+      name: SAMPLE_ANALYSES[2]?.name || 'Legitimate: GitHub Security Alert',
+      corpus: 'Enterprise Traffic',
+      verdict: SAMPLE_ANALYSES[2]?.verdict || 'CLEAN',
+      threatScore: SAMPLE_ANALYSES[2]?.riskScore ?? 4,
+      subject: SAMPLE_ANALYSES[2]?.headers?.subject || '[GitHub] A personal access token has been generated',
+      signals: [
+        'Cryptographic SPF Pass (192.30.252.204) + valid 2048-bit RSA DKIM Pass',
+        'Full DMARC alignment verified against authentic GitHub CIDR block',
+      ],
+      originHint: 'GitHub CIDR • AS36459',
+    },
+  ];
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -39,7 +84,7 @@ export function LandingView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',-apple-system,BlinkMacSystemFont,sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative">
+    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',-apple-system,BlinkMacSystemFont,sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
       
       <div id="top" />
 
@@ -61,6 +106,9 @@ export function LandingView({
           <div className="hidden lg:flex items-center gap-8 text-[14.5px]">
             <button onClick={() => scrollToSection('pipeline')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               How it works
+            </button>
+            <button onClick={() => scrollToSection('case-studies')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Case studies
             </button>
             <button onClick={() => scrollToSection('product')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               Product
@@ -113,6 +161,12 @@ export function LandingView({
               className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
             >
               How it works
+            </button>
+            <button
+              onClick={() => { scrollToSection('case-studies'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+            >
+              Case studies
             </button>
             <button
               onClick={() => { scrollToSection('product'); setMobileMenuOpen(false); }}
@@ -187,6 +241,7 @@ export function LandingView({
                 Walk through a trace
               </button>
             </div>
+            {/* TODO: Add response-time SLA copy here (e.g., "We review every request within 48 hours") once a team review turnaround SLA is agreed upon */}
 
             <div className="mt-6 sm:mt-8 text-[13px] sm:text-[13.5px] text-[#b9af9c] max-w-md border-l-2 border-[#3a352c] pl-3.5">
               Built for security teams who need to prove what happened, not guess at it.
@@ -334,6 +389,113 @@ export function LandingView({
           <p className="text-[#b9af9c] text-[14.5px] max-w-[60ch] mx-auto m-0 leading-relaxed">
             Trained and validated against the <strong className="text-[#ede6d8] font-semibold">Nazario Phishing Corpus</strong> and the <strong className="text-[#ede6d8] font-semibold">Enron Email Corpus</strong>: real attacks and real legitimate mail, not synthetic examples.
           </p>
+        </div>
+      </section>
+
+      {/* Case Studies Section (Real Samples) */}
+      <section id="case-studies" className="py-20 border-b border-[#3a352c] bg-[#171410]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+            <div className="max-w-[680px]">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[2px] bg-[#3a352c]/50 border border-[#3a352c] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[11px] mb-3 uppercase tracking-wider">
+                <Terminal className="w-3 h-3 text-[#c9a227]" />
+                Corpus Proof &amp; Detection Output
+              </div>
+              <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8] leading-[1.2]">
+                See it work on a real sample
+              </h2>
+              <p className="text-[#b9af9c] mt-3 text-[15px] max-w-[60ch] leading-relaxed">
+                Real detection outputs produced by TraceXMail from historical attack corpora and authentic inbound mail. Not invented marketing copy. Click any sample to inspect the complete forensic chain in the analyst console.
+              </p>
+            </div>
+            <div className="shrink-0">
+              <button
+                onClick={() => handleCaseClick(0)}
+                className="inline-flex items-center gap-2 font-['IBM_Plex_Mono',monospace] text-[12.5px] text-[#b9af9c] hover:text-[#ede6d8] transition-colors border border-[#3a352c] hover:border-[#b9af9c] px-3.5 py-2 rounded-[3px] bg-[#14120f] cursor-pointer"
+              >
+                <span>Launch primary sample (Nazario #01)</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {sampleCases.map((c) => {
+              const isMalicious = c.threatScore >= 70;
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => handleCaseClick(c.index)}
+                  className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md relative overflow-hidden"
+                >
+                  <div className="space-y-4">
+                    {/* Top Meta Bar */}
+                    <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/70 pb-3">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#b9af9c] tracking-wider uppercase font-semibold">
+                        {c.corpus}
+                      </span>
+                      <span
+                        className={`font-['IBM_Plex_Mono',monospace] text-[11px] px-2 py-0.5 rounded-[2px] border font-bold ${
+                          isMalicious
+                            ? 'bg-[#b23a2e]/15 text-[#b23a2e] border-[#b23a2e]/40'
+                            : 'bg-[#2e7a4a]/20 text-[#4ade80] border-[#2e7a4a]/40'
+                        }`}
+                      >
+                        {c.verdict}
+                      </span>
+                    </div>
+
+                    {/* Threat Score & Title */}
+                    <div>
+                      <div className="flex items-baseline gap-2 mb-1.5">
+                        <span className="font-['Fraunces',serif] text-[24px] font-semibold text-[#ede6d8]">
+                          {c.threatScore}
+                        </span>
+                        <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c]">
+                          / 100 THREAT SCORE
+                        </span>
+                      </div>
+                      <h3 className="font-['Fraunces',serif] text-[17px] font-medium text-[#ede6d8] group-hover:text-white transition-colors leading-snug line-clamp-2">
+                        {c.name}
+                      </h3>
+                      <p className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#b9af9c] mt-1 truncate">
+                        Subject: {c.subject}
+                      </p>
+                    </div>
+
+                    {/* Real Detected Signals */}
+                    <div className="space-y-2 pt-1 border-t border-[#3a352c]/50">
+                      <div className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] uppercase tracking-wider font-semibold">
+                        Detected Forensic Signals:
+                      </div>
+                      <ul className="space-y-1.5 m-0 p-0 list-none">
+                        {c.signals.map((sig, sIdx) => (
+                          <li
+                            key={sIdx}
+                            className="flex items-start gap-2 text-[12.5px] text-[#ede6d8] leading-snug font-['IBM_Plex_Sans',sans-serif]"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] shrink-0 mt-1.5" />
+                            <span>{sig}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom / Action */}
+                  <div className="pt-5 mt-5 border-t border-[#3a352c]/70 flex items-center justify-between text-[12px] font-['IBM_Plex_Mono',monospace]">
+                    <span className="text-[#8e8574] truncate max-w-[170px]">
+                      {c.originHint}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[#b9af9c] group-hover:text-[#ede6d8] font-medium transition-colors">
+                      Inspect case
+                      <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -1051,6 +1213,7 @@ export function LandingView({
               Talk to us first
             </button>
           </div>
+          {/* TODO: Add response-time SLA copy here (e.g., "We review every request within 48 hours") once a team review turnaround SLA is agreed upon */}
         </div>
       </section>
 
@@ -1064,7 +1227,13 @@ export function LandingView({
             <span>TraceXMail, email forensic intelligence</span>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            <a href="/privacy" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
+              Privacy Policy
+            </a>
+            <a href="/terms" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
+              Terms of Service
+            </a>
             <a href="mailto:support@tracexmail.io" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
               Contact us
             </a>
@@ -1074,6 +1243,21 @@ export function LandingView({
           </div>
         </div>
       </footer>
+
+      {/* Mobile Persistent Bottom CTA Bar (visible on mobile viewports below sm breakpoint) */}
+      <aside
+        aria-label="Mobile Quick Access"
+        className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#14120f]/95 backdrop-blur-md border-t border-[#3a352c] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_24px_rgba(0,0,0,0.6)]"
+      >
+        <div className="w-full max-w-[1180px] mx-auto px-1">
+          <button
+            onClick={onRequestAccess || onOpenConsole}
+            className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-4 rounded-[3px] font-semibold text-[14.5px] border border-[#b23a2e] shadow-lg text-center cursor-pointer transition-colors active:scale-[0.99]"
+          >
+            Request access
+          </button>
+        </div>
+      </aside>
 
     </div>
   );

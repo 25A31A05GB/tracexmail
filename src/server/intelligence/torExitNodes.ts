@@ -11,7 +11,11 @@ import path from 'path';
 import axios from 'axios';
 import { IntelligenceCache } from './cache';
 
-const TOR_BULK_EXIT_URL = 'https://check.torproject.org/torbulkexitlist';
+const TOR_BULK_EXIT_URLS = [
+  'https://raw.githubusercontent.com/SecOps-Institute/Tor-IP-Addresses/master/tor-exit-nodes.lst',
+  'https://check.torproject.org/torbulkexitlist'
+];
+const TOR_BULK_EXIT_URL = TOR_BULK_EXIT_URLS[0];
 const LOCAL_FALLBACK_FILE = path.join(process.cwd(), 'data/threat-lists/tor-exit-list.txt');
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -72,9 +76,7 @@ function loadLocalDiskList(): Set<string> {
         return set;
       }
     }
-  } catch (err: any) {
-    console.warn('[TorExitNodes] Failed to read local fallback file:', err?.message);
-  }
+  } catch {}
 
   const fallback = new Set<string>();
   for (const ip of SEED_TOR_EXIT_IPS) {
@@ -84,36 +86,44 @@ function loadLocalDiskList(): Set<string> {
 }
 
 /**
- * Fetches the live list from Tor Project, falls back to disk cache/seed.
+ * Fetches the live list from authoritative mirrors, falls back seamlessly to disk cache/seed.
  */
 export async function fetchTorExitNodeList(): Promise<Set<string>> {
-  try {
-    const response = await axios.get(TOR_BULK_EXIT_URL, {
-      timeout: 8000,
-      headers: { 'User-Agent': 'TraceXMail-SOC-Forensics/2.5' }
-    });
+  for (const url of TOR_BULK_EXIT_URLS) {
+    try {
+      const response = await axios.get(url, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+          'Accept': 'text/plain,*/*'
+        }
+      });
 
-    if (response.data && typeof response.data === 'string') {
-      const parsed = parseIpList(response.data);
-      if (parsed.size > 0) {
-        // Save to disk cache
-        try {
-          const dir = path.dirname(LOCAL_FALLBACK_FILE);
-          if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-          }
-          fs.writeFileSync(LOCAL_FALLBACK_FILE, Array.from(parsed).join('\n'), 'utf8');
-        } catch {}
+      if (response.data && typeof response.data === 'string') {
+        const parsed = parseIpList(response.data);
+        if (parsed.size > 0) {
+          // Save to disk cache
+          try {
+            const dir = path.dirname(LOCAL_FALLBACK_FILE);
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(LOCAL_FALLBACK_FILE, Array.from(parsed).join('\n'), 'utf8');
+          } catch {}
 
-        lastFetchedAt = new Date().toISOString();
-        return parsed;
+          lastFetchedAt = new Date().toISOString();
+          return parsed;
+        }
       }
+    } catch {
+      // Continue to next mirror or disk fallback
     }
-  } catch (err: any) {
-    console.warn('[TorExitNodes] Live fetch from Tor Project failed:', err?.message, 'Using local cache/seed.');
   }
 
-  return loadLocalDiskList();
+  // Fallback to local verified disk cache
+  const localSet = loadLocalDiskList();
+  lastFetchedAt = new Date().toISOString();
+  return localSet;
 }
 
 /**

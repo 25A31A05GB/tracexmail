@@ -480,7 +480,7 @@ export function mapBackendCaseToAnalysis(
         ? data.threatScore 
         : (data.overall_risk_score || 0)));
 
-  const rawClassification = (data.classification || data.verdict || data.threatVerdict || data.status || '').toUpperCase();
+  const rawClassification = (data.verdict || data.threatVerdict || data.classification || data.status || '').toUpperCase();
   const resolvedVerdict = rawClassification.includes('PHISH') 
     ? 'PHISHING' 
     : (rawClassification.includes('FRAUD') 
@@ -503,7 +503,7 @@ export function mapBackendCaseToAnalysis(
       ? data.phishing_probability
       : undefined);
 
-  const resolvedClassification = data.classification || data.raw_classification || data.verdict || data.threatVerdict || undefined;
+  const resolvedClassification = data.verdict || data.threatVerdict || data.classification || data.raw_classification || undefined;
   const resolvedBreakdown = data.threatScoreBreakdown || data.threat_score_breakdown || undefined;
 
   return {
@@ -511,6 +511,8 @@ export function mapBackendCaseToAnalysis(
     sessionId: data.session_id || data.id || `session_${Date.now()}`,
     trackingId: data.tracking_id || data.id || `track_${Date.now()}`,
     evidenceId: data.evidence_id || data.evidenceId || generateEvidenceId(),
+    analysisSource: 'server_verified',
+    isClientFallback: false,
     sha256: effectiveHash,
     sha256Hash: effectiveHash,
     custodyHash: effectiveHash,
@@ -547,6 +549,7 @@ export function mapBackendCaseToAnalysis(
     threatScoreBreakdown: resolvedBreakdown,
     probabilities: data.probabilities,
     classification: resolvedClassification,
+    raw_classification: data.raw_classification || data.classification || undefined,
     rawEml: rawContent || data.raw_email || data.rawEml,
     summary: data.summary || data.description || `Forensic analysis complete for ${subject}`,
     why: data.why,
@@ -816,22 +819,28 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
   }
 
   const isPhish = heuristics.length >= 2 || spfStatus === 'FAIL';
-  const riskScore = isPhish ? 94 : 12;
-  const verdict = isPhish ? 'MALICIOUS PHISH' : 'LEGITIMATE';
-  const mlConfidence = isPhish ? 0.978 : 0.015;
+  const riskScore = isPhish ? 75 : 15;
+  const verdict = isPhish ? 'SUSPICIOUS (CLIENT HEURISTIC)' : 'UNVERIFIED (CLIENT PARSER)';
+  const mlConfidence = 0;
+
+  const now = new Date();
+  const formatTime = (offsetMs: number) => {
+    const d = new Date(now.getTime() + offsetMs);
+    return d.toTimeString().split(' ')[0] + '.' + String(d.getMilliseconds()).padStart(3, '0');
+  };
 
   const logs: ForensicLogEntry[] = [
-    { id: 'l1', timestamp: '14:22:01.010', tag: 'INIT', message: `Parsing raw RFC822 stream from ${filename}` },
-    { id: 'l2', timestamp: '14:22:01.042', tag: 'INFO', message: `Extracted ${hops.length} network hops and ${extractedUrls.length} links` },
-    { id: 'l3', timestamp: '14:22:01.088', tag: 'DNS', message: `SPF lookup: evaluated as ${spfStatus}` },
-    { id: 'l4', timestamp: '14:22:01.124', tag: 'SEC', message: `DKIM verification: ${dkimStatus}` },
-    { id: 'l5', timestamp: '14:22:01.170', tag: 'SEC', message: `DMARC evaluation: ${dmarcStatus}` },
-    { id: 'l6', timestamp: '14:22:01.210', tag: 'ML', message: `Random Forest classifier score: ${(mlConfidence * 100).toFixed(1)}%` },
-    { id: 'l7', timestamp: '14:22:01.260', tag: 'GRAPH', message: `Computed geographical relay vector: ${hops.map(h => h.countryCode || '??').join(' -> ')}` },
+    { id: 'l_warn', timestamp: formatTime(0), tag: 'WARN', message: 'NOTICE: Processed via local client-side parser fallback. Server pipeline was unreachable.', highlight: true },
+    { id: 'l1', timestamp: formatTime(10), tag: 'INIT', message: `Parsed local RFC 822 structure from ${filename}` },
+    { id: 'l2', timestamp: formatTime(25), tag: 'INFO', message: `Extracted ${hops.length} network hops and ${extractedUrls.length} links` },
+    { id: 'l3', timestamp: formatTime(40), tag: 'DNS', message: `Header declared SPF status: ${spfStatus}` },
+    { id: 'l4', timestamp: formatTime(55), tag: 'SEC', message: `Header declared DKIM status: ${dkimStatus}` },
+    { id: 'l5', timestamp: formatTime(70), tag: 'SEC', message: `Header declared DMARC status: ${dmarcStatus}` },
+    { id: 'l7', timestamp: formatTime(90), tag: 'GRAPH', message: `Extracted raw relay IP sequence: ${hops.map(h => h.fromIp || '??').join(' -> ')}` },
   ];
 
   if (isPhish) {
-    logs.push({ id: 'l8', timestamp: '14:22:01.300', tag: 'ALERT', message: 'SOC ALERT: Malicious indicators detected, quarantine recommended', highlight: true });
+    logs.push({ id: 'l8', timestamp: formatTime(110), tag: 'ALERT', message: 'CLIENT HEURISTIC: Suspicious indicators detected. Full backend verification recommended.', highlight: true });
   }
 
   const sessionId = `Analysis-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -844,11 +853,13 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     sessionId,
     trackingId,
     evidenceId,
+    analysisSource: 'client_fallback_unverified',
+    isClientFallback: true,
     sha256Hash: sha256,
     custodyHash: sha256,
-    evidenceSource: 'email_upload',
+    evidenceSource: 'client_offline_fallback',
     evidenceReceivedAt: new Date().toISOString(),
-    hashVerified: true,
+    hashVerified: false,
     name: filename,
     analyzedAt: new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC',
     headers: {
@@ -897,17 +908,17 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     mlConfidence,
     rawEml: raw,
     summary: isPhish
-      ? `High-risk email with suspicious indicators: ${heuristics.map(h => h.title).join(', ')}.`
-      : `Clean email with verified authentication headers and low heuristic risk.`,
+      ? `[DEGRADED FALLBACK] Client-side heuristic flagged suspicious indicators: ${heuristics.map(h => h.title).join(', ')}. Server verification required.`
+      : `[DEGRADED FALLBACK] Client-side parse completed. Server-side verification required before evidentiary use.`,
     domain_intelligence: {
       domain: extractDomain(fromEmail) || fromEmail.split('@')[1] || 'domain.com',
-      status: 'ok',
-      registrar: isPhish ? 'NameCheap, Inc.' : 'MarkMonitor Inc.',
-      created_date: isPhish ? '2024-07-04T12:00:00Z' : '2015-03-12T00:00:00Z',
-      expiration_date: isPhish ? '2025-07-04T12:00:00Z' : '2026-03-12T00:00:00Z',
-      domain_age_days: isPhish ? 14 : 3420,
-      is_newly_registered: isPhish,
-      is_typosquat: isPhish,
+      status: 'unverified_client_fallback',
+      registrar: 'Unverified (Backend Offline)',
+      created_date: undefined,
+      expiration_date: undefined,
+      domain_age_days: undefined,
+      is_newly_registered: false,
+      is_typosquat: false,
       typosquat_matched_brand: isPhish ? 'paypal.com' : undefined,
       typosquatting: {
         is_typosquat: isPhish,

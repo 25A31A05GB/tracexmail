@@ -237,6 +237,8 @@ export interface EmailAnalysis {
   sessionId?: string;
   trackingId?: string;
   evidenceId?: string;
+  analysisSource?: 'server_verified' | 'client_fallback_unverified';
+  isClientFallback?: boolean;
   sha256Hash?: string;
   sha256?: string;
   custodyHash?: string;
@@ -266,6 +268,7 @@ export interface EmailAnalysis {
     };
   };
   classification?: string;
+  raw_classification?: string;
   probabilities?: Record<string, number>;
   phishingProbability?: number;
   activeClassifier?: 'logistic_regression' | 'centroid_cosine';

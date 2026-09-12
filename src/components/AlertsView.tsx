@@ -320,7 +320,7 @@ export function AlertsView({
             }`}
           >
             <Radar className="w-4 h-4 text-amber-300 animate-pulse" />
-            <span>Real-World Threat Feeds ({realWorldFeeds.length || 5})</span>
+            <span>Curated Threat Scenarios ({realWorldFeeds.length || 5})</span>
           </button>
 
           <button
@@ -359,7 +359,7 @@ export function AlertsView({
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950 hover:bg-amber-900 border border-amber-800 text-amber-300 text-xs font-semibold transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncingFeeds ? 'animate-spin' : ''}`} />
-              <span>{syncingFeeds ? 'Syncing Feeds...' : 'Sync Threat Intelligence'}</span>
+              <span>{syncingFeeds ? 'Syncing...' : 'Sync Scenarios'}</span>
             </button>
           </div>
         )}
@@ -400,7 +400,7 @@ export function AlertsView({
         </div>
       )}
 
-      {/* TAB 0: REAL-WORLD THREAT FEEDS & DYNAMIC CASES */}
+      {/* TAB 0: REAL-WORLD THREAT SCENARIOS & DYNAMIC CASES */}
       {activeTab === 'realworld' && (
         <div className="space-y-4">
           {/* Header Description Card */}
@@ -408,12 +408,12 @@ export function AlertsView({
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
-                  MULTI-SOURCE INGESTION
+                  CURATED BENCHMARK LIBRARY
                 </span>
-                <span className="text-xs text-slate-400">Live feeds from CISA, OpenPhish, PhishTank, VirusTotal & SOC Honeypots</span>
+                <span className="text-xs text-slate-400">Vetted threat archetypes &amp; IOC campaign signatures (CISA, OpenPhish, PhishTank, VirusTotal)</span>
               </div>
               <p className="text-xs text-slate-300">
-                Click <strong className="text-amber-300">"Triage as Active Case"</strong> to dynamically ingest any verified real-world threat advisory into Supabase as an investigable forensic case with full headers, IOC hashes, and mitigation paths.
+                Click <strong className="text-amber-300">"Triage as Active Case"</strong> to dynamically ingest any verified threat scenario into Supabase as an investigable forensic case with full headers, IOC hashes, and mitigation paths.
               </p>
             </div>
 
@@ -471,12 +471,17 @@ export function AlertsView({
                           </span>
 
                           <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800 text-[10px] font-mono">
-                            Target: {threat.target_brand}
+                            Target: {threat.targeted_brand || threat.target_brand || 'Unknown'}
                           </span>
 
                           <span className="text-xs text-slate-500 font-mono flex items-center gap-1 ml-auto">
                             <Clock className="w-3 h-3" />
-                            {new Date(threat.detected_at).toLocaleString()}
+                            {(() => {
+                              const dateStr = threat.timestamp || threat.detected_at;
+                              if (!dateStr) return 'Recent';
+                              const parsed = new Date(dateStr);
+                              return isNaN(parsed.getTime()) ? 'Recent' : parsed.toLocaleString();
+                            })()}
                           </span>
                         </div>
 
@@ -495,7 +500,9 @@ export function AlertsView({
                             <Link2 className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
                             <div className="truncate">
                               <span className="text-[10px] uppercase text-slate-500 block font-semibold">Attacking Domain</span>
-                              <span className="font-mono text-slate-200 truncate block text-[11px]">{threat.iocs.domains[0]}</span>
+                              <span className="font-mono text-slate-200 truncate block text-[11px]">
+                                {threat.ioc_indicators?.sender_domain || threat.iocs?.domains?.[0] || 'N/A'}
+                              </span>
                             </div>
                           </div>
 
@@ -503,7 +510,9 @@ export function AlertsView({
                             <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
                             <div className="truncate">
                               <span className="text-[10px] uppercase text-slate-500 block font-semibold">Origin IP</span>
-                              <span className="font-mono text-slate-200 truncate block text-[11px]">{threat.iocs.ips[0]}</span>
+                              <span className="font-mono text-slate-200 truncate block text-[11px]">
+                                {threat.ioc_indicators?.sender_ip || threat.iocs?.ips?.[0] || 'N/A'}
+                              </span>
                             </div>
                           </div>
 
@@ -511,15 +520,17 @@ export function AlertsView({
                             <ShieldAlert className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
                             <div className="truncate">
                               <span className="text-[10px] uppercase text-slate-500 block font-semibold">Target Vector</span>
-                              <span className="font-sans text-slate-200 truncate block text-[11px]">{threat.target_brand} Phish</span>
+                              <span className="font-sans text-slate-200 truncate block text-[11px]">
+                                {(threat.targeted_brand || threat.target_brand || 'Target Vector')} Phish
+                              </span>
                             </div>
                           </div>
                         </div>
 
                         {/* Sample Header snippet */}
                         <div className="bg-slate-950 border border-slate-800/60 rounded-lg p-2.5 text-[11px] font-mono text-slate-400 space-y-0.5">
-                          <div className="truncate"><span className="text-slate-500">From:</span> <span className="text-red-300">{threat.sample_headers.from}</span></div>
-                          <div className="truncate"><span className="text-slate-500">Subject:</span> <span className="text-slate-200 font-semibold">{threat.sample_headers.subject}</span></div>
+                          <div className="truncate"><span className="text-slate-500">From:</span> <span className="text-red-300">{threat.sample_headers?.from || 'Unknown'}</span></div>
+                          <div className="truncate"><span className="text-slate-500">Subject:</span> <span className="text-slate-200 font-semibold">{threat.sample_headers?.subject || 'N/A'}</span></div>
                         </div>
                       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, ShieldAlert, Shield, Eye, User, Building2, MailCheck } from 'lucide-react';
+import { signInWithGoogleOAuth } from '../lib/supabaseGoogleAuth';
+import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, ShieldAlert, Shield, Eye, User, Building2, MailCheck, Chrome } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface SignupViewProps {
@@ -23,10 +24,28 @@ export function SignupView({
   const [orgName, setOrgName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('analyst');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToLogin;
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setErrorMsg(null);
+    try {
+      const res = await signInWithGoogleOAuth();
+      if (!res.success) {
+        setErrorMsg(res.error || 'Google authentication failed.');
+      } else if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'An unexpected error occurred during Google sign up.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -229,7 +248,40 @@ export function SignupView({
         )}
 
         {!successMsg && (
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <>
+            {/* Google OAuth Quick Sign Up */}
+            <button
+              id="google-signup-btn"
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading || loading}
+              className="w-full mb-3.5 py-2.5 px-4 rounded-[2px] border border-[var(--line)] bg-[var(--ink-2)] hover:bg-[rgba(237,230,216,0.06)] hover:border-[var(--paper-dim)] text-[var(--paper)] text-xs font-sans font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group shadow-xs"
+            >
+              {googleLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[var(--stamp)]" />
+                  <span>Connecting to Google Account…</span>
+                </>
+              ) : (
+                <>
+                  <Chrome className="w-4 h-4 text-[#ea4335] group-hover:scale-110 transition-transform" />
+                  <span>Sign up with Google</span>
+                  {!isSupabaseConfigured && (
+                    <span className="ml-auto text-[9.5px] font-mono text-[var(--stamp)] bg-[rgba(201,162,39,0.12)] px-1.5 py-0.5 rounded-[2px] border border-[rgba(201,162,39,0.25)]">
+                      Needs Config
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+
+            <div className="flex items-center gap-3 my-3 text-xs text-[var(--line)]">
+              <div className="flex-1 h-px bg-[var(--line)]" />
+              <span className="font-sans text-[11px] text-[var(--paper-muted)] font-medium">or register with email &amp; password</span>
+              <div className="flex-1 h-px bg-[var(--line)]" />
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-name">
@@ -360,6 +412,7 @@ export function SignupView({
               )}
             </button>
           </form>
+          </>
         )}
 
         <div className="mt-4 text-[11.5px] text-[var(--paper-muted)] text-center font-sans">

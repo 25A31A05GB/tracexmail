@@ -1,4 +1,5 @@
 import express from 'express';
+import cors, { CorsOptions } from 'cors';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
@@ -6,6 +7,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer as createViteServer } from 'vite';
+import { OAuth2Client } from 'google-auth-library';
 
 import { extractHopsAndOriginIp, classifyIp } from './src/server/ipExtractor';
 import { resolveIpGeolocation, resolveIpGeolocationWithFallback } from './src/server/geoService';
@@ -88,7 +90,6 @@ import {
   updateQueueItemStatus,
   IngestionQueueItem
 } from './src/server/gmailService';
-import { encryptToken } from './src/utils/crypto';
 import {
   getSlackConfig,
   updateSlackConfig,
@@ -107,6 +108,8 @@ import {
   runRetentionCleanup,
   encryptSensitiveField,
   decryptSensitiveField,
+  encryptToken,
+  decryptToken,
   authenticateUser,
   signUserToken,
   requireAuth,
@@ -1366,12 +1369,81 @@ async function parseRawEmailToAnalysis(
   return { case: newCaseItem, analysis: emailAnalysis, alert: newAlert };
 }
 
+const googleAuthClient = new OAuth2Client();
+
+async function verifyGooglePubSubPushToken(req: express.Request): Promise<boolean> {
+  const pushSecret = process.env.PUBSUB_PUSH_TOKEN;
+  const providedQueryToken = (req.query.token as string) || (req.headers['x-goog-pubsub-token'] as string);
+
+  // 1. Shared secret token check (query parameter ?token=... or x-goog-pubsub-token header)
+  if (pushSecret && providedQueryToken) {
+    const bufA = Buffer.from(providedQueryToken);
+    const bufB = Buffer.from(pushSecret);
+    if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+      return true;
+    }
+  }
+
+  // 2. Google Cloud Pub/Sub OIDC Bearer Token verification
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const idToken = authHeader.slice(7).trim();
+    try {
+      const audience = process.env.PUBSUB_AUDIENCE || `${req.protocol}://${req.get('host')}/api/gmail/pubsub/push`;
+      const ticket = await googleAuthClient.verifyIdToken({
+        idToken,
+        audience: audience.includes(',') ? audience.split(',').map(s => s.trim()) : audience
+      });
+      const payload = ticket.getPayload();
+      if (payload && (payload.iss === 'https://accounts.google.com' || payload.iss === 'accounts.google.com')) {
+        return true;
+      }
+    } catch (oidcErr: any) {
+      console.warn('[GmailPubSub] Google OIDC token verification notice:', oidcErr?.message || oidcErr);
+    }
+  }
+
+  // If PUBSUB_PUSH_TOKEN is not set and we are not in production, log notice and permit local testing
+  if (!pushSecret && process.env.NODE_ENV !== 'production') {
+    console.warn('[GmailPubSub] PUBSUB_PUSH_TOKEN not configured in development environment. Permitting request for local testing.');
+    return true;
+  }
+
+  return false;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
   // Configure reverse proxy trust appropriately for Cloud Run / production load balancers
   app.set('trust proxy', true);
+
+  // Explicit, intentional CORS policy configured from environment allow-list
+  const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || '';
+  const allowedOriginsList = rawAllowedOrigins
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  const corsOptions: CorsOptions = {
+    origin: (requestOrigin, callback) => {
+      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps, or same-origin)
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+      if (allowedOriginsList.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+      // If origin is not on allow-list, disallow cross-origin access (no Access-Control-Allow-Origin header echoed)
+      return callback(null, false);
+    },
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'X-Goog-PubSub-Token']
+  };
+
+  app.use(cors(corsOptions));
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -1384,12 +1456,12 @@ async function startServer() {
   // REST API Endpoints
 
   // Network Intelligence Endpoints (Workstation / Analyst Session Profile)
-  app.get('/api/network-info', handleGetNetworkInfo);
-  app.get('/api/network/ping', handlePingNetwork);
-  app.get('/api/network/bandwidth-payload', handleGetBandwidthPayload);
+  app.get('/api/network-info', publicLimiter, handleGetNetworkInfo);
+  app.get('/api/network/ping', publicLimiter, handlePingNetwork);
+  app.get('/api/network/bandwidth-payload', publicLimiter, handleGetBandwidthPayload);
 
   // Authentication & Profile Verification Endpoint
-  app.get('/api/auth/me', requireAuth, (req, res) => {
+  app.get('/api/auth/me', authenticatedLimiter, requireAuth, (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     res.json({
       status: 'authenticated',
@@ -1404,53 +1476,15 @@ async function startServer() {
   });
 
   // Deprecated fake session endpoint: permanent 410 Gone with instructions
-  app.all('/api/auth/session', (_req, res) => {
+  app.all('/api/auth/session', publicLimiter, (_req, res) => {
     res.status(410).json({
       error: 'The insecure /api/auth/session endpoint has been permanently removed. Authenticate using real Supabase Auth (email/password or SSO) and provide the JWT token in Authorization: Bearer <token>.',
       code: 'ERR_ENDPOINT_GONE'
     });
   });
 
-  app.get('/api/auth/session', (req, res) => {
-    const user = (req as AuthenticatedRequest).user;
-    if (user) {
-      return res.json({
-        status: 'authenticated',
-        user: {
-          ...user,
-          label: user.role === 'admin'
-            ? 'Demo Admin Session'
-            : user.role === 'read_only'
-              ? 'Demo Auditor (Read-Only) Session'
-              : 'Demo Analyst Session'
-        }
-      });
-    }
-
-    // Default to issuing a demo analyst token for client initialization
-    const token = signUserToken({
-      userId: 'usr_analyst_demo',
-      email: 'analyst@acmedefense.sec',
-      organizationId: 'org_acme_soc_01',
-      role: 'analyst'
-    });
-
-    res.json({
-      status: 'authenticated',
-      token,
-      user: {
-        userId: 'usr_analyst_demo',
-        email: 'analyst@acmedefense.sec',
-        organizationId: 'org_acme_soc_01',
-        role: 'analyst',
-        label: 'Demo Analyst Session'
-      },
-      expires_in: '24h'
-    });
-  });
-
   // System Health
-  app.get('/api/health', (_req, res) => {
+  app.get('/api/health', publicLimiter, (_req, res) => {
     const supabase = getSupabaseClient();
     res.json({
       status: 'ok',
@@ -1566,12 +1600,12 @@ async function startServer() {
     }
   };
 
-  app.get('/api/stats', handleStatsResponse);
-  app.get('/api/stats/dashboard', handleStatsResponse);
-  app.get('/api/v1/stats', handleStatsResponse);
+  app.get('/api/stats', publicLimiter, handleStatsResponse);
+  app.get('/api/stats/dashboard', publicLimiter, handleStatsResponse);
+  app.get('/api/v1/stats', publicLimiter, handleStatsResponse);
 
   // Cases Management with RBAC & Supabase persistence
-  app.get('/api/cases', async (req, res) => {
+  app.get('/api/cases', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1610,7 +1644,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/cases/:caseId', async (req, res) => {
+  app.get('/api/cases/:caseId', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1699,7 +1733,7 @@ async function startServer() {
   });
 
   // Case Deletion with RBAC: admin / analyst only
-  app.delete('/api/cases/:caseId', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.delete('/api/cases/:caseId', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1755,7 +1789,7 @@ async function startServer() {
     });
   });
 
-  app.patch('/api/cases/:caseId', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.patch('/api/cases/:caseId', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1827,7 +1861,7 @@ async function startServer() {
   });
 
   // Dynamic Fast Triage Case Status Transition
-  app.post('/api/cases/:caseId/triage', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/cases/:caseId/triage', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1885,7 +1919,7 @@ async function startServer() {
   });
 
   // Explicit Case Closure with Analyst Verdict (C4)
-  app.post('/api/cases/:caseId/close', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/cases/:caseId/close', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -1993,19 +2027,21 @@ async function startServer() {
   // Real-World Threat Feeds & Live Alert APIs
   // ==========================================
 
-  // Get active real-world threat feeds
-  app.get('/api/threat-feeds/real-world', async (req, res) => {
+  // Get curated threat scenario library & benchmark feed
+  app.get('/api/threat-feeds/real-world', publicLimiter, async (req, res) => {
     res.json({
       status: 'active',
+      feed_type: 'curated_benchmark_library',
       count: REAL_WORLD_THREAT_FEED.length,
       feeds: REAL_WORLD_THREAT_FEED,
-      sources: ['CISA Advisories', 'OpenPhish Live Feed', 'PhishTank Community Feed', 'VirusTotal Telemetry', 'SOC Honeypot Inbound'],
+      sources: ['CISA Advisory Archetypes', 'OpenPhish Signatures', 'PhishTank Patterns', 'VirusTotal Telemetry Archetypes', 'Curated Honeypot Scenarios'],
+      description: 'Curated library of verified real-world threat archetypes and IOC campaign benchmarks for SOC testing and incident response evaluation.',
       last_synced: new Date().toISOString()
     });
   });
 
   // Sync / Trigger Real-World Threat Feeds & Broadcast Live Alerts
-  app.post('/api/threat-feeds/sync', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/threat-feeds/sync', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     const user = (req as AuthenticatedRequest).user!;
     const orgId = user?.organizationId || DEFAULT_ORG_ID;
@@ -2058,7 +2094,7 @@ async function startServer() {
   });
 
   // Convert real-world threat feed item into an active dynamic case
-  app.post('/api/threat-feeds/convert-to-case', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/threat-feeds/convert-to-case', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const user = (req as AuthenticatedRequest).user!;
     const { threat_id } = req.body;
     
@@ -2099,7 +2135,7 @@ async function startServer() {
   });
 
   // Populate verified real-world incident cases into Supabase
-  app.post('/api/cases/real-world/seed', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/cases/real-world/seed', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const user = (req as AuthenticatedRequest).user!;
     const createdCases: any[] = [];
 
@@ -2128,7 +2164,7 @@ async function startServer() {
   });
 
   // Classifier Corrections Feedback API (C4)
-  app.get('/api/corrections', requireAuth, async (req, res) => {
+  app.get('/api/corrections', authenticatedLimiter, requireAuth, async (req, res) => {
     const user = (req as AuthenticatedRequest).user!;
     const { status, case_id } = req.query;
     const list = getCorrections({
@@ -2139,7 +2175,7 @@ async function startServer() {
     res.json(list);
   });
 
-  app.get('/api/corrections/:id', requireAuth, async (req, res) => {
+  app.get('/api/corrections/:id', authenticatedLimiter, requireAuth, async (req, res) => {
     const list = getCorrections();
     const found = list.find(c => c.id === req.params.id);
     if (!found) {
@@ -2148,7 +2184,7 @@ async function startServer() {
     res.json(found);
   });
 
-  app.patch('/api/corrections/:id', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.patch('/api/corrections/:id', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const user = (req as AuthenticatedRequest).user!;
     const { status, review_notes, analyst_verdict } = req.body;
     const updated = updateCorrection(req.params.id, {
@@ -2163,7 +2199,7 @@ async function startServer() {
     res.json(updated);
   });
 
-  app.post('/api/corrections', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/corrections', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const user = (req as AuthenticatedRequest).user!;
     const {
       case_id,
@@ -2211,12 +2247,12 @@ async function startServer() {
     res.status(201).json(newCorrection);
   });
 
-  app.post('/api/cases/:caseId/emails', (req, res) => {
+  app.post('/api/cases/:caseId/emails', publicLimiter, (req, res) => {
     res.json({ status: 'success', message: 'Emails added to case' });
   });
 
   // Case Evidence Retrieval with Decryption and RBAC Masking
-  app.get('/api/cases/:caseId/evidence', requireAuth, async (req, res) => {
+  app.get('/api/cases/:caseId/evidence', authenticatedLimiter, requireAuth, async (req, res) => {
     const user = (req as AuthenticatedRequest).user;
     const { caseId } = req.params;
     // Default-deny masking policy: unauthenticated/anonymous requests (!user) must receive masked PII by default for security.
@@ -2263,7 +2299,7 @@ async function startServer() {
   });
 
   // Compliance: Audit Logs API (admin only)
-  app.get('/api/compliance/audit-logs', requireAuth, requireRole(['admin']), async (req, res) => {
+  app.get('/api/compliance/audit-logs', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const { organization_id, case_id, action, search, limit, offset } = req.query;
       const user = (req as AuthenticatedRequest).user!;
@@ -2282,7 +2318,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/compliance/audit-logs', requireAuth, async (req, res) => {
+  app.post('/api/compliance/audit-logs', authenticatedLimiter, requireAuth, async (req, res) => {
     try {
       const user = (req as AuthenticatedRequest).user!;
       const { action, case_id, resource_type, resource_id, details, metadata } = req.body;
@@ -2308,7 +2344,7 @@ async function startServer() {
   });
 
   // Compliance: Retention Cleanup Execution (admin only)
-  app.post('/api/compliance/retention/run', requireAuth, requireRole(['admin']), async (req, res) => {
+  app.post('/api/compliance/retention/run', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const user = (req as AuthenticatedRequest).user!;
       const { organization_id, retention_days, mode } = req.body;
@@ -2328,7 +2364,7 @@ async function startServer() {
   });
 
   // Campaigns Management via Supabase
-  app.get('/api/campaigns', async (req, res) => {
+  app.get('/api/campaigns', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2358,7 +2394,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/campaigns/:campaignId', async (req, res) => {
+  app.get('/api/campaigns/:campaignId', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2384,7 +2420,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/campaigns/:campaignId/timeline', async (req, res) => {
+  app.get('/api/campaigns/:campaignId/timeline', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2446,7 +2482,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/temporal-analysis', async (_req, res) => {
+  app.get('/api/temporal-analysis', publicLimiter, async (_req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2494,7 +2530,7 @@ async function startServer() {
   });
 
   // Cross-Case Graph Correlation
-  app.get(['/api/cases/:caseId/graph', '/api/v1/cases/:caseId/graph'], async (req, res) => {
+  app.get(['/api/cases/:caseId/graph', '/api/v1/cases/:caseId/graph'], publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2548,7 +2584,7 @@ async function startServer() {
   });
 
   // Forensic PDF Report Generation Endpoint
-  app.get(['/api/cases/:caseId/report.pdf', '/api/v1/reports/:caseId', '/api/v1/reports/:caseId.pdf', '/api/cases/:caseId/export/pdf'], async (req, res) => {
+  app.get(['/api/cases/:caseId/report.pdf', '/api/v1/reports/:caseId', '/api/v1/reports/:caseId.pdf', '/api/cases/:caseId/export/pdf'], publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2607,7 +2643,7 @@ async function startServer() {
     doc.end();
   });
 
-  app.get('/api/emails/:emailId/campaign-candidates', async (_req, res) => {
+  app.get('/api/emails/:emailId/campaign-candidates', publicLimiter, async (_req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2616,11 +2652,11 @@ async function startServer() {
     res.json({ candidates: camps || [] });
   });
 
-  app.post('/api/campaigns/:campaignId/members', (_req, res) => {
+  app.post('/api/campaigns/:campaignId/members', publicLimiter, (_req, res) => {
     res.json({ status: 'success', message: 'Members added to campaign' });
   });
 
-  app.post('/api/campaigns', requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+  app.post('/api/campaigns', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2653,7 +2689,7 @@ async function startServer() {
   });
 
   // Global Search
-  app.get('/api/search', async (req, res) => {
+  app.get('/api/search', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -2819,16 +2855,16 @@ Link: https://verify-auth-portal.net/login`;
     });
   };
 
-  app.get('/api/ml/metrics', handleMlMetrics);
-  app.get('/api/v1/ml/metrics', handleMlMetrics);
-  app.get('/api/ml/status', handleMlMetrics);
-  app.get('/api/v1/ml/status', handleMlMetrics);
-  app.get('/api/ml/semantic-status', (_req, res) => {
+  app.get('/api/ml/metrics', publicLimiter, handleMlMetrics);
+  app.get('/api/v1/ml/metrics', publicLimiter, handleMlMetrics);
+  app.get('/api/ml/status', publicLimiter, handleMlMetrics);
+  app.get('/api/v1/ml/status', publicLimiter, handleMlMetrics);
+  app.get('/api/ml/semantic-status', publicLimiter, (_req, res) => {
     res.json(getLocalEmbeddingModelStatus());
   });
 
   // Dedicated Live Domain Intelligence endpoint
-  app.get(['/api/v1/cases/:caseId/domain-intelligence', '/api/domain-intelligence/:domain'], async (req, res) => {
+  app.get(['/api/v1/cases/:caseId/domain-intelligence', '/api/domain-intelligence/:domain'], publicLimiter, async (req, res) => {
     let domain = req.params.domain || (req.params.caseId?.includes('.') ? req.params.caseId : '');
     if (!domain) {
       const supabase = getSupabaseClient();
@@ -2851,7 +2887,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // --- Standardized Forensic Intelligence Endpoints ---
-  app.get('/api/intelligence/ip/:ip', async (req, res) => {
+  app.get('/api/intelligence/ip/:ip', publicLimiter, async (req, res) => {
     try {
       const result = await enrichIpFull(req.params.ip);
       res.json(result);
@@ -2860,7 +2896,7 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  app.get('/api/intelligence/domain/:domain', async (req, res) => {
+  app.get('/api/intelligence/domain/:domain', publicLimiter, async (req, res) => {
     try {
       const result = await resolveIntelligenceDomain(req.params.domain);
       res.json(result);
@@ -2869,7 +2905,7 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  app.get('/api/intelligence/dns/:domain', async (req, res) => {
+  app.get('/api/intelligence/dns/:domain', publicLimiter, async (req, res) => {
     try {
       const result = await resolveIntelligenceDns(req.params.domain);
       res.json(result);
@@ -2878,7 +2914,7 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  app.get('/api/intelligence/rdap/:domain', async (req, res) => {
+  app.get('/api/intelligence/rdap/:domain', publicLimiter, async (req, res) => {
     try {
       const result = await resolveIntelligenceRdap(req.params.domain);
       res.json(result);
@@ -2887,7 +2923,7 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  app.get('/api/intelligence/status', (_req, res) => {
+  app.get('/api/intelligence/status', publicLimiter, (_req, res) => {
     const rateLimit = providerRateLimiter.getUsage('maxmind-geolite');
     const mmdbPath = process.env.MAXMIND_CITY_DB_PATH || path.join(process.cwd(), 'data', 'maxmind', 'GeoLite2-City.mmdb');
     const hasMmdb = fs.existsSync(mmdbPath);
@@ -2929,7 +2965,7 @@ Link: https://verify-auth-portal.net/login`;
     });
   });
 
-  app.post('/api/intelligence/cache/clear', (req, res) => {
+  app.post('/api/intelligence/cache/clear', publicLimiter, (req, res) => {
     const scope = req.body?.scope || 'all';
     if (scope === 'all' || scope === 'geoip') geoIpCache.clear();
     if (scope === 'all' || scope === 'asn') asnCache.clear();
@@ -2951,7 +2987,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // Dedicated Origin Intelligence & IP Geolocation endpoint (handling RFC 1918 & public IPs)
-  app.get(['/api/origin-intelligence/:ip', '/api/v1/lookup-ip/:ip', '/api/ip/:ip'], async (req, res) => {
+  app.get(['/api/origin-intelligence/:ip', '/api/v1/lookup-ip/:ip', '/api/ip/:ip'], publicLimiter, async (req, res) => {
     const ip = req.params.ip;
     const geo = await resolveIpGeolocation(ip);
 
@@ -3005,7 +3041,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // Dedicated MaxMind Status & Inventory endpoint
-  app.get('/api/maxmind/status', (_req, res) => {
+  app.get('/api/maxmind/status', publicLimiter, (_req, res) => {
     const maxmindDataDir = path.join(process.cwd(), 'data', 'maxmind');
     const files = [
       'README.md',
@@ -3045,7 +3081,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // Dedicated MaxMind Refresh endpoint (trigger background DB download / update)
-  app.post(['/api/maxmind/refresh', '/api/v1/maxmind/refresh'], async (_req, res) => {
+  app.post(['/api/maxmind/refresh', '/api/v1/maxmind/refresh'], authenticatedLimiter, requireAuth, requireRole(['admin']), async (_req, res) => {
     try {
       const refreshed = await refreshMaxMindDatabases();
       maxMindDb.initReaders();
@@ -3060,7 +3096,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // Dedicated MaxMind README Documentation endpoint
-  app.get('/api/maxmind/readme', (_req, res) => {
+  app.get('/api/maxmind/readme', publicLimiter, (_req, res) => {
     const readmePath = path.join(process.cwd(), 'data', 'maxmind', 'README.md');
     if (fs.existsSync(readmePath)) {
       const content = fs.readFileSync(readmePath, 'utf-8');
@@ -3075,7 +3111,7 @@ Link: https://verify-auth-portal.net/login`;
   // ==========================================
 
   // 1. Get Gmail Integration & Quarantine Status
-  app.get('/api/gmail/status', (req, res) => {
+  app.get('/api/gmail/status', publicLimiter, (req, res) => {
     const userEmail = (req.query.user_email as string) || (req.headers['x-user-email'] as string);
     res.json(getGmailStatus(userEmail));
   });
@@ -3090,7 +3126,7 @@ Link: https://verify-auth-portal.net/login`;
   }
 
   // 2. Start Gmail OAuth Flow
-  app.get(['/api/gmail/oauth/start', '/api/auth/url'], (req, res) => {
+  app.get(['/api/gmail/oauth/start', '/api/auth/url'], publicLimiter, (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
     const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
@@ -3107,7 +3143,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 2a. Refresh OAuth Permissions & Reset Scopes
-  app.post('/api/gmail/oauth/refresh-permissions', async (req, res) => {
+  app.post('/api/gmail/oauth/refresh-permissions', authenticatedLimiter, async (req, res) => {
     try {
       const { scopes, expires_in_seconds } = req.body || {};
       const updatedScopes = refreshOAuthPermissionsState({
@@ -3135,7 +3171,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 2a-2. Toggle OAuth Scope Simulation (for testing degraded or missing permissions)
-  app.post('/api/gmail/oauth/toggle-scope', (req, res) => {
+  app.post('/api/gmail/oauth/toggle-scope', authenticatedLimiter, (req, res) => {
     try {
       const { scope, granted } = req.body;
       if (!scope) {
@@ -3312,11 +3348,11 @@ Link: https://verify-auth-portal.net/login`;
   };
 
   // Mount callback route for GET and POST (supporting /api/v1/gmail/callback and legacy aliases)
-  app.get(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback', '/auth/callback'], handleGmailOAuthCallback);
-  app.post(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback'], handleGmailOAuthCallback);
+  app.get(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback'], publicLimiter, handleGmailOAuthCallback);
+  app.post(['/api/v1/gmail/callback', '/oauth/gmail/callback', '/api/oauth/gmail/callback'], publicLimiter, handleGmailOAuthCallback);
 
   // 2c. Generic OAuth 2.0 Authorization Endpoint (Consent decision handler)
-  app.post('/api/oauth/v1/authorize', (req, res) => {
+  app.post('/api/oauth/v1/authorize', publicLimiter, (req, res) => {
     const { client_id, redirect_uri, state, scope, response_type, user_id, user_email, decision } = req.body;
 
     if (!redirect_uri) {
@@ -3348,7 +3384,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 2d. Generic OAuth 2.0 Token Exchange Endpoint (/oauth/token)
-  app.post(['/api/oauth/v1/token', '/oauth/token'], (req, res) => {
+  app.post(['/api/oauth/v1/token', '/oauth/token'], publicLimiter, (req, res) => {
     const { grant_type, code, client_id, client_secret, redirect_uri } = req.body;
 
     if (grant_type !== 'authorization_code') {
@@ -3406,11 +3442,11 @@ Link: https://verify-auth-portal.net/login`;
     }
   };
 
-  app.post('/api/gmail/watch/start', handleStartWatch);
-  app.post('/api/gmail/watch', handleStartWatch);
+  app.post('/api/gmail/watch/start', authenticatedLimiter, handleStartWatch);
+  app.post('/api/gmail/watch', authenticatedLimiter, handleStartWatch);
 
   // 4. Stop Gmail users.watch() endpoint
-  app.post('/api/gmail/watch/stop', async (req, res) => {
+  app.post('/api/gmail/watch/stop', authenticatedLimiter, async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
@@ -3428,7 +3464,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 5. Get Gmail Watch Status
-  app.get('/api/gmail/watch/status', (_req, res) => {
+  app.get('/api/gmail/watch/status', publicLimiter, (_req, res) => {
     const status = getGmailStatus();
     res.json({
       status: 'ok',
@@ -3439,7 +3475,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 6. Connect Real Gmail Token
-  app.post('/api/gmail/connect-token', async (req, res) => {
+  app.post('/api/gmail/connect-token', authenticatedLimiter, async (req, res) => {
     try {
       const { access_token, refresh_token, email, expires_in_seconds, org_id } = req.body;
       if (!access_token || !email) {
@@ -3468,7 +3504,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 6b. Gmail Real Live Sync / Polling
-  app.post('/api/gmail/poll-now', async (req, res) => {
+  app.post('/api/gmail/poll-now', authenticatedLimiter, async (req, res) => {
     try {
       const userEmail = req.body?.user_email || req.body?.email || (req.headers['x-user-email'] as string);
       const authHeader = req.headers.authorization;
@@ -3562,7 +3598,7 @@ Link: https://verify-auth-portal.net/login`;
   });
 
   // 6c. Ingestion Analysis Queue Endpoint
-  app.get('/api/gmail/ingestion-queue', (_req, res) => {
+  app.get('/api/gmail/ingestion-queue', publicLimiter, (_req, res) => {
     const queue = getIngestionQueue();
     const queuedCount = queue.filter(q => q.status === 'QUEUED').length;
     const analyzingCount = queue.filter(q => q.status === 'ANALYZING').length;
@@ -3584,7 +3620,15 @@ Link: https://verify-auth-portal.net/login`;
 
   // 7. Cloud Pub/Sub Push Webhook Receiver (Sub-Second Inbound Interception)
   // Receives push notifications from Google Cloud Pub/Sub triggered by Gmail users.watch()
-  app.post('/api/gmail/pubsub/push', async (req, res) => {
+  app.post('/api/gmail/pubsub/push', publicLimiter, async (req, res) => {
+    const isAuthorized = await verifyGooglePubSubPushToken(req);
+    if (!isAuthorized) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or missing Google Cloud Pub/Sub verification token.'
+      });
+    }
+
     try {
       const pushResult = await handlePubSubPush(req.body);
 
@@ -3636,7 +3680,7 @@ https://corp-defense-notice.info/login/sso-verification`;
   });
 
   // 8. Test Cloud Pub/Sub Push Webhook (Simulates Pub/Sub message envelope from Google Cloud)
-  app.post('/api/gmail/pubsub/test-push', async (req, res) => {
+  app.post('/api/gmail/pubsub/test-push', authenticatedLimiter, async (req, res) => {
     try {
       const emailAddress = req.body?.emailAddress || 'security-audit@tracexmail-enterprise.internal';
       const historyId = String(Date.now());
@@ -3707,7 +3751,7 @@ All systems operating normally. Zero critical intrusions detected in the past 24
   });
 
   // 9. Simulate Inbound Push Interception & Quarantine Gate Test
-  app.post('/api/gmail/simulate-inbound', async (req, res) => {
+  app.post('/api/gmail/simulate-inbound', authenticatedLimiter, async (req, res) => {
     try {
       const isMalicious = req.body?.is_malicious ?? true;
       const customSubject = req.body?.subject;
@@ -3758,13 +3802,13 @@ Thanks!`;
   });
 
   // 10. Update Quarantine Configuration
-  app.post('/api/gmail/quarantine/config', (req, res) => {
+  app.post('/api/gmail/quarantine/config', authenticatedLimiter, requireAuth, requireRole(['admin']), (req, res) => {
     const updated = updateQuarantineConfig(req.body);
     res.json({ status: 'ok', quarantine: updated });
   });
 
   // 11. Get Quarantine Audit Log (with Supabase DB persistence fallback)
-  app.get('/api/gmail/quarantine/logs', async (_req, res) => {
+  app.get('/api/gmail/quarantine/logs', authenticatedLimiter, requireAuth, async (_req, res) => {
     try {
       const logs = await fetchQuarantineAuditLogs();
       res.json({ logs });
@@ -3774,18 +3818,18 @@ Thanks!`;
   });
 
   // 12. Update Watch Configuration
-  app.post('/api/gmail/watch/config', (req, res) => {
+  app.post('/api/gmail/watch/config', authenticatedLimiter, requireAuth, requireRole(['admin']), (req, res) => {
     const updated = updateWatchConfig(req.body);
     res.json({ status: 'ok', watch: updated });
   });
 
   // 13. Disconnect Gmail
-  app.post('/api/gmail/disconnect', (_req, res) => {
+  app.post('/api/gmail/disconnect', authenticatedLimiter, requireAuth, requireRole(['admin']), (_req, res) => {
     res.json(disconnectGmail());
   });
 
   // 14. Get Live Synced & Analyzed Gmail Inbound Stream
-  app.get('/api/gmail/synced-emails', async (req, res) => {
+  app.get('/api/gmail/synced-emails', publicLimiter, async (req, res) => {
     try {
       let emails = getSyncedEmails();
       const status = getGmailStatus();
@@ -4130,12 +4174,12 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     });
   };
 
-  app.get('/api/v1/cases/:caseId/ai-narrative', handleGroqNarrative);
-  app.post('/api/v1/cases/:caseId/ai-narrative', handleGroqNarrative);
-  app.post('/api/ai-summary', handleGroqNarrative);
+  app.get('/api/v1/cases/:caseId/ai-narrative', publicLimiter, handleGroqNarrative);
+  app.post('/api/v1/cases/:caseId/ai-narrative', publicLimiter, handleGroqNarrative);
+  app.post('/api/ai-summary', publicLimiter, handleGroqNarrative);
 
   // Alerts via Supabase
-  app.get('/api/alerts', async (req, res) => {
+  app.get('/api/alerts', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -4158,7 +4202,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     }
   });
 
-  app.patch('/api/alerts/:alertId/read', async (req, res) => {
+  app.patch('/api/alerts/:alertId/read', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -4174,7 +4218,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     res.json({ status: 'success', alert: data });
   });
 
-  app.post('/api/alerts/mark-all-read', requireAuth, async (req, res) => {
+  app.post('/api/alerts/mark-all-read', authenticatedLimiter, requireAuth, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
@@ -4207,10 +4251,10 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     });
   };
 
-  app.get('/api/slack/status', handleSlackStatus);
-  app.get('/api/alerts/slack/status', handleSlackStatus);
+  app.get('/api/slack/status', publicLimiter, handleSlackStatus);
+  app.get('/api/alerts/slack/status', publicLimiter, handleSlackStatus);
 
-  app.post('/api/slack/config', (req, res) => {
+  app.post('/api/slack/config', authenticatedLimiter, requireAuth, requireRole(['admin']), (req, res) => {
     const { bot_token, channel_id, webhook_url, min_severity } = req.body || {};
     const updated = updateSlackConfig({
       ...(bot_token !== undefined && { botToken: String(bot_token).trim() }),
@@ -4236,10 +4280,10 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     res.status(result.success ? 200 : (result.statusCode || 200)).json(result);
   };
 
-  app.post('/api/slack/test', handleSlackTest);
-  app.post('/api/alerts/slack/test', handleSlackTest);
+  app.post('/api/slack/test', authenticatedLimiter, requireAuth, requireRole(['admin']), handleSlackTest);
+  app.post('/api/alerts/slack/test', authenticatedLimiter, requireAuth, requireRole(['admin']), handleSlackTest);
 
-  app.get('/api/slack/deliveries', async (_req, res) => {
+  app.get('/api/slack/deliveries', publicLimiter, async (_req, res) => {
     try {
       const deliveries = await fetchSlackDeliveries();
       res.json(deliveries);
@@ -4249,7 +4293,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   });
 
   // Email Alert Delivery Logs from Supabase email_alert_logs
-  app.get(['/api/alerts/email/logs', '/api/email/logs'], async (_req, res) => {
+  app.get(['/api/alerts/email/logs', '/api/email/logs'], publicLimiter, async (_req, res) => {
     try {
       const logs = await fetchEmailAlertLogs();
       res.json({ logs });
@@ -4274,7 +4318,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   }> = [];
 
   // Team & RBAC Management Endpoints (wired to profiles and team_invitations in Supabase)
-  app.get('/api/team/members', async (_req, res) => {
+  app.get('/api/team/members', publicLimiter, async (_req, res) => {
     const defaultRoster = [
       { id: 'mem_001', name: 'Robert Simmons', email: 'r.simmons@acmedefense.sec', role: 'admin', status: 'ACTIVE', lastActive: 'Just now' },
       { id: 'mem_002', name: 'Jane Lopez', email: 'j.lopez@acmedefense.sec', role: 'analyst', status: 'ACTIVE', lastActive: '12m ago' },
@@ -4356,7 +4400,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   });
 
   // Provision new Employee Account with credentials (ID & Password) for Organization
-  app.post('/api/team/create-employee', async (req, res) => {
+  app.post('/api/team/create-employee', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     const { name, email, password, role, employeeId, organizationId } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
@@ -4439,7 +4483,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   });
 
   // Verify employee credentials during sign in
-  app.post('/api/team/verify-employee-auth', (req, res) => {
+  app.post('/api/team/verify-employee-auth', publicLimiter, (req, res) => {
     const { email, password } = req.body || {};
     if (!email || !password) {
       return res.status(400).json({ authenticated: false, error: 'Email and password required' });
@@ -4468,7 +4512,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     return res.status(401).json({ authenticated: false, error: 'Invalid employee credentials' });
   });
 
-  app.post('/api/team/invite', async (req, res) => {
+  app.post('/api/team/invite', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     const { email, role, name } = req.body || {};
     if (!email) return res.status(400).json({ error: 'Email is required' });
 
@@ -4512,7 +4556,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     });
   });
 
-  app.delete('/api/team/invite/:id', async (req, res) => {
+  app.delete('/api/team/invite/:id', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     const inviteId = req.params.id;
     const memIdx = memoryInvitations.findIndex(i => i.id === inviteId);
     if (memIdx >= 0) memoryInvitations.splice(memIdx, 1);
@@ -4528,7 +4572,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     res.json({ status: 'success', revoked: inviteId });
   });
 
-  app.post('/api/slack/send-case/:caseId', async (req, res) => {
+  app.post('/api/slack/send-case/:caseId', authenticatedLimiter, requireAuth, async (req, res) => {
     const caseId = req.params.caseId;
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -4573,7 +4617,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     res.json({ status: resultLog.status, log: resultLog, emailDispatch });
   });
 
-  app.get('/api/alerts/email/config', (_req, res) => {
+  app.get('/api/alerts/email/config', publicLimiter, (_req, res) => {
     const cfg = getEmailAlertConfig();
     res.json({
       enabled: cfg.enabled,
@@ -4585,7 +4629,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     });
   });
 
-  app.post('/api/alerts/email/test', async (req, res) => {
+  app.post('/api/alerts/email/test', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     const { subject, sender, threatScore, verdict } = req.body || {};
     const result = await sendEmailAlert({
       subject: subject || 'TEST: Phishing Attack Simulation',
@@ -4659,7 +4703,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     }
   });
 
-  app.post('/api/virustotal/enrich', async (req, res) => {
+  app.post('/api/virustotal/enrich', authenticatedLimiter, async (req, res) => {
     try {
       const { urls = [], attachments = [], existing_logs = [] } = req.body;
       const result = await enrichWithVirusTotal({
@@ -4689,6 +4733,90 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
         new_vt_logs: []
       });
     }
+  });
+
+  // Auth status and diagnostics endpoint
+  app.get('/api/auth/status', publicLimiter, (_req, res) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+    const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+    const googleAuthConfigured = Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID);
+    res.json({
+      status: 'ok',
+      supabaseConfigured,
+      googleAuthConfigured,
+      supabaseUrl: supabaseUrl || null,
+      supabaseAnonKey: supabaseAnonKey || null,
+      message: supabaseConfigured
+        ? 'Supabase credentials detected'
+        : 'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY not set'
+    });
+  });
+
+  // Dedicated OAuth popup callback handler for Supabase and Google OAuth
+  app.get('/auth/callback', publicLimiter, (_req, res) => {
+    res.setHeader('Content-Type', 'text/html');
+    res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Authenticating with TraceXMail</title>
+  <style>
+    body {
+      background: #13110e;
+      color: #ede6d8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      text-align: center;
+      padding: 28px 36px;
+      border: 1px solid #3a352c;
+      background: #1a1712;
+      border-radius: 4px;
+      max-width: 420px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      border: 2px solid #3a352c;
+      border-top-color: #c9a227;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <div style="font-size: 14px; font-weight: 500; letter-spacing: 0.02em;">Completing Authentication…</div>
+    <div style="font-size: 12px; color: #9d9282; margin-top: 6px;">Closing window and returning to TraceXMail…</div>
+  </div>
+  <script>
+    try {
+      if (window.opener) {
+        window.opener.postMessage({
+          type: 'SUPABASE_AUTH_SUCCESS',
+          hash: window.location.hash,
+          search: window.location.search
+        }, '*');
+        setTimeout(function() { window.close(); }, 600);
+      } else {
+        window.location.href = '/' + window.location.search + window.location.hash;
+      }
+    } catch (e) {
+      window.location.href = '/';
+    }
+  </script>
+</body>
+</html>`);
   });
 
   // Centralized Error Handling Middleware (Catches and sanitizes all uncaught API errors)
@@ -4746,7 +4874,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     ws.send(JSON.stringify({ type: 'CONNECTED', message: 'TraceXMail Live Alert Feed Active' }));
   });
 
-  app.post('/api/alerts/broadcast', (req, res) => {
+  app.post('/api/alerts/broadcast', authenticatedLimiter, requireAuth, requireRole(['admin']), (req, res) => {
     const { title = 'New Threat Alert', description = 'Automated alert trigger', severity = 'HIGH', category = 'THREAT_DETECTION' } = req.body;
     const newAlert = {
       id: `alt_${Date.now()}`,

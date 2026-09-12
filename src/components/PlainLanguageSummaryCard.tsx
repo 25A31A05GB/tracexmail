@@ -68,6 +68,8 @@ export function PlainLanguageSummaryCard({
       plainExplanation = `This email originated from an anonymized relay or suspicious hosting provider (${anomalousHop.city || 'unverified region'}, ${anomalousHop.country || 'anomalous network'}) rather than an authorized enterprise mail server.`;
     } else if (hasDangerousAtts) {
       plainExplanation = `This email includes dangerous file attachments (${dangerousAtts[0].filename}) engineered to execute malicious scripts or malware.`;
+    } else if (!isTyposquat && !hasSuspiciousUrls && !anomalousHop && !hasDangerousAtts) {
+      plainExplanation = `This email was flagged by automated classification as potentially malicious, but no specific technical evidence (spoofed domain, malicious links, dangerous attachments, or anomalous routing) was found — manual review is recommended before taking action.`;
     } else {
       plainExplanation = `This email exhibits strong indicators of a targeted phishing or wire fraud lure designed to compromise credentials.`;
     }

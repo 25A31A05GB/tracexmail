@@ -1,5 +1,5 @@
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
-import { encryptToken, decryptToken } from '../utils/crypto';
+import { encryptToken, decryptToken } from './compliance';
 
 export interface SlackConfig {
   botToken: string;

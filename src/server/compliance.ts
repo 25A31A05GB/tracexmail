@@ -696,16 +696,43 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
               authMethod: 'jwt'
             };
           } else {
-            // Profile row missing or not yet populated: use metadata or fallback org
-            const orgId = authUser.user_metadata?.organization_id || authUser.app_metadata?.organization_id || '00000000-0000-0000-0000-000000000000';
-            const role = (authUser.user_metadata?.role || authUser.app_metadata?.role || 'analyst') as UserRole;
-            userContext = {
-              userId: authUser.id,
-              email: authUser.email || '',
-              organizationId: orgId,
-              role: role,
-              authMethod: 'jwt'
-            };
+            // SECURITY DEFENSE: Profile row missing or not yet populated.
+            // NEVER trust user_metadata or app_metadata for authorization, role, or organization_id.
+            // Supabase user_metadata is client-writable via supabase.auth.updateUser().
+            // Auto-provision a profile row strictly with the lowest-privilege role ('read_only')
+            // using the server service-role client, or treat as unauthenticated if provisioning fails.
+            const defaultOrg = '00000000-0000-0000-0000-000000000000';
+            const lowestRole: UserRole = 'read_only';
+
+            try {
+              const { data: newProfile, error: upsertErr } = await supabaseAdmin
+                .from('profiles')
+                .upsert({
+                  id: authUser.id,
+                  email: authUser.email || '',
+                  role: lowestRole,
+                  organization_id: defaultOrg,
+                  updated_at: new Date().toISOString()
+                })
+                .select('organization_id, role')
+                .maybeSingle();
+
+              if (!upsertErr && newProfile && newProfile.role === lowestRole) {
+                userContext = {
+                  userId: authUser.id,
+                  email: authUser.email || '',
+                  organizationId: newProfile.organization_id || defaultOrg,
+                  role: lowestRole,
+                  authMethod: 'jwt'
+                };
+              } else {
+                console.warn(`[Auth] User ${authUser.id} has no valid profiles row and auto-provisioning failed:`, upsertErr?.message);
+                userContext = null;
+              }
+            } catch (createErr) {
+              console.warn(`[Auth] Profile creation exception for user ${authUser.id}:`, createErr);
+              userContext = null;
+            }
           }
         }
       } catch (authErr) {

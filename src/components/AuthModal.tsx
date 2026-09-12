@@ -1,26 +1,60 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2 } from 'lucide-react';
+import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Chrome, Loader2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { signInWithGoogleOAuth } from '../lib/supabaseGoogleAuth';
 import { initializeSession, SessionUser, signOutUser } from '../lib/api';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser?: SessionUser | null;
+  initialMode?: 'signin' | 'signup';
 }
 
-export function AuthModal({ isOpen, onClose, currentUser = null }: AuthModalProps) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = 'signin' }: AuthModalProps) {
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'analyst' | 'admin' | 'read_only'>('analyst');
   const [organizationId, setOrganizationId] = useState('org_acme_soc_01');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialMode) setMode(initialMode);
+      setSubmitted(false);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+    }
+  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
+
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await signInWithGoogleOAuth();
+      if (!res.success) {
+        setErrorMessage(res.error || 'Google authentication failed.');
+      } else {
+        setSuccessMessage('Signed in with Google successfully.');
+        await initializeSession();
+        setTimeout(() => {
+          onClose();
+        }, 800);
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed initiating Google sign in.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -90,11 +124,9 @@ export function AuthModal({ isOpen, onClose, currentUser = null }: AuthModalProp
           }
         }
 
-        setSuccessMessage('Account created successfully! Check your email if email confirmation is required, or sign in now.');
+        setSuccessMessage('Account created successfully! Verification link or confirmation dispatched.');
         await initializeSession();
-        setTimeout(() => {
-          onClose();
-        }, 1200);
+        setSubmitted(true);
       } else {
         // Sign In
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -131,25 +163,66 @@ export function AuthModal({ isOpen, onClose, currentUser = null }: AuthModalProp
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-100">
-                {currentUser ? 'Forensic Identity & Access' : mode === 'signin' ? 'SOC Analyst Sign In' : 'Register SOC Account'}
+                {submitted
+                  ? 'Access Request Submitted'
+                  : currentUser
+                  ? 'Forensic Identity & Access'
+                  : mode === 'signin'
+                  ? 'SOC Analyst Sign In'
+                  : 'Register SOC Account'}
               </h3>
               <p className="text-xs text-slate-400">
-                Supabase Auth • Multi-Tenant RBAC &amp; Tenant Isolation
+                {submitted
+                  ? 'TraceXMail SOC Workspace Access'
+                  : 'Supabase Auth • Multi-Tenant RBAC & Tenant Isolation'}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {!submitted && (
+            <button
+              onClick={() => {
+                setSubmitted(false);
+                onClose();
+              }}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          {/* Active Session Card if User is logged in */}
-          {currentUser ? (
+          {submitted ? (
+            <div className="space-y-5 py-2">
+              <div className="p-6 rounded-lg bg-emerald-950/30 border border-emerald-800/60 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-900/40 border border-emerald-500/50 text-emerald-400 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-6 h-6" />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-base font-semibold text-slate-100">
+                    Access Request Submitted
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+                    Your access request has been successfully submitted. A team member will follow up by email at <span className="font-mono text-cyan-300 font-medium">{email || 'your email'}</span> with your workspace clearance and next steps.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmitted(false);
+                    onClose();
+                  }}
+                  className="w-full py-2.5 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : currentUser ? (
             <div className="space-y-4">
               <div className="p-4 rounded-lg bg-emerald-950/30 border border-emerald-800/60 space-y-2">
                 <div className="flex items-center gap-2 text-emerald-400 font-medium text-sm">
@@ -228,6 +301,33 @@ export function AuthModal({ isOpen, onClose, currentUser = null }: AuthModalProp
                 >
                   Create Account
                 </button>
+              </div>
+
+              {/* Google OAuth Option */}
+              <button
+                id="modal-google-auth-btn"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-lg text-xs text-slate-200 font-medium flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {googleLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+                    <span>Connecting to Google…</span>
+                  </>
+                ) : (
+                  <>
+                    <Chrome className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Continue with Google</span>
+                  </>
+                )}
+              </button>
+
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <div className="flex-1 h-px bg-slate-800" />
+                <span>or continue with email</span>
+                <div className="flex-1 h-px bg-slate-800" />
               </div>
 
               {errorMessage && (

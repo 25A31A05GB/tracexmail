@@ -54,6 +54,8 @@ export interface StandardizedVerdict {
   recommendedAction: string;
 }
 
+export const TEXT_LABEL_MALICIOUS_MIN_SCORE = 60;
+
 /**
  * Centrally resolves and standardizes an email analysis verdict, threat score, and severity.
  * Pulls directly from backend-provided fields without re-deriving or guessing disparate logic.
@@ -87,14 +89,18 @@ export function getStandardizedVerdict(analysis?: Partial<EmailAnalysis> | null)
   // If score is verified low (<35/100), composite risk takes precedence over text-only ML labels
   const isScoreLow = hasScore && score < 35 && !isUncertain;
 
+  const hasMaliciousTextLabel =
+    rawVerdict.includes('PHISH') ||
+    rawVerdict.includes('FRAUD') ||
+    rawVerdict.includes('MALICIOUS') ||
+    rawVerdict.includes('IMPERSONAT');
+
   const isMalicious =
     !isScoreLow &&
     !isUncertain &&
-    (rawVerdict.includes('PHISH') ||
-    rawVerdict.includes('FRAUD') ||
-    rawVerdict.includes('MALICIOUS') ||
-    rawVerdict.includes('IMPERSONAT') ||
-    (hasScore && score >= 75));
+    (hasScore
+      ? (hasMaliciousTextLabel && score >= TEXT_LABEL_MALICIOUS_MIN_SCORE) || score >= 75
+      : hasMaliciousTextLabel);
 
   const isClean =
     isScoreLow ||
@@ -116,7 +122,11 @@ export function getStandardizedVerdict(analysis?: Partial<EmailAnalysis> | null)
   let verdict = isScoreLow ? 'LEGITIMATE' : (analysis?.threatVerdict || analysis?.verdict || analysis?.classification);
   if (isUncertain) {
     verdict = 'UNCERTAIN';
-  } else if (!verdict || (isScoreLow && (verdict.includes('PHISH') || verdict.includes('MALICIOUS')))) {
+  } else if (
+    !verdict ||
+    (isScoreLow && (verdict.includes('PHISH') || verdict.includes('MALICIOUS'))) ||
+    (!isMalicious && (verdict.toUpperCase().includes('PHISH') || verdict.toUpperCase().includes('MALICIOUS') || verdict.toUpperCase().includes('FRAUD') || verdict.toUpperCase().includes('IMPERSONAT')))
+  ) {
     verdict = isMalicious ? 'MALICIOUS PHISH' : isSuspicious ? 'SUSPICIOUS' : 'LEGITIMATE';
   }
 
