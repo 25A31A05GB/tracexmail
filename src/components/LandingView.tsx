@@ -1218,35 +1218,58 @@ export function LandingView({
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-[#3a352c] py-9">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[13.5px] text-[#b9af9c]">
+      <footer id="landing-footer" className="border-t border-[#3a352c] bg-[#100e0c]/80 backdrop-blur-sm py-10">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[13.5px] text-[#b9af9c]">
           <div className="flex items-center gap-2.5">
             <div className="w-4 h-4 rounded-full border border-[#b23a2e] relative shrink-0">
               <div className="absolute inset-[3px] rounded-full bg-[#b23a2e]" />
             </div>
-            <span>TraceXMail, email forensic intelligence</span>
+            <span className="font-medium tracking-tight text-[#ede6d8]">TraceXMail</span>
+            <span className="text-[#6e6659] hidden sm:inline">•</span>
+            <span className="text-[#8a8070] text-xs">Email Forensic Intelligence Platform</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
-            <a href="/privacy" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
-              Privacy
+          <nav aria-label="Legal and Platform Verification" className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs font-mono">
+            <a
+              id="footer-link-privacy"
+              href="/privacy"
+              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Privacy Policy
             </a>
-            <a href="/terms" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
-              Terms
+            <a
+              id="footer-link-terms"
+              href="/terms"
+              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Terms of Service
             </a>
-            <a href="/cookies" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
-              Cookies
+            <a
+              id="footer-link-cookies"
+              href="/cookies"
+              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Cookie Policy
             </a>
-            <a href="/domains" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
-              Domains
+            <a
+              id="footer-link-domains"
+              href="/domains"
+              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Authorized Domains
             </a>
-            <a href="/contact" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
-              Contact
+            <a
+              id="footer-link-contact"
+              href="/contact"
+              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Developer Contact
             </a>
-            <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2 py-0.5 rounded-[2px] text-[#8a8070]">
-              VERIFIED: TRACEXMAIL.VERCEL.APP
+            <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2.5 py-0.5 rounded-[2px] text-[#22c55e] bg-[#22c55e]/10 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse"></span>
+              <span>VERIFIED DOMAIN</span>
             </div>
-          </div>
+          </nav>
         </div>
       </footer>
 

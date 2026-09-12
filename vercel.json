@@ -15,7 +15,31 @@
       "destination": "https://tracexmail-l6c7.onrender.com/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/privacy",
+      "destination": "/privacy/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms/index.html"
+    },
+    {
+      "source": "/cookies",
+      "destination": "/cookies/index.html"
+    },
+    {
+      "source": "/domains",
+      "destination": "/domains/index.html"
+    },
+    {
+      "source": "/contact",
+      "destination": "/contact/index.html"
+    },
+    {
+      "source": "/security",
+      "destination": "/security/index.html"
+    },
+    {
+      "source": "/((?!privacy|terms|cookies|domains|contact|security|api|.*\\..*).*)",
       "destination": "/index.html"
     }
   ],

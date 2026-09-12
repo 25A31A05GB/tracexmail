@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { LegalPage } from './components/LegalPage';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LandingView } from './components/LandingView';
@@ -42,30 +41,6 @@ import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/s
 
 export default function App() {
   const publicPath = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
-
-  if (publicPath === '/privacy' || publicPath === '/privacy-policy') {
-    return <LegalPage type="privacy" />;
-  }
-
-  if (publicPath === '/terms' || publicPath === '/terms-of-service' || publicPath === '/tos') {
-    return <LegalPage type="terms" />;
-  }
-
-  if (publicPath === '/cookies' || publicPath === '/cookie-policy' || publicPath === '/cookies-policy') {
-    return <LegalPage type="cookies" />;
-  }
-
-  if (publicPath === '/domains' || publicPath === '/domain-verification' || publicPath === '/authorized-domains') {
-    return <LegalPage type="domains" />;
-  }
-
-  if (publicPath === '/contact' || publicPath === '/developer-contact' || publicPath === '/support') {
-    return <LegalPage type="contact" />;
-  }
-
-  if (publicPath === '/security' || publicPath === '/security-policy') {
-    return <LegalPage type="security" />;
-  }
 
   if (publicPath === '/oauth/consent' || publicPath === '/oauth/authorize') {
     return <OAuthConsentScreen />;
