@@ -194,7 +194,7 @@ export interface HeuristicSignal {
 export interface ForensicLogEntry {
   id: string;
   timestamp: string;
-  tag: 'INIT' | 'DNS' | 'SEC' | 'API' | 'ML' | 'GRAPH' | 'INFO' | 'WARN' | 'ALERT';
+  tag: 'INIT' | 'DNS' | 'SEC' | 'API' | 'ML' | 'GRAPH' | 'INFO' | 'WARN' | 'ALERT' | 'VT' | 'VT_STATUS' | 'VT_API' | string;
   message: string;
   highlight?: boolean;
 }

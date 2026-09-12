@@ -24,7 +24,8 @@ import {
   HelpCircle,
   Sparkles,
   Eye,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Lock
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';

@@ -396,7 +396,7 @@ export function useSession(): UseSessionReturn {
 
   const organizationId = profile?.organization_id || 
     user?.user_metadata?.org_name || 
-    user?.user_metadata?.organization_id || 
+    (user?.user_metadata as any)?.organization_id || 
     'org_acme_soc_01';
 
   const accountType: AccountType = (profile?.account_type as AccountType) ||

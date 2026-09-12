@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CheckCircle2, Loader2, Clock, ShieldCheck, Activity, Terminal } from 'lucide-react';
+import { getWebSocketUrl } from '../utils/wsUrl';
 
 export type StageKey = 'headers' | 'domain' | 'geo' | 'auth' | 'classify' | 'finalize';
 export type StageStatus = 'pending' | 'active' | 'done';
@@ -127,8 +128,7 @@ export function useAnalysisProgress(): UseAnalysisProgressReturn {
     }
 
     try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/alerts`;
+      const wsUrl = getWebSocketUrl('/ws/alerts');
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 

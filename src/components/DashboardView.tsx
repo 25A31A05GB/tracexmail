@@ -343,7 +343,13 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             .from('cases')
             .select('*', { count: 'exact', head: true });
           if (!error && typeof count === 'number' && statsData) {
-            setStats(prev => prev ? { ...prev, totalCases: Math.max(prev.totalCases || 0, count) } : statsData);
+            setStats(prev => prev ? {
+              ...prev,
+              summary: {
+                ...prev.summary,
+                total_cases: Math.max(prev.summary?.total_cases || 0, count)
+              }
+            } : statsData);
           }
         } catch (e) {
           console.debug('[DashboardView] Supabase cases count query fallback:', e);

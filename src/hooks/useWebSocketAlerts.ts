@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getWebSocketUrl } from '../utils/wsUrl';
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
@@ -70,6 +71,22 @@ export interface CaseUpdateEvent {
   timestamp: string;
 }
 
+let sharedAudioContext: AudioContext | null = null;
+
+function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioCtx) return null;
+  if (!sharedAudioContext) {
+    try {
+      sharedAudioContext = new AudioCtx();
+    } catch {
+      return null;
+    }
+  }
+  return sharedAudioContext;
+}
+
 export function useWebSocketAlerts() {
   const [alerts, setAlerts] = useState<WebSocketAlert[]>(INITIAL_ALERTS);
   const [activeToast, setActiveToast] = useState<WebSocketAlert | null>(null);
@@ -104,22 +121,27 @@ export function useWebSocketAlerts() {
   const playNotificationSound = useCallback(() => {
     if (!soundEnabled) return;
     try {
-      if (typeof window !== 'undefined' && window.AudioContext) {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
+      const ctx = getSharedAudioContext();
+      if (!ctx) return;
+
+      // If audio context is suspended (common before user gesture), resume it
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
     } catch {
-      // Audio context might be restricted before user gesture
+      // Audio context might be restricted before user gesture or unsupported
     }
   }, [soundEnabled]);
 
@@ -157,19 +179,7 @@ export function useWebSocketAlerts() {
     setStatus('connecting');
 
     try {
-      // Prioritize VITE_WS_URL if defined at build/runtime
-      const envWsUrl = (import.meta as any).env?.VITE_WS_URL;
-      const configuredWsUrl = typeof envWsUrl === 'string' && envWsUrl.trim() !== ''
-        ? envWsUrl.trim()
-        : null;
-
-      // In production deployed on Vercel, connect to Render backend if no custom env is set
-      const isVercel = window.location.host.includes('vercel.app');
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const sameOriginWsUrl = `${protocol}//${window.location.host}/ws/alerts`;
-      const renderBackendWsUrl = 'wss://tracexmail-l6c7.onrender.com/ws/alerts';
-
-      const wsUrl = configuredWsUrl || (isVercel ? renderBackendWsUrl : sameOriginWsUrl);
+      const wsUrl = getWebSocketUrl('/ws/alerts');
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
