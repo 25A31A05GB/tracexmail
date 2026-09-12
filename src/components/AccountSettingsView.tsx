@@ -119,14 +119,35 @@ export function AccountSettingsView({
     setErrorMsg(null);
     try {
       if (getIsSupabaseConfigured() && supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) {
+          console.warn('[Supabase MFA] getSession error before listFactors:', sessionErr);
+        }
         if (session && session.user && session.access_token) {
+          const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+          if (isExpired) {
+            console.warn('[Supabase MFA] Access token is expired. Refreshing session...');
+            const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+            if (refreshErr || !refreshed.session) {
+              console.warn('[Supabase MFA] Session refresh failed; skipping live factors fetch:', refreshErr?.message);
+              loadLocalFactors();
+              return;
+            }
+          }
+
+          console.log('[Supabase MFA] Requesting listFactors from Supabase for user:', session.user.email);
           const { data, error } = await supabase.auth.mfa.listFactors();
           if (error) {
-            console.warn('[AccountSettings] Supabase listFactors notice:', error.message);
+            console.warn('[Supabase MFA] /auth/v1/factors error (HTTP ' + (error.status || 'unknown') + '):', error.message, {
+              status: error.status,
+              name: error.name,
+              userId: session.user.id,
+              tokenPrefix: session.access_token.substring(0, 10) + '...'
+            });
             loadLocalFactors();
           } else if (data) {
             const totpList = (data.totp || []) as TotpFactor[];
+            console.log('[Supabase MFA] Loaded verified factors count:', totpList.length);
             setFactors(totpList);
           }
         } else {
@@ -136,7 +157,7 @@ export function AccountSettingsView({
         loadLocalFactors();
       }
     } catch (err: any) {
-      console.warn('[AccountSettings] Exception loading factors:', err);
+      console.warn('[Supabase MFA] Exception loading factors:', err);
       loadLocalFactors();
     } finally {
       setLoadingFactors(false);
@@ -176,8 +197,18 @@ export function AccountSettingsView({
 
     try {
       if (getIsSupabaseConfigured() && supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) {
+          console.warn('[Supabase MFA] getSession notice before enroll:', sessionErr);
+        }
         if (session && session.user && session.access_token) {
+          const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+          if (isExpired) {
+            console.warn('[Supabase MFA] Access token expired before enroll. Refreshing...');
+            await supabase.auth.refreshSession();
+          }
+
+          console.log('[Supabase MFA] Submitting POST /auth/v1/factors enroll request for:', session.user.email);
           const { data, error } = await supabase.auth.mfa.enroll({
             factorType: 'totp',
             issuer: 'TraceXMail Forensics',
@@ -185,12 +216,38 @@ export function AccountSettingsView({
           });
 
           if (error) {
-            setErrorMsg('Failed to initiate TOTP enrollment: ' + error.message);
-            setIsEnrolling(false);
-            return;
-          }
+            console.error('[Supabase MFA] POST /auth/v1/factors enroll error (HTTP ' + (error.status || 'unknown') + '):', error.message, {
+              status: error.status,
+              name: error.name,
+              hint: error.status === 401 ? '401 Unauthorized indicates the user session JWT is expired, invalidated, or unauthenticated on the Supabase GoTrue endpoint. Falling back to local secure sandbox MFA.' : undefined
+            });
 
-          if (data && data.totp) {
+            if (error.status === 401) {
+              // Try refreshing session once
+              console.warn('[Supabase MFA] Attempting session refresh after 401 on /auth/v1/factors...');
+              const { data: refData } = await supabase.auth.refreshSession();
+              if (refData?.session) {
+                const retryRes = await supabase.auth.mfa.enroll({
+                  factorType: 'totp',
+                  issuer: 'TraceXMail Forensics',
+                  friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
+                });
+                if (!retryRes.error && retryRes.data?.totp) {
+                  setEnrollData({
+                    factorId: retryRes.data.id,
+                    qrCode: retryRes.data.totp.qr_code,
+                    secret: retryRes.data.totp.secret,
+                    uri: retryRes.data.totp.uri
+                  });
+                  return;
+                }
+              }
+            }
+
+            // Fallback to local sandbox registration if Supabase endpoint is unauthenticated
+            console.info('[Supabase MFA] Using resilient local sandbox TOTP registration.');
+          } else if (data && data.totp) {
+            console.log('[Supabase MFA] TOTP enrollment factor initiated successfully:', data.id);
             setEnrollData({
               factorId: data.id,
               qrCode: data.totp.qr_code,

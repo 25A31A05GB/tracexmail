@@ -177,9 +177,8 @@ async function callGeminiForensics(text: string, metadata?: { from?: string; sub
 
   const prompt = `${FORENSIC_SYSTEM_PROMPT}\n\n${metaContext}Email Content to Analyze:\n${text.slice(0, 6000)}`;
 
-  // @ts-ignore - GoogleGenAI call with JSON configuration
   const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
+    model: 'gemini-3.8-flash',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',

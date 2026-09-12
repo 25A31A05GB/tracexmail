@@ -143,9 +143,16 @@ export function LoginView({
 
           // Check if user requires MFA challenge
           try {
-            const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            const { data: aalData, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (aalErr) {
+              console.warn('[LoginView] Supabase getAuthenticatorAssuranceLevel notice:', aalErr.message);
+            }
             if (aalData && aalData.currentLevel === 'aal1' && aalData.nextLevel === 'aal2') {
-              const { data: factorsData } = await supabase.auth.mfa.listFactors();
+              console.log('[LoginView] User requires AAL2 MFA verification. Fetching factors...');
+              const { data: factorsData, error: factorsErr } = await supabase.auth.mfa.listFactors();
+              if (factorsErr) {
+                console.warn('[LoginView] /auth/v1/factors listFactors notice during login:', factorsErr.message, factorsErr);
+              }
               const totpFactor = factorsData?.totp?.find((f: any) => f.status === 'verified');
               if (totpFactor) {
                 const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({

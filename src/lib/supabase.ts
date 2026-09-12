@@ -1,43 +1,69 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 
 const clientEnvUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const clientEnvKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
 /**
- * Validates whether the Supabase URL and Anon Key are well-formed and belong to the same project.
+ * Returns the canonical Google OAuth callback URL.
+ */
+export function getGoogleOAuthRedirectUrl(): string {
+  if (typeof window === 'undefined') return '/auth/callback';
+  return `${window.location.origin}/auth/callback`;
+}
+
+/**
+ * Comprehensive diagnostic logger for Supabase Authentication operations.
+ */
+export function logSupabaseAuthEvent(event: string, details?: any, level: 'info' | 'warn' | 'error' = 'info') {
+  const timestamp = new Date().toISOString();
+  const prefix = `[SupabaseAuth:${event}] [${timestamp}]`;
+  if (level === 'error') {
+    console.error(prefix, details);
+  } else if (level === 'warn') {
+    console.warn(prefix, details);
+  } else {
+    console.log(prefix, details);
+  }
+}
+
+/**
+ * Validates whether the Supabase URL and Anon Key are well-formed.
  */
 export function validateSupabaseCredentials(url?: string | null, key?: string | null): boolean {
   if (!url || !key) return false;
   if (url.includes('placeholder') || key.includes('placeholder')) return false;
   if (!url.startsWith('http://') && !url.startsWith('https://')) return false;
+  if (key.trim().length < 15) return false;
 
-  // Validate JWT structure
+  // Validate JWT structure if key follows the 3-part format
   try {
     const parts = key.split('.');
-    if (parts.length !== 3) return false;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    const parsed = JSON.parse(jsonPayload);
+    if (parts.length === 3) {
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      const parsed = JSON.parse(jsonPayload);
 
-    // Extract project ref from URL e.g. https://<ref>.supabase.co
-    const urlMatch = url.match(/https?:\/\/([^.]+)\.supabase\./i);
-    if (urlMatch && urlMatch[1] && parsed.ref) {
-      if (urlMatch[1].toLowerCase() !== parsed.ref.toLowerCase()) {
-        console.warn(
-          `[Supabase] Mismatched URL ref ("${urlMatch[1]}") and Anon Key ref ("${parsed.ref}"). Supabase client disabled.`
-        );
-        return false;
+      // Extract project ref from URL e.g. https://<ref>.supabase.co
+      const urlMatch = url.match(/https?:\/\/([^.]+)\.supabase\./i);
+      if (urlMatch && urlMatch[1] && parsed.ref) {
+        if (urlMatch[1].toLowerCase() !== parsed.ref.toLowerCase()) {
+          console.warn(
+            `[Supabase] Mismatched URL ref ("${urlMatch[1]}") and Anon Key ref ("${parsed.ref}"). Supabase client disabled.`
+          );
+          return false;
+        }
       }
     }
     return true;
   } catch {
-    return false;
+    // If base64 decode fails on non-standard token, accept valid URL + non-empty key
+    return true;
   }
 }
 
@@ -46,7 +72,7 @@ let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : '';
 
 /**
  * Frontend Supabase Client initialized with verified VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
- * Configured with session persistence, token auto-refresh, and URL session detection.
+ * Configured with session persistence, token auto-refresh, PKCE auth flow, and URL session detection.
  */
 export let supabase: SupabaseClient = createClient(
   isSupabaseConfigured ? clientEnvUrl : 'https://placeholder.supabase.co',
@@ -56,6 +82,7 @@ export let supabase: SupabaseClient = createClient(
       persistSession: isSupabaseConfigured,
       autoRefreshToken: isSupabaseConfigured,
       detectSessionInUrl: isSupabaseConfigured,
+      flowType: 'pkce',
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     },
     realtime: {
@@ -86,6 +113,7 @@ export async function ensureSupabaseClient(): Promise<boolean> {
 
   initPromise = (async () => {
     try {
+      logSupabaseAuthEvent('Init', 'Querying /api/auth/status for runtime configuration...');
       const res = await fetch('/api/auth/status');
       const data = await res.json();
       if (
@@ -100,19 +128,59 @@ export async function ensureSupabaseClient(): Promise<boolean> {
             persistSession: true,
             autoRefreshToken: true,
             detectSessionInUrl: true,
+            flowType: 'pkce',
             storage: typeof window !== 'undefined' ? window.localStorage : undefined,
           },
         });
         isSupabaseConfigured = true;
+        logSupabaseAuthEvent('InitSuccess', { url: data.supabaseUrl });
         return true;
+      } else {
+        logSupabaseAuthEvent('InitNotice', 'Supabase credentials not active from server status endpoint.');
       }
-    } catch {
-      // ignore
+    } catch (err: any) {
+      logSupabaseAuthEvent('InitError', { message: err?.message }, 'warn');
     }
     return isSupabaseConfigured;
   })();
 
   return initPromise;
+}
+
+/**
+ * Verifies if the current user session has an active, unexpired JWT token.
+ */
+export async function getValidSupabaseSession(): Promise<{ session: Session | null; user: User | null; valid: boolean; error?: string }> {
+  try {
+    if (!getIsSupabaseConfigured() || !supabase) {
+      return { session: null, user: null, valid: false, error: 'Supabase client is not configured' };
+    }
+
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      logSupabaseAuthEvent('SessionCheckError', { error: error.message }, 'warn');
+      return { session: null, user: null, valid: false, error: error.message };
+    }
+
+    if (!data.session || !data.session.access_token) {
+      return { session: null, user: null, valid: false, error: 'No active session found' };
+    }
+
+    // Check expiration timestamp (with 30s buffer)
+    const expiresAt = data.session.expires_at;
+    if (expiresAt && (expiresAt * 1000) < (Date.now() + 30000)) {
+      logSupabaseAuthEvent('TokenExpired', { expiresAt }, 'warn');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        return { session: null, user: null, valid: false, error: refreshError?.message || 'Token refresh failed' };
+      }
+      return { session: refreshData.session, user: refreshData.session.user, valid: true };
+    }
+
+    return { session: data.session, user: data.session.user, valid: true };
+  } catch (err: any) {
+    return { session: null, user: null, valid: false, error: err?.message };
+  }
 }
 
 // If client-side VITE_ variables are missing, attempt runtime fetch of public config from server

@@ -122,6 +122,12 @@ export function useSession(): UseSessionReturn {
       return;
     }
 
+    // Valid live Supabase session active - remove stale enclave local sessions
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('tracexmail_supabase_auth_callback');
+    } catch {}
+
     setLocalSession(currentSession);
     const currentUser = currentSession.user;
     setUser(currentUser);
@@ -143,7 +149,7 @@ export function useSession(): UseSessionReturn {
       email: currentUser.email || '',
       organizationId,
       role,
-      label: prof?.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Security Analyst'),
+      label: prof?.full_name || currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || (currentUser.email ? currentUser.email.split('@')[0] : 'Security Analyst'),
       authMethod: 'supabase_jwt'
     };
 
@@ -190,22 +196,32 @@ export function useSession(): UseSessionReturn {
     supabase.auth.getSession().then(({ data: { session: initSession }, error }) => {
       if (!isMounted) return;
       if (error) {
-        console.warn('[useSession] getSession error:', error.message);
+        console.warn('[useSession] Supabase getSession error:', error.message, error);
         setLoading(false);
         return;
       }
       if (initSession) {
+        console.log('[useSession] Initial Supabase session restored for user:', initSession.user?.email, 'Provider:', initSession.user?.app_metadata?.provider);
         syncState(initSession);
       } else {
+        console.log('[useSession] No active initial Supabase session detected.');
         setLoading(false);
       }
     });
 
     // Auth state listener for sign in / sign out / token refresh
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
+      console.log(`[useSession] Supabase auth event: "${event}"`, {
+        userId: newSession?.user?.id,
+        email: newSession?.user?.email,
+        provider: newSession?.user?.app_metadata?.provider,
+        hasAccessToken: Boolean(newSession?.access_token)
+      });
       if (newSession) {
         syncState(newSession);
+      } else if (event === 'SIGNED_OUT') {
+        syncState(null);
       }
     });
 

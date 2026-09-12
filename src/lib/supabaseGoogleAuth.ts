@@ -94,6 +94,8 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
   const callbackUrl = `${window.location.origin}/auth/callback`;
 
   try {
+    console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl);
+
     // Inside an iframe (e.g. AI Studio preview), redirecting inside the iframe
     // causes Google accounts to fail with X-Frame-Options: SAMEORIGIN.
     // We request the OAuth URL with skipBrowserRedirect and open a popup window.
@@ -110,6 +112,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
     });
 
     if (error) {
+      console.error('[Supabase Google Auth] signInWithOAuth failed:', error.status, error.message, error);
       const msg = error.message.toLowerCase();
       if (msg.includes('provider is not enabled') || msg.includes('unsupported provider')) {
         return {
@@ -125,8 +128,11 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
 
     // In top-level mode where skipBrowserRedirect is false, Supabase already initiates the redirect
     if (!inIframe || !data?.url) {
+      console.log('[Supabase Google Auth] Redirecting top-level window to:', data?.url || 'OAuth endpoint');
       return { success: true };
     }
+
+    console.log('[Supabase Google Auth] Opening OAuth popup window to:', data.url);
 
     // In iframe mode: open provider authorization URL directly in a popup window
     const width = 560;
@@ -142,6 +148,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
 
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
       // Browser popup blocker prevented opening the popup window
+      console.warn('[Supabase Google Auth] Popup window blocked by browser');
       return {
         success: false,
         error: 'The Google authentication popup was blocked by your browser. Please allow popups for this site and try again.'
@@ -158,12 +165,33 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
       };
 
       const messageListener = async (event: MessageEvent) => {
-        // Validate origin: accept local or matching origin
-        if (event.origin !== window.location.origin && !event.origin.endsWith('.run.app') && !event.origin.includes('localhost')) {
+        // Validate origin: accept matching origin, Vercel, Cloud Run preview, or localhost
+        const isAllowedOrigin = 
+          !event.origin ||
+          event.origin === window.location.origin ||
+          event.origin.endsWith('.vercel.app') ||
+          event.origin.endsWith('.run.app') ||
+          event.origin.includes('localhost') ||
+          event.origin.includes('127.0.0.1');
+
+        if (!isAllowedOrigin) {
+          return;
+        }
+
+        if (event.data?.type === 'SUPABASE_AUTH_ERROR') {
+          console.error('[Supabase Google Auth] Popup reported auth error:', event.data);
+          if (resolved) return;
+          resolved = true;
+          cleanup();
+          resolve({
+            success: false,
+            error: event.data.error || 'Google authentication encountered an authorization error.'
+          });
           return;
         }
 
         if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
+          console.log('[Supabase Google Auth] Received SUPABASE_AUTH_SUCCESS from popup');
           if (resolved) return;
           resolved = true;
           cleanup();
@@ -178,25 +206,39 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
               const accessToken = hashParams.get('access_token');
               const refreshToken = hashParams.get('refresh_token');
               if (accessToken && refreshToken) {
-                await supabase.auth.setSession({
+                console.log('[Supabase Google Auth] Applying tokens via setSession...');
+                const { error: sessionSetErr } = await supabase.auth.setSession({
                   access_token: accessToken,
                   refresh_token: refreshToken
                 });
+                if (sessionSetErr) {
+                  console.warn('[Supabase Google Auth] setSession notice:', sessionSetErr);
+                }
               }
             } else if (search) {
               const searchParams = new URLSearchParams(search);
               const code = searchParams.get('code');
               if (code) {
-                await (supabase.auth as any).exchangeCodeForSession?.(code);
+                console.log('[Supabase Google Auth] Exchanging PKCE code for session...');
+                const { error: exchangeErr } = await (supabase.auth as any).exchangeCodeForSession?.(code);
+                if (exchangeErr) {
+                  console.warn('[Supabase Google Auth] exchangeCodeForSession notice:', exchangeErr);
+                }
               }
             }
 
-            const { data: sessionData } = await supabase.auth.getSession();
+            const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+            if (sessionErr) {
+              console.error('[Supabase Google Auth] getSession error after OAuth exchange:', sessionErr);
+            }
+
+            console.log('[Supabase Google Auth] Session successfully finalized. User:', sessionData?.session?.user?.email);
             resolve({
               success: true,
               user: sessionData?.session?.user
             });
           } catch (err: any) {
+            console.error('[Supabase Google Auth] Finalization exception:', err);
             resolve({
               success: false,
               error: err?.message || 'Failed finalizing Google authentication session.'

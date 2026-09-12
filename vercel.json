@@ -39,7 +39,11 @@
       "destination": "/security/index.html"
     },
     {
-      "source": "/((?!api|privacy|terms|cookies|domains|contact|security|assets).*)",
+      "source": "/auth/callback",
+      "destination": "/auth/callback/index.html"
+    },
+    {
+      "source": "/((?!api|privacy|terms|cookies|domains|contact|security|auth|assets).*)",
       "destination": "/index.html"
     }
   ],

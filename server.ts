@@ -4082,7 +4082,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
 
     const groqKey = process.env.GROQ_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
-    const model = groqKey ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : 'gemini-3.6-flash';
+    const model = groqKey ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : 'gemini-3.8-flash';
 
     // If neither key is configured, return honest explanation
     if (!geminiKey && !groqKey) {
@@ -4101,7 +4101,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       try {
         const ai = new GoogleGenAI({ apiKey: geminiKey });
         const response = await ai.models.generateContent({
-          model: 'gemini-3.6-flash',
+          model: 'gemini-3.8-flash',
           contents: promptText
         });
         const narrativeText = response.text;
@@ -4109,7 +4109,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
           return res.json({
             ai_narrative: {
               narrative: narrativeText.trim(),
-              model: 'gemini-3.6-flash',
+              model: 'gemini-3.8-flash',
               source: 'TraceXMail AI Forensic Reasoning Engine (Gemini)',
               disclaimer: 'AI-generated narrative summary based on deterministic forensic telemetry. Verify independently before regulatory or legal submission.'
             }
@@ -4740,7 +4740,14 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
-    let supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('placeholder'));
+    let supabaseConfigured = Boolean(
+      supabaseUrl &&
+      supabaseAnonKey &&
+      !supabaseUrl.includes('placeholder') &&
+      !supabaseAnonKey.includes('placeholder') &&
+      supabaseAnonKey.trim().length >= 15
+    );
+
     if (supabaseConfigured) {
       try {
         const parts = supabaseAnonKey.split('.');
@@ -4752,11 +4759,9 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
               supabaseConfigured = false;
             }
           }
-        } else {
-          supabaseConfigured = false;
         }
       } catch {
-        supabaseConfigured = false;
+        // Keep supabaseConfigured true if basic URL and key length criteria are met
       }
     }
 

@@ -360,10 +360,16 @@ async function precomputeLocalReferenceEmbeddings(): Promise<boolean> {
   }
 }
 
+let geminiCooldownUntil = 0;
+
 /**
  * Fetches an embedding vector for a given text using Gemini text-embedding-004 (768-d).
  */
 async function fetchGeminiEmbedding(text: string, apiKey: string): Promise<number[] | null> {
+  if (Date.now() < geminiCooldownUntil) {
+    return null;
+  }
+
   const clean = text.slice(0, 8000).trim();
   if (!clean) return null;
 
@@ -383,7 +389,7 @@ async function fetchGeminiEmbedding(text: string, apiKey: string): Promise<numbe
     });
 
     // @ts-ignore
-    const values = response?.embedding?.values || response?.values;
+    const values = response?.embedding?.values || response?.values || (Array.isArray(response?.embeddings) ? response.embeddings[0]?.values : undefined);
     if (Array.isArray(values) && values.length > 0) {
       incomingEmbeddingsGeminiCache.set(hash, values);
       return values;
@@ -398,14 +404,13 @@ async function fetchGeminiEmbedding(text: string, apiKey: string): Promise<numbe
     const resp = await axios.post(
       url,
       {
-        model: 'models/text-embedding-004',
         content: {
           parts: [{ text: clean }]
         }
       },
       {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 8000
+        timeout: 6000
       }
     );
 
@@ -415,7 +420,9 @@ async function fetchGeminiEmbedding(text: string, apiKey: string): Promise<numbe
       return values;
     }
   } catch (restErr: any) {
-    console.warn('[SemanticEmbedding] Gemini API request failed:', restErr?.response?.data || restErr?.message);
+    geminiCooldownUntil = Date.now() + 2 * 60 * 1000;
+    const errMsg = restErr?.response?.data?.error?.message || restErr?.message || 'API request failed';
+    console.info(`[SemanticEmbedding] Cloud embedding unavailable (${errMsg}), using offline local model.`);
   }
 
   return null;
@@ -425,6 +432,10 @@ async function fetchGeminiEmbedding(text: string, apiKey: string): Promise<numbe
  * Pre-computes and caches reference template embeddings using Gemini text-embedding-004.
  */
 export async function ensureReferenceEmbeddingsLoaded(apiKey: string): Promise<boolean> {
+  if (Date.now() < geminiCooldownUntil) {
+    return false;
+  }
+
   if (referenceEmbeddingsGeminiCache.size >= REFERENCE_TEMPLATES.length) {
     return true;
   }
@@ -593,7 +604,7 @@ export async function scoreSemanticSimilarity(text: string): Promise<SemanticSim
       }
     } catch (geminiErr: any) {
       geminiFailureReason = geminiErr?.message || 'Gemini API call failed';
-      console.warn('[SemanticEmbedding] Gemini embedding path failed, engaging local fallback:', geminiFailureReason);
+      console.info(`[SemanticEmbedding] Gemini embedding path bypassed (${geminiFailureReason}), using offline local model.`);
     }
   } else {
     geminiFailureReason = 'GEMINI_API_KEY is unset or empty in environment';
