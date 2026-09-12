@@ -33,7 +33,7 @@ import {
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { UserRole } from '../hooks/useSession';
-import { Sparkles, Building2 as OrgIcon, ShieldCheck } from 'lucide-react';
+import { Sparkles, Building2 as OrgIcon, ShieldCheck, Keyboard } from 'lucide-react';
 
 export type NavTab = 
   | 'dashboard'
@@ -64,6 +64,8 @@ interface SidebarProps {
   onOpenUpgradeModal?: (featureName?: string) => void;
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
+  onOpenShortcutsHelp?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export function Sidebar({
@@ -75,7 +77,9 @@ export function Sidebar({
   accountType = 'organization',
   onOpenUpgradeModal,
   onOpenWalkthrough,
-  viewMode = 'simple'
+  viewMode = 'simple',
+  onOpenShortcutsHelp,
+  onOpenCommandPalette
 }: SidebarProps) {
   const [engineHealth, setEngineHealth] = useState<'operational' | 'degraded' | 'checking'>('operational');
   const [latencyMs, setLatencyMs] = useState<number>(12);
@@ -509,7 +513,7 @@ export function Sidebar({
         <motion.button
           onClick={() => setActiveTab('ingest')}
           disabled={role === 'read_only'}
-          title={role === 'read_only' ? 'Read-only access: file ingestion restricted' : 'Ingest .EML File'}
+          title={role === 'read_only' ? 'Read-only access: file ingestion restricted' : 'Ingest .EML File (Alt+2 / ⌘2)'}
           whileHover={{ scale: role === 'read_only' ? 1 : 1.02 }}
           whileTap={{ scale: role === 'read_only' ? 1 : 0.97 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
@@ -522,6 +526,22 @@ export function Sidebar({
           <Upload className="w-3.5 h-3.5 text-[var(--thread)]" />
           <span>{role === 'read_only' ? 'Ingestion Restricted' : 'Ingest .EML File'}</span>
         </motion.button>
+
+        {onOpenShortcutsHelp && (
+          <button
+            onClick={onOpenShortcutsHelp}
+            className="w-full py-1 px-2 rounded text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8] hover:bg-[#221e17] flex items-center justify-between transition-colors cursor-pointer"
+            title="View Keyboard Shortcuts Cheat Sheet (?)"
+          >
+            <span className="flex items-center gap-1.5">
+              <Keyboard className="w-3 h-3 text-amber-400/80" />
+              <span>Shortcuts</span>
+            </span>
+            <kbd className="px-1.5 py-0.2 bg-[#26211a] border border-[#3a352c] rounded text-[9.5px] font-mono text-amber-400/90">
+              ⌘K / ?
+            </kbd>
+          </button>
+        )}
       </div>
 
       {/* Public legal links */}

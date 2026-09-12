@@ -35,7 +35,7 @@ import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvide
 import { EvidenceTagCard } from './EvidenceTagCard';
 import { AuthModal } from './AuthModal';
 import { UserRole } from '../hooks/useSession';
-import { LogOut } from 'lucide-react';
+import { LogOut, Keyboard, Command } from 'lucide-react';
 
 interface HeaderProps {
   currentAnalysis: EmailAnalysis;
@@ -56,6 +56,8 @@ interface HeaderProps {
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
   onSetViewMode?: (mode: 'simple' | 'analyst') => void;
+  onOpenCommandPalette?: () => void;
+  onOpenShortcutsHelp?: () => void;
 }
 
 export function Header({
@@ -76,7 +78,9 @@ export function Header({
   onSwitchRole,
   onOpenWalkthrough,
   viewMode = 'simple',
-  onSetViewMode
+  onSetViewMode,
+  onOpenCommandPalette,
+  onOpenShortcutsHelp
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -354,6 +358,32 @@ export function Header({
           )}
         </div>
 
+        {/* Command Palette / Quick Search Trigger */}
+        {onOpenCommandPalette && (
+          <button
+            onClick={onOpenCommandPalette}
+            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
+            title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
+          >
+            <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
+            <span className="font-sans">Command Deck</span>
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#26211a] border border-[#3a352c] rounded text-amber-400/90 group-hover:text-amber-300">
+              ⌘K
+            </kbd>
+          </button>
+        )}
+
+        {/* Keyboard Shortcuts Help Button */}
+        {onOpenShortcutsHelp && (
+          <button
+            onClick={onOpenShortcutsHelp}
+            className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-[#9d9282] hover:text-amber-300 transition-colors cursor-pointer"
+            title="Keyboard Shortcuts Cheat Sheet (?)"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Investigation Objective Setup Prompt */}
         {onOpenWalkthrough && (
           <button
@@ -375,7 +405,7 @@ export function Header({
                 ? 'bg-purple-950/70 border-purple-700 text-purple-200'
                 : 'bg-[#221e17] hover:bg-[#2c271f] border-[#3a352c] text-[#ede6d8]'
             }`}
-            title="Configure Privacy Safeguards, Retention & PII Masking"
+            title="Configure Privacy Safeguards, Retention & PII Masking (⌘⇧P)"
           >
             <Scale className="w-3.5 h-3.5 text-purple-400" />
             <span className="hidden sm:inline font-mono">Privacy &amp; Compliance</span>
@@ -385,13 +415,17 @@ export function Header({
           </button>
         )}
 
-        {/* New Analysis Button */}
+        {/* New Analysis Button with Shortcut Badge */}
         <button
           onClick={onOpenNewModal}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer group"
+          title="Create New Email Analysis (⌘N / Ctrl+N)"
         >
           <Plus className="w-4 h-4" />
           <span>New Analysis</span>
+          <kbd className="hidden sm:inline-block px-1.5 py-0.2 bg-black/25 border border-white/20 rounded text-[9.5px] font-mono text-amber-200">
+            ⌘N
+          </kbd>
         </button>
       </div>
 

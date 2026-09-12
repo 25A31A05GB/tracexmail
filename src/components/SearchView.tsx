@@ -116,8 +116,13 @@ export function SearchView({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by IP (e.g. 185.220), domain, subject keyword, sender, SHA-256..."
-            className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+            className="w-full pl-12 pr-16 py-3 rounded-xl bg-slate-950 border border-slate-700 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
           />
+          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            <kbd className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#1e1b15] border border-slate-700 rounded text-slate-400">
+              Alt+5
+            </kbd>
+          </div>
         </div>
 
         {/* Filter Pills */}

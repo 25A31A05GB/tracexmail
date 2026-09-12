@@ -25,6 +25,9 @@ import { ReportModal } from './components/ReportModal';
 import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
 import { ForensicWalkthroughModal } from './components/ForensicWalkthroughModal';
 import { InvestigationObjectiveModal, ObjectiveSelection } from './components/InvestigationObjectiveModal';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { AlertToast } from './components/AlertToast';
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
@@ -143,26 +146,6 @@ export default function App() {
       isMounted = false;
     };
   }, [session]);
-  const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
-  const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState<boolean>(false);
-  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(false);
-
-  const handleApplyObjective = (selection: ObjectiveSelection) => {
-    // 1. Switch Role
-    if (selection.recommendedRole && switchRole) {
-      switchRole(selection.recommendedRole);
-    }
-    // 2. Set Active Tab
-    setActiveTab(selection.defaultTab);
-    // 3. Configure Privacy Masking if required
-    if (selection.privacyMasking) {
-      const updatedCfg = { ...privacyConfig, maskingEnabled: true };
-      setPrivacyConfig(updatedCfg);
-      savePrivacyConfig(updatedCfg);
-    }
-  };
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'simple' | 'analyst'>(() => {
@@ -196,6 +179,53 @@ export default function App() {
       } catch {}
       return next;
     });
+  };
+
+  const [isNewModalOpen, setIsNewModalOpen] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
+  const [isObjectiveModalOpen, setIsObjectiveModalOpen] = useState<boolean>(false);
+  const [isWalkthroughOpen, setIsWalkthroughOpen] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
+
+  // Global Keyboard Shortcuts (Cmd+K for search, Cmd+N for new analysis, Cmd+E for report, 1-9 for tabs, ? for help)
+  useKeyboardShortcuts({
+    onOpenCommandPalette: () => setIsCommandPaletteOpen(prev => !prev),
+    onNewAnalysis: () => setIsNewModalOpen(true),
+    onOpenReport: () => setIsReportModalOpen(true),
+    onOpenPrivacyModal: () => setIsPrivacyModalOpen(true),
+    onOpenWalkthrough: () => setIsObjectiveModalOpen(true),
+    onToggleViewMode: () => handleToggleViewMode(viewMode === 'simple' ? 'analyst' : 'simple'),
+    onToggleDemoCases: handleToggleDemoCases,
+    onOpenShortcutsHelp: () => setIsShortcutsHelpOpen(prev => !prev),
+    onSelectTab: (tab) => setActiveTab(tab),
+    onCloseModals: () => {
+      setIsCommandPaletteOpen(false);
+      setIsShortcutsHelpOpen(false);
+      setIsNewModalOpen(false);
+      setIsReportModalOpen(false);
+      setIsPrivacyModalOpen(false);
+      setIsObjectiveModalOpen(false);
+      setIsWalkthroughOpen(false);
+      setIsUpgradeModalOpen(false);
+    },
+    enabled: true
+  });
+
+  const handleApplyObjective = (selection: ObjectiveSelection) => {
+    // 1. Switch Role
+    if (selection.recommendedRole && switchRole) {
+      switchRole(selection.recommendedRole);
+    }
+    // 2. Set Active Tab
+    setActiveTab(selection.defaultTab);
+    // 3. Configure Privacy Masking if required
+    if (selection.privacyMasking) {
+      const updatedCfg = { ...privacyConfig, maskingEnabled: true };
+      setPrivacyConfig(updatedCfg);
+      savePrivacyConfig(updatedCfg);
+    }
   };
 
   const handleUpdatePrivacyConfig = (newCfg: PrivacyConfig) => {
@@ -452,6 +482,8 @@ export default function App() {
         onOpenUpgradeModal={handleOpenUpgradeModal}
         onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
         viewMode={viewMode}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
 
       <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 overflow-hidden">
@@ -475,6 +507,8 @@ export default function App() {
           onSwitchRole={switchRole}
           viewMode={viewMode}
           onSetViewMode={handleToggleViewMode}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         />
 
         {/* View Switcher Container */}
@@ -735,6 +769,51 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Global Command Palette / Spotlight Search (Cmd+K / Ctrl+K) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setIsCommandPaletteOpen(false);
+        }}
+        onNewAnalysis={() => {
+          setIsCommandPaletteOpen(false);
+          setIsNewModalOpen(true);
+        }}
+        onOpenReport={() => {
+          setIsCommandPaletteOpen(false);
+          setIsReportModalOpen(true);
+        }}
+        onOpenPrivacyModal={() => {
+          setIsCommandPaletteOpen(false);
+          setIsPrivacyModalOpen(true);
+        }}
+        onOpenWalkthrough={() => {
+          setIsCommandPaletteOpen(false);
+          setIsObjectiveModalOpen(true);
+        }}
+        onToggleViewMode={() => handleToggleViewMode(viewMode === 'simple' ? 'analyst' : 'simple')}
+        onToggleDemoCases={handleToggleDemoCases}
+        onOpenShortcutsHelp={() => {
+          setIsCommandPaletteOpen(false);
+          setIsShortcutsHelpOpen(true);
+        }}
+        onSelectAnalysis={(analysis) => {
+          setCurrentAnalysis(analysis);
+          setActiveTab('overview');
+        }}
+        currentAnalysis={currentAnalysis}
+        viewMode={viewMode}
+        showDemoCases={showDemoCases}
+      />
+
+      {/* Keyboard Shortcuts Reference Modal (Cmd+/ or ?) */}
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+      />
     </div>
   );
 }
