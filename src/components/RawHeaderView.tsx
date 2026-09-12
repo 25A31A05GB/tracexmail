@@ -87,17 +87,17 @@ function getEffectiveRawHeaders(analysis?: EmailAnalysis): string {
   const dkimStat = (analysis.auth?.dkim?.status || analysis.authResults?.dkim?.status || 'NONE').toLowerCase();
   const dmarcStat = (analysis.auth?.dmarc?.status || analysis.authResults?.dmarc?.status || 'NONE').toLowerCase();
 
-  const origin = resolveOrigin(analysis.hops);
-  const clientIp = analysis.auth?.spf?.ip || (origin.resolved ? origin.ip! : 'unresolved-ip');
-  const senderDomain = analysis.headers?.fromEmail?.split('@')[1] || 'sender.com';
+  const origin = resolveOrigin(analysis?.hops);
+  const clientIp = analysis?.auth?.spf?.ip || (origin.resolved ? origin.ip! : 'unresolved-ip');
+  const senderDomain = analysis?.headers?.fromEmail?.split('@')[1] || 'sender.com';
 
   lines.push(`Received-SPF: ${spfStat} (mx.corporate.com: domain designates ${clientIp} as permitted sender) client-ip=${clientIp}; envelope-from=${senderDomain};`);
-  lines.push(`DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=${analysis.auth?.dkim?.domain || senderDomain}; s=${analysis.auth?.dkim?.selector || 's1'}; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;`);
-  lines.push(`Authentication-Results: mx.corporate.com;\n  dkim=${dkimStat} header.i=@${senderDomain} header.s=s1;\n  spf=${spfStat} smtp.mailfrom=${senderDomain};\n  dmarc=${dmarcStat} (p=${analysis.auth?.dmarc?.policy || 'none'}) header.from=${senderDomain}`);
+  lines.push(`DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=${analysis?.auth?.dkim?.domain || senderDomain}; s=${analysis?.auth?.dkim?.selector || 's1'}; bh=47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=;`);
+  lines.push(`Authentication-Results: mx.corporate.com;\n  dkim=${dkimStat} header.i=@${senderDomain} header.s=s1;\n  spf=${spfStat} smtp.mailfrom=${senderDomain};\n  dmarc=${dmarcStat} (p=${analysis?.auth?.dmarc?.policy || 'none'}) header.from=${senderDomain}`);
 
-  if (analysis.hops && analysis.hops.length > 0) {
+  if (analysis?.hops && analysis.hops.length > 0) {
     analysis.hops.forEach((hop) => {
-      lines.push(`Received: from ${hop.fromHost || hop.fromIp || 'mail.relay.net'} (${hop.fromIp ? `[${hop.fromIp}]` : 'unknown'})\n  by ${hop.byHost || 'mx.corporate.com'} with ${hop.protocol || 'ESMTPS'}\n  for <${analysis.to || 'recipient@corp.com'}>; ${hop.timestamp || new Date().toUTCString()}`);
+      lines.push(`Received: from ${hop.fromHost || hop.fromIp || 'mail.relay.net'} (${hop.fromIp ? `[${hop.fromIp}]` : 'unknown'})\n  by ${hop.byHost || 'mx.corporate.com'} with ${hop.protocol || 'ESMTPS'}\n  for <${analysis?.to || 'recipient@corp.com'}>; ${hop.timestamp || new Date().toUTCString()}`);
     });
   }
 
@@ -285,26 +285,26 @@ export function RawHeaderView({ analysis }: RawHeaderViewProps) {
 
   // High-Trust Auth Indicators Extraction
   const authMetrics = useMemo(() => {
-    const spfObj = analysis.auth?.spf || analysis.authResults?.spf;
-    const dkimObj = analysis.auth?.dkim || analysis.authResults?.dkim;
-    const dmarcObj = analysis.auth?.dmarc || analysis.authResults?.dmarc;
+    const spfObj = analysis?.auth?.spf || analysis?.authResults?.spf;
+    const dkimObj = analysis?.auth?.dkim || analysis?.authResults?.dkim;
+    const dmarcObj = analysis?.auth?.dmarc || analysis?.authResults?.dmarc;
 
     const spfStatus = (spfObj?.status || 'NONE').toUpperCase();
     const dkimStatus = (dkimObj?.status || 'NONE').toUpperCase();
     const dmarcStatus = (dmarcObj?.status || 'NONE').toUpperCase();
 
-    const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
+    const fromEmail = analysis?.headers?.fromEmail || analysis?.from || '';
     const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';
-    const returnPath = analysis.headers?.returnPath || analysis.returnPath || '';
+    const returnPath = analysis?.headers?.returnPath || analysis?.returnPath || '';
     const returnPathDomain = returnPath.includes('@') ? returnPath.split('@')[1].replace(/[<>]/g, '').trim() : '';
 
     const isAligned = Boolean(fromDomain && returnPathDomain && (fromDomain === returnPathDomain || fromDomain.endsWith(`.${returnPathDomain}`) || returnPathDomain.endsWith(`.${fromDomain}`)));
 
-    const originHop = analysis.hops?.find((h) => h.isOrigin) || analysis.hops?.find((h) => !h.isPrivate && h.fromIp) || analysis.hops?.[0];
+    const originHop = analysis?.hops?.find((h) => h.isOrigin) || analysis?.hops?.find((h) => !h.isPrivate && h.fromIp) || analysis?.hops?.[0];
     const originIp = originHop?.fromIp || spfObj?.ip || 'N/A';
     const originLocation = originHop?.country ? `${originHop.city ? `${originHop.city}, ` : ''}${originHop.country}` : originHop?.isPrivate ? 'Private LAN (RFC 1918)' : 'Unresolved Origin';
 
-    const mlConf = analysis.mlConfidence !== undefined ? `${(analysis.mlConfidence * 100).toFixed(1)}%` : '98.4%';
+    const mlConf = analysis?.mlConfidence !== undefined ? `${(analysis.mlConfidence * 100).toFixed(1)}%` : '98.4%';
     const stdVerdict = getStandardizedVerdict(analysis);
 
     return {
@@ -323,9 +323,19 @@ export function RawHeaderView({ analysis }: RawHeaderViewProps) {
       verdict: stdVerdict.verdict,
       verdictColors: stdVerdict.colors,
       score: stdVerdict.score,
-      totalHops: analysis.hops?.length || 0
+      totalHops: analysis?.hops?.length || 0
     };
   }, [analysis]);
+
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
+        <FileText className="w-10 h-10 text-[#7fa3ba] mb-3" />
+        <h3 className="text-base font-bold text-[#ede6d8]">No Analysis Selected</h3>
+        <p className="text-xs text-[#8a8070] mt-1">Please select an analysis to inspect RFC822 raw headers.</p>
+      </div>
+    );
+  }
 
   return (
     <div id="raw-headers-view" className="flex-1 flex flex-col h-full bg-[#14120f] overflow-hidden p-6 space-y-4 select-text">

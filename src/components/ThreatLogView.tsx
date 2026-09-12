@@ -28,16 +28,6 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
   const [copied, setCopied] = useState<boolean>(false);
   const [copiedIocs, setCopiedIocs] = useState<boolean>(false);
   const [logsState, setLogsState] = useState<ForensicLogEntry[]>(analysis?.logs || []);
-
-  if (!analysis) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
-        <Terminal className="w-10 h-10 text-[#7fa3ba] mb-3" />
-        <h3 className="text-base font-bold text-[#ede6d8]">No Analysis Selected</h3>
-        <p className="text-xs text-[#8a8070] mt-1">Please select an analysis to inspect threat logs.</p>
-      </div>
-    );
-  }
   const [isEnrichingVT, setIsEnrichingVT] = useState<boolean>(false);
   const [vtStatusInfo, setVtStatusInfo] = useState<{
     configured: boolean;
@@ -75,7 +65,7 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
 
   // Keep local log state updated if analysis changes
   useEffect(() => {
-    setLogsState(analysis.logs || []);
+    setLogsState(analysis?.logs || []);
   }, [analysis]);
 
   const handleCopyLogs = () => {
@@ -88,6 +78,7 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
   };
 
   const handleCopyAllIocs = () => {
+    if (!analysis) return;
     const iocSet = new Set<string>();
 
     // 1. File hashes (SHA256, MD5)
@@ -132,6 +123,7 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
   };
 
   const handleRunVirusTotalEnrichment = async () => {
+    if (!analysis) return;
     setIsEnrichingVT(true);
     try {
       const result = await forensicApi.enrichVirusTotal({
@@ -190,6 +182,16 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
       log.tag.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesTag && matchesSearch;
   });
+
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
+        <Terminal className="w-10 h-10 text-[#7fa3ba] mb-3" />
+        <h3 className="text-base font-bold text-[#ede6d8]">No Analysis Selected</h3>
+        <p className="text-xs text-[#8a8070] mt-1">Please select an analysis to inspect threat logs.</p>
+      </div>
+    );
+  }
 
   const totalUrlsScanned = analysis.urls?.length || 0;
   const totalAttachmentsScanned = analysis.attachments?.length || 0;

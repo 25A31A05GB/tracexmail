@@ -112,9 +112,15 @@ export function AlertsView({
       });
       await loadRealWorldFeeds();
     } catch (err: any) {
+      const status = err?.response?.status;
+      const msg = status === 401
+        ? 'Authentication Required (401): Active session required to sync real-world feeds. Please log in or check your credentials.'
+        : status === 403
+        ? 'Access Forbidden (403): Read-Only users cannot sync threat feeds. Analyst or Admin role required.'
+        : err?.response?.data?.error || err.message || 'Failed to sync real-world threat feeds';
       setSlackFeedback({
         type: 'error',
-        message: err?.response?.data?.error || err.message || 'Failed to sync real-world threat feeds'
+        message: msg
       });
     } finally {
       setSyncingFeeds(false);
@@ -142,9 +148,15 @@ export function AlertsView({
         }
       }
     } catch (err: any) {
+      const status = err?.response?.status;
+      const msg = status === 401
+        ? 'Authentication Required (401): Active session required to convert threat feed to dynamic case. Please check your session credentials.'
+        : status === 403
+        ? 'Access Forbidden (403): Read-Only users cannot convert threat feeds into active cases. Analyst or Admin role required.'
+        : err?.response?.data?.error || err.message || 'Failed to convert threat feed to dynamic case';
       setSlackFeedback({
         type: 'error',
-        message: err?.response?.data?.error || err.message || 'Failed to convert threat feed to dynamic case'
+        message: msg
       });
     } finally {
       setConvertingFeedId(null);

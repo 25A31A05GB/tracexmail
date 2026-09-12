@@ -525,7 +525,7 @@ export function Sidebar({
       </div>
 
       {/* Public legal links */}
-      <div className="px-3 pb-3 flex items-center justify-center gap-3 text-[10px] font-mono text-[#8a8070]">
+      <div className="px-3 pb-3 flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono text-[#8a8070]">
         <a
           href="/privacy"
           target="_blank"
@@ -542,6 +542,24 @@ export function Sidebar({
           className="transition-colors hover:text-[#ede6d8]"
         >
           TERMS
+        </a>
+        <span className="text-[#3a352c]">•</span>
+        <a
+          href="/cookies"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-colors hover:text-[#ede6d8]"
+        >
+          COOKIES
+        </a>
+        <span className="text-[#3a352c]">•</span>
+        <a
+          href="/contact"
+          target="_blank"
+          rel="noreferrer"
+          className="transition-colors hover:text-[#ede6d8]"
+        >
+          CONTACT
         </a>
       </div>
     </aside>

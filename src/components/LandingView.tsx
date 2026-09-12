@@ -1227,18 +1227,24 @@ export function LandingView({
             <span>TraceXMail, email forensic intelligence</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            <a href="/privacy" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
-              Privacy Policy
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+            <a href="/privacy" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
+              Privacy
             </a>
-            <a href="/terms" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
-              Terms of Service
+            <a href="/terms" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
+              Terms
             </a>
-            <a href="mailto:support@tracexmail.io" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline">
-              Contact us
+            <a href="/cookies" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
+              Cookies
             </a>
-            <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2.5 py-1 rounded-[2px]">
-              CASE STATUS: OPEN
+            <a href="/domains" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
+              Domains
+            </a>
+            <a href="/contact" className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors no-underline text-xs">
+              Contact
+            </a>
+            <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2 py-0.5 rounded-[2px] text-[#8a8070]">
+              VERIFIED: TRACEXMAIL.VERCEL.APP
             </div>
           </div>
         </div>

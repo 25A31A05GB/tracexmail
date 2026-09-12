@@ -34,7 +34,7 @@ import { useWebSocketAlerts } from '../hooks/useWebSocketAlerts';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { UserRole } from '../hooks/useSession';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 
 interface CasesViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -135,6 +135,7 @@ export function CasesView({
   // Real-World Threat Seeding State
   const [seedingRealWorld, setSeedingRealWorld] = useState<boolean>(false);
   const [seedSuccessBanner, setSeedSuccessBanner] = useState<string | null>(null);
+  const [seedErrorBanner, setSeedErrorBanner] = useState<string | null>(null);
 
   // Slack Dispatch State
   const [sendingSlackCaseId, setSendingSlackCaseId] = useState<string | null>(null);
@@ -144,13 +145,21 @@ export function CasesView({
     try {
       setSeedingRealWorld(true);
       setSeedSuccessBanner(null);
+      setSeedErrorBanner(null);
       const res = await forensicApi.seedRealWorldCases();
       setSeedSuccessBanner(`Successfully ingested ${res.seeded_cases_count || 5} active real-world threat cases into Supabase.`);
       await fetchCases();
       setTimeout(() => setSeedSuccessBanner(null), 6000);
     } catch (err: any) {
       console.warn('Error seeding real-world cases:', err);
-      setFetchError(err?.response?.data?.error || err.message || 'Failed to seed real-world cases');
+      const status = err?.response?.status;
+      const errorMsg = status === 401
+        ? 'Authentication Required (401): Valid session token required. Please sign in or ensure your session is initialized with Analyst/Admin role before seeding cases.'
+        : status === 403
+        ? 'Access Forbidden (403): Read-Only users cannot seed cases. Analyst or Admin role required.'
+        : err?.response?.data?.error || err.message || 'Failed to seed real-world cases';
+      setSeedErrorBanner(errorMsg);
+      setTimeout(() => setSeedErrorBanner(null), 8000);
     } finally {
       setSeedingRealWorld(false);
     }
@@ -224,18 +233,26 @@ export function CasesView({
 
   // Real-time Supabase postgres changes channel for cases table
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!getIsSupabaseConfigured() || !supabase) return;
 
-    const channel = supabase
-      .channel('cases_table_live_stream')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
-        fetchCases();
-      })
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel('cases_table_live_stream')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
+          fetchCases();
+        })
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            supabase.removeChannel(channel);
+          }
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // ignore
+    }
   }, [showDemoCases, maskPii]);
 
   // Periodic safety net polling interval (30s)
@@ -668,6 +685,22 @@ export function CasesView({
           <button
             onClick={() => setSeedSuccessBanner(null)}
             className="p-1 text-emerald-400 hover:text-emerald-200 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Seed Error Banner */}
+      {seedErrorBanner && (
+        <div className="bg-red-950/50 border border-red-800/80 p-3.5 rounded-xl flex items-center justify-between text-xs text-red-200 shadow-md animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+            <span className="font-semibold">{seedErrorBanner}</span>
+          </div>
+          <button
+            onClick={() => setSeedErrorBanner(null)}
+            className="p-1 text-red-400 hover:text-red-200 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>

@@ -38,17 +38,33 @@ import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkle
 import { OAuthConsentScreen } from './components/OAuthConsentScreen';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
-import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
-  const publicPath = window.location.pathname;
+  const publicPath = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
 
-  if (publicPath === '/privacy') {
+  if (publicPath === '/privacy' || publicPath === '/privacy-policy') {
     return <LegalPage type="privacy" />;
   }
 
-  if (publicPath === '/terms') {
+  if (publicPath === '/terms' || publicPath === '/terms-of-service' || publicPath === '/tos') {
     return <LegalPage type="terms" />;
+  }
+
+  if (publicPath === '/cookies' || publicPath === '/cookie-policy' || publicPath === '/cookies-policy') {
+    return <LegalPage type="cookies" />;
+  }
+
+  if (publicPath === '/domains' || publicPath === '/domain-verification' || publicPath === '/authorized-domains') {
+    return <LegalPage type="domains" />;
+  }
+
+  if (publicPath === '/contact' || publicPath === '/developer-contact' || publicPath === '/support') {
+    return <LegalPage type="contact" />;
+  }
+
+  if (publicPath === '/security' || publicPath === '/security-policy') {
+    return <LegalPage type="security" />;
   }
 
   if (publicPath === '/oauth/consent' || publicPath === '/oauth/authorize') {
@@ -124,21 +140,28 @@ export default function App() {
     fetchLatestSupabaseCase();
 
     // Supabase Realtime channel subscription for instant case synchronization
-    if (isSupabaseConfigured) {
-      const channel = supabase
-        .channel('realtime_cases_feed')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cases' }, (payload) => {
-          if (payload.new && isMounted) {
-            console.log('[Supabase Realtime] New forensic case inserted:', payload.new);
-            setCasesRefreshSignal(prev => prev + 1);
-          }
-        })
-        .subscribe();
+    if (getIsSupabaseConfigured() && supabase) {
+      try {
+        const channel = supabase
+          .channel('realtime_cases_feed')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cases' }, (payload) => {
+            if (payload.new && isMounted) {
+              setCasesRefreshSignal(prev => prev + 1);
+            }
+          })
+          .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              supabase.removeChannel(channel);
+            }
+          });
 
-      return () => {
-        isMounted = false;
-        supabase.removeChannel(channel);
-      };
+        return () => {
+          isMounted = false;
+          supabase.removeChannel(channel);
+        };
+      } catch {
+        // ignore
+      }
     }
 
     return () => {

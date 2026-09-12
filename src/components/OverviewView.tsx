@@ -65,7 +65,7 @@ interface AICaseSummaryProps {
  */
 export function AICaseSummary({ analysis, className = '' }: AICaseSummaryProps) {
   const [narrativeData, setNarrativeData] = useState<AINarrative | null>(() => {
-    const raw = analysis.ai_narrative || analysis.aiNarrative;
+    const raw = analysis?.ai_narrative || analysis?.aiNarrative;
     if (!raw) return null;
     if (typeof raw === 'string') {
       return {
@@ -84,7 +84,7 @@ export function AICaseSummary({ analysis, className = '' }: AICaseSummaryProps) 
 
   // Sync state if analysis prop updates
   useEffect(() => {
-    const raw = analysis.ai_narrative || analysis.aiNarrative;
+    const raw = analysis?.ai_narrative || analysis?.aiNarrative;
     if (raw) {
       if (typeof raw === 'string') {
         setNarrativeData({
@@ -100,7 +100,7 @@ export function AICaseSummary({ analysis, className = '' }: AICaseSummaryProps) 
       // Non-blocking background fetch attempt if analysis has an ID
       let isMounted = true;
       const attemptFetchNarrative = async () => {
-        if (!analysis.id) return;
+        if (!analysis?.id) return;
         try {
           setIsLoading(true);
           const controller = new AbortController();
@@ -138,11 +138,12 @@ export function AICaseSummary({ analysis, className = '' }: AICaseSummaryProps) 
       };
 
       attemptFetchNarrative();
+
       return () => {
         isMounted = false;
       };
     }
-  }, [analysis.id, analysis.ai_narrative, analysis.aiNarrative]);
+  }, [analysis?.id, analysis?.ai_narrative, analysis?.aiNarrative]);
 
   const handleCopy = () => {
     if (!narrativeData?.narrative) return;
@@ -259,30 +260,6 @@ export function OverviewView({
   onOpenReportModal,
   viewMode = 'simple'
 }: OverviewViewProps) {
-  if (!analysis) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--ink)] text-[var(--paper-dim)] space-y-4">
-        <div className="w-12 h-12 rounded-full bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] flex items-center justify-center text-[var(--thread)]">
-          <AlertTriangle className="w-6 h-6" />
-        </div>
-        <div className="text-center space-y-1">
-          <h3 className="text-base font-bold text-[var(--paper)]">No Analysis Selected</h3>
-          <p className="text-xs text-[var(--paper-dim)] max-w-sm font-sans">
-            Please ingest an email file or select a forensic case to inspect detailed evidence telemetry.
-          </p>
-        </div>
-        {onOpenNewModal && (
-          <button
-            onClick={onOpenNewModal}
-            className="btn-primary text-xs font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer"
-          >
-            <span>Ingest Email File</span>
-          </button>
-        )}
-      </div>
-    );
-  }
-
   const stdVerdict = getStandardizedVerdict(analysis);
 
   // Diagnostic logging on analysis update/mount
@@ -306,6 +283,7 @@ export function OverviewView({
       });
     }
   }, [analysis, stdVerdict.verdict]);
+
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState<boolean>(false);
   const [reverifying, setReverifying] = useState<boolean>(false);
@@ -313,10 +291,13 @@ export function OverviewView({
   const [isEvidenceTagOpen, setIsEvidenceTagOpen] = useState<boolean>(false);
   const [overviewMode, setOverviewMode] = useState<'card' | 'workspace'>('card');
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingPng, setExportingPng] = useState(false);
 
   useEffect(() => {
     setIsTechnicalExpanded(viewMode === 'analyst');
   }, [viewMode]);
+
   const [auditResult, setAuditResult] = useState<{
     verified: boolean;
     recomputedHash: string;
@@ -339,7 +320,7 @@ export function OverviewView({
     }
   };
 
-  const safeHops = Array.isArray(analysis.hops) ? analysis.hops : [];
+  const safeHops = Array.isArray(analysis?.hops) ? analysis.hops : [];
   const originHopRaw = safeHops.find((h) => h?.isOrigin) || safeHops[0];
   const firstPublicGatewayHop = safeHops.find((h) => !h?.isPrivate && h?.fromIp && !h?.isOrigin) || safeHops.find((h) => !h?.isPrivate && h?.fromIp);
 
@@ -439,6 +420,7 @@ export function OverviewView({
   })();
 
   const effectiveDomainIntelligence = (() => {
+    if (!analysis) return null;
     const rawIntel = analysis.domain_intelligence || analysis.domainIntelligence;
     if (rawIntel && rawIntel.domain && !rawIntel.error && rawIntel.status !== 'api_error') {
       return rawIntel;
@@ -484,9 +466,9 @@ export function OverviewView({
     };
   })();
 
-  const safeCaseId = analysis.id || 'case-001';
-  const effectiveEvidenceId = analysis.evidenceId || `EV-${safeCaseId.slice(-6).toUpperCase()}`;
-  const effectiveHash = analysis.sha256Hash || analysis.sha256 || analysis.custodyHash || (analysis.rawEml ? sha256Sync(analysis.rawEml) : sha256Sync(analysis.id || JSON.stringify(analysis)));
+  const safeCaseId = analysis?.id || 'case-001';
+  const effectiveEvidenceId = analysis?.evidenceId || `EV-${safeCaseId.slice(-6).toUpperCase()}`;
+  const effectiveHash = analysis?.sha256Hash || analysis?.sha256 || analysis?.custodyHash || (analysis?.rawEml ? sha256Sync(analysis.rawEml) : sha256Sync(analysis?.id || JSON.stringify(analysis || '')));
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -502,6 +484,7 @@ export function OverviewView({
 
   // Perform live cryptographic re-verification
   const handleReverifyVault = async () => {
+    if (!analysis) return;
     setReverifying(true);
     try {
       // 1. Check API endpoint if live
@@ -518,7 +501,6 @@ export function OverviewView({
       } else {
         // Local cryptographic recalculation
         const localHash = await computeSha256(analysis.rawEml || '');
-        const isMatch = (localHash === effectiveHash || !effectiveHash);
         setAuditResult({
           verified: true,
           recomputedHash: localHash,
@@ -542,10 +524,8 @@ export function OverviewView({
     }
   };
 
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const [exportingPng, setExportingPng] = useState(false);
-
   const handleExportPdf = async () => {
+    if (!analysis) return;
     setExportingPdf(true);
     try {
       const cardEl = document.querySelector('.evidence-card') as HTMLElement || document.getElementById('overview-dashboard');
@@ -564,6 +544,7 @@ export function OverviewView({
   };
 
   const handleExportPng = async () => {
+    if (!analysis) return;
     setExportingPng(true);
     try {
       const cardEl = document.querySelector('.evidence-card') as HTMLElement || document.getElementById('overview-dashboard');
@@ -582,6 +563,7 @@ export function OverviewView({
   };
 
   const handleDownloadRawEml = () => {
+    if (!analysis) return;
     const blob = new Blob([analysis.rawEml || ''], { type: 'message/rfc822' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -592,6 +574,30 @@ export function OverviewView({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  if (!analysis) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[var(--ink)] text-[var(--paper-dim)] space-y-4 font-mono">
+        <div className="w-12 h-12 rounded-full bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] flex items-center justify-center text-[var(--thread)]">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <div className="text-center space-y-1">
+          <h3 className="text-base font-bold text-[var(--paper)]">No Analysis Selected</h3>
+          <p className="text-xs text-[var(--paper-dim)] max-w-sm font-sans">
+            Please ingest an email file or select a forensic case to inspect detailed evidence telemetry.
+          </p>
+        </div>
+        {onOpenNewModal && (
+          <button
+            onClick={onOpenNewModal}
+            className="btn-primary text-xs font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer"
+          >
+            <span>Ingest Email File</span>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const evidenceCardData = mapAnalysisToEvidenceCardData(analysis);
 

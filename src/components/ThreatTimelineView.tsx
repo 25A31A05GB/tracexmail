@@ -79,18 +79,18 @@ export function ThreatTimelineView({
 
   // Extract core target properties from current analysis
   const currentSenderEmail = useMemo(() => {
-    return analysis.headers.fromEmail || (analysis.headers.from.match(/<([^>]+)>/) || [])[1] || analysis.headers.from;
+    return analysis?.headers?.fromEmail || (analysis?.headers?.from ? (analysis.headers.from.match(/<([^>]+)>/) || [])[1] || analysis.headers.from : analysis?.from || 'unknown@example.com');
   }, [analysis]);
 
   const currentDomain = useMemo(() => {
-    if (currentSenderEmail.includes('@')) {
+    if (currentSenderEmail && currentSenderEmail.includes('@')) {
       return currentSenderEmail.split('@')[1].toLowerCase();
     }
-    return currentSenderEmail;
+    return currentSenderEmail || 'example.com';
   }, [currentSenderEmail]);
 
   const currentReturnPathDomain = useMemo(() => {
-    if (analysis.headers.returnPath) {
+    if (analysis?.headers?.returnPath) {
       const match = analysis.headers.returnPath.match(/@([a-zA-Z0-9.-]+)/);
       if (match) return match[1].toLowerCase();
     }
@@ -98,7 +98,8 @@ export function ThreatTimelineView({
   }, [analysis]);
 
   const currentOriginIp = useMemo(() => {
-    const originHop = analysis.hops.find((h) => h.isOrigin) || analysis.hops[0];
+    const hops = Array.isArray(analysis?.hops) ? analysis.hops : [];
+    const originHop = hops.find((h) => h.isOrigin) || hops[0];
     return originHop?.fromIp || originHop?.byHost || '185.220.101.5';
   }, [analysis]);
 

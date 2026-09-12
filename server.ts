@@ -4739,17 +4739,37 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   app.get('/api/auth/status', publicLimiter, (_req, res) => {
     const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
     const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
-    const supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+    let supabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('placeholder'));
+    if (supabaseConfigured) {
+      try {
+        const parts = supabaseAnonKey.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          const urlMatch = supabaseUrl.match(/https?:\/\/([^.]+)\.supabase\./i);
+          if (urlMatch && urlMatch[1] && payload.ref) {
+            if (urlMatch[1].toLowerCase() !== payload.ref.toLowerCase()) {
+              supabaseConfigured = false;
+            }
+          }
+        } else {
+          supabaseConfigured = false;
+        }
+      } catch {
+        supabaseConfigured = false;
+      }
+    }
+
     const googleAuthConfigured = Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID);
     res.json({
       status: 'ok',
       supabaseConfigured,
       googleAuthConfigured,
-      supabaseUrl: supabaseUrl || null,
-      supabaseAnonKey: supabaseAnonKey || null,
+      supabaseUrl: supabaseConfigured ? supabaseUrl : null,
+      supabaseAnonKey: supabaseConfigured ? supabaseAnonKey : null,
       message: supabaseConfigured
-        ? 'Supabase credentials detected'
-        : 'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY not set'
+        ? 'Supabase credentials detected and verified'
+        : 'Supabase credentials not configured or mismatched'
     });
   });
 

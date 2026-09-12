@@ -53,15 +53,61 @@ export function subscribeSession(listener: SessionListener): () => void {
 /**
  * Real Supabase session initialization:
  * Reads verified session from Supabase Auth client, fetches profile, and syncs session state.
+ * Falls back safely to stored enclave session in local/offline modes.
  */
 export async function initializeSession(): Promise<{ token: string | null; user: SessionUser | null }> {
   if (!supabase) {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('tracexmail_enclave_session');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.token && parsed.user) {
+            const user: SessionUser = {
+              userId: parsed.user.id || 'usr_analyst_enclave',
+              email: parsed.user.email || 'analyst@tracexmail.sec',
+              organizationId: parsed.profile?.organization_id || DEFAULT_ORG_ID,
+              role: parsed.profile?.role || parsed.user?.user_metadata?.role || 'analyst',
+              label: parsed.profile?.full_name || 'Security Analyst',
+              authMethod: 'enclave_token'
+            };
+            setSession(parsed.token, user);
+            return { token: parsed.token, user };
+          }
+        }
+      } catch (e) {
+        console.warn('[Session] Failed to parse enclave session storage:', e);
+      }
+    }
     return { token: null, user: null };
   }
 
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error || !session) {
+      // Check for local enclave session fallback before resetting
+      if (typeof window !== 'undefined') {
+        try {
+          const stored = localStorage.getItem('tracexmail_enclave_session');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed && parsed.token && parsed.user) {
+              const user: SessionUser = {
+                userId: parsed.user.id || 'usr_analyst_enclave',
+                email: parsed.user.email || 'analyst@tracexmail.sec',
+                organizationId: parsed.profile?.organization_id || DEFAULT_ORG_ID,
+                role: parsed.profile?.role || parsed.user?.user_metadata?.role || 'analyst',
+                label: parsed.profile?.full_name || 'Security Analyst',
+                authMethod: 'enclave_token'
+              };
+              setSession(parsed.token, user);
+              return { token: parsed.token, user };
+            }
+          }
+        } catch (e) {
+          console.warn('[Session] Failed to parse enclave session storage:', e);
+        }
+      }
       setSession(null, null);
       return { token: null, user: null };
     }

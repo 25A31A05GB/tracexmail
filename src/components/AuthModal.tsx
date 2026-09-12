@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2 } from 'lucide-react';
+import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2, MailCheck, ArrowRight } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { initializeSession, SessionUser, signOutUser } from '../lib/api';
@@ -172,29 +172,60 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
         {/* Body */}
         <div className="p-6 space-y-4">
           {submitted ? (
-            <div className="space-y-5 py-2">
-              <div className="p-6 rounded-lg bg-emerald-950/30 border border-emerald-800/60 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-900/40 border border-emerald-500/50 text-emerald-400 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-6 h-6" />
+            <div className="space-y-4 py-2">
+              <div className="p-5 rounded-lg bg-emerald-950/30 border border-emerald-800/60 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-900/40 border border-emerald-500/50 text-emerald-400 flex items-center justify-center mx-auto shadow-sm">
+                  <MailCheck className="w-6 h-6" />
                 </div>
-                <div className="space-y-2">
-                  <h4 className="text-base font-semibold text-slate-100">
-                    Access Request Submitted
+                <div className="space-y-1.5">
+                  <h4 className="text-base font-semibold text-slate-100 font-display">
+                    Account Registration &amp; Access Dispatched
                   </h4>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
-                    Your access request has been successfully submitted. A team member will follow up by email at <span className="font-mono text-cyan-300 font-medium">{email || 'your email'}</span> with your workspace clearance and next steps.
+                    Your request has been registered in the SOC enclave directory. A confirmation email and security clearance verification link have been dispatched to:
                   </p>
+                  <div className="inline-block px-3 py-1 rounded bg-[#0c0a08] border border-[#3a352c] font-mono text-cyan-300 text-xs font-medium mt-1">
+                    {email || 'your corporate email'}
+                  </div>
+                </div>
+
+                {/* Provisioned Attributes */}
+                <div className="pt-2 text-left bg-slate-900/70 border border-slate-800 rounded p-3 text-[11px] font-mono space-y-1 text-slate-300">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Requested Role:</span>
+                    <span className="text-amber-400 uppercase font-bold">{role}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Tenant Org:</span>
+                    <span className="text-slate-200">{organizationId || 'org_acme_soc_01'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Verification Link:</span>
+                    <span className="text-emerald-400">Valid for 24h</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="pt-1">
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmitted(false);
+                    setMode('signin');
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Proceed to Sign In</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     setSubmitted(false);
                     onClose();
                   }}
-                  className="w-full py-2.5 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all cursor-pointer"
+                  className="py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs transition-colors cursor-pointer"
                 >
                   Close
                 </button>

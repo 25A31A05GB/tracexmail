@@ -27,6 +27,15 @@ export function HopTracerouteView({ analysis }: HopTracerouteProps) {
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'timeline' | 'flow'>('flow');
 
+  const hops = Array.isArray(analysis?.hops) ? analysis.hops : [];
+  const activeHop = hops[selectedHopIndex] || hops[0] || {} as EmailHop;
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(text);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
   if (!analysis) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#14120f] text-[#8a8070]">
@@ -36,15 +45,6 @@ export function HopTracerouteView({ analysis }: HopTracerouteProps) {
       </div>
     );
   }
-
-  const hops = Array.isArray(analysis.hops) ? analysis.hops : [];
-  const activeHop = hops[selectedHopIndex] || hops[0] || {} as EmailHop;
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000);
-  };
 
   return (
     <div id="hops-view" className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto bg-[#14120f]">

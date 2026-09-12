@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { getWebSocketUrl } from '../utils/wsUrl';
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
@@ -284,53 +284,61 @@ export function useWebSocketAlerts() {
 
   // Real-time Postgres changes stream via Supabase Realtime channel
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!getIsSupabaseConfigured() || !supabase) return;
 
-    const channel = supabase
-      .channel('supabase_realtime_alerts_stream')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload) => {
-        const row = payload.new as any;
-        if (row) {
-          const incoming: WebSocketAlert = {
-            id: row.id || `alt_${Date.now()}`,
-            case_id: row.case_id,
-            timestamp: row.timestamp || new Date().toISOString(),
-            severity: row.severity || 'HIGH',
-            title: row.title || 'Security Incident Alert',
-            description: row.description || 'Forensic threat anomaly detected in message pipeline.',
-            source: row.source || 'supabase-realtime',
-            read: Boolean(row.read),
-            threat_score: row.threat_score || 80,
-            category: row.category || 'SECURITY_ALERT',
-            sender: row.sender,
-            subject: row.subject
-          };
-          addAlert(incoming);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'alerts' }, (payload) => {
-        const row = payload.new as any;
-        if (row && row.id) {
-          setAlerts(prev => prev.map(a => (a.id === row.id ? { ...a, ...row } : a)));
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cases' }, (payload) => {
-        const newCase = payload.new as any;
-        if (newCase?.id) {
-          setLastCreatedCaseId(newCase.id);
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cases' }, (payload) => {
-        const updatedCase = payload.new as any;
-        if (updatedCase?.id) {
-          setLastCreatedCaseId(`update_${updatedCase.id}_${Date.now()}`);
-        }
-      })
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel('supabase_realtime_alerts_stream')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, (payload) => {
+          const row = payload.new as any;
+          if (row) {
+            const incoming: WebSocketAlert = {
+              id: row.id || `alt_${Date.now()}`,
+              case_id: row.case_id,
+              timestamp: row.timestamp || new Date().toISOString(),
+              severity: row.severity || 'HIGH',
+              title: row.title || 'Security Incident Alert',
+              description: row.description || 'Forensic threat anomaly detected in message pipeline.',
+              source: row.source || 'supabase-realtime',
+              read: Boolean(row.read),
+              threat_score: row.threat_score || 80,
+              category: row.category || 'SECURITY_ALERT',
+              sender: row.sender,
+              subject: row.subject
+            };
+            addAlert(incoming);
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'alerts' }, (payload) => {
+          const row = payload.new as any;
+          if (row && row.id) {
+            setAlerts(prev => prev.map(a => (a.id === row.id ? { ...a, ...row } : a)));
+          }
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'cases' }, (payload) => {
+          const newCase = payload.new as any;
+          if (newCase?.id) {
+            setLastCreatedCaseId(newCase.id);
+          }
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'cases' }, (payload) => {
+          const updatedCase = payload.new as any;
+          if (updatedCase?.id) {
+            setLastCreatedCaseId(`update_${updatedCase.id}_${Date.now()}`);
+          }
+        })
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            supabase.removeChannel(channel);
+          }
+        });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // ignore
+    }
   }, [addAlert]);
 
   const dismissToast = useCallback(() => {

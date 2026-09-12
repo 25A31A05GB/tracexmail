@@ -295,9 +295,24 @@ export function OAuthConsentScreen({ onConsentHandled }: OAuthConsentProps) {
               </button>
             </div>
 
-            <p className="text-[10px] text-center text-[#787163]">
-              By clicking Authorize, you grant this application permission to access your designated SOC data under your current organization's data governance policy.
-            </p>
+            <div className="pt-2 text-[10px] text-center text-[#787163] space-y-1">
+              <p>
+                By clicking Authorize, you grant this application permission to access your designated SOC data under your current organization's data governance policy.
+              </p>
+              <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-mono">
+                <a href="/privacy" target="_blank" rel="noreferrer" className="text-[#a89f8d] hover:text-[#ede6d8] underline">
+                  Privacy Policy
+                </a>
+                <span>•</span>
+                <a href="/terms" target="_blank" rel="noreferrer" className="text-[#a89f8d] hover:text-[#ede6d8] underline">
+                  Terms of Service
+                </a>
+                <span>•</span>
+                <a href="/contact" target="_blank" rel="noreferrer" className="text-[#a89f8d] hover:text-[#ede6d8] underline">
+                  Developer Contact
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>
