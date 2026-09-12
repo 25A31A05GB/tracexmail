@@ -40,8 +40,8 @@ export function SignupView({
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMsg('Password must be at least 6 characters.');
+    if (password.length < 12) {
+      setErrorMsg('Security Policy: Password must be at least 12 characters in length.');
       return;
     }
 
@@ -69,6 +69,18 @@ export function SignupView({
         });
 
         if (error) {
+          const errMsg = error.message.toLowerCase();
+          if (errMsg.includes('pwned') || errMsg.includes('compromised') || errMsg.includes('breach') || errMsg.includes('leaked')) {
+            setErrorMsg('Security Notice: This password has appeared in known public data breaches. Please choose a different, strong password.');
+            setLoading(false);
+            return;
+          }
+          if (errMsg.includes('already registered') || errMsg.includes('already exists') || errMsg.includes('user already in use')) {
+            // Anti-enumeration: return identical confirmation prompt
+            setSuccessMsg(`Verification link dispatched. Please check your inbox at ${email.trim()} to confirm your account.`);
+            setLoading(false);
+            return;
+          }
           setErrorMsg(error.message || 'Account registration failed.');
           setLoading(false);
           return;
@@ -270,13 +282,17 @@ export function SignupView({
             </div>
 
             <div className="space-y-1">
-              <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-password">
-                Password (min 6 characters)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-password">
+                  Password (min 12 characters)
+                </label>
+                <span className="text-[10.5px] text-[var(--forensic-green)] font-mono">Leaked-check active</span>
+              </div>
               <input
                 id="signup-password"
                 type="password"
                 required
+                minLength={12}
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

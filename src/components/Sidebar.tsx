@@ -27,7 +27,8 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  Mail
+  Mail,
+  SlidersHorizontal
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
@@ -50,7 +51,8 @@ export type NavTab =
   | 'ingest'
   | 'gmail'
   | 'organization'
-  | 'team';
+  | 'team'
+  | 'settings';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -153,6 +155,7 @@ export function Sidebar({
     { id: 'search', label: 'Search', icon: Search },
     { id: 'overview', label: 'Message Overview', icon: Activity },
     { id: 'alerts', label: 'Live Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
+    { id: 'settings', label: 'Account & Security', icon: SlidersHorizontal },
   ];
 
   // Tier 2: Collapsible Forensic Tools Items
@@ -178,7 +181,7 @@ export function Sidebar({
 
   const handleTabClick = (tabId: NavTab, label: string) => {
     // If in personal mode and clicking an enterprise-only feature
-    const personalAllowedTabs: NavTab[] = ['ingest', 'overview', 'hops', 'map', 'headers', 'logs'];
+    const personalAllowedTabs: NavTab[] = ['ingest', 'overview', 'hops', 'map', 'headers', 'logs', 'settings'];
     if (accountType === 'personal' && !personalAllowedTabs.includes(tabId)) {
       if (onOpenUpgradeModal) {
         onOpenUpgradeModal(label);

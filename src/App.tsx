@@ -19,6 +19,7 @@ import { IngestionPipelineView } from './components/IngestionPipelineView';
 import { GmailConnectionView } from './components/GmailConnectionView';
 import { OrganizationView } from './components/OrganizationView';
 import { TeamView } from './components/TeamView';
+import { AccountSettingsView } from './components/AccountSettingsView';
 import { ModeUpgradeModal } from './components/ModeUpgradeModal';
 import { NewAnalysisModal } from './components/NewAnalysisModal';
 import { ReportModal } from './components/ReportModal';
@@ -65,6 +66,7 @@ export default function App() {
     organizationId, 
     loading: authLoading, 
     signOut, 
+    revokeAllOtherSessions,
     loginAsRole, 
     switchRole,
     upgradeToOrganization,
@@ -437,7 +439,7 @@ export default function App() {
     ? 'dashboard'
     : activeTab;
 
-  const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers'].includes(effectiveTab);
+  const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers', 'settings'].includes(effectiveTab);
 
   return (
     <div className="flex h-screen w-screen bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
@@ -454,7 +456,6 @@ export default function App() {
         viewMode={viewMode}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 overflow-hidden">
         {/* Top Header with clearance badge, avatar, role switcher, and sign-out */}
         <Header
@@ -472,6 +473,7 @@ export default function App() {
           accountType={accountType}
           onOpenUpgradeModal={handleOpenUpgradeModal}
           onSignOut={signOut}
+          onOpenSettings={() => setActiveTab('settings')}
           onSwitchRole={switchRole}
           viewMode={viewMode}
           onSetViewMode={handleToggleViewMode}
@@ -627,6 +629,21 @@ export default function App() {
 
               {effectiveTab === 'team' && role === 'admin' && (
                 <TeamView />
+              )}
+
+              {effectiveTab === 'settings' && (
+                <AccountSettingsView
+                  role={role}
+                  accountType={accountType}
+                  organizationId={organizationId || 'org_acme_soc_01'}
+                  user={user}
+                  profile={profile}
+                  userLabel={userInitials}
+                  isEmailVerified={isEmailVerified}
+                  onSignOut={signOut}
+                  revokeAllOtherSessions={revokeAllOtherSessions}
+                  onNavigateTab={setActiveTab}
+                />
               )}
             </>
           )}

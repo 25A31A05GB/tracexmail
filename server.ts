@@ -115,6 +115,7 @@ import {
   type UserContext,
   type AuthenticatedRequest
 } from './src/server/compliance';
+import { createAuthRouter } from './src/server/authRoutes';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
@@ -1378,6 +1379,7 @@ async function startServer() {
 
   // Apply strict rate limiting to authentication routes
   app.use('/api/auth', authLimiter);
+  app.use('/api/auth', createAuthRouter({ broadcastAlertFn: broadcastAlert }));
 
   // REST API Endpoints
 

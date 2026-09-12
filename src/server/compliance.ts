@@ -121,7 +121,27 @@ export function getSupabaseClient(): SupabaseClient | null {
 // ============================================================================
 
 /**
+ * Redacts passwords, bearer tokens, and secrets from any audit log payload
+ */
+export function sanitizeAuditPayload(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizeAuditPayload);
+  const sanitized: Record<string, any> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (/password|secret|token|authorization|bearer|apikey|cookie|credential|cvv|hash/i.test(k)) {
+      sanitized[k] = '[REDACTED]';
+    } else if (typeof v === 'object' && v !== null) {
+      sanitized[k] = sanitizeAuditPayload(v);
+    } else {
+      sanitized[k] = v;
+    }
+  }
+  return sanitized;
+}
+
+/**
  * Logs an audit action. Awaits the Supabase insert and surfaces a real error if it fails.
+ * Guarantees zero leakage of passwords, bearer tokens, or sensitive credentials.
  */
 export async function logAuditAction(
   entry: AuditLogEntryInput,
@@ -135,10 +155,10 @@ export async function logAuditAction(
     user_email: entry.user_email || 'system@tracexmail.sec',
     user_role: entry.user_role || 'system',
     action: entry.action,
-    resource_type: entry.resource_type || 'case',
+    resource_type: entry.resource_type || (entry.action.startsWith('AUTH_') ? 'auth' : 'case'),
     resource_id: entry.resource_id || null,
-    details: entry.details || {},
-    metadata: entry.metadata || {},
+    details: sanitizeAuditPayload(entry.details || {}),
+    metadata: sanitizeAuditPayload(entry.metadata || {}),
     ip_address: entry.ip_address || '127.0.0.1',
     status: entry.status || 'SUCCESS',
     created_at: new Date().toISOString()

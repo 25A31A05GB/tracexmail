@@ -49,6 +49,7 @@ export interface UseSessionReturn {
   loading: boolean;
   userLabel: string;
   signOut: () => Promise<void>;
+  revokeAllOtherSessions: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   loginAsRole: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => void;
   switchRole: (newRole: UserRole) => void;
@@ -62,6 +63,7 @@ export function useSession(): UseSessionReturn {
   const [session, setLocalSession] = useState<Session | EnclaveLocalSession | null>(null);
   const [user, setUser] = useState<User | EnclaveLocalSession['user'] | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchProfile = useCallback(async (currentUser: User): Promise<UserProfile | null> => {
@@ -145,6 +147,7 @@ export function useSession(): UseSessionReturn {
       authMethod: 'supabase_jwt'
     };
 
+    setSessionToken(currentSession.access_token);
     setSession(currentSession.access_token, sessionUser);
     setLoading(false);
   }, [fetchProfile]);
@@ -161,6 +164,7 @@ export function useSession(): UseSessionReturn {
           setLocalSession(parsed);
           setUser(parsed.user as any);
           setProfile(parsed.profile);
+          setSessionToken(parsed.token);
           const sessionUser: SessionUser = {
             userId: parsed.user.id,
             email: parsed.user.email,
@@ -212,9 +216,25 @@ export function useSession(): UseSessionReturn {
   }, [syncState]);
 
   const signOut = useCallback(async () => {
+    const currentToken = sessionToken;
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
+
+    // Call server revocation endpoint if token exists
+    if (currentToken) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (err) {
+        console.warn('[useSession] Server logout notice:', err);
+      }
+    }
 
     if (supabase) {
       try {
@@ -226,8 +246,33 @@ export function useSession(): UseSessionReturn {
     setLocalSession(null);
     setUser(null);
     setProfile(null);
+    setSessionToken(null);
     setSession(null, null);
-  }, []);
+  }, [sessionToken]);
+
+  const revokeAllOtherSessions = useCallback(async () => {
+    const currentToken = sessionToken;
+    if (supabase) {
+      try {
+        await supabase.auth.signOut({ scope: 'others' });
+      } catch (err) {
+        console.warn('[useSession] Supabase revoke others notice:', err);
+      }
+    }
+    if (currentToken) {
+      try {
+        await fetch('/api/auth/revoke-all-sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (err) {
+        console.warn('[useSession] Server revoke-all notice:', err);
+      }
+    }
+  }, [sessionToken]);
 
   const loginAsRole = useCallback((newRole: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => {
     const roleTitles: Record<UserRole, { title: string; defaultEmail: string }> = {
@@ -382,6 +427,7 @@ export function useSession(): UseSessionReturn {
     loading,
     userLabel,
     signOut,
+    revokeAllOtherSessions,
     refreshProfile,
     loginAsRole,
     switchRole,

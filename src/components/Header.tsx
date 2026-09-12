@@ -50,6 +50,7 @@ interface HeaderProps {
   accountType?: 'personal' | 'organization';
   onOpenUpgradeModal?: (featureName?: string) => void;
   onSignOut?: () => void;
+  onOpenSettings?: () => void;
   onSwitchRole?: (newRole: UserRole) => void;
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
@@ -70,6 +71,7 @@ export function Header({
   accountType = 'organization',
   onOpenUpgradeModal,
   onSignOut,
+  onOpenSettings,
   onSwitchRole,
   onOpenWalkthrough,
   viewMode = 'simple',
@@ -321,8 +323,20 @@ export function Header({
                 </div>
               </div>
 
-              {onSignOut && (
-                <div className="py-1">
+              <div className="py-1">
+                {onOpenSettings && (
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      onOpenSettings();
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[#ede6d8] hover:bg-[rgba(201,162,39,0.15)] hover:text-[var(--stamp)] flex items-center gap-2 cursor-pointer transition-colors font-sans font-medium"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                    <span>Account &amp; MFA Settings</span>
+                  </button>
+                )}
+                {onSignOut && (
                   <button
                     onClick={() => {
                       setUserDropdownOpen(false);
@@ -333,8 +347,8 @@ export function Header({
                     <LogOut className="w-3.5 h-3.5 text-[var(--thread)]" />
                     <span>Sign out of enclave</span>
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

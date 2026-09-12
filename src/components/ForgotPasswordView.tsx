@@ -33,17 +33,28 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro }: ForgotPassw
         });
 
         if (error) {
-          setErrorMsg(error.message || 'Failed to send password reset email.');
-          setLoading(false);
-          return;
+          // If rate limit, inform user; otherwise return generic message to prevent enumeration
+          if (error.message.toLowerCase().includes('rate') || error.status === 429) {
+            setErrorMsg('Rate limit exceeded: Too many reset requests. Please wait a few minutes before trying again.');
+            setLoading(false);
+            return;
+          }
         }
+      } else {
+        // Fallback to server endpoint
+        await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim() })
+        });
       }
 
-      // Successful password reset email dispatched
-      setSuccessMsg(`Password reset instructions and verification link have been dispatched to ${email.trim()}. Please check your inbox and spam folders.`);
+      // Consistent non-enumerating message for all valid attempts
+      setSuccessMsg(`If an account exists for ${email.trim()}, password recovery instructions and a secure reset link have been dispatched. Please check your inbox and spam folders.`);
     } catch (err: any) {
       console.error('[ForgotPassword] Reset error:', err);
-      setErrorMsg(err.message || 'An unexpected error occurred while requesting password reset.');
+      // Even on error, avoid leaking user existence unless connection failure
+      setSuccessMsg(`If an account exists for ${email.trim()}, password recovery instructions have been dispatched.`);
     } finally {
       setLoading(false);
     }
