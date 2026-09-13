@@ -32,17 +32,20 @@ export function generateForensicMarkdownReport(
   const displaySubject = enforceMasking ? maskText(analysis.name || analysis.subject || analysis.headers?.subject, privacyConfig.maskingMode) : (analysis.name || analysis.subject || analysis.headers?.subject || 'NO SUBJECT');
   const purgeInfo = getRetentionPurgeDate(privacyConfig.retentionPolicy, analysis.analyzedAt);
 
+  const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
+  const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';
+
   // Real human sender (client) IP — distinct from the "Origin Relay IP" above, which is
   // the sending domain's own registered outbound mail server/infra IP. Only populated
   // when the sending platform actually disclosed it (e.g. X-Originating-IP). Never fabricated.
   const realSender = analysis.realSenderIp?.resolved
     ? analysis.realSenderIp
     : extractRealSenderIp(analysis.headers?.allHeaders);
-  const realSenderIpRaw = formatRealSenderIp(realSender);
+  const realSenderIpRaw = formatRealSenderIp(realSender, fromDomain);
   const realSenderIpDisplay = realSender.resolved
     ? (enforceMasking ? maskIp(realSender.ip || undefined, false, privacyConfig.maskingMode) : realSenderIpRaw)
     : realSenderIpRaw;
-  const realSenderLocation = formatRealSenderLocation(realSender);
+  const realSenderLocation = formatRealSenderLocation(realSender, fromDomain);
 
   const hopsTable = (analysis.hops || []).map((h, i) => {
     const ip = enforceMasking ? maskIp(h.fromIp, h.isPrivate, privacyConfig.maskingMode) : (h.fromIp || '0.0.0.0');

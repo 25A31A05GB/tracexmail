@@ -122,84 +122,82 @@ export function ForensicCaseTwoPanel({
             ))}
           </div>
 
-          {/* Section 2: ORIGIN & RELAY (Progressive Disclosure) */}
-          {isTechnicalExpanded && (
-            <>
-              <div className="border-b border-[#2A2D34] pb-1.5 mb-3 mt-4 text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider flex items-center justify-between">
-                <span>{evidenceCardData.origin?.sectionTitle || 'ORIGIN & RELAY'}</span>
-                <JargonTooltip termKey="ASN" text="Network Operator (ASN)" />
-              </div>
-              <div className="grid grid-cols-[110px_1fr] gap-y-1.5 items-start text-xs font-mono py-1">
-                {evidenceCardData.origin && (
-                  <>
-                    <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
-                      FIRST-HOP IP
-                    </span>
-                    <span
-                      className={`break-all font-bold ${
-                        evidenceCardData.origin.ipStatus === 'bad'
-                          ? 'text-[#F87171]'
-                          : 'text-[#34D399]'
-                      }`}
-                    >
-                      {evidenceCardData.origin.ip}
-                    </span>
+          {/* Section 2: ORIGIN & SENDER IP (Always visible for primary attribution) */}
+          <div className="border-b border-[#2A2D34] pb-1.5 mb-3 mt-4 text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider flex items-center justify-between">
+            <span>{evidenceCardData.origin?.sectionTitle || 'ORIGIN & SENDER IP'}</span>
+            <JargonTooltip termKey="ASN" text="Network Operator (ASN)" />
+          </div>
+          <div className="grid grid-cols-[110px_1fr] gap-y-1.5 items-start text-xs font-mono py-1">
+            {evidenceCardData.origin && (
+              <>
+                <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
+                  FIRST-HOP IP
+                </span>
+                <span
+                  className={`break-all font-bold ${
+                    evidenceCardData.origin.ipStatus === 'bad'
+                      ? 'text-[#F87171]'
+                      : 'text-[#34D399]'
+                  }`}
+                >
+                  {evidenceCardData.origin.ip}
+                </span>
 
-                    <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
-                      LOCATION
-                    </span>
-                    <div className="text-[#F1EFEA] flex items-center justify-between gap-2 flex-wrap">
-                      <span className="break-all">{evidenceCardData.origin.location}</span>
-                      {onNavigateToMap && (
-                        <button
-                          onClick={onNavigateToMap}
-                          className="text-[#38BDF8] hover:text-[#7DD3FC] text-[11px] font-bold shrink-0 cursor-pointer ml-auto"
-                        >
-                          Maps ↗
-                        </button>
-                      )}
-                    </div>
-
-                    {evidenceCardData.origin.extraRows?.map((r, idx) => (
-                      <div key={idx} className="contents">
-                        <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
-                          {r.k}
-                        </span>
-                        <span
-                          className={`break-all font-bold ${
-                            r.status === 'bad'
-                              ? 'text-[#F87171]'
-                              : r.status === 'warn'
-                              ? 'text-[#FBBF24]'
-                              : 'text-[#F1EFEA]'
-                          }`}
-                        >
-                          {r.v}
-                        </span>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-
-              {/* Relay Chain Box */}
-              {evidenceCardData.relay && (
-                <div className="mt-2.5 p-2.5 rounded border border-[#2A2D34] bg-[#1D2027] text-xs flex items-center justify-between gap-3 flex-wrap">
-                  <span
-                    className="text-[#8C94A0] font-mono break-words leading-relaxed [&>b]:text-[#F1EFEA] [&>span]:text-[#F87171]"
-                    dangerouslySetInnerHTML={{ __html: evidenceCardData.relay.chain }}
-                  />
-                  {onNavigateToGraph && (
+                <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
+                  LOCATION
+                </span>
+                <div className="text-[#F1EFEA] flex items-center justify-between gap-2 flex-wrap">
+                  <span className="break-all">{evidenceCardData.origin.location}</span>
+                  {onNavigateToMap && (
                     <button
-                      onClick={onNavigateToGraph}
-                      className="text-[#38BDF8] hover:text-[#7DD3FC] text-[11px] font-bold shrink-0 cursor-pointer"
+                      onClick={onNavigateToMap}
+                      className="text-[#38BDF8] hover:text-[#7DD3FC] text-[11px] font-bold shrink-0 cursor-pointer ml-auto"
                     >
-                      Full graph ↗
+                      Maps ↗
                     </button>
                   )}
                 </div>
+
+                {evidenceCardData.origin.extraRows?.map((r, idx) => (
+                  <div key={idx} className="contents">
+                    <span className="text-[#8C94A0] font-semibold tracking-wider uppercase text-[11px] pt-0.5">
+                      {r.k}
+                    </span>
+                    <span
+                      className={`break-all font-bold ${
+                        r.status === 'bad'
+                          ? 'text-[#F87171]'
+                          : r.status === 'warn'
+                          ? 'text-[#FBBF24]'
+                          : r.status === 'good'
+                          ? 'text-[#34D399]'
+                          : 'text-[#CBD5E1]'
+                      }`}
+                    >
+                      {r.v}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+
+          {/* Relay Chain Box (Progressive Disclosure - only expanded during technical deep dive) */}
+          {isTechnicalExpanded && evidenceCardData.relay && (
+            <div className="mt-2.5 p-2.5 rounded border border-[#2A2D34] bg-[#1D2027] text-xs flex items-center justify-between gap-3 flex-wrap">
+              <span
+                className="text-[#8C94A0] font-mono break-words leading-relaxed [&>b]:text-[#F1EFEA] [&>span]:text-[#F87171]"
+                dangerouslySetInnerHTML={{ __html: evidenceCardData.relay.chain }}
+              />
+              {onNavigateToGraph && (
+                <button
+                  onClick={onNavigateToGraph}
+                  className="text-[#38BDF8] hover:text-[#7DD3FC] text-[11px] font-bold shrink-0 cursor-pointer"
+                >
+                  Full graph ↗
+                </button>
               )}
-            </>
+            </div>
           )}
 
           {/* Section 3: DOMAIN INTELLIGENCE */}

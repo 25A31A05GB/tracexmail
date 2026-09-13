@@ -38,6 +38,17 @@ export interface EnclaveLocalSession {
   profile: UserProfile;
 }
 
+export interface LoginRoleOptions {
+  token: string;
+  userId: string;
+  email: string;
+  fullName?: string;
+  orgName?: string;
+  accountType?: AccountType;
+  employeeId?: string;
+  isEmailVerified: boolean;
+}
+
 export interface UseSessionReturn {
   session: Session | EnclaveLocalSession | null;
   user: User | EnclaveLocalSession['user'] | null;
@@ -51,7 +62,7 @@ export interface UseSessionReturn {
   signOut: () => Promise<void>;
   revokeAllOtherSessions: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  loginAsRole: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => void;
+  loginAsRole: (role: UserRole, options: LoginRoleOptions) => void;
   switchRole: (newRole: UserRole) => void;
   switchAccountType: (newType: AccountType, orgName?: string) => void;
   upgradeToOrganization: (orgName: string) => Promise<void>;
@@ -95,20 +106,23 @@ export function useSession(): UseSessionReturn {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed: EnclaveLocalSession = JSON.parse(stored);
-          setLocalSession(parsed);
-          setUser(parsed.user as any);
-          setProfile(parsed.profile);
-          const sessionUser: SessionUser = {
-            userId: parsed.user.id,
-            email: parsed.user.email,
-            organizationId: parsed.profile.organization_id || 'org_acme_soc_01',
-            role: parsed.profile.role || 'analyst',
-            label: parsed.profile.full_name || 'Security Analyst',
-            authMethod: 'enclave_token'
-          };
-          setSession(parsed.token, sessionUser);
-          setLoading(false);
-          return;
+          if (parsed.token && parsed.user?.id && parsed.user?.email) {
+            setLocalSession(parsed);
+            setUser(parsed.user as any);
+            setProfile(parsed.profile);
+            setSessionToken(parsed.token);
+            const sessionUser: SessionUser = {
+              userId: parsed.user.id,
+              email: parsed.user.email,
+              organizationId: parsed.profile?.organization_id || 'org_acme_soc_01',
+              role: parsed.profile?.role || 'analyst',
+              label: parsed.profile?.full_name || 'Security Analyst',
+              authMethod: 'enclave_token'
+            };
+            setSession(parsed.token, sessionUser);
+            setLoading(false);
+            return;
+          }
         }
       } catch (e) {
         console.warn('Failed to parse stored enclave session:', e);
@@ -117,6 +131,7 @@ export function useSession(): UseSessionReturn {
       setLocalSession(null);
       setUser(null);
       setProfile(null);
+      setSessionToken(null);
       setSession(null, null);
       setLoading(false);
       return;
@@ -166,7 +181,7 @@ export function useSession(): UseSessionReturn {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed: EnclaveLocalSession = JSON.parse(stored);
-        if (isMounted) {
+        if (isMounted && parsed.token && parsed.user?.id && parsed.user?.email) {
           setLocalSession(parsed);
           setUser(parsed.user as any);
           setProfile(parsed.profile);
@@ -174,9 +189,9 @@ export function useSession(): UseSessionReturn {
           const sessionUser: SessionUser = {
             userId: parsed.user.id,
             email: parsed.user.email,
-            organizationId: parsed.profile.organization_id || 'org_acme_soc_01',
-            role: parsed.profile.role || 'analyst',
-            label: parsed.profile.full_name || 'Security Analyst',
+            organizationId: parsed.profile?.organization_id || 'org_acme_soc_01',
+            role: parsed.profile?.role || 'analyst',
+            label: parsed.profile?.full_name || 'Security Analyst',
             authMethod: 'enclave_token'
           };
           setSession(parsed.token, sessionUser);
@@ -201,10 +216,9 @@ export function useSession(): UseSessionReturn {
         return;
       }
       if (initSession) {
-        console.log('[useSession] Initial Supabase session restored for user:', initSession.user?.email, 'Provider:', initSession.user?.app_metadata?.provider);
+        console.log('[useSession] Initial Supabase session restored for user:', initSession.user?.email);
         syncState(initSession);
       } else {
-        console.log('[useSession] No active initial Supabase session detected.');
         setLoading(false);
       }
     });
@@ -212,12 +226,6 @@ export function useSession(): UseSessionReturn {
     // Auth state listener for sign in / sign out / token refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!isMounted) return;
-      console.log(`[useSession] Supabase auth event: "${event}"`, {
-        userId: newSession?.user?.id,
-        email: newSession?.user?.email,
-        provider: newSession?.user?.app_metadata?.provider,
-        hasAccessToken: Boolean(newSession?.access_token)
-      });
       if (newSession) {
         syncState(newSession);
       } else if (event === 'SIGNED_OUT') {
@@ -290,19 +298,20 @@ export function useSession(): UseSessionReturn {
     }
   }, [sessionToken]);
 
-  const loginAsRole = useCallback((newRole: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; employeeId?: string; isEmailVerified?: boolean }) => {
-    const roleTitles: Record<UserRole, { title: string; defaultEmail: string }> = {
-      admin: { title: 'SOC Lead (Commander)', defaultEmail: 'admin@tracexmail.sec' },
-      analyst: { title: 'Senior Forensic Analyst', defaultEmail: 'analyst@tracexmail.sec' },
-      read_only: { title: 'Security Auditor', defaultEmail: 'auditor@tracexmail.sec' }
-    };
+  /**
+   * loginAsRole now REQUIRES real values verified by the server/Supabase.
+   * Disallows fabrication of tokens or unverified access out of thin air.
+   */
+  const loginAsRole = useCallback((newRole: UserRole, options: LoginRoleOptions) => {
+    if (!options || !options.token || !options.userId || !options.email) {
+      console.error('[useSession] loginAsRole rejected: missing required real authentication credentials (token, userId, or email).');
+      return;
+    }
 
-    const email = options?.email || roleTitles[newRole].defaultEmail;
-    const fullName = options?.fullName || roleTitles[newRole].title;
-    const orgName = options?.orgName || (options?.accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC');
-    const accountType: AccountType = options?.accountType || (newRole === 'admin' ? 'organization' : 'organization');
-    const isVerified = options?.isEmailVerified ?? true;
-    const userId = `usr_${newRole}_${Date.now()}`;
+    const { token, userId, email, isEmailVerified } = options;
+    const fullName = options.fullName || email.split('@')[0];
+    const orgName = options.orgName || (options.accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC');
+    const accountType: AccountType = options.accountType || (newRole === 'admin' ? 'organization' : 'organization');
 
     const localProf: UserProfile = {
       id: userId,
@@ -310,26 +319,26 @@ export function useSession(): UseSessionReturn {
       role: newRole,
       full_name: fullName,
       email,
-      employee_id: options?.employeeId,
+      employee_id: options.employeeId,
       account_type: accountType,
-      email_verified: isVerified,
+      email_verified: isEmailVerified,
       created_at: new Date().toISOString()
     };
 
     const enclaveSession: EnclaveLocalSession = {
-      token: `enclave_jwt_${newRole}_${Date.now()}`,
+      token,
       user: {
         id: userId,
         email,
-        email_confirmed_at: isVerified ? new Date().toISOString() : undefined,
+        email_confirmed_at: isEmailVerified ? new Date().toISOString() : undefined,
         user_metadata: {
           full_name: fullName,
           org_name: orgName,
           organization_name: orgName,
           role: newRole,
           account_type: accountType,
-          employee_id: options?.employeeId,
-          email_verified: isVerified
+          employee_id: options.employeeId,
+          email_verified: isEmailVerified
         }
       },
       profile: localProf
@@ -344,6 +353,7 @@ export function useSession(): UseSessionReturn {
     setLocalSession(enclaveSession);
     setUser(enclaveSession.user as any);
     setProfile(localProf);
+    setSessionToken(token);
 
     const sessionUser: SessionUser = {
       userId,
@@ -353,51 +363,80 @@ export function useSession(): UseSessionReturn {
       label: fullName,
       authMethod: 'enclave_token'
     };
-    setSession(enclaveSession.token, sessionUser);
+    setSession(token, sessionUser);
   }, []);
 
+  /**
+   * switchRole only relabels an ALREADY-authenticated session using the existing real token.
+   */
   const switchRole = useCallback((newRole: UserRole) => {
-    if (!session) return;
-    const currentEmail = user?.email || 'analyst@tracexmail.sec';
-    const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Operator';
-    const orgName = user?.user_metadata?.org_name || 'Acme Cyber Defense SOC';
-    const currentAccType: AccountType = profile?.account_type || user?.user_metadata?.account_type || 'organization';
+    if (!session || !sessionToken || !user || !user.id || !user.email) {
+      console.warn('[useSession] switchRole denied: No authenticated session active.');
+      return;
+    }
+    const currentEmail = user.email;
+    const currentName = profile?.full_name || user.user_metadata?.full_name || 'Operator';
+    const orgName = user.user_metadata?.org_name || 'Acme Cyber Defense SOC';
+    const currentAccType: AccountType = profile?.account_type || user.user_metadata?.account_type || 'organization';
+    const isVerified = Boolean((user as any).email_confirmed_at);
 
     loginAsRole(newRole, {
+      token: sessionToken,
+      userId: user.id,
       email: currentEmail,
       fullName: currentName,
       orgName,
-      accountType: currentAccType
+      accountType: currentAccType,
+      isEmailVerified: isVerified
     });
-  }, [session, user, profile, loginAsRole]);
+  }, [session, sessionToken, user, profile, loginAsRole]);
 
+  /**
+   * switchAccountType only switches mode on an ALREADY-authenticated session.
+   */
   const switchAccountType = useCallback((newType: AccountType, orgName?: string) => {
-    if (!session) return;
-    const currentEmail = user?.email || 'analyst@tracexmail.sec';
-    const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Operator';
-    const currentRole = (profile?.role as UserRole) || (user?.user_metadata?.role as UserRole) || 'analyst';
+    if (!session || !sessionToken || !user || !user.id || !user.email) {
+      console.warn('[useSession] switchAccountType denied: No authenticated session active.');
+      return;
+    }
+    const currentEmail = user.email;
+    const currentName = profile?.full_name || user.user_metadata?.full_name || 'Operator';
+    const currentRole = (profile?.role as UserRole) || (user.user_metadata?.role as UserRole) || 'analyst';
+    const isVerified = Boolean((user as any).email_confirmed_at);
 
     loginAsRole(currentRole, {
+      token: sessionToken,
+      userId: user.id,
       email: currentEmail,
       fullName: currentName,
       orgName: orgName || (newType === 'organization' ? 'Enterprise Cyber SOC' : 'Personal Sandbox'),
-      accountType: newType
+      accountType: newType,
+      isEmailVerified: isVerified
     });
-  }, [session, user, profile, loginAsRole]);
+  }, [session, sessionToken, user, profile, loginAsRole]);
 
+  /**
+   * upgradeToOrganization requires an existing authenticated session.
+   */
   const upgradeToOrganization = useCallback(async (orgName: string) => {
-    if (!session) return;
-    const currentEmail = user?.email || 'admin@defense.sec';
-    const currentName = profile?.full_name || user?.user_metadata?.full_name || 'Organization Lead';
-    
-    // Switch to Admin role in organization mode
+    if (!session || !sessionToken || !user || !user.id || !user.email) {
+      console.warn('[useSession] upgradeToOrganization denied: No authenticated session active.');
+      return;
+    }
+    const currentEmail = user.email;
+    const currentName = profile?.full_name || user.user_metadata?.full_name || 'Organization Lead';
+    const isVerified = Boolean((user as any).email_confirmed_at);
+
     loginAsRole('admin', {
+      token: sessionToken,
+      userId: user.id,
       email: currentEmail,
       fullName: currentName,
       orgName: orgName.trim() || 'Enterprise Cyber SOC',
-      accountType: 'organization'
+      accountType: 'organization',
+      isEmailVerified: isVerified
     });
-  }, [session, user, profile, loginAsRole]);
+  }, [session, sessionToken, user, profile, loginAsRole]);
 
   const refreshProfile = useCallback(async () => {
     if (user && (user as User).id) {
@@ -419,11 +458,8 @@ export function useSession(): UseSessionReturn {
     (user?.user_metadata?.account_type as AccountType) ||
     (role === 'admin' ? 'organization' : 'organization');
 
-  const isEmailVerified: boolean = Boolean(
-    (user as any)?.email_confirmed_at || 
-    user?.user_metadata?.email_verified !== false ||
-    profile?.email_verified !== false
-  );
+  // Strict email verification check: only genuine email_confirmed_at counts
+  const isEmailVerified: boolean = Boolean((user as any)?.email_confirmed_at);
 
   // Compute initials or short user label
   const userLabel = profile?.full_name 

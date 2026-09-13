@@ -51,13 +51,20 @@ const REAL_SENDER_IP_HEADERS: Array<{ key: string; display: string }> = [
   { key: 'x-real-ip', display: 'X-Real-IP' },
   { key: 'x-source-ip', display: 'X-Source-IP' },
   { key: 'x-remote-ip', display: 'X-Remote-IP' },
+  { key: 'x-auth-ip', display: 'X-Auth-IP' },
+  { key: 'x-authenticated-ip', display: 'X-Authenticated-IP' },
+  { key: 'x-sender-client-ip', display: 'X-Sender-Client-IP' },
+  { key: 'x-originating-client-ip', display: 'X-Originating-Client-IP' },
+  { key: 'x-http-client-ip', display: 'X-HTTP-Client-IP' },
   { key: 'x-yahoo-post-ip', display: 'X-Yahoo-Post-IP' },
   { key: 'x-aol-ip', display: 'X-AOL-IP' },
   { key: 'x-mailgun-sending-ip', display: 'X-Mailgun-Sending-Ip' },
   { key: 'x-originating-email', display: 'X-Originating-Email' },
-  // X-Forwarded-For is a last resort: it's added by HTTP webmail front-ends and can
+  { key: 'x-proxied-for', display: 'X-Proxied-For' },
+  // X-Forwarded-For is added by HTTP webmail front-ends and can
   // legitimately carry a proxy chain. We take the left-most (client-facing) entry.
-  { key: 'x-forwarded-for', display: 'X-Forwarded-For' }
+  { key: 'x-forwarded-for', display: 'X-Forwarded-For' },
+  { key: 'x-forwarded-client-ip', display: 'X-Forwarded-Client-IP' }
 ];
 
 function firstValue(v: string | string[] | undefined): string | undefined {
@@ -138,15 +145,61 @@ export function extractRealSenderIp(
     };
   }
 
+  // Check authenticated client submission in Received headers (ESMTPA / ESMTPSA)
+  const receivedHeader = allHeaders['received'] || allHeaders['Received'];
+  if (receivedHeader) {
+    const recArray = Array.isArray(receivedHeader) ? receivedHeader : [receivedHeader];
+    for (const line of recArray) {
+      if (typeof line === 'string' && /with\s+ESMTPSA?|authenticated|submission/i.test(line)) {
+        const candidateIp = extractIpFromHeaderValue(line);
+        if (candidateIp && isPublicRoutableIp(candidateIp)) {
+          const maxmind = lookupMaxMindGeo(candidateIp);
+          return {
+            ip: candidateIp,
+            ipSource: 'Received (Authenticated SMTP Submission - ESMTPSA)',
+            city: maxmind.found ? maxmind.city ?? null : null,
+            region: maxmind.found ? maxmind.region ?? null : null,
+            country: maxmind.found ? maxmind.country ?? null : null,
+            countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
+            lat: maxmind.found ? maxmind.lat ?? null : null,
+            lng: maxmind.found ? maxmind.lng ?? null : null,
+            asn: maxmind.found ? maxmind.asn ?? null : null,
+            org: maxmind.found ? maxmind.org ?? null : null,
+            isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
+            reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
+            isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
+            isTor: Boolean(maxmind.isTor),
+            maxmindVerified: Boolean(maxmind.isVerified),
+            resolved: true
+          };
+        }
+      }
+    }
+  }
+
   return emptyResult();
 }
 
 /**
  * Standardized user-facing IP string for the real sender.
+ * Provides provider-aware explanation when an email originates from privacy-preserving webmail like Gmail.
  */
-export function formatRealSenderIp(info: RealSenderIpInfo): string {
+export function formatRealSenderIp(info: RealSenderIpInfo, senderDomain?: string | null): string {
   if (!info.resolved || !info.ip) {
-    return 'Not disclosed by sending platform (no client-IP header present)';
+    const domain = (senderDomain || '').toLowerCase();
+    if (domain === 'gmail.com' || domain === 'googlemail.com' || domain.endsWith('.google.com')) {
+      return 'Not disclosed by Gmail (Google strips client device IP for privacy; outbound Google relay MTA shown above)';
+    }
+    if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com' || domain.endsWith('.microsoft.com')) {
+      return 'Not disclosed by Microsoft (client device IP omitted by webmail; outbound Microsoft relay MTA shown above)';
+    }
+    if (domain === 'yahoo.com' || domain === 'aol.com') {
+      return 'Not disclosed by Yahoo/AOL (client device IP omitted; outbound relay MTA shown above)';
+    }
+    if (domain === 'icloud.com' || domain === 'me.com' || domain === 'mac.com') {
+      return 'Not disclosed by Apple iCloud (Apple omits client device IP for privacy; outbound relay MTA shown above)';
+    }
+    return 'Not disclosed by sending platform (no client-IP header present; relay MTA IP shown above)';
   }
   return info.ip;
 }
@@ -154,9 +207,16 @@ export function formatRealSenderIp(info: RealSenderIpInfo): string {
 /**
  * Standardized user-facing location string for the real sender.
  */
-export function formatRealSenderLocation(info: RealSenderIpInfo): string {
+export function formatRealSenderLocation(info: RealSenderIpInfo, senderDomain?: string | null): string {
   if (!info.resolved) {
-    return 'Unresolved — sending platform did not leak the sender\'s real client IP';
+    const domain = (senderDomain || '').toLowerCase();
+    if (domain === 'gmail.com' || domain === 'googlemail.com' || domain.endsWith('.google.com')) {
+      return 'Unresolved — Gmail client devices connect via HTTPS and Google does not leak client IP in headers';
+    }
+    if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com' || domain.endsWith('.microsoft.com')) {
+      return 'Unresolved — Microsoft webmail does not publish client device IP in headers';
+    }
+    return "Unresolved — sending platform did not disclose the sender's real client IP";
   }
   const parts: string[] = [];
   if (info.city && info.country) {

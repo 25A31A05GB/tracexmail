@@ -92,8 +92,8 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
   const realSender = analysis.realSenderIp?.resolved
     ? analysis.realSenderIp
     : extractRealSenderIp(analysis.headers?.allHeaders);
-  const realSenderIpStr = formatRealSenderIp(realSender);
-  const realSenderLocStr = formatRealSenderLocation(realSender);
+  const realSenderIpStr = formatRealSenderIp(realSender, fromDomain);
+  const realSenderLocStr = formatRealSenderLocation(realSender, fromDomain);
 
   // Relay Chain
   let chainString = '';
@@ -212,7 +212,7 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     identityRows,
     checks,
     origin: {
-      sectionTitle: 'ORIGIN & RELAY',
+      sectionTitle: 'ORIGIN & SENDER IP',
       ip: originIp,
       ipStatus: (abuseScore > 50 || isTor) ? 'bad' : 'good',
       location: originLocationStr,

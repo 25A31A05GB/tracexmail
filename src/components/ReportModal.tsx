@@ -88,6 +88,9 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
   const originCity = originHop?.city || 'Unknown';
   const originAsn = originHop?.asn || 'AS44050';
 
+  const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
+  const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';
+
   // Real human sender (client) IP — distinct from "Origin Relay IP" above, which is
   // the sending domain's own registered outbound mail server/infra IP. Only populated
   // when the sending platform actually disclosed it (e.g. X-Originating-IP). Never fabricated.
@@ -96,9 +99,9 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
     : extractRealSenderIp(analysis.headers?.allHeaders);
   const rawRealSenderIp = realSender.ip || '';
   const realSenderIpDisplay = realSender.resolved
-    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender))
-    : formatRealSenderIp(realSender);
-  const realSenderLocation = formatRealSenderLocation(realSender);
+    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender, fromDomain))
+    : formatRealSenderIp(realSender, fromDomain);
+  const realSenderLocation = formatRealSenderLocation(realSender, fromDomain);
 
   // Build sanitized telemetry object if masking is active
   const getExportData = () => {

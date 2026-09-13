@@ -210,7 +210,7 @@ export function mapBackendCaseToAnalysis(
 ): EmailAnalysis {
   const data = apiResponse?.analysis || (apiResponse?.hops ? apiResponse : apiResponse?.case) || apiResponse || {};
 
-  const headersObj = data.headers || {};
+  const headersObj = data.headers || data.all_headers || data.raw_headers || {};
   let allHeadersMap: Record<string, string | string[]> = {};
   if (Array.isArray(headersObj)) {
     headersObj.forEach((h: any) => {
@@ -230,6 +230,14 @@ export function mapBackendCaseToAnalysis(
     } else {
       allHeadersMap = { ...headersObj };
     }
+  }
+
+  // Also fold in data.all_headers or data.raw_headers if they exist as separate properties
+  if (data.all_headers && typeof data.all_headers === 'object' && !Array.isArray(data.all_headers)) {
+    allHeadersMap = { ...allHeadersMap, ...data.all_headers };
+  }
+  if (data.raw_headers && typeof data.raw_headers === 'object' && !Array.isArray(data.raw_headers)) {
+    allHeadersMap = { ...allHeadersMap, ...data.raw_headers };
   }
 
   const subject = data.subject || data.headers?.subject || data.title || data.name || getHeaderCaseInsensitive(allHeadersMap, 'Subject') || '(No Subject)';
@@ -605,17 +613,16 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
   const addHeaderToMap = (key: string, val: string) => {
     if (key.toLowerCase() === 'received') {
       receivedHeaders.push(val);
-    } else {
-      const existing = headerMap[key];
-      if (existing) {
-        if (Array.isArray(existing)) {
-          existing.push(val);
-        } else {
-          headerMap[key] = [existing, val];
-        }
+    }
+    const existing = headerMap[key];
+    if (existing) {
+      if (Array.isArray(existing)) {
+        existing.push(val);
       } else {
-        headerMap[key] = val;
+        headerMap[key] = [existing, val];
       }
+    } else {
+      headerMap[key] = val;
     }
   };
 

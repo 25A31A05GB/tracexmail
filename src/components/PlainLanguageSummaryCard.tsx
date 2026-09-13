@@ -126,6 +126,14 @@ export function PlainLanguageSummaryCard({
     });
   }
 
+  const isWebmailProvider = /^(gmail\.com|googlemail\.com|outlook\.com|hotmail\.com|yahoo\.com|icloud\.com)$/i.test(fromDomain);
+  if (isWebmailProvider && !analysis.realSenderIp?.resolved) {
+    whatThisMeans.push({
+      title: 'Sender device IP privacy',
+      text: `Sender device privacy — ${fromDomain} transmits messages via HTTPS to cloud servers and omits the human sender's device/home IP from email headers. The origin IP shown is the provider's outbound mail relay.`
+    });
+  }
+
   if (isSafe && whatThisMeans.length === 0) {
     whatThisMeans.push({
       title: 'Verified sender',

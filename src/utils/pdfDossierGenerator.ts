@@ -50,6 +50,9 @@ export function generateForensicPdfDossier({
   const originAsn = originHop?.asn || 'AS44050';
   const originOrg = originHop?.org || originHop?.isp || 'Bulletproof Hosting / Relay Network';
 
+  const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
+  const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';
+
   // Real human sender (client) IP — distinct from "Origin IP" above, which is the sending
   // domain's own registered outbound mail relay derived from Received: hop tracing.
   // Only populated when the sending platform actually disclosed it. Never fabricated.
@@ -58,9 +61,9 @@ export function generateForensicPdfDossier({
     : extractRealSenderIp(analysis.headers?.allHeaders);
   const rawRealSenderIp = realSender.ip || '';
   const realSenderIp = realSender.resolved
-    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender))
-    : formatRealSenderIp(realSender);
-  const realSenderLocation = formatRealSenderLocation(realSender);
+    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender, fromDomain))
+    : formatRealSenderIp(realSender, fromDomain);
+  const realSenderLocation = formatRealSenderLocation(realSender, fromDomain);
 
   const caseId = analysis.id || 'CASE-2026-8894';
   const evidenceId = analysis.evidenceId || `EV-${caseId.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 8)}`;

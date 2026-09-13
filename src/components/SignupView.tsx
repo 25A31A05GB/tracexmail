@@ -8,14 +8,22 @@ interface SignupViewProps {
   onBackToLogin: () => void;
   onBackToIntro?: () => void;
   onSuccess?: () => void;
-  onSelectRoleLogin?: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; isEmailVerified?: boolean }) => void;
+  onSelectRoleLogin?: (role: UserRole, options: {
+    token: string;
+    userId: string;
+    email: string;
+    fullName?: string;
+    orgName?: string;
+    accountType?: AccountType;
+    isEmailVerified: boolean;
+  }) => void;
 }
 
 export function SignupView({ 
   onBackToLogin, 
   onBackToIntro,
   onSuccess,
-  onSelectRoleLogin 
+  onSelectRoleLogin: _onSelectRoleLogin 
 }: SignupViewProps) {
   const [accountType, setAccountType] = useState<AccountType>('personal');
   const [fullName, setFullName] = useState('');
@@ -88,34 +96,21 @@ export function SignupView({
         }
 
         if (data.user) {
-          const isConfirmed = Boolean(data.user.email_confirmed_at);
-          setSuccessMsg(
-            isConfirmed
-              ? `Account ready for ${email}. Opening your workspace…`
-              : `Account created! Verification link sent to ${email}. Logging you into workspace…`
-          );
-          if (onSuccess) {
-            setTimeout(onSuccess, 900);
+          const isConfirmed = Boolean(data.user.email_confirmed_at && data.session);
+          if (isConfirmed) {
+            setSuccessMsg(`Account ready for ${email}. Opening your workspace…`);
+            if (onSuccess) {
+              setTimeout(onSuccess, 900);
+            }
+          } else {
+            setSuccessMsg(`Account created! Please check your email at ${email} to confirm your account before signing in.`);
           }
           return;
         }
+      } else {
+        // Supabase is not configured client-side: refuse fake access creation
+        setErrorMsg('Account creation is not available: authentication service not configured.');
       }
-
-      // Direct Access Provisioning with Enclave
-      setSuccessMsg(`Access ready for ${email}. Opening ${accountType === 'organization' ? 'Organization' : 'Individual'} workspace…`);
-      setTimeout(() => {
-        if (onSelectRoleLogin) {
-          onSelectRoleLogin(targetRole, {
-            email: email.trim(),
-            fullName: fullName.trim() || (accountType === 'personal' ? 'Forensic User' : 'Team Member'),
-            orgName: targetOrg,
-            accountType,
-            isEmailVerified: true
-          });
-        } else if (onSuccess) {
-          onSuccess();
-        }
-      }, 700);
     } catch (err: any) {
       console.error('[Signup] Registration error:', err);
       setErrorMsg(err.message || 'An unexpected error occurred during account creation.');
@@ -158,61 +153,7 @@ export function SignupView({
         </div>
 
         <div className="text-[var(--paper-dim)] text-[13.5px] mb-4">
-          Choose your account tier to begin email forensics, DNS verification, and threat mitigation.
-        </div>
-
-        {/* Mode Selector: Individual vs Organization */}
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-[var(--paper)] mb-2 font-mono uppercase tracking-wider">
-            Select Account Tier:
-          </label>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                setAccountType('personal');
-                setSelectedRole('analyst');
-              }}
-              className={`p-3 rounded-[2px] border text-left transition-all cursor-pointer ${
-                accountType === 'personal'
-                  ? 'bg-[rgba(127,163,186,0.18)] border-[var(--slate)] shadow-xs'
-                  : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[10.5px] font-bold text-[var(--slate)] flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5" />
-                  INDIVIDUAL
-                </span>
-                <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[var(--ink-2)] text-[var(--paper-dim)]">FREE</span>
-              </div>
-              <div className="text-xs font-semibold text-[var(--paper)]">Email Analysis Only</div>
-              <div className="text-[10px] text-[var(--paper-dim)] mt-0.5 leading-snug">Ingest &amp; inspect single emails, hops, and headers.</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAccountType('organization');
-                setSelectedRole('admin');
-              }}
-              className={`p-3 rounded-[2px] border text-left transition-all cursor-pointer ${
-                accountType === 'organization'
-                  ? 'bg-[rgba(201,162,39,0.18)] border-[var(--stamp)] shadow-xs'
-                  : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[10.5px] font-bold text-[var(--stamp)] flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5" />
-                  ORGANIZATION
-                </span>
-                <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] font-bold">FULL ACCESS</span>
-              </div>
-              <div className="text-xs font-semibold text-[var(--paper)]">Full Enterprise SOC</div>
-              <div className="text-[10px] text-[var(--paper-dim)] mt-0.5 leading-snug">Create Employee IDs, Gmail Push &amp; Live Alerts.</div>
-            </button>
-          </div>
+          Register to authenticate your organization, retain forensic custody, and investigate email threats.
         </div>
 
         {errorMsg && (
@@ -223,172 +164,202 @@ export function SignupView({
         )}
 
         {successMsg && (
-          <div className="mb-4 p-3.5 rounded-[2px] bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--paper)] text-xs flex items-start gap-2.5">
+          <div className="mb-4 p-3 rounded-[2px] bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--paper)] text-xs flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[var(--forensic-green)]" />
             <div className="leading-relaxed font-sans">{successMsg}</div>
           </div>
         )}
 
-        {!successMsg && (
-          <>
-            {/* Google OAuth Quick Sign Up */}
-            <div className="mb-3.5">
-              <GoogleAuthButton
-                id="google-signup-btn"
-                mode="signup"
-                variant="primary"
-                onSuccess={() => {
-                  if (onSuccess) onSuccess();
-                }}
-                onError={(err) => setErrorMsg(err)}
-              />
-            </div>
+        {/* Supabase Google OAuth Action */}
+        <div className="mb-3.5">
+          <GoogleAuthButton
+            id="google-signup-btn"
+            mode="signup"
+            variant="primary"
+            onSuccess={() => {
+              if (onSuccess) onSuccess();
+            }}
+            onError={(err) => setErrorMsg(err)}
+          />
+        </div>
 
-            <div className="flex items-center gap-3 my-3 text-xs text-[var(--line)]">
-              <div className="flex-1 h-px bg-[var(--line)]" />
-              <span className="font-sans text-[11px] text-[var(--paper-muted)] font-medium">or register with email &amp; password</span>
-              <div className="flex-1 h-px bg-[var(--line)]" />
-            </div>
+        <div className="flex items-center gap-3 my-3 text-xs text-[var(--line)]">
+          <div className="flex-1 h-px bg-[var(--line)]" />
+          <span className="font-sans text-[11px] text-[var(--paper-muted)] font-medium">or register with work credentials</span>
+          <div className="flex-1 h-px bg-[var(--line)]" />
+        </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-name">
-                  Your Full Name
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* Account Mode Selector */}
+          <div>
+            <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+              Account Type
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setAccountType('personal')}
+                className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
+                  accountType === 'personal'
+                    ? 'border-[var(--stamp)] bg-[rgba(201,162,39,0.12)] text-[var(--paper)]'
+                    : 'border-[var(--line)] bg-[var(--ink)] text-[var(--paper-dim)] hover:border-[var(--paper-dim)]'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-xs mb-0.5">
+                  <User className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                  <span>Personal</span>
+                </div>
+                <div className="text-[10px] opacity-80">Sandbox analyst account</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAccountType('organization')}
+                className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
+                  accountType === 'organization'
+                    ? 'border-[var(--stamp)] bg-[rgba(201,162,39,0.12)] text-[var(--paper)]'
+                    : 'border-[var(--line)] bg-[var(--ink)] text-[var(--paper-dim)] hover:border-[var(--paper-dim)]'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-semibold text-xs mb-0.5">
+                  <Building2 className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                  <span>Organization</span>
+                </div>
+                <div className="text-[10px] opacity-80">Enterprise SOC team</div>
+              </button>
+            </div>
+          </div>
+
+          {accountType === 'organization' && (
+            <div className="p-3 bg-[var(--ink)] border border-[var(--line)] rounded-[2px] space-y-3">
+              <div>
+                <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+                  Organization / Company Name *
                 </label>
                 <input
-                  id="signup-name"
                   type="text"
                   required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Jane Doe"
-                  disabled={loading}
-                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-org">
-                  {accountType === 'organization' ? 'Company / Organization' : 'Workspace Name (Optional)'}
-                </label>
-                <input
-                  id="signup-org"
-                  type="text"
-                  required={accountType === 'organization'}
                   value={orgName}
                   onChange={(e) => setOrgName(e.target.value)}
-                  placeholder={accountType === 'organization' ? 'Acme Cyber SOC' : 'Personal Lab'}
-                  disabled={loading}
-                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                  placeholder="Acme Cyber Defense Corp"
+                  className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink-2)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-email">
-                {accountType === 'organization' ? 'Work Email (Official Domain)' : 'Personal or Work Email'}
-              </label>
-              <input
-                id="signup-email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="signup-password">
-                  Password (min 12 characters)
+              <div>
+                <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+                  Your SOC Role
                 </label>
-                <span className="text-[10.5px] text-[var(--forensic-green)] font-mono">Leaked-check active</span>
-              </div>
-              <input
-                id="signup-password"
-                type="password"
-                required
-                minLength={12}
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
-              />
-            </div>
-
-            {accountType === 'organization' && (
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs text-[var(--paper-dim)] font-medium">
-                  Initial Administrative Role:
-                </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setSelectedRole('admin')}
-                    className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
+                    className={`p-1.5 text-center text-xs font-mono rounded-[2px] border cursor-pointer ${
                       selectedRole === 'admin'
-                        ? 'bg-[rgba(201,162,39,0.18)] border-[var(--stamp)] text-[var(--paper)]'
-                        : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
+                        ? 'border-[var(--stamp)] bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] font-bold'
+                        : 'border-[var(--line)] text-[var(--paper-dim)] hover:text-[var(--paper)]'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-mono text-[10px] font-bold text-[var(--stamp)]">ORG ADMIN</span>
-                      <ShieldAlert className="w-3.5 h-3.5 text-[var(--stamp)]" />
-                    </div>
-                    <div className="text-xs truncate font-semibold">Admin (Lead)</div>
-                    <div className="text-[10px] text-[var(--paper-dim)] truncate">Can create employee credentials</div>
+                    Admin
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setSelectedRole('analyst')}
-                    className={`p-2.5 rounded-[2px] border text-left transition-all cursor-pointer ${
+                    className={`p-1.5 text-center text-xs font-mono rounded-[2px] border cursor-pointer ${
                       selectedRole === 'analyst'
-                        ? 'bg-[rgba(127,163,186,0.18)] border-[var(--slate)] text-[var(--paper)]'
-                        : 'bg-[var(--ink)] border-[var(--line)] text-[var(--paper-dim)] hover:border-[var(--paper-muted)]'
+                        ? 'border-[var(--slate)] bg-[rgba(127,163,186,0.2)] text-[var(--slate)] font-bold'
+                        : 'border-[var(--line)] text-[var(--paper-dim)] hover:text-[var(--paper)]'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="font-mono text-[10px] font-bold text-[var(--slate)]">SOC ANALYST</span>
-                      <Shield className="w-3.5 h-3.5 text-[var(--slate)]" />
-                    </div>
-                    <div className="text-xs truncate font-semibold">Forensic Analyst</div>
-                    <div className="text-[10px] text-[var(--paper-dim)] truncate">Full triage &amp; campaigns</div>
+                    Analyst
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('read_only')}
+                    className={`p-1.5 text-center text-xs font-mono rounded-[2px] border cursor-pointer ${
+                      selectedRole === 'read_only'
+                        ? 'border-[var(--paper-dim)] bg-[rgba(237,230,216,0.1)] text-[var(--paper)] font-bold'
+                        : 'border-[var(--line)] text-[var(--paper-dim)] hover:text-[var(--paper)]'
+                    }`}
+                  >
+                    Auditor
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Sarah Chen"
+              className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+              Work Email Address *
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="s.chen@enterprise.corp"
+              className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
+                Master Password *
+              </label>
+              <span className="text-[10px] font-mono text-[var(--paper-dim)]">Min 12 characters</span>
+            </div>
+            <input
+              type="password"
+              required
+              minLength={12}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••••••"
+              className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Creating Account…</span>
+              </>
+            ) : (
+              <span>Create Account</span>
             )}
+          </button>
+        </form>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full mt-3 text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 py-2.5 font-semibold"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[var(--paper)]" />
-                  <span>Setting up account…</span>
-                </>
-              ) : (
-                <span>{accountType === 'organization' ? 'Create Organization & Open Console' : 'Sign Up for Email Analysis'}</span>
-              )}
-            </button>
-          </form>
-          </>
-        )}
-
-        <div className="mt-4 text-[11.5px] text-[var(--paper-muted)] text-center font-sans">
-          Email verification enabled. Fast instant activation.
+        <div className="mt-4 pt-3 border-t border-[var(--line)] text-center text-xs text-[var(--paper-dim)]">
+          Already have clearance?{' '}
+          <button
+            onClick={onBackToLogin}
+            className="text-[var(--stamp)] hover:underline font-semibold cursor-pointer bg-transparent border-0 p-0"
+          >
+            Sign in here
+          </button>
         </div>
       </div>
     </div>
   );
 }
-

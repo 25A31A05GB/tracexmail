@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, Shield, UserCheck, KeyRound, ShieldAlert, Eye, Lock, MailCheck, Send } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, ShieldAlert, Lock, MailCheck, Send } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface LoginViewProps {
@@ -10,7 +10,15 @@ interface LoginViewProps {
   onRequestAccess?: () => void;
   onForgotPassword?: () => void;
   onSuccess?: () => void;
-  onSelectRoleLogin?: (role: UserRole, options?: { email?: string; fullName?: string; orgName?: string; accountType?: AccountType; isEmailVerified?: boolean }) => void;
+  onSelectRoleLogin?: (role: UserRole, options: {
+    token: string;
+    userId: string;
+    email: string;
+    fullName?: string;
+    orgName?: string;
+    accountType?: AccountType;
+    isEmailVerified: boolean;
+  }) => void;
 }
 
 export function LoginView({ 
@@ -191,11 +199,27 @@ export function LoginView({
         return;
       }
 
-      if (onSelectRoleLogin && resData.user) {
+      // Strict check on server response
+      if (!resData.token || !resData.user?.id) {
+        setErrorMsg('Authentication Error: Server failed to issue a valid authentication session.');
+        setLoading(false);
+        return;
+      }
+
+      if (!resData.user.emailVerified) {
+        setVerificationPending(true);
+        setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
+        setLoading(false);
+        return;
+      }
+
+      if (onSelectRoleLogin) {
         onSelectRoleLogin(resData.user.role || 'analyst', {
+          token: resData.token,
+          userId: resData.user.id,
           email: resData.user.email,
           fullName: resData.user.fullName || resData.user.email.split('@')[0],
-          orgName: 'Acme Cyber Defense SOC',
+          orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
           accountType: 'organization',
           isEmailVerified: resData.user.emailVerified
         });
@@ -206,20 +230,6 @@ export function LoginView({
       console.error('[Login] Authentication error:', err);
       setErrorMsg('Authentication Failed: Invalid email or password.');
       setLoading(false);
-    }
-  };
-
-  const handleQuickRole = (role: UserRole, roleName: string, roleEmail: string, accType: AccountType = 'organization') => {
-    if (onSelectRoleLogin) {
-      onSelectRoleLogin(role, {
-        email: roleEmail,
-        fullName: roleName,
-        orgName: accType === 'personal' ? 'Personal Sandbox' : 'Acme Security Team',
-        accountType: accType,
-        isEmailVerified: true
-      });
-    } else if (onSuccess) {
-      onSuccess();
     }
   };
 
@@ -290,61 +300,6 @@ export function LoginView({
           </div>
         )}
 
-        {/* 1-Click Fast Role Sign In */}
-        <div className="mb-5 p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)]">
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[11px] font-sans font-semibold text-[var(--paper-dim)] flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-[var(--slate)]" />
-              1-Click Instant Demo Login:
-            </span>
-            <span className="text-[10px] font-mono text-[var(--forensic-green)] flex items-center gap-1 font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--forensic-green)]" />
-              Enclave Active
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickRole('admin', 'Alex Vance (SOC Lead)', 'admin@tracexmail.sec', 'organization')}
-              className="p-2.5 rounded-[2px] border border-[rgba(201,162,39,0.35)] bg-[rgba(201,162,39,0.08)] hover:bg-[rgba(201,162,39,0.18)] hover:border-[var(--stamp)] text-left transition-all cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[10px] font-bold text-[var(--stamp)]">ORG ADMIN</span>
-                <ShieldAlert className="w-3 h-3 text-[var(--stamp)] opacity-80 group-hover:opacity-100" />
-              </div>
-              <div className="text-[11px] text-[var(--paper)] truncate font-semibold">Full Access</div>
-              <div className="text-[9.5px] text-[var(--paper-dim)] truncate">+ Employees</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickRole('analyst', 'Sarah Chen', 'analyst@tracexmail.sec', 'organization')}
-              className="p-2.5 rounded-[2px] border border-[rgba(127,163,186,0.35)] bg-[rgba(127,163,186,0.08)] hover:bg-[rgba(127,163,186,0.18)] hover:border-[var(--slate)] text-left transition-all cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[10px] font-bold text-[var(--slate)]">ANALYST</span>
-                <Shield className="w-3 h-3 text-[var(--slate)] opacity-80 group-hover:opacity-100" />
-              </div>
-              <div className="text-[11px] text-[var(--paper)] truncate font-semibold">Analyst</div>
-              <div className="text-[9.5px] text-[var(--paper-dim)] truncate">Full analysis</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickRole('read_only', 'Marcus Reed', 'auditor@tracexmail.sec', 'organization')}
-              className="p-2.5 rounded-[2px] border border-[var(--line)] bg-[var(--ink-2)] hover:bg-[rgba(237,230,216,0.08)] hover:border-[var(--paper-dim)] text-left transition-all cursor-pointer group"
-            >
-              <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[10px] font-bold text-[var(--paper-dim)]">AUDITOR</span>
-                <Eye className="w-3 h-3 text-[var(--paper-dim)] opacity-80 group-hover:opacity-100" />
-              </div>
-              <div className="text-[11px] text-[var(--paper)] truncate font-semibold">Auditor</div>
-              <div className="text-[9.5px] text-[var(--paper-dim)] truncate">Privacy view</div>
-            </button>
-          </div>
-        </div>
-
         {/* Supabase Google OAuth Action */}
         <div className="mb-3.5">
           <GoogleAuthButton
@@ -360,7 +315,7 @@ export function LoginView({
 
         <div className="flex items-center gap-3 my-3 text-xs text-[var(--line)]">
           <div className="flex-1 h-px bg-[var(--line)]" />
-          <span className="font-sans text-[11px] text-[var(--paper-muted)] font-medium">or enter your account credentials</span>
+          <span className="font-sans text-[11px] text-[var(--paper-muted)] font-medium">enter your account credentials</span>
           <div className="flex-1 h-px bg-[var(--line)]" />
         </div>
 
@@ -368,137 +323,117 @@ export function LoginView({
           <form onSubmit={handleVerifyMfa} className="space-y-4">
             <div className="p-3 bg-[rgba(201,162,39,0.12)] border border-[var(--stamp)] rounded-[2px] text-xs text-[var(--paper)]">
               <div className="font-semibold text-[var(--stamp)] flex items-center gap-1.5 mb-1">
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>Multi-Factor Authentication (MFA) Required</span>
+                <ShieldAlert className="w-4 h-4" />
+                Multi-Factor Authentication Required
               </div>
-              <p className="text-[var(--paper-dim)] leading-relaxed">
-                Enter the 6-digit verification code from your authenticator app (e.g. Google Authenticator) to complete sign-in.
+              <p className="text-[11.5px] text-[var(--paper-dim)]">
+                Enter the 6-digit verification code from your authenticator app (Google Authenticator, 1Password, Authy).
               </p>
             </div>
 
-            <div className="space-y-1">
-              <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="totp-code">
-                Security Code
+            <div>
+              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+                6-Digit Security Code
               </label>
               <input
-                id="totp-code"
                 type="text"
-                required
                 maxLength={6}
-                autoFocus
-                autoComplete="one-time-code"
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
                 placeholder="123456"
-                disabled={mfaVerifying}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--stamp)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-center text-lg tracking-widest font-mono text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50"
+                autoFocus
+                className="w-full text-center tracking-[0.5em] font-mono text-lg py-2.5 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)]"
               />
             </div>
 
             <button
               type="submit"
-              disabled={mfaVerifying || totpCode.trim().length < 6}
-              className="btn-primary w-full mt-2 text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 py-2.5 font-semibold"
+              disabled={mfaVerifying || totpCode.length < 6}
+              className="w-full py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               {mfaVerifying ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[var(--paper)]" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>Verifying Code…</span>
                 </>
               ) : (
-                <span>Verify &amp; Continue</span>
+                <span>Confirm & Sign In</span>
               )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setMfaChallenge(null); setTotpCode(''); }}
-              className="w-full text-center text-xs text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors py-1 cursor-pointer bg-transparent border-0"
-            >
-              ← Cancel &amp; back to sign-in
             </button>
           </form>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div className="space-y-1">
-              <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="login-email">
-                Work or Personal Email
+            <div>
+              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+                Work Email
               </label>
               <input
-                id="login-email"
                 type="email"
                 required
-                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com or employee@domain.com"
-                disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                placeholder="analyst@enterprise.corp"
+                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
               />
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs text-[var(--paper-dim)] font-medium" htmlFor="login-password">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
                   Password
                 </label>
                 {onForgotPassword && (
                   <button
                     type="button"
                     onClick={onForgotPassword}
-                    className="text-[11.5px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0"
+                    className="text-[11px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
                   >
-                    Forgot password?
+                    Forgot Password?
                   </button>
                 )}
               </div>
               <input
-                id="login-password"
                 type="password"
                 required
-                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                disabled={loading}
-                className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-[var(--slate)] focus:outline-hidden rounded-[2px] px-3.5 py-2 text-sm text-[var(--paper)] placeholder-[var(--paper-muted)] transition-colors disabled:opacity-50 font-sans"
+                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary w-full mt-2 text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 py-2.5 font-semibold"
+              className="w-full mt-2 py-2.5 px-4 bg-[var(--thread)] text-[var(--paper)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[var(--paper)]" />
-                  <span>Checking Credentials…</span>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Authenticating…</span>
                 </>
               ) : (
-                <span>Sign In to TraceXMail</span>
+                <span>Sign In to Workspace</span>
               )}
             </button>
           </form>
         )}
 
-        {onRequestAccess && (
-          <div className="mt-4 pt-3.5 border-t border-[var(--line)] text-center">
+        {/* Footer links */}
+        <div className="mt-5 pt-4 border-t border-[var(--line)] flex items-center justify-between text-xs text-[var(--paper-dim)]">
+          <span>Need an account?</span>
+          {onRequestAccess ? (
             <button
-              type="button"
               onClick={onRequestAccess}
-              className="text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0"
+              className="text-[var(--slate)] hover:text-[var(--paper)] font-medium hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
             >
-              Don&apos;t have an account? Sign up now →
+              Register for Access →
             </button>
-          </div>
-        )}
-
-        <div className="mt-4 text-[11.5px] text-[var(--paper-muted)] text-center font-sans">
-          Protected with end-to-end encryption &amp; email verification check
+          ) : (
+            <span className="font-mono text-[11px] text-[var(--paper-muted)]">Contact Administrator</span>
+          )}
         </div>
       </div>
     </div>
   );
 }
-
