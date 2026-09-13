@@ -32,6 +32,7 @@ import { AlertToast } from './components/AlertToast';
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
+import { ResetPasswordView } from './components/ResetPasswordView';
 import { AcceptInviteView } from './components/AcceptInviteView';
 import { SAMPLE_ANALYSES } from './data/samples';
 import { EmailAnalysis } from './types';
@@ -69,27 +70,50 @@ export default function App() {
     switchAccountType 
   } = useSession();
 
-  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'accept-invite'>('intro');
+  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'accept-invite'>('intro');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
-  // Auto-detect invitation tokens or reset-password requests in window hash
+  // Auto-detect invitation tokens, password resets, or recovery tokens in URL
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      
       if (hash.startsWith('#invite=')) {
         const token = hash.replace('#invite=', '').trim();
         if (token) {
           setInviteToken(token);
           setAuthView('accept-invite');
         }
-      } else if (hash.startsWith('#reset-password')) {
+      } else if (
+        hash.includes('type=recovery') || 
+        hash.startsWith('#reset-password') || 
+        search.includes('type=recovery')
+      ) {
+        setAuthView('reset-password');
+      } else if (hash.startsWith('#forgot-password')) {
         setAuthView('forgot-password');
       }
     };
 
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+
+    // Supabase PASSWORD_RECOVERY event listener
+    let authSub: any = null;
+    if (isSupabaseConfigured && supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setAuthView('reset-password');
+        }
+      });
+      authSub = subscription;
+    }
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      if (authSub) authSub.unsubscribe();
+    };
   }, []);
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
   const [activeTab, setActiveTab] = useState<NavTab>('ingest');
@@ -383,6 +407,25 @@ export default function App() {
         <ForgotPasswordView
           onBackToLogin={() => setAuthView('login')}
           onBackToIntro={() => setAuthView('intro')}
+          onSuccess={() => {
+            setActiveTab('ingest');
+            setAuthView('intro');
+          }}
+        />
+      );
+    }
+    if (authView === 'reset-password') {
+      return (
+        <ResetPasswordView
+          onSuccess={() => {
+            setActiveTab('ingest');
+            setAuthView('intro');
+            window.location.hash = '';
+          }}
+          onBackToLogin={() => {
+            setAuthView('login');
+            window.location.hash = '';
+          }}
         />
       );
     }

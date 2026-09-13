@@ -46,6 +46,19 @@ export function getGoogleOAuthRedirectUrl(): string {
 }
 
 /**
+ * Returns the canonical Password Reset redirect URL.
+ * Routes back to the app with the `#reset-password` hash anchor to trigger the new password form.
+ */
+export function getResetPasswordRedirectUrl(): string {
+  if (typeof window === 'undefined') {
+    return `${clientAppUrl.replace(/\/$/, '')}/#reset-password`;
+  }
+
+  // Always prefer the active window origin so the user lands back on the exact same domain/port
+  return `${window.location.origin}/#reset-password`;
+}
+
+/**
  * Comprehensive diagnostic logger for Supabase Authentication operations.
  */
 export function logSupabaseAuthEvent(event: string, details?: any, level: 'info' | 'warn' | 'error' = 'info') {
