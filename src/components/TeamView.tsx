@@ -16,10 +16,15 @@ import {
   Sparkles, 
   ShieldAlert,
   Building2,
-  Check
+  Check,
+  Send,
+  Link as LinkIcon,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { UserRole } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { InviteMemberModal } from './InviteMemberModal';
 
 interface TeamMember {
   id: string;
@@ -29,6 +34,19 @@ interface TeamMember {
   role: UserRole;
   status: 'ACTIVE' | 'PENDING' | 'REVOKED';
   lastActive: string;
+}
+
+interface TeamInvite {
+  id: string;
+  email: string;
+  full_name?: string;
+  role: UserRole;
+  department?: string;
+  invited_by: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'revoked';
+  expires_at: string;
+  created_at: string;
 }
 
 interface ProvisionedCreds {
@@ -42,8 +60,13 @@ interface ProvisionedCreds {
 
 export function TeamView() {
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [invites, setInvites] = useState<TeamInvite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [provisionModalOpen, setProvisionModalOpen] = useState(false);
+  const [copiedInviteId, setCopiedInviteId] = useState<string | null>(null);
+
+  // Direct Employee Provisioning Form State
   const [employeeName, setEmployeeName] = useState('');
   const [employeeEmail, setEmployeeEmail] = useState('');
   const [employeeId, setEmployeeId] = useState('');
@@ -80,16 +103,18 @@ export function TeamView() {
     setProvisionModalOpen(true);
   };
 
-  const fetchTeamRoster = async () => {
+  const fetchTeamData = async () => {
     try {
       setLoading(true);
+
+      // 1. Fetch team members
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data && data.length > 0) {
+        if (data && data.length > 0) {
           const members: TeamMember[] = data.map((p: any) => ({
             id: p.id,
             name: p.full_name || p.email?.split('@')[0] || 'Security Analyst',
@@ -100,25 +125,30 @@ export function TeamView() {
             lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
           }));
           setTeam(members);
-          setLoading(false);
-          return;
+        }
+      } else {
+        const res = await fetch('/api/team/members');
+        if (res.ok) {
+          const data = await res.json();
+          setTeam(data);
         }
       }
 
-      const res = await fetch('/api/team/members');
-      if (res.ok) {
-        const data = await res.json();
-        setTeam(data);
+      // 2. Fetch pending invites
+      const invitesRes = await fetch('/api/auth/invites');
+      if (invitesRes.ok) {
+        const invitesData = await invitesRes.json();
+        setInvites(invitesData);
       }
     } catch (err) {
-      console.warn('[TeamView] Error fetching roster:', err);
+      console.warn('[TeamView] Error fetching roster/invites:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTeamRoster();
+    fetchTeamData();
   }, []);
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
@@ -179,43 +209,80 @@ export function TeamView() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyInviteLink = (invite: TeamInvite) => {
+    const inviteUrl = `${window.location.origin}/#invite=${invite.token}`;
+    navigator.clipboard.writeText(inviteUrl);
+    setCopiedInviteId(invite.id);
+    setTimeout(() => setCopiedInviteId(null), 2000);
+  };
+
+  const handleResendInvite = async (inviteId: string) => {
+    try {
+      const res = await fetch(`/api/auth/invites/${inviteId}/resend`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setFeedbackMsg(data.message || 'Invitation resent successfully.');
+      } else {
+        setFeedbackMsg(data.error || 'Failed to resend invite.');
+      }
+    } catch (err: any) {
+      setFeedbackMsg(err.message || 'Error resending invite.');
+    }
+  };
+
   const handleRevokeInvite = async (inviteId: string) => {
     try {
-      const res = await fetch(`/api/team/invite/${inviteId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/auth/invites/${inviteId}`, { method: 'DELETE' });
       if (res.ok) {
-        setTeam(prev => prev.filter(m => m.id !== inviteId));
+        setInvites(prev => prev.filter(inv => inv.id !== inviteId));
+        setFeedbackMsg('Invitation has been revoked.');
       }
     } catch (err) {
       console.error('[TeamView] Revoke failed:', err);
     }
   };
 
+  const handleInviteCreated = (newInvite: any) => {
+    setInvites(prev => [newInvite, ...prev.filter(inv => inv.id !== newInvite.id)]);
+    setFeedbackMsg(`Invitation issued to ${newInvite.email}.`);
+  };
+
   return (
-    <div className="flex-1 p-6 overflow-y-auto bg-[var(--ink)] text-[var(--paper)] space-y-6">
+    <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-[var(--ink)] text-[var(--paper)] space-y-6">
       {/* Top Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--line)] pb-4 gap-4">
         <div>
           <div className="flex items-center gap-2.5">
             <Users className="w-5 h-5 text-[var(--slate)]" />
-            <h2 className="font-serif font-semibold text-xl text-[var(--paper)]">
+            <h2 className="font-serif font-semibold text-lg sm:text-xl text-[var(--paper)]">
               Organization Employees &amp; Access Control
             </h2>
-            <span className="font-mono text-[10.5px] px-2 py-0.5 rounded bg-[rgba(201,162,39,0.18)] text-[var(--stamp)] border border-[var(--stamp)] font-bold">
+            <span className="hidden sm:inline-block font-mono text-[10.5px] px-2 py-0.5 rounded bg-[rgba(201,162,39,0.18)] text-[var(--stamp)] border border-[var(--stamp)] font-bold">
               ORGANIZATION FULL ACCESS
             </span>
           </div>
           <p className="text-xs text-[var(--paper-dim)] mt-1">
-            Create employee IDs, generate temporary/permanent credentials, and grant RBAC clearances directly to the database.
+            Invite analysts with one-click clearance links, generate temporary employee credentials, and enforce RBAC.
           </p>
         </div>
 
-        <button
-          onClick={handleOpenProvisionModal}
-          className="btn-primary flex items-center gap-2 text-xs font-semibold px-4 py-2 cursor-pointer shadow-md"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>+ Create Employee ID &amp; Password</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setInviteModalOpen(true)}
+            className="py-2 px-3 bg-[var(--stamp)] text-[var(--ink)] text-xs font-bold rounded-sm flex items-center gap-1.5 cursor-pointer hover:brightness-110 shadow-md uppercase tracking-wider"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Invite Member</span>
+          </button>
+
+          <button
+            onClick={handleOpenProvisionModal}
+            className="py-2 px-3 bg-[var(--ink-2)] border border-[var(--line)] text-[var(--paper)] text-xs font-semibold rounded-sm flex items-center gap-1.5 cursor-pointer hover:border-[var(--paper-dim)] shadow-sm"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-[var(--slate)]" />
+            <span>Direct ID &amp; Password</span>
+          </button>
+        </div>
       </div>
 
       {feedbackMsg && (
@@ -243,14 +310,14 @@ export function TeamView() {
             <ShieldAlert className="w-4 h-4 text-[var(--stamp)]" />
           </div>
           <p className="text-xs text-[var(--paper-dim)] mt-2 leading-relaxed">
-            Full root privileges. Can create employee accounts, set IDs and passwords, configure organization settings, and manage incident cases.
+            Full root privileges. Can invite team members, generate IDs &amp; master credentials, configure organization settings, and manage incident cases.
           </p>
         </div>
 
         <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-4">
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] font-semibold px-2 py-0.5 rounded bg-[rgba(127,163,186,0.2)] text-[var(--slate)]">
-              ANALYST
+              ANALYST (L1/L2)
             </span>
             <Shield className="w-4 h-4 text-[var(--slate)]" />
           </div>
@@ -272,6 +339,111 @@ export function TeamView() {
         </div>
       </div>
 
+      {/* Pending Invitations Section */}
+      {invites.length > 0 && (
+        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm overflow-hidden">
+          <div className="p-3.5 border-b border-[var(--line)] flex items-center justify-between bg-[rgba(201,162,39,0.06)]">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-[var(--stamp)]" />
+              <h3 className="font-semibold text-xs text-[var(--paper)] uppercase tracking-wider font-mono">
+                Pending Invitations ({invites.filter(i => i.status === 'pending').length})
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-[var(--paper-dim)]">
+              Recipients can join via direct token or email link
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[var(--ink)] text-[var(--paper-muted)] font-mono uppercase text-[10px] border-b border-[var(--line)]">
+                <tr>
+                  <th className="p-3">Invitee Email</th>
+                  <th className="p-3">Role</th>
+                  <th className="p-3">Department</th>
+                  <th className="p-3">Expires</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)] text-[var(--paper-dim)]">
+                {invites.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-[rgba(237,230,216,0.03)]">
+                    <td className="p-3 font-mono font-medium text-[var(--paper)]">
+                      <div>{inv.email}</div>
+                      {inv.full_name && <div className="text-[10px] text-[var(--paper-dim)]">{inv.full_name}</div>}
+                    </td>
+                    <td className="p-3">
+                      <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-medium ${
+                        inv.role === 'admin' 
+                          ? 'bg-[rgba(201,162,39,0.2)] text-[var(--stamp)]' 
+                          : 'bg-[rgba(127,163,186,0.2)] text-[var(--slate)]'
+                      }`}>
+                        {inv.role.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono text-xs">{inv.department || 'SOC Unit'}</td>
+                    <td className="p-3 font-mono text-[11px] text-[var(--paper-muted)]">
+                      {new Date(inv.expires_at).toLocaleDateString()}
+                    </td>
+                    <td className="p-3">
+                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                        inv.status === 'accepted' 
+                          ? 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)]' 
+                          : inv.status === 'revoked'
+                          ? 'text-[var(--thread)] bg-[rgba(178,58,46,0.15)]'
+                          : 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)]'
+                      }`}>
+                        {inv.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      {inv.status === 'pending' && (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyInviteLink(inv)}
+                            className="inline-flex items-center gap-1 text-[11px] text-[var(--paper-dim)] hover:text-[var(--paper)] cursor-pointer bg-transparent border-0"
+                            title="Copy Direct Link"
+                          >
+                            {copiedInviteId === inv.id ? (
+                              <Check className="w-3.5 h-3.5 text-[var(--forensic-green)]" />
+                            ) : (
+                              <LinkIcon className="w-3.5 h-3.5" />
+                            )}
+                            <span>{copiedInviteId === inv.id ? 'Copied' : 'Link'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvite(inv.id)}
+                            className="inline-flex items-center gap-1 text-[11px] text-[var(--slate)] hover:underline cursor-pointer bg-transparent border-0"
+                            title="Resend Invitation Email"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Resend</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRevokeInvite(inv.id)}
+                            className="inline-flex items-center gap-1 text-[11px] text-[var(--thread)] hover:underline cursor-pointer bg-transparent border-0"
+                            title="Revoke Invite"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Revoke</span>
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Team Roster Table */}
       <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm overflow-hidden">
         <div className="p-4 border-b border-[var(--line)] flex items-center justify-between">
@@ -282,7 +454,7 @@ export function TeamView() {
             </span>
           </div>
           <button
-            onClick={fetchTeamRoster}
+            onClick={fetchTeamData}
             disabled={loading}
             className="flex items-center gap-1.5 text-xs text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer px-2.5 py-1 rounded-[2px] bg-[var(--ink)] border border-[var(--line)]"
             title="Refresh Roster from Database"
@@ -340,18 +512,7 @@ export function TeamView() {
                   </td>
                   <td className="p-3 font-mono text-[var(--paper-muted)]">{mem.lastActive}</td>
                   <td className="p-3 text-right">
-                    {mem.status === 'PENDING' ? (
-                      <button
-                        onClick={() => handleRevokeInvite(mem.id)}
-                        className="inline-flex items-center gap-1 text-[11px] text-[var(--thread)] hover:underline cursor-pointer bg-transparent border-0"
-                        title="Revoke Invitation"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Revoke</span>
-                      </button>
-                    ) : (
-                      <span className="text-[10px] font-mono text-[var(--forensic-green)]">● Active</span>
-                    )}
+                    <span className="text-[10px] font-mono text-[var(--forensic-green)]">● Active</span>
                   </td>
                 </tr>
               ))}
@@ -359,6 +520,13 @@ export function TeamView() {
           </table>
         </div>
       </div>
+
+      {/* Invite Member Modal */}
+      <InviteMemberModal
+        isOpen={inviteModalOpen}
+        onClose={() => setInviteModalOpen(false)}
+        onInviteCreated={handleInviteCreated}
+      />
 
       {/* Direct Provision Employee Modal */}
       {provisionModalOpen && (
@@ -530,7 +698,7 @@ export function TeamView() {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-2.5 top-2 text-[var(--paper-muted)] hover:text-[var(--paper)] bg-transparent border-0 cursor-pointer"
                     >
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-[var(--paper-muted)]" />}
                     </button>
                   </div>
                 </div>

@@ -31,6 +31,8 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { AlertToast } from './components/AlertToast';
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
+import { ForgotPasswordView } from './components/ForgotPasswordView';
+import { AcceptInviteView } from './components/AcceptInviteView';
 import { SAMPLE_ANALYSES } from './data/samples';
 import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
@@ -67,7 +69,28 @@ export default function App() {
     switchAccountType 
   } = useSession();
 
-  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup'>('intro');
+  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'accept-invite'>('intro');
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  // Auto-detect invitation tokens or reset-password requests in window hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#invite=')) {
+        const token = hash.replace('#invite=', '').trim();
+        if (token) {
+          setInviteToken(token);
+          setAuthView('accept-invite');
+        }
+      } else if (hash.startsWith('#reset-password')) {
+        setAuthView('forgot-password');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
   const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
   const [activeTab, setActiveTab] = useState<NavTab>('ingest');
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
@@ -327,6 +350,7 @@ export default function App() {
         <LoginView
           onBackToIntro={() => setAuthView('intro')}
           onRequestAccess={() => setAuthView('signup')}
+          onForgotPassword={() => setAuthView('forgot-password')}
           onSelectRoleLogin={(selectedRole, options) => {
             setActiveTab('ingest');
             loginAsRole(selectedRole, options);
@@ -350,6 +374,41 @@ export default function App() {
           onSuccess={() => {
             setActiveTab('ingest');
             setAuthView('intro');
+          }}
+        />
+      );
+    }
+    if (authView === 'forgot-password') {
+      return (
+        <ForgotPasswordView
+          onBackToLogin={() => setAuthView('login')}
+          onBackToIntro={() => setAuthView('intro')}
+        />
+      );
+    }
+    if (authView === 'accept-invite') {
+      return (
+        <AcceptInviteView
+          token={inviteToken || ''}
+          onSuccess={(userData) => {
+            if (userData.token && userData.user) {
+              loginAsRole(userData.user.role || 'analyst', {
+                token: userData.token,
+                userId: userData.user.id,
+                email: userData.user.email,
+                fullName: userData.user.fullName,
+                orgName: userData.user.orgName,
+                accountType: userData.user.accountType || 'organization',
+                isEmailVerified: true
+              });
+            }
+            setActiveTab('ingest');
+            setAuthView('intro');
+            window.location.hash = '';
+          }}
+          onBackToLogin={() => {
+            setAuthView('login');
+            window.location.hash = '';
           }}
         />
       );

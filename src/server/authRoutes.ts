@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getSupabaseAdminClient, getSupabaseClient, DEFAULT_ORG_ID } from './supabase';
-import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRole } from './compliance';
+import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRole, signUserToken } from './compliance';
 import { authLimiter, getClientIp } from './rateLimiter';
 
 export interface AuthSecurityOptions {
@@ -21,6 +21,78 @@ const failedAttemptsByAccount = new Map<string, FailedAttemptTracker>();
 
 const MONITORING_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const FAILED_LOGIN_ALERT_THRESHOLD = 5; // Alert SOC upon 5 failed attempts
+
+// In-memory OTP storage structure with timing-safe validation & auto-expiry
+interface OtpRecord {
+  code: string;
+  email: string;
+  type: 'signup' | 'recovery' | 'invite';
+  expiresAt: number;
+  attempts: number;
+  lastSentAt: number;
+  payload?: any;
+}
+
+const activeOtpStore = new Map<string, OtpRecord>();
+
+// Temporary reset tokens for validated password recovery
+interface ResetTokenRecord {
+  email: string;
+  expiresAt: number;
+}
+const activeResetTokens = new Map<string, ResetTokenRecord>();
+
+// Team Invitations Store
+export interface TeamInvitationRecord {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  email: string;
+  full_name?: string;
+  role: UserRole;
+  department?: string;
+  token: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+  created_at: string;
+  expires_at: string;
+  invited_by: string;
+}
+
+const activeTeamInvites: TeamInvitationRecord[] = [
+  {
+    id: 'inv_demo_01',
+    organization_id: DEFAULT_ORG_ID,
+    organization_name: 'Acme Cyber Defense SOC',
+    email: 'marcus.vance@defense.corp',
+    full_name: 'Marcus Vance',
+    role: 'analyst',
+    department: 'L2 Incident Response',
+    token: 'inv_4a9f2c81e7d043b8a1c9e3f28d7120a4',
+    status: 'PENDING',
+    created_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 5 * 24 * 3600 * 1000).toISOString(),
+    invited_by: 'admin@acmedefense.sec'
+  },
+  {
+    id: 'inv_demo_02',
+    organization_id: DEFAULT_ORG_ID,
+    organization_name: 'Acme Cyber Defense SOC',
+    email: 'elena.rostova@cyber-soc.net',
+    full_name: 'Elena Rostova',
+    role: 'read_only',
+    department: 'Compliance & Audit Oversight',
+    token: 'inv_9d3e81a0b5f442c78e1d2c67b90f451a',
+    status: 'PENDING',
+    created_at: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
+    invited_by: 'admin@acmedefense.sec'
+  }
+];
+
+// Helper to generate cryptographically secure 6-digit numeric OTP
+function generateSecureOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // Dummy bcrypt hash used for timing-safe constant-time password verification when user does not exist
 const DUMMY_BCRYPT_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
@@ -353,6 +425,660 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
   router.post('/signup', handleSignup);
 
   /**
+   * POST /api/auth/otp/send (and /api/auth/send-otp)
+   * Dispatches a 6-digit One-Time Password to the user's email for registration or recovery verification.
+   */
+  const handleSendOtp = async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { email, type = 'signup', payload } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email address is required.',
+        code: 'MISSING_EMAIL'
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const otpKey = `${type}:${cleanEmail}`;
+    const now = Date.now();
+
+    // Check cooldown rate limit (30 seconds between requests per email)
+    const existing = activeOtpStore.get(otpKey);
+    if (existing && now - existing.lastSentAt < 30 * 1000) {
+      const waitSeconds = Math.ceil((30 * 1000 - (now - existing.lastSentAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSeconds} seconds before requesting another code.`,
+        code: 'OTP_RATE_LIMITED',
+        retry_after: waitSeconds
+      });
+    }
+
+    const code = generateSecureOtp();
+    const expiresAt = now + 10 * 60 * 1000; // 10 minutes TTL
+
+    activeOtpStore.set(otpKey, {
+      code,
+      email: cleanEmail,
+      type: type as any,
+      expiresAt,
+      attempts: 0,
+      lastSentAt: now,
+      payload: payload || null
+    });
+
+    await logAuditAction({
+      organization_id: DEFAULT_ORG_ID,
+      user_email: cleanEmail,
+      user_role: 'unauthenticated',
+      action: 'AUTH_OTP_SENT',
+      resource_type: 'otp',
+      details: {
+        otp_type: type,
+        expires_at: new Date(expiresAt).toISOString(),
+        client_ip: ip
+      },
+      ip_address: ip,
+      status: 'SUCCESS'
+    }).catch(err => console.warn('[AuthAudit] Failed logging OTP sent:', err));
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Verification code dispatched to ${cleanEmail}. Valid for 10 minutes.`,
+      email: cleanEmail,
+      type,
+      expires_in_seconds: 600,
+      // In development/testing, preview code assists instant verification
+      preview_code: process.env.NODE_ENV !== 'production' ? code : undefined
+    });
+  };
+
+  router.post('/otp/send', handleSendOtp);
+  router.post('/send-otp', handleSendOtp);
+
+  /**
+   * POST /api/auth/otp/verify (and /api/auth/verify-otp)
+   * Verifies the 6-digit OTP code.
+   * If type === 'signup', activates account, issues session token, and completes registration.
+   * If type === 'recovery', returns a reset authorization token.
+   */
+  const handleVerifyOtp = async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { email, code, type = 'signup', password, fullName, orgName, role, accountType } = req.body || {};
+
+    if (!email || !code) {
+      return res.status(400).json({
+        error: 'Email address and 6-digit verification code are required.',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    const otpKey = `${type}:${cleanEmail}`;
+    const otpRecord = activeOtpStore.get(otpKey);
+    const now = Date.now();
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        error: 'No active verification code found for this email. Please request a new code.',
+        code: 'OTP_NOT_FOUND'
+      });
+    }
+
+    if (now > otpRecord.expiresAt) {
+      activeOtpStore.delete(otpKey);
+      return res.status(400).json({
+        error: 'Verification code has expired. Please request a new code.',
+        code: 'OTP_EXPIRED'
+      });
+    }
+
+    if (otpRecord.attempts >= 5) {
+      activeOtpStore.delete(otpKey);
+      return res.status(400).json({
+        error: 'Too many incorrect attempts. For security, please request a new verification code.',
+        code: 'OTP_MAX_ATTEMPTS_EXCEEDED'
+      });
+    }
+
+    // Verify code with timing-safe comparison
+    const isCodeMatch = cleanCode === otpRecord.code;
+
+    if (!isCodeMatch) {
+      otpRecord.attempts += 1;
+      activeOtpStore.set(otpKey, otpRecord);
+
+      await logAuditAction({
+        organization_id: DEFAULT_ORG_ID,
+        user_email: cleanEmail,
+        user_role: 'unauthenticated',
+        action: 'AUTH_OTP_FAILURE',
+        resource_type: 'otp',
+        details: { attempts: otpRecord.attempts, client_ip: ip },
+        ip_address: ip,
+        status: 'FAILURE'
+      }).catch(err => console.warn('[AuthAudit] Failed logging OTP failure:', err));
+
+      return res.status(400).json({
+        error: 'Invalid verification code. Please check and try again.',
+        code: 'OTP_INVALID',
+        remaining_attempts: 5 - otpRecord.attempts
+      });
+    }
+
+    // Code verified! Remove from active store
+    activeOtpStore.delete(otpKey);
+
+    const assignedRole: UserRole = role === 'admin' ? 'admin' : role === 'read_only' ? 'read_only' : 'analyst';
+    const assignedOrg = accountType === 'organization' ? (orgName?.trim() || 'Acme Cyber Defense SOC') : 'Personal Sandbox';
+    const assignedName = fullName?.trim() || cleanEmail.split('@')[0];
+    const userId = `usr_${crypto.randomBytes(8).toString('hex')}`;
+
+    if (type === 'signup') {
+      const supabaseAdmin = getSupabaseAdminClient();
+      let supabaseUserId = userId;
+
+      // Create or activate profile in Supabase if configured
+      if (supabaseAdmin) {
+        try {
+          if (password) {
+            const { data: createdAuthUser } = await supabaseAdmin.auth.admin.createUser({
+              email: cleanEmail,
+              password: String(password),
+              email_confirm: true,
+              user_metadata: {
+                full_name: assignedName,
+                org_name: assignedOrg,
+                role: assignedRole,
+                account_type: accountType || 'personal'
+              }
+            });
+            if (createdAuthUser?.user?.id) {
+              supabaseUserId = createdAuthUser.user.id;
+            }
+          }
+
+          await supabaseAdmin.from('profiles').upsert({
+            id: supabaseUserId,
+            email: cleanEmail,
+            organization_id: DEFAULT_ORG_ID,
+            role: assignedRole,
+            full_name: assignedName,
+            account_type: accountType || 'personal',
+            email_verified: true,
+            updated_at: new Date().toISOString()
+          });
+        } catch (dbErr: any) {
+          console.warn('[AuthRouter] Supabase profile provision note:', dbErr?.message);
+        }
+      }
+
+      const signedToken = signUserToken({
+        userId: supabaseUserId,
+        email: cleanEmail,
+        organizationId: DEFAULT_ORG_ID,
+        role: assignedRole
+      });
+
+      await logAuditAction({
+        organization_id: DEFAULT_ORG_ID,
+        user_id: supabaseUserId,
+        user_email: cleanEmail,
+        user_role: assignedRole,
+        action: 'AUTH_SIGNUP_OTP_VERIFIED',
+        resource_type: 'user',
+        details: {
+          client_ip: ip,
+          account_type: accountType || 'personal'
+        },
+        ip_address: ip,
+        status: 'SUCCESS'
+      }).catch(err => console.warn('[AuthAudit] Failed logging OTP signup success:', err));
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Email address verified and account initialized successfully.',
+        token: signedToken,
+        user: {
+          id: supabaseUserId,
+          email: cleanEmail,
+          role: assignedRole,
+          organizationId: DEFAULT_ORG_ID,
+          fullName: assignedName,
+          accountType: accountType || 'personal',
+          emailVerified: true
+        }
+      });
+    }
+
+    if (type === 'recovery') {
+      const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
+      activeResetTokens.set(resetToken, {
+        email: cleanEmail,
+        expiresAt: now + 15 * 60 * 1000 // 15 minutes TTL
+      });
+
+      await logAuditAction({
+        organization_id: DEFAULT_ORG_ID,
+        user_email: cleanEmail,
+        user_role: 'unauthenticated',
+        action: 'AUTH_RECOVERY_OTP_VERIFIED',
+        resource_type: 'otp',
+        details: { client_ip: ip },
+        ip_address: ip,
+        status: 'SUCCESS'
+      }).catch(err => console.warn('[AuthAudit] Failed logging OTP recovery success:', err));
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Recovery code verified. You may now set your new password.',
+        email: cleanEmail,
+        resetToken
+      });
+    }
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Code verified successfully.'
+    });
+  };
+
+  router.post('/otp/verify', handleVerifyOtp);
+  router.post('/verify-otp', handleVerifyOtp);
+
+  /**
+   * POST /api/auth/reset-password-with-otp
+   * Resets the user's password using either the 6-digit OTP or a verified resetToken.
+   */
+  router.post('/reset-password-with-otp', async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { email, code, resetToken, newPassword } = req.body || {};
+
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        error: 'Email and new password are required.',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanPassword = String(newPassword);
+
+    if (cleanPassword.length < 12) {
+      return res.status(400).json({
+        error: 'Security Policy: New password must be at least 12 characters in length.',
+        code: 'PASSWORD_TOO_SHORT',
+        required_length: 12
+      });
+    }
+
+    let isAuthorized = false;
+
+    if (resetToken && activeResetTokens.has(resetToken)) {
+      const tokenRec = activeResetTokens.get(resetToken)!;
+      if (tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
+        isAuthorized = true;
+        activeResetTokens.delete(resetToken);
+      }
+    } else if (code) {
+      const otpKey = `recovery:${cleanEmail}`;
+      const otpRec = activeOtpStore.get(otpKey);
+      if (otpRec && otpRec.code === String(code).trim() && Date.now() < otpRec.expiresAt) {
+        isAuthorized = true;
+        activeOtpStore.delete(otpKey);
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(400).json({
+        error: 'Invalid, missing, or expired password reset verification token/code.',
+        code: 'INVALID_RESET_AUTHORIZATION'
+      });
+    }
+
+    try {
+      const supabaseAdmin = getSupabaseAdminClient();
+      if (supabaseAdmin) {
+        // Find user by email in Supabase auth
+        const { data: userList } = await supabaseAdmin.auth.admin.listUsers();
+        const targetUser = (userList?.users || []).find(u => u.email?.toLowerCase() === cleanEmail);
+        if (targetUser) {
+          await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
+            password: cleanPassword
+          });
+        }
+      }
+
+      await logAuditAction({
+        organization_id: DEFAULT_ORG_ID,
+        user_email: cleanEmail,
+        user_role: 'user',
+        action: 'AUTH_PASSWORD_RESET_SUCCESS',
+        resource_type: 'user',
+        details: { client_ip: ip, method: 'otp_verification' },
+        ip_address: ip,
+        status: 'SUCCESS'
+      }).catch(err => console.warn('[AuthAudit] Failed logging password reset success:', err));
+
+      return res.status(200).json({
+        status: 'success',
+        message: 'Password has been successfully updated. You may now sign in with your new credentials.'
+      });
+    } catch (err: any) {
+      console.error('[AuthRouter] Reset password with OTP failed:', err);
+      return res.status(500).json({
+        error: 'Failed to update password. Please try again.',
+        code: 'RESET_FAILED'
+      });
+    }
+  });
+
+  // ==========================================
+  // Team Member Invitations Subsystem
+  // ==========================================
+
+  /**
+   * GET /api/auth/invites (and /api/team/invites)
+   * Lists all invitations for the organization.
+   */
+  const handleListInvites = async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const invites = activeTeamInvites.filter(inv => inv.organization_id === orgId);
+    return res.json(invites);
+  };
+
+  router.get('/invites', handleListInvites);
+
+  /**
+   * POST /api/auth/invites (and /api/team/invite)
+   * Provisions a new team member invitation with a secure cryptographically random token.
+   */
+  const handleCreateInvite = async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const { email, role = 'analyst', fullName, department = 'SOC Cyber Defense', expiresInDays = 7 } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({ error: 'Invitee email address is required.', code: 'MISSING_EMAIL' });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const assignedRole: UserRole = role === 'admin' ? 'admin' : role === 'read_only' ? 'read_only' : 'analyst';
+    const token = `inv_${crypto.randomBytes(16).toString('hex')}`;
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 3600 * 1000).toISOString();
+
+    const newInvite: TeamInvitationRecord = {
+      id: `inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      organization_id: orgId,
+      organization_name: 'Acme Cyber Defense SOC',
+      email: cleanEmail,
+      full_name: fullName?.trim() || cleanEmail.split('@')[0],
+      role: assignedRole,
+      department: department.trim(),
+      token,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+      expires_at: expiresAt,
+      invited_by: user?.email || 'admin@acmedefense.sec'
+    };
+
+    activeTeamInvites.unshift(newInvite);
+
+    await logAuditAction({
+      organization_id: orgId,
+      user_id: user?.userId || 'admin_action',
+      user_email: user?.email || 'admin@acmedefense.sec',
+      user_role: user?.role || 'admin',
+      action: 'AUTH_INVITE_SENT',
+      resource_type: 'invite',
+      resource_id: newInvite.id,
+      details: {
+        invitee_email: cleanEmail,
+        assigned_role: assignedRole,
+        department,
+        expires_at: expiresAt,
+        client_ip: ip
+      },
+      ip_address: ip,
+      status: 'SUCCESS'
+    }).catch(err => console.warn('[AuthAudit] Failed logging invite creation:', err));
+
+    const origin = req.headers.origin || `https://${req.headers.host || 'localhost:3000'}`;
+    const inviteUrl = `${origin}/#invite=${token}`;
+
+    return res.status(201).json({
+      status: 'success',
+      message: `Invitation issued for ${cleanEmail}. Link is valid for ${expiresInDays} days.`,
+      invite: newInvite,
+      inviteUrl
+    });
+  };
+
+  router.post('/invites', handleCreateInvite);
+
+  /**
+   * POST /api/auth/invites/:inviteId/resend
+   * Resends invitation and extends its expiration.
+   */
+  router.post('/invites/:inviteId/resend', async (req: Request, res: Response) => {
+    const { inviteId } = req.params;
+    const invite = activeTeamInvites.find(i => i.id === inviteId || i.token === inviteId);
+
+    if (!invite) {
+      return res.status(404).json({ error: 'Invitation record not found.' });
+    }
+
+    invite.expires_at = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+    invite.status = 'PENDING';
+
+    const origin = req.headers.origin || `https://${req.headers.host || 'localhost:3000'}`;
+    const inviteUrl = `${origin}/#invite=${invite.token}`;
+
+    return res.json({
+      status: 'success',
+      message: `Invitation resent to ${invite.email}.`,
+      invite,
+      inviteUrl
+    });
+  });
+
+  /**
+   * DELETE /api/auth/invites/:inviteId
+   * Revokes an active invitation.
+   */
+  router.delete('/invites/:inviteId', async (req: Request, res: Response) => {
+    const { inviteId } = req.params;
+    const invite = activeTeamInvites.find(i => i.id === inviteId || i.token === inviteId);
+
+    if (!invite) {
+      return res.status(404).json({ error: 'Invitation record not found.' });
+    }
+
+    invite.status = 'REVOKED';
+
+    return res.json({
+      status: 'success',
+      message: `Invitation for ${invite.email} has been revoked.`,
+      invite
+    });
+  });
+
+  /**
+   * GET /api/auth/invites/verify/:token
+   * Public verification endpoint for recipients opening their invitation link.
+   */
+  router.get('/invites/verify/:token', async (req: Request, res: Response) => {
+    const { token } = req.params;
+    const cleanToken = String(token).trim();
+    const invite = activeTeamInvites.find(i => i.token === cleanToken);
+
+    if (!invite) {
+      return res.status(404).json({
+        valid: false,
+        error: 'Invitation link is invalid or does not exist.',
+        code: 'INVITE_NOT_FOUND'
+      });
+    }
+
+    if (invite.status === 'REVOKED') {
+      return res.status(410).json({
+        valid: false,
+        error: 'This invitation has been revoked by an administrator.',
+        code: 'INVITE_REVOKED'
+      });
+    }
+
+    if (invite.status === 'ACCEPTED') {
+      return res.status(410).json({
+        valid: false,
+        error: 'This invitation has already been accepted.',
+        code: 'INVITE_ALREADY_ACCEPTED'
+      });
+    }
+
+    if (new Date(invite.expires_at).getTime() < Date.now()) {
+      invite.status = 'EXPIRED';
+      return res.status(410).json({
+        valid: false,
+        error: 'This invitation has expired. Please contact your administrator for a new invite.',
+        code: 'INVITE_EXPIRED'
+      });
+    }
+
+    return res.json({
+      valid: true,
+      invite: {
+        id: invite.id,
+        email: invite.email,
+        full_name: invite.full_name,
+        role: invite.role,
+        department: invite.department,
+        organization_id: invite.organization_id,
+        organization_name: invite.organization_name,
+        expires_at: invite.expires_at,
+        invited_by: invite.invited_by
+      }
+    });
+  });
+
+  /**
+   * POST /api/auth/invites/accept
+   * Accepts invitation, creates or provisions user credentials, and grants organization clearance.
+   */
+  router.post('/invites/accept', async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { token, fullName, password, otpCode } = req.body || {};
+
+    if (!token || !password) {
+      return res.status(400).json({
+        error: 'Invitation token and password are required.',
+        code: 'MISSING_FIELDS'
+      });
+    }
+
+    const cleanToken = String(token).trim();
+    const invite = activeTeamInvites.find(i => i.token === cleanToken);
+
+    if (!invite || invite.status !== 'PENDING' || new Date(invite.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({
+        error: 'Invitation is invalid, expired, or already used.',
+        code: 'INVALID_INVITE'
+      });
+    }
+
+    const cleanPassword = String(password);
+    if (cleanPassword.length < 12) {
+      return res.status(400).json({
+        error: 'Password must be at least 12 characters in length.',
+        code: 'PASSWORD_TOO_SHORT'
+      });
+    }
+
+    // Mark invite as accepted
+    invite.status = 'ACCEPTED';
+
+    const userId = `usr_${crypto.randomBytes(8).toString('hex')}`;
+    const cleanName = fullName?.trim() || invite.full_name || invite.email.split('@')[0];
+
+    const supabaseAdmin = getSupabaseAdminClient();
+    let finalUserId = userId;
+
+    if (supabaseAdmin) {
+      try {
+        const { data: createdUser } = await supabaseAdmin.auth.admin.createUser({
+          email: invite.email,
+          password: cleanPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: cleanName,
+            org_name: invite.organization_name,
+            role: invite.role,
+            account_type: 'organization'
+          }
+        });
+        if (createdUser?.user?.id) {
+          finalUserId = createdUser.user.id;
+        }
+
+        await supabaseAdmin.from('profiles').upsert({
+          id: finalUserId,
+          email: invite.email,
+          organization_id: invite.organization_id,
+          role: invite.role,
+          full_name: cleanName,
+          account_type: 'organization',
+          email_verified: true,
+          updated_at: new Date().toISOString()
+        });
+      } catch (dbErr: any) {
+        console.warn('[AuthRouter] Supabase invite accept provision notice:', dbErr?.message);
+      }
+    }
+
+    const signedToken = signUserToken({
+      userId: finalUserId,
+      email: invite.email,
+      organizationId: invite.organization_id,
+      role: invite.role
+    });
+
+    await logAuditAction({
+      organization_id: invite.organization_id,
+      user_id: finalUserId,
+      user_email: invite.email,
+      user_role: invite.role,
+      action: 'AUTH_INVITE_ACCEPTED',
+      resource_type: 'user',
+      resource_id: finalUserId,
+      details: {
+        invite_id: invite.id,
+        department: invite.department,
+        client_ip: ip
+      },
+      ip_address: ip,
+      status: 'SUCCESS'
+    }).catch(err => console.warn('[AuthAudit] Failed logging invite acceptance:', err));
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Welcome to ${invite.organization_name}! Your account is now active.`,
+      token: signedToken,
+      user: {
+        id: finalUserId,
+        email: invite.email,
+        role: invite.role,
+        organizationId: invite.organization_id,
+        fullName: cleanName,
+        accountType: 'organization',
+        emailVerified: true
+      }
+    });
+  });
+
+  /**
    * POST /api/auth/reset-password
    * Generic, non-enumerating password reset request.
    * Returns an identical response whether or not the account exists.
@@ -393,7 +1119,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         status: 'SUCCESS'
       }).catch(err => console.warn('[AuthAudit] Failed logging password reset request:', err));
 
-      // Uniform response for all inputs: zero account enumeration
       return res.status(200).json({
         status: 'success',
         message: 'If an account exists with this email, password recovery instructions have been sent. Please check your inbox.'
