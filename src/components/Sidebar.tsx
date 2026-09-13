@@ -160,29 +160,29 @@ export function Sidebar({
   // Tier 1: Always Visible Navigation Items
   const alwaysVisibleNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'cases', label: 'Cases', icon: FolderOpen },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'overview', label: 'Overview', icon: Activity },
-    { id: 'alerts', label: 'Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
-    { id: 'settings', label: 'Settings', icon: SlidersHorizontal },
+    { id: 'cases', label: 'Investigation Cases', icon: FolderOpen },
+    { id: 'search', label: 'Search & Filter', icon: Search },
+    { id: 'overview', label: 'Email Analysis', icon: Activity },
+    { id: 'alerts', label: 'Security Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
+    { id: 'settings', label: 'Account & Settings', icon: SlidersHorizontal },
   ];
 
   // Tier 2: Collapsible Forensic Tools Items
   const forensicNavItems: NavItem[] = [
-    { id: 'campaigns', label: 'Campaigns', icon: Layers },
-    { id: 'graph', label: 'Sender Graph', icon: Share2 },
-    { id: 'timeline', label: 'Timeline', icon: Clock },
-    { id: 'ingest', label: 'Upload Email', icon: Database, readOnlyDisabled: role === 'read_only' },
-    { id: 'gmail', label: 'Gmail Sync', icon: Mail, readOnlyDisabled: role === 'read_only' },
-    { id: 'hops', label: 'Delivery Path', icon: Network },
-    { id: 'map', label: 'Geo Location', icon: MapPin },
-    { id: 'logs', label: 'Activity Logs', icon: Terminal },
-    { id: 'headers', label: 'Email Headers', icon: FileText },
+    { id: 'campaigns', label: 'Attack Campaigns', icon: Layers },
+    { id: 'graph', label: 'Sender & Domain Graph', icon: Share2 },
+    { id: 'timeline', label: 'Threat Timeline', icon: Clock },
+    { id: 'ingest', label: 'Upload & Inspect Email', icon: Database, readOnlyDisabled: role === 'read_only' },
+    { id: 'gmail', label: 'Gmail Live Sync', icon: Mail, readOnlyDisabled: role === 'read_only' },
+    { id: 'hops', label: 'Server Routing & Hops', icon: Network },
+    { id: 'map', label: 'Origin Geo Map', icon: MapPin },
+    { id: 'logs', label: 'Security Logs', icon: Terminal },
+    { id: 'headers', label: 'Raw Email Headers', icon: FileText },
   ];
 
   const adminNavItems: NavItem[] = [
     { id: 'organization', label: 'Organization', icon: Building2 },
-    { id: 'team', label: 'Team Members', icon: Users },
+    { id: 'team', label: 'Team & access', icon: Users },
   ];
 
   const isWsConnected = (wsStatus as string)?.toLowerCase() === 'connected';
@@ -221,16 +221,16 @@ export function Sidebar({
             </span>
             {accountType === 'personal' ? (
               <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[rgba(127,163,186,0.2)] text-[var(--slate)] border border-[var(--slate)]/40 font-bold">
-                PERSONAL
+                INDIVIDUAL
               </span>
             ) : (
               <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[var(--stamp)]/40 font-bold">
-                TEAM
+                ORGANIZATION
               </span>
             )}
           </div>
           <span className="text-[10px] text-[#b9af9c] font-mono tracking-wider">
-            {accountType === 'personal' ? 'SINGLE EMAIL MODE' : 'TEAM WORKSPACE'}
+            {accountType === 'personal' ? 'SINGLE EMAIL ANALYSIS' : 'FULL SOC SUITE'}
           </span>
         </div>
       </button>
@@ -240,17 +240,17 @@ export function Sidebar({
         <div className="mx-3 mt-3 p-2.5 rounded-[2px] bg-[rgba(201,162,39,0.1)] border border-[rgba(201,162,39,0.3)] text-xs space-y-1.5">
           <div className="flex items-center gap-1.5 text-[var(--stamp)] font-semibold text-[11px]">
             <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span>Personal Plan</span>
+            <span>Individual Mode</span>
           </div>
           <p className="text-[10.5px] text-[var(--paper-dim)] leading-tight">
-            Analyze individual emails and inspect threats.
+            Email Ingestion &amp; single-message forensic triage active.
           </p>
           <button
             onClick={() => onOpenUpgradeModal && onOpenUpgradeModal('Organization Full SOC Access')}
             className="w-full text-center py-1 rounded-[2px] bg-[var(--stamp)] text-[var(--ink)] font-bold text-[10.5px] hover:brightness-110 cursor-pointer transition-all flex items-center justify-center gap-1"
           >
             <OrgIcon className="w-3 h-3" />
-            <span>Upgrade to Team</span>
+            <span>Switch to Org Mode</span>
           </button>
         </div>
       )}
@@ -309,15 +309,15 @@ export function Sidebar({
           })}
         </div>
 
-        {/* Analysis Tools (Collapsible Section) */}
+        {/* Forensic Tools (Collapsible Section) */}
         <div className="space-y-1">
           <button
             onClick={toggleForensicTools}
             className="w-full px-3 pb-1 pt-1 text-[10px] font-mono font-medium text-[#b9af9c] hover:text-[#ede6d8] uppercase tracking-wider flex items-center justify-between cursor-pointer group"
-            title={isForensicExpanded ? "Collapse Analysis Tools" : "Expand Analysis Tools"}
+            title={isForensicExpanded ? "Collapse Forensic Tools" : "Expand Forensic Tools"}
           >
             <span className="flex items-center gap-1.5">
-              <span>Analysis Tools</span>
+              <span>Forensic Tools</span>
               {!isForensicExpanded && (
                 <span className="text-[9px] px-1 py-0.2 rounded bg-[#3a352c]/50 text-[#8a8070]">
                   {forensicNavItems.length}
@@ -365,7 +365,7 @@ export function Sidebar({
                     <span className="relative z-10 flex-1">{item.label}</span>
                     {isRestrictedForPersonal && (
                       <span className="relative z-10 text-[9px] font-mono px-1 py-0.2 rounded bg-[rgba(201,162,39,0.15)] text-[var(--stamp)]">
-                        TEAM
+                        ORG
                       </span>
                     )}
                     {item.badge && !isRestrictedForPersonal && (
@@ -384,8 +384,8 @@ export function Sidebar({
         {role === 'admin' && accountType === 'organization' && (
           <div className="space-y-1 pt-2 border-t border-[#3a352c]/50">
             <div className="px-3 pb-1 text-[10px] font-mono font-medium text-[#c9a227] uppercase tracking-wider flex items-center justify-between">
-              <span>Administration</span>
-              <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">ADMIN</span>
+              <span>Admin &amp; Employees</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">ORG ROOT</span>
             </div>
             {adminNavItems.map((item) => {
               const Icon = item.icon;
@@ -426,7 +426,7 @@ export function Sidebar({
           <div 
             onClick={() => setIsExpandedHealth(!isExpandedHealth)}
             className="flex items-center justify-between cursor-pointer text-[#8a8070] hover:text-[#ede6d8] transition-colors"
-            title="System Status"
+            title="Toggle Service Health Details"
           >
             <div className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full inline-block ${
@@ -434,7 +434,7 @@ export function Sidebar({
                   ? 'bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' 
                   : 'bg-[var(--thread)]'
               }`} />
-              <span className="font-bold tracking-wider text-[#ede6d8]">SYSTEM STATUS</span>
+              <span className="font-bold tracking-wider text-[#ede6d8]">SERVICE HEALTH</span>
             </div>
             <div className="flex items-center gap-1 text-[9.5px]">
               <span className="text-emerald-400 font-semibold">{latencyMs}ms</span>
@@ -448,7 +448,7 @@ export function Sidebar({
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-[#8a8070]">
                   <Cpu className="w-3 h-3 text-[var(--thread)]" />
-                  <span>Analyzer Engine</span>
+                  <span>Analysis Engine</span>
                 </span>
                 <span className={`font-bold text-[9.5px] px-1 py-0.2 rounded border ${
                   engineHealth === 'operational'
@@ -459,11 +459,11 @@ export function Sidebar({
                 </span>
               </div>
 
-              {/* Gemini AI */}
+              {/* Gemini AI Intel */}
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-[#8a8070]">
                   <Zap className="w-3 h-3 text-[var(--stamp)]" />
-                  <span>AI Security</span>
+                  <span>Gemini 3.6 AI</span>
                 </span>
                 <span className="font-bold text-[9.5px] px-1 py-0.2 rounded bg-[rgba(201,162,39,0.15)] border border-[rgba(201,162,39,0.4)] text-[var(--stamp)]">
                   ACTIVE
@@ -474,18 +474,18 @@ export function Sidebar({
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-[#8a8070]">
                   <Globe className="w-3 h-3 text-[var(--slate)]" />
-                  <span>Threat Intel</span>
+                  <span>Intel &amp; Rep APIs</span>
                 </span>
                 <span className="font-bold text-[9.5px] px-1 py-0.2 rounded bg-[rgba(127,163,186,0.15)] border border-[rgba(127,163,186,0.4)] text-[var(--slate)]">
                   ONLINE
                 </span>
               </div>
 
-              {/* Live Alerts */}
+              {/* Real-time WS Bridge */}
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-1 text-[#8a8070]">
                   <Radio className="w-3 h-3 text-emerald-400" />
-                  <span>Live Alerts</span>
+                  <span>Alert WS Bridge</span>
                 </span>
                 <span className={`font-bold text-[9.5px] px-1 py-0.2 rounded border ${
                   isWsConnected
@@ -511,17 +511,17 @@ export function Sidebar({
             whileTap={{ scale: 0.97 }}
             transition={{ type: 'spring', stiffness: 400, damping: 25 }}
             className="w-full py-1.5 px-3 rounded-[2px] text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all bg-[rgba(201,162,39,0.12)] hover:bg-[rgba(201,162,39,0.22)] border border-[rgba(201,162,39,0.35)] text-[var(--stamp)] cursor-pointer shadow-xs"
-            title="Getting Started Guide"
+            title="Launch Interactive Forensic Walkthrough Overlay"
           >
             <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
-            <span>GETTING STARTED</span>
+            <span>GET STARTED GUIDE</span>
           </motion.button>
         )}
 
         <motion.button
           onClick={() => setActiveTab('ingest')}
           disabled={role === 'read_only'}
-          title={role === 'read_only' ? 'Uploads disabled in read-only mode' : 'Upload .eml File (Alt+2 / ⌘2)'}
+          title={role === 'read_only' ? 'Read-only access: file ingestion restricted' : 'Ingest .EML File (Alt+2 / ⌘2)'}
           whileHover={{ scale: role === 'read_only' ? 1 : 1.02 }}
           whileTap={{ scale: role === 'read_only' ? 1 : 0.97 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
@@ -532,7 +532,7 @@ export function Sidebar({
           }`}
         >
           <Upload className="w-3.5 h-3.5 text-[var(--thread)]" />
-          <span>{role === 'read_only' ? 'Uploads Disabled' : 'Upload .eml File'}</span>
+          <span>{role === 'read_only' ? 'Ingestion Restricted' : 'Ingest .EML File'}</span>
         </motion.button>
 
         {onOpenShortcutsHelp && (
