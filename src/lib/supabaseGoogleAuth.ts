@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured, ensureSupabaseClient, getIsSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured, ensureSupabaseClient, getIsSupabaseConfigured, getSupabaseAnonKey } from './supabase';
 
 export interface GoogleAuthResult {
   success: boolean;
@@ -92,21 +92,22 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
 
   const inIframe = isRunningInIframe();
   const callbackUrl = `${window.location.origin}/auth/callback`;
+  const anonKey = getSupabaseAnonKey();
 
   try {
     console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl);
 
-    // Inside an iframe (e.g. AI Studio preview), redirecting inside the iframe
-    // causes Google accounts to fail with X-Frame-Options: SAMEORIGIN.
-    // We request the OAuth URL with skipBrowserRedirect and open a popup window.
+    // Request OAuth authorization URL with skipBrowserRedirect so we can sanitize
+    // and guarantee the `apikey` query parameter is present for Supabase's Kong gateway.
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: callbackUrl,
-        skipBrowserRedirect: inIframe,
+        skipBrowserRedirect: true,
         queryParams: {
           access_type: 'offline',
-          prompt: 'consent'
+          prompt: 'consent',
+          ...(anonKey ? { apikey: anonKey } : {})
         }
       }
     });
@@ -126,13 +127,37 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
       };
     }
 
-    // In top-level mode where skipBrowserRedirect is false, Supabase already initiates the redirect
-    if (!inIframe || !data?.url) {
-      console.log('[Supabase Google Auth] Redirecting top-level window to:', data?.url || 'OAuth endpoint');
+    let authUrl = data?.url;
+    if (!authUrl) {
+      return {
+        success: false,
+        error: 'Failed to retrieve Google OAuth authorization URL from Supabase.'
+      };
+    }
+
+    // Ensure `apikey` parameter is explicitly attached to the auth URL to satisfy Supabase Kong gateway
+    if (anonKey) {
+      try {
+        const urlObj = new URL(authUrl);
+        if (!urlObj.searchParams.has('apikey')) {
+          urlObj.searchParams.set('apikey', anonKey);
+          authUrl = urlObj.toString();
+        }
+      } catch {
+        if (!authUrl.includes('apikey=')) {
+          authUrl += (authUrl.includes('?') ? '&' : '?') + `apikey=${encodeURIComponent(anonKey)}`;
+        }
+      }
+    }
+
+    // In top-level mode (outside iframe), navigate directly
+    if (!inIframe) {
+      console.log('[Supabase Google Auth] Navigating top-level window to:', authUrl);
+      window.location.assign(authUrl);
       return { success: true };
     }
 
-    console.log('[Supabase Google Auth] Opening OAuth popup window to:', data.url);
+    console.log('[Supabase Google Auth] Opening OAuth popup window to:', authUrl);
 
     // In iframe mode: open provider authorization URL directly in a popup window
     const width = 560;
@@ -141,7 +166,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
     const top = window.screenY + (window.outerHeight - height) / 2;
 
     const popup = window.open(
-      data.url,
+      authUrl,
       'tracexmail_google_auth_popup',
       `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,status=1,resizable=yes`
     );

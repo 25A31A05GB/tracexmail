@@ -73,6 +73,15 @@ export function validateSupabaseCredentials(url?: string | null, key?: string | 
 
 export let isSupabaseConfigured = validateSupabaseCredentials(clientEnvUrl, clientEnvKey);
 let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : '';
+let configuredSupabaseAnonKey: string = isSupabaseConfigured ? clientEnvKey : '';
+
+export function getSupabaseAnonKey(): string {
+  return configuredSupabaseAnonKey || clientEnvKey;
+}
+
+export function getSupabaseUrl(): string {
+  return configuredSupabaseUrl || clientEnvUrl;
+}
 
 /**
  * Frontend Supabase Client initialized with verified VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
@@ -82,6 +91,11 @@ export let supabase: SupabaseClient = createClient(
   isSupabaseConfigured ? clientEnvUrl : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? clientEnvKey : 'placeholder-anon-key',
   {
+    global: {
+      headers: {
+        apikey: isSupabaseConfigured ? clientEnvKey : 'placeholder-anon-key',
+      },
+    },
     auth: {
       persistSession: isSupabaseConfigured,
       autoRefreshToken: isSupabaseConfigured,
@@ -127,7 +141,13 @@ export async function ensureSupabaseClient(): Promise<boolean> {
         validateSupabaseCredentials(data.supabaseUrl, data.supabaseAnonKey)
       ) {
         configuredSupabaseUrl = data.supabaseUrl;
+        configuredSupabaseAnonKey = data.supabaseAnonKey;
         supabase = createClient(data.supabaseUrl, data.supabaseAnonKey, {
+          global: {
+            headers: {
+              apikey: data.supabaseAnonKey,
+            },
+          },
           auth: {
             persistSession: true,
             autoRefreshToken: true,
