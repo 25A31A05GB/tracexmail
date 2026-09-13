@@ -250,9 +250,9 @@ export function LoginView({
             </button>
           )}
 
-          <div className="font-mono text-[10.5px] text-[var(--stamp)] uppercase tracking-wider ml-auto flex items-center gap-1">
-            <Lock className="w-3 h-3 text-[var(--stamp)]" />
-            <span>STRICT AUTHENTICATION</span>
+          <div className="font-mono text-[11px] text-[var(--paper-dim)] flex items-center gap-1.5 ml-auto">
+            <Lock className="w-3 h-3 text-[var(--forensic-green)]" />
+            <span>Secure Sign In</span>
           </div>
         </div>
 
@@ -262,12 +262,12 @@ export function LoginView({
             <div className="w-2 h-2 rounded-full bg-[var(--thread)]" />
           </div>
           <span className="font-display font-bold text-xl text-[var(--paper)] tracking-tight">
-            TraceXMail Sign In
+            Sign In to TraceXMail
           </span>
         </div>
 
         <div className="text-[var(--paper-dim)] text-[13.5px] mb-5">
-          Sign in to inspect suspicious emails, view route maps, and access your forensic cases.
+          Access email threat analysis, route tracing, and investigation reports.
         </div>
 
         {errorMsg && (

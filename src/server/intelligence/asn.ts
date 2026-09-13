@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import maxmind, { AsnResponse, Reader } from 'maxmind';
-import { validateAndClassifyIp } from './ipValidation';
+import { validateAndClassifyIp, ipToInt } from './ipValidation';
 import { asnCache } from './cache';
 import { createProvenanceMetadata } from './provenance';
 import { AsnResult } from './types';
@@ -18,11 +18,6 @@ interface CsvAsnBlock {
 
 let csvAsnBlocks: CsvAsnBlock[] | null = null;
 let csvAsnLoaded = false;
-
-function ipToInt(ip: string): number {
-  const parts = ip.split('.').map(p => parseInt(p, 10));
-  return ((parts[0] << 24) >>> 0) + ((parts[1] << 16) >>> 0) + ((parts[2] << 8) >>> 0) + (parts[3] >>> 0);
-}
 
 function parseCidr(cidr: string): { startInt: number; endInt: number } {
   const [baseIp, maskStr] = cidr.split('/');

@@ -440,3 +440,12 @@ export function validateAndClassifyIp(rawIp?: string | null): IpValidationResult
     lookupStatus: 'valid'
   };
 }
+
+/**
+ * Converts a standard IPv4 dotted string into a 32-bit unsigned integer.
+ */
+export function ipToInt(ip: string): number {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) return 0;
+  return ((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+}

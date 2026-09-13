@@ -253,7 +253,7 @@ export function AlertsView({
   });
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#14120f] overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 flex flex-col h-full bg-[#14120f] overflow-y-auto p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
       {/* Top Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

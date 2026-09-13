@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import maxmind, { CityResponse, Reader } from 'maxmind';
-import { validateAndClassifyIp } from './ipValidation';
+import { validateAndClassifyIp, ipToInt } from './ipValidation';
 import { geoIpCache } from './cache';
 import { providerRateLimiter } from './rateLimiter';
 import { createProvenanceMetadata, MAXMIND_COPYRIGHT_NOTICE, MAXMIND_LICENSE_NOTICE } from './provenance';
@@ -41,11 +41,6 @@ interface CsvBlock {
 let csvLocationsMap: Map<number, CsvLocation> | null = null;
 let csvBlocksArray: CsvBlock[] | null = null;
 let csvLoaded = false;
-
-function ipToInt(ip: string): number {
-  const parts = ip.split('.').map(p => parseInt(p, 10));
-  return ((parts[0] << 24) >>> 0) + ((parts[1] << 16) >>> 0) + ((parts[2] << 8) >>> 0) + (parts[3] >>> 0);
-}
 
 function parseCidrRange(cidr: string): { startInt: number; endInt: number } {
   const [baseIp, maskStr] = cidr.split('/');

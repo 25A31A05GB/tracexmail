@@ -148,12 +148,12 @@ export function SignupView({
             <div className="w-2 h-2 rounded-full bg-[var(--thread)]" />
           </div>
           <span className="font-display font-bold text-xl text-[var(--paper)] tracking-tight">
-            Create TraceXMail Account
+            Create Your Account
           </span>
         </div>
 
         <div className="text-[var(--paper-dim)] text-[13.5px] mb-4">
-          Register to authenticate your organization, retain forensic custody, and investigate email threats.
+          Start analyzing email security, verifying sender authenticity, and uncovering threats.
         </div>
 
         {errorMsg && (

@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured, getSupabaseAnonKey } from './supabase';
 
 const DEFAULT_ORG_ID = 'org_acme_soc_01';
 
@@ -51,6 +51,46 @@ export function subscribeSession(listener: SessionListener): () => void {
   return () => {
     sessionListeners.delete(listener);
   };
+}
+
+/**
+ * Directly resolves the active authentication session token from Supabase client,
+ * guaranteeing outbound requests carry fresh, verified tokens without stale state.
+ */
+export async function getActiveAuthToken(): Promise<string | null> {
+  // 1. Direct active Supabase session lookup (primary source of truth)
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (!error && session?.access_token) {
+        memorySessionToken = session.access_token;
+        return session.access_token;
+      }
+    } catch (e) {
+      console.warn('[Session] Direct session token extraction warning:', e);
+    }
+  }
+
+  // 2. In-memory session token fallback
+  if (memorySessionToken) {
+    return memorySessionToken;
+  }
+
+  // 3. Local Enclave session token fallback
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('tracexmail_enclave_session');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.token) {
+          memorySessionToken = parsed.token;
+          return parsed.token;
+        }
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 /**
@@ -190,17 +230,25 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor: attaches the verified JWT token to all outbound Axios calls
+// Request interceptor: attaches the verified JWT token and apikey to all outbound Axios calls
 apiClient.interceptors.request.use(async (config) => {
-  if (!memorySessionToken) {
-    await initializeSession();
+  const token = await getActiveAuthToken();
+  const anonKey = getSupabaseAnonKey();
+
+  // Always supply the Supabase apikey header to satisfy Kong gateway and backend authorization
+  if (anonKey) {
+    config.headers.set('apikey', anonKey);
+    config.headers.set('x-api-key', anonKey);
   }
-  if (memorySessionToken) {
-    config.headers.set('Authorization', `Bearer ${memorySessionToken}`);
+
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
   }
+
   if (!config.headers.has('x-organization-id')) {
-    config.headers.set('x-organization-id', DEFAULT_ORG_ID);
+    config.headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
   }
+
   return config;
 });
 
@@ -231,12 +279,11 @@ apiClient.interceptors.response.use(
 
 /**
  * Centralized fetch wrapper that automatically injects the active session's
- * Authorization: Bearer <token> and organization headers.
+ * Authorization: Bearer <token>, apikey, and organization headers.
  */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  if (!memorySessionToken) {
-    await initializeSession();
-  }
+  const token = await getActiveAuthToken();
+  const anonKey = getSupabaseAnonKey();
 
   let targetUrl = input;
   if (typeof input === 'string' && input.startsWith('/api') && API_URL) {
@@ -244,11 +291,20 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   }
 
   const headers = new Headers(init?.headers);
-  if (memorySessionToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${memorySessionToken}`);
+
+  // Guarantee apikey presence for Supabase Kong Gateway & backend
+  if (anonKey && !headers.has('apikey')) {
+    headers.set('apikey', anonKey);
+  }
+  if (anonKey && !headers.has('x-api-key')) {
+    headers.set('x-api-key', anonKey);
+  }
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
   if (!headers.has('x-organization-id')) {
-    headers.set('x-organization-id', DEFAULT_ORG_ID);
+    headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
   }
 
   return fetch(targetUrl, {

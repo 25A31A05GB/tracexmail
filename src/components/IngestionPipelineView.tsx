@@ -329,10 +329,10 @@ export function IngestionPipelineView({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-display font-bold text-[var(--paper)] flex items-center gap-2">
-                <span>Email Ingestion &amp; Evidence Pipeline</span>
+                <span>Upload &amp; Inspect Email</span>
               </h2>
               <p className="text-xs text-[var(--paper-dim)] mt-0.5 font-sans">
-                Ingest raw RFC822 (.eml, .msg, .txt) email files through the multi-stage forensic analysis engine.
+                Upload an email file (.eml, .msg, or raw text) to instantly verify the sender, route, links, and security status.
               </p>
             </div>
           </div>

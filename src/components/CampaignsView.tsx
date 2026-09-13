@@ -192,9 +192,9 @@ export function CampaignsView() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-950 text-slate-100 min-h-screen">
+    <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6 bg-slate-950 text-slate-100 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 sm:pb-5 gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 bg-purple-950/90 text-purple-300 border border-purple-800 rounded">

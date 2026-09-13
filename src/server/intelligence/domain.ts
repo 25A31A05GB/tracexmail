@@ -32,7 +32,7 @@ const HIGH_VALUE_BRANDS = [
   'linkedin'
 ];
 
-function levenshteinDistance(a: string, b: string): number {
+export function levenshteinDistance(a: string, b: string): number {
   const an = a ? a.length : 0;
   const bn = b ? b.length : 0;
   if (an === 0) return bn;

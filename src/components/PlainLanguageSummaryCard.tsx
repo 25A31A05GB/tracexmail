@@ -192,7 +192,7 @@ export function PlainLanguageSummaryCard({
             </span>
             <span className="text-slate-400 hidden md:inline">•</span>
             <span className="text-slate-300 text-xs hidden md:inline">
-              Executive & Non-Technical Reviewer Summary
+              Overview & Analysis Summary
             </span>
           </div>
         </div>
@@ -202,17 +202,17 @@ export function PlainLanguageSummaryCard({
           <button
             type="button"
             onClick={() => onToggleTechnicalDetails(!isTechnicalExpanded)}
-            className="px-3.5 py-1.5 rounded-lg bg-[#1D2027] hover:bg-[#2A2D34] border border-[#2A2D34] text-xs text-cyan-300 hover:text-cyan-200 font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shadow-sm"
+            className="px-3.5 py-1.5 rounded-lg bg-[#1D2027] hover:bg-[#2A2D34] border border-[#2A2D34] text-xs text-amber-300 hover:text-amber-200 font-sans font-medium flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto shadow-sm"
           >
             {isTechnicalExpanded ? (
               <>
-                <ChevronUp className="w-4 h-4 text-cyan-400" />
-                <span>Hide technical deep dive</span>
+                <ChevronUp className="w-4 h-4 text-amber-400" />
+                <span>Hide Technical Details</span>
               </>
             ) : (
               <>
-                <ChevronDown className="w-4 h-4 text-cyan-400" />
-                <span>Show technical deep dive</span>
+                <ChevronDown className="w-4 h-4 text-amber-400" />
+                <span>View Technical Details</span>
               </>
             )}
           </button>

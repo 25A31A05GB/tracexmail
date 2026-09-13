@@ -25,7 +25,9 @@ import {
   Sparkles,
   Eye,
   SlidersHorizontal,
-  Lock
+  Lock,
+  Menu,
+  X
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -58,6 +60,8 @@ interface HeaderProps {
   onSetViewMode?: (mode: 'simple' | 'analyst') => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
+  onToggleMobileSidebar?: () => void;
+  isMobileSidebarOpen?: boolean;
 }
 
 export function Header({
@@ -80,7 +84,9 @@ export function Header({
   viewMode = 'simple',
   onSetViewMode,
   onOpenCommandPalette,
-  onOpenShortcutsHelp
+  onOpenShortcutsHelp,
+  onToggleMobileSidebar,
+  isMobileSidebarOpen = false
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -184,27 +190,39 @@ export function Header({
   const BadgeIcon = badge.icon;
 
   return (
-    <header className="h-16 border-b border-[#3a352c] bg-[#14120f]/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-20 select-none">
-      {/* Left: Active Case Switcher & Title */}
-      <div className="flex items-center gap-4 min-w-0">
+    <header className="h-16 border-b border-[#3a352c] bg-[#14120f]/95 backdrop-blur px-3 sm:px-4 md:px-6 flex items-center justify-between shrink-0 z-20 select-none gap-2">
+      {/* Left: Mobile Toggle & Active Case Switcher & Title */}
+      <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+        {onToggleMobileSidebar && (
+          <button
+            type="button"
+            id="btn-mobile-sidebar-toggle"
+            onClick={onToggleMobileSidebar}
+            className="md:hidden p-2 rounded-md bg-[#221e17] border border-[#3a352c] text-[#ede6d8] hover:text-[var(--stamp)] hover:border-[var(--stamp)] transition-colors cursor-pointer flex items-center justify-center shrink-0 min-w-[40px] min-h-[40px]"
+            aria-label={isMobileSidebarOpen ? "Close Navigation Menu" : "Open Navigation Menu"}
+          >
+            {isMobileSidebarOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
+          </button>
+        )}
+
         <div className="relative">
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
           >
-            <Shield className="w-4 h-4 text-[#7fa3ba]" />
-            <span className="max-w-[200px] truncate font-mono text-xs text-[#ede6d8]">
+            <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
+            <span className="max-w-[110px] sm:max-w-[180px] md:max-w-[200px] truncate font-mono text-xs text-[#ede6d8]">
               {currentAnalysis.id || 'CASE-ACTIVE'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#8a8070]" />
+            <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
           </button>
 
           {dropdownOpen && (
-            <div className="absolute left-0 mt-2 w-72 rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2 z-50">
+            <div className="absolute left-0 mt-2 w-72 max-w-[85vw] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2 z-50">
               <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-2 py-1 tracking-wider">
                 Preset Forensic Samples
               </div>
-              <div className="space-y-1 mt-1">
+              <div className="space-y-1 mt-1 max-h-60 overflow-y-auto">
                 {SAMPLE_ANALYSES.map((sample) => (
                   <button
                     key={sample.id}
@@ -227,8 +245,8 @@ export function Header({
           )}
         </div>
 
-        <div className="hidden md:flex flex-col min-w-0">
-          <h1 className="font-display text-sm font-semibold text-[#ede6d8] truncate max-w-md">
+        <div className="hidden lg:flex flex-col min-w-0">
+          <h1 className="font-display text-sm font-semibold text-[#ede6d8] truncate max-w-xs xl:max-w-md">
             {currentAnalysis.subject || 'Forensic Case View'}
           </h1>
           <span className="text-xs text-[#8a8070] truncate">
@@ -237,21 +255,21 @@ export function Header({
         </div>
 
         {/* Verdict Pill */}
-        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-semibold ${badge.bg}`}>
-          <BadgeIcon className="w-3.5 h-3.5" />
-          <span>{badge.label}</span>
-          <span className="opacity-80 font-mono text-[11px]">({currentAnalysis.threatScore || 0}/100)</span>
+        <div className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border text-[11px] sm:text-xs font-semibold ${badge.bg}`}>
+          <BadgeIcon className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">{badge.label}</span>
+          <span className="opacity-80 font-mono text-[10.5px]">({currentAnalysis.threatScore || 0}/100)</span>
         </div>
       </div>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
         {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
         {onSetViewMode && (
-          <div className="flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">
+          <div className="hidden sm:flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">
             <button
               onClick={() => onSetViewMode('simple')}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
                 viewMode === 'simple'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-[#9d9282] hover:text-[#f4efe6]'
@@ -263,7 +281,7 @@ export function Header({
             </button>
             <button
               onClick={() => onSetViewMode('analyst')}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
                 viewMode === 'analyst'
                   ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                   : 'text-[#9d9282] hover:text-[#f4efe6]'
@@ -280,12 +298,12 @@ export function Header({
         <div className="relative">
           <button 
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
+            className="flex items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3 py-1.5 rounded-xl hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
             title={`Role: ${role.toUpperCase()} | ${sessionUser?.email || userLabel}`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-              <span className="text-xs font-semibold text-[#f4efe6] capitalize">
+              <span className="hidden sm:inline text-xs font-semibold text-[#f4efe6] capitalize">
                 {role === 'admin' ? 'Admin' : 'Analyst'}
               </span>
             </div>
@@ -362,7 +380,7 @@ export function Header({
         {onOpenCommandPalette && (
           <button
             onClick={onOpenCommandPalette}
-            className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
+            className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
             title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
           >
             <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
@@ -377,7 +395,7 @@ export function Header({
         {onOpenShortcutsHelp && (
           <button
             onClick={onOpenShortcutsHelp}
-            className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-[#9d9282] hover:text-amber-300 transition-colors cursor-pointer"
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-[#9d9282] hover:text-amber-300 transition-colors cursor-pointer"
             title="Keyboard Shortcuts Cheat Sheet (?)"
           >
             <Keyboard className="w-3.5 h-3.5" />
@@ -388,7 +406,7 @@ export function Header({
         {onOpenWalkthrough && (
           <button
             onClick={onOpenWalkthrough}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
             title="Setup Investigation Goal & Tailor Enclave Workspace"
           >
             <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
@@ -400,7 +418,7 @@ export function Header({
         {onOpenPrivacyModal && (
           <button
             onClick={onOpenPrivacyModal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
               privacyConfig?.maskingEnabled
                 ? 'bg-purple-950/70 border-purple-700 text-purple-200'
                 : 'bg-[#221e17] hover:bg-[#2c271f] border-[#3a352c] text-[#ede6d8]'
@@ -408,7 +426,7 @@ export function Header({
             title="Configure Privacy Safeguards, Retention & PII Masking (⌘⇧P)"
           >
             <Scale className="w-3.5 h-3.5 text-purple-400" />
-            <span className="hidden sm:inline font-mono">Privacy &amp; Compliance</span>
+            <span className="font-mono">Privacy</span>
             {privacyConfig?.maskingEnabled && (
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
             )}
@@ -418,12 +436,13 @@ export function Header({
         {/* New Analysis Button with Shortcut Badge */}
         <button
           onClick={onOpenNewModal}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer group"
+          className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer shrink-0"
           title="Create New Email Analysis (⌘N / Ctrl+N)"
         >
-          <Plus className="w-4 h-4" />
-          <span>New Analysis</span>
-          <kbd className="hidden sm:inline-block px-1.5 py-0.2 bg-black/25 border border-white/20 rounded text-[9.5px] font-mono text-amber-200">
+          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+          <span className="hidden xs:inline sm:inline">New Analysis</span>
+          <span className="inline xs:hidden sm:hidden">New</span>
+          <kbd className="hidden md:inline-block px-1.5 py-0.2 bg-black/25 border border-white/20 rounded text-[9.5px] font-mono text-amber-200">
             ⌘N
           </kbd>
         </button>

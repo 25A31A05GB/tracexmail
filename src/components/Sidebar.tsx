@@ -28,7 +28,8 @@ import {
   ChevronUp,
   Zap,
   Mail,
-  SlidersHorizontal
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
@@ -66,6 +67,8 @@ interface SidebarProps {
   viewMode?: 'simple' | 'analyst';
   onOpenShortcutsHelp?: () => void;
   onOpenCommandPalette?: () => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export function Sidebar({
@@ -79,7 +82,9 @@ export function Sidebar({
   onOpenWalkthrough,
   viewMode = 'simple',
   onOpenShortcutsHelp,
-  onOpenCommandPalette
+  onOpenCommandPalette,
+  isMobileOpen = false,
+  onCloseMobile
 }: SidebarProps) {
   const [engineHealth, setEngineHealth] = useState<'operational' | 'degraded' | 'checking'>('operational');
   const [latencyMs, setLatencyMs] = useState<number>(12);
@@ -155,24 +160,24 @@ export function Sidebar({
   // Tier 1: Always Visible Navigation Items
   const alwaysVisibleNavItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'cases', label: 'Cases', icon: FolderOpen },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'overview', label: 'Message Overview', icon: Activity },
-    { id: 'alerts', label: 'Live Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
-    { id: 'settings', label: 'Account & Security', icon: SlidersHorizontal },
+    { id: 'cases', label: 'Investigation Cases', icon: FolderOpen },
+    { id: 'search', label: 'Search & Filter', icon: Search },
+    { id: 'overview', label: 'Email Analysis', icon: Activity },
+    { id: 'alerts', label: 'Security Alerts', icon: Bell, badge: alertCount, isLocked: role === 'read_only' },
+    { id: 'settings', label: 'Account & Settings', icon: SlidersHorizontal },
   ];
 
   // Tier 2: Collapsible Forensic Tools Items
   const forensicNavItems: NavItem[] = [
-    { id: 'campaigns', label: 'Campaigns', icon: Layers },
-    { id: 'graph', label: 'Relationship Graph', icon: Share2 },
+    { id: 'campaigns', label: 'Attack Campaigns', icon: Layers },
+    { id: 'graph', label: 'Sender & Domain Graph', icon: Share2 },
     { id: 'timeline', label: 'Threat Timeline', icon: Clock },
-    { id: 'ingest', label: 'Email Ingestion', icon: Database, readOnlyDisabled: role === 'read_only' },
-    { id: 'gmail', label: 'Gmail Live Auto-Sync', icon: Mail, readOnlyDisabled: role === 'read_only' },
-    { id: 'hops', label: 'Hop Traceroute', icon: Network },
-    { id: 'map', label: 'Geographic Map', icon: MapPin },
-    { id: 'logs', label: 'Analysis Log', icon: Terminal },
-    { id: 'headers', label: 'Raw RFC822 / EML', icon: FileText },
+    { id: 'ingest', label: 'Upload & Inspect Email', icon: Database, readOnlyDisabled: role === 'read_only' },
+    { id: 'gmail', label: 'Gmail Live Sync', icon: Mail, readOnlyDisabled: role === 'read_only' },
+    { id: 'hops', label: 'Server Routing & Hops', icon: Network },
+    { id: 'map', label: 'Origin Geo Map', icon: MapPin },
+    { id: 'logs', label: 'Security Logs', icon: Terminal },
+    { id: 'headers', label: 'Raw Email Headers', icon: FileText },
   ];
 
   const adminNavItems: NavItem[] = [
@@ -193,6 +198,9 @@ export function Sidebar({
       }
     }
     setActiveTab(tabId);
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
   };
 
   return (

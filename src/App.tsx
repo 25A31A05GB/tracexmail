@@ -74,6 +74,7 @@ export default function App() {
   const [upgradeTargetFeature, setUpgradeTargetFeature] = useState<string>('Enterprise SOC Suite');
   const [verificationChecking, setVerificationChecking] = useState<boolean>(false);
   const [verificationResent, setVerificationResent] = useState<boolean>(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   const handleOpenUpgradeModal = (featureName?: string) => {
     if (featureName) setUpgradeTargetFeature(featureName);
@@ -484,6 +485,8 @@ export default function App() {
         viewMode={viewMode}
         onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 overflow-hidden">
@@ -509,6 +512,8 @@ export default function App() {
           onSetViewMode={handleToggleViewMode}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
+          isMobileSidebarOpen={isMobileSidebarOpen}
         />
 
         {/* View Switcher Container */}

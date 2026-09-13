@@ -8,7 +8,7 @@ import dns from 'dns';
 import axios from 'axios';
 import { classifyIp, ClassifiedIp } from './ipExtractor';
 import { maxMindDb } from './maxmindService';
-import { isTorExitNode } from './intelligence/torExitList';
+import { isTorExitNode } from './intelligence/torExitNodes';
 import { classifyInfra } from './intelligence/vpnHostingList';
 import { getRegisteredCountry } from './intelligence/rirCountryCheck';
 import { providerRateLimiter } from './intelligence/rateLimiter';

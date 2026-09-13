@@ -47,7 +47,7 @@ export function HopTracerouteView({ analysis }: HopTracerouteProps) {
   }
 
   return (
-    <div id="hops-view" className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto bg-[#14120f]">
+    <div id="hops-view" className="flex-1 p-3.5 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-6 overflow-y-auto bg-[#14120f]">
       {/* Top Banner */}
       <div className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
         <div>

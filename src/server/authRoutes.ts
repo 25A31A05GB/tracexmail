@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { getSupabaseAdminClient, getSupabaseClient, DEFAULT_ORG_ID } from './supabase';
 import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRole } from './compliance';
-import { authLimiter } from './rateLimiter';
+import { authLimiter, getClientIp } from './rateLimiter';
 
 export interface AuthSecurityOptions {
   broadcastAlertFn: (alert: any, extraData?: any) => Promise<void> | void;
@@ -24,14 +24,6 @@ const FAILED_LOGIN_ALERT_THRESHOLD = 5; // Alert SOC upon 5 failed attempts
 
 // Dummy bcrypt hash used for timing-safe constant-time password verification when user does not exist
 const DUMMY_BCRYPT_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
-
-function getClientIp(req: Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.ip || req.socket.remoteAddress || '127.0.0.1';
-}
 
 /**
  * Records failed login attempt and dispatches real-time SOC Live Alert
