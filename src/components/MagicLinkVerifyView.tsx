@@ -61,14 +61,28 @@ export function MagicLinkVerifyView({
           setUserEmail(emailParam);
         }
 
+        // Check if this is a recovery redirect
+        if (typeParam === 'recovery' || hashQuery.includes('type=recovery') || window.location.search.includes('type=recovery')) {
+          setStatusMsg('Recovery clearance verified. Directing to Master Password reset…');
+          setStatus('success');
+          window.location.hash = `#reset-password?code=${code || ''}&token=${token || ''}&email=${encodeURIComponent(emailParam || '')}`;
+          return;
+        }
+
         // Case A: Supabase PKCE authorization code
         if (code && isSupabaseConfigured && supabase) {
           setStatusMsg('Exchanging cryptographic verification token…');
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
-            console.warn('[MagicLink] Supabase code exchange warning:', error.message);
+            console.warn('[MagicLink] Supabase code exchange notice:', error.message);
+            // Check if session was already exchanged by Supabase listener
+            const { data: sessData } = await supabase.auth.getSession();
+            if (sessData?.session?.user && isMounted) {
+              handleSessionSuccess(sessData.session.user, sessData.session.access_token);
+              return;
+            }
           } else if (data.session && isMounted) {
-            handleSessionSuccess(data.session.user);
+            handleSessionSuccess(data.session.user, data.session.access_token);
             return;
           }
         }
@@ -81,7 +95,7 @@ export function MagicLinkVerifyView({
             refresh_token: refreshToken || ''
           });
           if (!error && data.session && isMounted) {
-            handleSessionSuccess(data.session.user);
+            handleSessionSuccess(data.session.user, data.session.access_token);
             return;
           }
         }
@@ -105,9 +119,7 @@ export function MagicLinkVerifyView({
             if (resData.type === 'recovery') {
               setStatusMsg('Recovery clearance verified. Directing to Master Password reset…');
               setStatus('success');
-              setTimeout(() => {
-                window.location.hash = `#reset-password?token=${resData.resetToken || token}&email=${encodeURIComponent(resData.email || emailParam || '')}`;
-              }, 1200);
+              window.location.hash = `#reset-password?token=${resData.resetToken || token}&email=${encodeURIComponent(resData.email || emailParam || '')}`;
               return;
             }
 
@@ -115,21 +127,19 @@ export function MagicLinkVerifyView({
             setStatus('success');
             setStatusMsg('Identity authenticated. Unlocking security enclave…');
 
-            setTimeout(() => {
-              if (onSelectRoleLogin && resData.user) {
-                onSelectRoleLogin(resData.user.role || 'analyst', {
-                  token: resData.token,
-                  userId: resData.user.id,
-                  email: resData.user.email,
-                  fullName: resData.user.fullName,
-                  orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
-                  accountType: resData.user.accountType || 'organization',
-                  isEmailVerified: true
-                });
-              } else if (onSuccess) {
-                onSuccess();
-              }
-            }, 1400);
+            if (onSelectRoleLogin && resData.user) {
+              onSelectRoleLogin(resData.user.role || 'analyst', {
+                token: resData.token,
+                userId: resData.user.id,
+                email: resData.user.email,
+                fullName: resData.user.fullName,
+                orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
+                accountType: resData.user.accountType || 'organization',
+                isEmailVerified: true
+              });
+            } else if (onSuccess) {
+              onSuccess();
+            }
             return;
           }
         }
@@ -138,7 +148,7 @@ export function MagicLinkVerifyView({
         if (isSupabaseConfigured && supabase) {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user && isMounted) {
-            handleSessionSuccess(session.user);
+            handleSessionSuccess(session.user, session.access_token);
             return;
           }
         }
@@ -164,24 +174,35 @@ export function MagicLinkVerifyView({
     };
   }, []);
 
-  const handleSessionSuccess = (user: any) => {
+  const handleSessionSuccess = (user: any, token?: string) => {
     setStatus('success');
     setStatusMsg('Identity authenticated. Launching forensic workspace…');
-    setTimeout(() => {
-      if (onSelectRoleLogin) {
-        onSelectRoleLogin((user.user_metadata?.role as UserRole) || 'analyst', {
-          token: `sb_${user.id}`,
-          userId: user.id,
-          email: user.email || '',
-          fullName: user.user_metadata?.full_name || user.email?.split('@')[0],
-          orgName: user.user_metadata?.org_name || 'Acme Cyber Defense SOC',
-          accountType: (user.user_metadata?.account_type as AccountType) || 'organization',
-          isEmailVerified: true
-        });
-      } else if (onSuccess) {
-        onSuccess();
-      }
-    }, 1200);
+
+    // Clean up address bar query parameters and hash immediately
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const verifiedToken = token || `sb_${user.id}`;
+    const role = (user.user_metadata?.role as UserRole) || 'analyst';
+    const fullName = user.user_metadata?.full_name || user.email?.split('@')[0];
+    const orgName = user.user_metadata?.org_name || 'Acme Cyber Defense SOC';
+    const accountType = (user.user_metadata?.account_type as AccountType) || 'organization';
+
+    if (onSelectRoleLogin) {
+      onSelectRoleLogin(role, {
+        token: verifiedToken,
+        userId: user.id,
+        email: user.email || '',
+        fullName,
+        orgName,
+        accountType,
+        isEmailVerified: true
+      });
+    }
+    if (onSuccess) {
+      onSuccess();
+    }
   };
 
   const handleResendLink = async () => {
@@ -197,20 +218,30 @@ export function MagicLinkVerifyView({
     setResending(true);
     setResendStatus(null);
     try {
+      const cleanEmail = userEmail.trim().toLowerCase();
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signInWithOtp({
+          email: cleanEmail,
+          options: {
+            emailRedirectTo: window.location.origin
+          }
+        });
+      }
+
       const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: userEmail.trim(),
+          email: cleanEmail,
           type: 'signin',
           redirectTo: window.location.origin
         })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to dispatch new magic link.');
+      if (!res.ok && !isSupabaseConfigured) throw new Error(data.error || 'Failed to dispatch new magic link.');
 
-      setResendStatus(`Fresh magic link dispatched to ${userEmail.trim()}. Please check your inbox.`);
+      setResendStatus(`Fresh magic link dispatched to ${cleanEmail}. Please check your inbox.`);
     } catch (err: any) {
       setResendStatus(err.message || 'Error requesting new magic link.');
     } finally {

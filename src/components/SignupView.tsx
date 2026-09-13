@@ -172,6 +172,13 @@ export function SignupView({
       const redirectUrl = window.location.origin;
 
       if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signInWithOtp({
+          email: cleanEmail,
+          options: {
+            emailRedirectTo: redirectUrl
+          }
+        }).catch(err => console.warn('[SignupView] Supabase magic link resend notice:', err?.message));
+        
         const { error } = await supabase.auth.resend({
           type: 'signup',
           email: cleanEmail,

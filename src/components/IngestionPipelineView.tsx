@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent, DragEvent, useEffect } from 'react';
+import React, { useState, useRef, ChangeEvent, DragEvent, useEffect, Suspense, lazy } from 'react';
 import { 
   Database, 
   Upload, 
@@ -35,7 +35,8 @@ import { apiFetch } from '../lib/api';
 import { ForensicScanAnimationModal } from './ForensicScanAnimationModal';
 import { AlertToast } from './AlertToast';
 import { WebSocketAlert } from '../hooks/useWebSocketAlerts';
-import { GmailConnectionView } from './GmailConnectionView';
+
+const GmailConnectionView = lazy(() => import('./GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
 
 interface IngestionPipelineViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -624,7 +625,13 @@ export function IngestionPipelineView({
 
           {activeTab === 'gmail' && (
             <div className="pt-2">
-              <GmailConnectionView onNewCasesProcessed={onNewCasesProcessed} />
+              <Suspense fallback={
+                <div className="flex items-center justify-center p-8">
+                  <div className="w-8 h-8 border-2 border-[var(--stamp)]/30 border-t-[var(--stamp)] rounded-full animate-spin" />
+                </div>
+              }>
+                <GmailConnectionView onNewCasesProcessed={onNewCasesProcessed} />
+              </Suspense>
             </div>
           )}
         </div>

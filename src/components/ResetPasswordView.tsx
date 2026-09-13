@@ -426,15 +426,6 @@ export function ResetPasswordView({
                 <span>Go to Password Recovery Form →</span>
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={() => setManualTokenMode(true)}
-              className="w-full py-2 px-3 text-xs text-[var(--paper-dim)] hover:text-[var(--paper)] flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0 font-mono"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-[var(--slate)]" />
-              <span>Have a recovery token? Enter manually</span>
-            </button>
           </div>
         </div>
       </div>
@@ -506,22 +497,6 @@ export function ResetPasswordView({
               className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
             />
           </div>
-
-          {/* Manual Token Input if toggled */}
-          {manualTokenMode && !currentResetToken && (
-            <div>
-              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
-                Recovery Token
-              </label>
-              <input
-                type="text"
-                value={manualTokenInput}
-                onChange={e => setManualTokenInput(e.target.value)}
-                placeholder="Paste token from email link"
-                className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
-              />
-            </div>
-          )}
 
           {/* New Password Input */}
           <div>

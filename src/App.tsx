@@ -100,26 +100,40 @@ export default function App() {
     const handleHashChange = () => {
       const hash = window.location.hash || '';
       const search = window.location.search || '';
-      
+
+      const searchParams = new URLSearchParams(search);
+      const hashQuery = hash.replace(/^#\/?/, '').replace(/^reset-password\??/, '').replace(/^magic-link\??/, '');
+      const hashParams = new URLSearchParams(hashQuery);
+
+      const code = searchParams.get('code') || hashParams.get('code');
+      const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      const type = searchParams.get('type') || hashParams.get('type');
+      const token = searchParams.get('token') || hashParams.get('token') || searchParams.get('magic_token') || hashParams.get('magic_token');
+
+      const isRecovery = type === 'recovery' || 
+                         hash.includes('type=recovery') || 
+                         search.includes('type=recovery') || 
+                         hash.startsWith('#reset-password') || 
+                         hash.includes('reset-password');
+
       if (hash.startsWith('#invite=')) {
-        const token = hash.replace('#invite=', '').trim();
-        if (token) {
-          setInviteToken(token);
+        const invite = hash.replace('#invite=', '').trim();
+        if (invite) {
+          setInviteToken(invite);
           setAuthView('accept-invite');
         }
+      } else if (isRecovery) {
+        setAuthView('reset-password');
       } else if (
-        hash.startsWith('#magic-link') ||
-        hash.includes('magic_token') ||
-        search.includes('magic_token') ||
-        (search.includes('token=mlk_') && !hash.startsWith('#reset-password'))
+        code || 
+        accessToken || 
+        hash.startsWith('#magic-link') || 
+        hash.includes('magic_token') || 
+        search.includes('magic_token') || 
+        (token && token.startsWith('mlk_')) ||
+        (search.includes('token=') && !hash.startsWith('#reset-password'))
       ) {
         setAuthView('magic-link');
-      } else if (
-        hash.includes('type=recovery') || 
-        hash.startsWith('#reset-password') || 
-        search.includes('type=recovery')
-      ) {
-        setAuthView('reset-password');
       } else if (hash.startsWith('#forgot-password')) {
         setAuthView('forgot-password');
       } else if (hash.startsWith('#login')) {
@@ -132,12 +146,18 @@ export default function App() {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
 
-    // Supabase PASSWORD_RECOVERY event listener
+    // Supabase Auth State listener for real-time magic link verification & password recovery
     let authSub: any = null;
     if (isSupabaseConfigured && supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
         if (event === 'PASSWORD_RECOVERY') {
           setAuthView('reset-password');
+        } else if (event === 'SIGNED_IN' && newSession) {
+          if (typeof window !== 'undefined' && (window.location.search.includes('code=') || window.location.hash.includes('access_token='))) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setActiveTab('ingest');
+          setAuthView('intro');
         }
       });
       authSub = subscription;
@@ -602,7 +622,13 @@ export default function App() {
               onClick={async () => {
                 try {
                   if (session.user?.email && isSupabaseConfigured) {
-                    await supabase.auth.resend({ type: 'signup', email: session.user.email });
+                    await supabase.auth.signInWithOtp({
+                      email: session.user.email,
+                      options: {
+                        emailRedirectTo: window.location.origin
+                      }
+                    });
+                    await supabase.auth.resend({ type: 'signup', email: session.user.email, options: { emailRedirectTo: window.location.origin } });
                     setVerificationResent(true);
                   }
                 } catch (e) {

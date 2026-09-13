@@ -494,8 +494,20 @@ export function useSession(): UseSessionReturn {
     (user?.user_metadata?.account_type as AccountType) ||
     (role === 'admin' ? 'organization' : 'organization');
 
-  // Strict email verification check: only genuine email_confirmed_at counts
-  const isEmailVerified: boolean = Boolean((user as any)?.email_confirmed_at);
+  // Strict email verification check: checks genuine email confirmation from auth session and user metadata
+  const isEmailVerified: boolean = Boolean(
+    (user as any)?.email_confirmed_at ||
+    (user as any)?.confirmed_at ||
+    (session as any)?.user?.email_confirmed_at ||
+    (session as any)?.user?.confirmed_at ||
+    (profile as any)?.email_verified ||
+    (user as any)?.user_metadata?.email_verified ||
+    (user as any)?.user_metadata?.email_confirmed_at ||
+    (session as any)?.user?.user_metadata?.email_verified ||
+    (session as any)?.profile?.email_verified ||
+    (user as any)?.app_metadata?.provider === 'google' ||
+    (session as any)?.user?.app_metadata?.provider === 'google'
+  );
 
   // Compute initials or short user label
   const userLabel = profile?.full_name 

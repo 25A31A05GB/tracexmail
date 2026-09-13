@@ -29,7 +29,7 @@ export function LoginView({
   onSuccess,
   onSelectRoleLogin 
 }: LoginViewProps) {
-  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('password');
+  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('magic-link');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,13 +53,13 @@ export function LoginView({
     setResendStatus(null);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
       // 1. Supabase native OTP/Magic Link
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
-          email: email.trim(),
+          email: cleanEmail,
           options: {
-            emailRedirectTo: `${window.location.origin}/#magic-link`,
-            shouldCreateUser: false
+            emailRedirectTo: window.location.origin
           }
         }).catch(err => console.warn('[LoginView] Supabase magic link notice:', err?.message));
       }
@@ -69,14 +69,14 @@ export function LoginView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
+          email: cleanEmail,
           type: 'signin',
           redirectTo: window.location.origin
         })
       });
 
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok && !isSupabaseConfigured) {
         throw new Error(data.error || 'Failed to dispatch magic link.');
       }
 
@@ -94,12 +94,12 @@ export function LoginView({
     setResending(true);
     setResendStatus(null);
     try {
+      const cleanEmail = email.trim().toLowerCase();
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
-          email: email.trim(),
+          email: cleanEmail,
           options: {
-            emailRedirectTo: `${window.location.origin}/#magic-link`,
-            shouldCreateUser: false
+            emailRedirectTo: window.location.origin
           }
         }).catch(err => console.warn('[LoginView] Supabase resend notice:', err?.message));
       }
@@ -108,16 +108,16 @@ export function LoginView({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: email.trim(),
+          email: cleanEmail,
           type: 'signin',
           redirectTo: window.location.origin
         })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to resend magic link.');
+      if (!res.ok && !isSupabaseConfigured) throw new Error(data.error || 'Failed to resend magic link.');
 
-      setResendStatus(`Fresh magic link dispatched to ${email.trim()}.`);
+      setResendStatus(`Fresh magic link dispatched to ${cleanEmail}.`);
     } catch (err: any) {
       setResendStatus(err.message || 'Error resending magic link.');
     } finally {
@@ -130,10 +130,10 @@ export function LoginView({
     setResending(true);
     setResendStatus(null);
     try {
+      const cleanEmail = email.trim().toLowerCase();
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.auth.resend({
-          type: 'signup',
-          email: email.trim(),
+        const { error } = await supabase.auth.signInWithOtp({
+          email: cleanEmail,
           options: {
             emailRedirectTo: window.location.origin
           }
@@ -141,18 +141,18 @@ export function LoginView({
         if (error) {
           setResendStatus('Failed to resend: ' + error.message);
         } else {
-          setResendStatus('Verification link dispatched to ' + email.trim() + '. Please check your inbox.');
+          setResendStatus('Verification magic link dispatched to ' + cleanEmail + '. Please check your inbox.');
         }
       } else {
-        await fetch('/api/auth/resend-verification', {
+        await fetch('/api/auth/magic-link/send', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), redirectTo: window.location.origin })
+          body: JSON.stringify({ email: cleanEmail, type: 'signin', redirectTo: window.location.origin })
         });
-        setResendStatus('Verification link dispatched to ' + email.trim() + '. Please check your inbox.');
+        setResendStatus('Verification magic link dispatched to ' + cleanEmail + '. Please check your inbox.');
       }
     } catch (err: any) {
-      setResendStatus(err.message || 'Error sending verification link.');
+      setResendStatus(err.message || 'Error sending verification magic link.');
     } finally {
       setResending(false);
     }
