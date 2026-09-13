@@ -17,27 +17,9 @@
 
 import { isPublicRoutableIp } from './originResolution';
 import { lookupMaxMindGeo } from './maxmindService';
+import { RealSenderIpInfo } from '../types';
 
-export interface RealSenderIpInfo {
-  ip: string | null;
-  /** Which header the IP was recovered from, e.g. "X-Originating-IP" */
-  ipSource: string | null;
-  city: string | null;
-  region: string | null;
-  country: string | null;
-  countryCode: string | null;
-  lat: number | null;
-  lng: number | null;
-  asn: string | null;
-  org: string | null;
-  isp: string | null;
-  reverseDns: string | null;
-  isProxyOrVpn: boolean;
-  isTor: boolean;
-  maxmindVerified: boolean;
-  /** true only if a genuine public client IP was recovered from a known header */
-  resolved: boolean;
-}
+export type { RealSenderIpInfo };
 
 function emptyResult(): RealSenderIpInfo {
   return {

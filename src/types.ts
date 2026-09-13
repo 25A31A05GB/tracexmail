@@ -225,6 +225,27 @@ export interface EvidenceVaultRecord {
   }>;
 }
 
+export interface RealSenderIpInfo {
+  ip: string | null;
+  /** Which header the IP was recovered from, e.g. "X-Originating-IP" */
+  ipSource: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  countryCode: string | null;
+  lat: number | null;
+  lng: number | null;
+  asn: string | null;
+  org: string | null;
+  isp: string | null;
+  reverseDns: string | null;
+  isProxyOrVpn: boolean;
+  isTor: boolean;
+  maxmindVerified: boolean;
+  /** true only if a genuine public client IP was recovered from a known header */
+  resolved: boolean;
+}
+
 export interface AINarrative {
   narrative: string;
   model: string;
@@ -369,24 +390,7 @@ export interface EmailAnalysis {
    * Received: hop tracing). Only populated when the sending platform actually discloses
    * it; never fabricated. See src/utils/realSenderIp.ts.
    */
-  realSenderIp?: {
-    ip: string | null;
-    ipSource: string | null;
-    city: string | null;
-    region: string | null;
-    country: string | null;
-    countryCode: string | null;
-    lat: number | null;
-    lng: number | null;
-    asn: string | null;
-    org: string | null;
-    isp: string | null;
-    reverseDns: string | null;
-    isProxyOrVpn: boolean;
-    isTor: boolean;
-    maxmindVerified: boolean;
-    resolved: boolean;
-  };
+  realSenderIp?: RealSenderIpInfo;
 }
 
 export interface EvidenceCardData {
