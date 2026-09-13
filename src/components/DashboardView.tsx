@@ -61,6 +61,7 @@ import { getStandardizedVerdict } from '../utils/verdict';
 import { NetworkIntelligenceCard } from './NetworkIntelligenceCard';
 import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { mapBackendCaseToAnalysis } from '../utils/parser';
 
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
@@ -281,6 +282,7 @@ const getHeatColor = (z: number, severity: string) => {
 export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthrough, viewMode = 'simple' }: DashboardViewProps) {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [casesList, setCasesList] = useState<EmailAnalysis[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [chartType, setChartType] = useState<'AREA' | 'BAR' | 'PIE'>('AREA');
   const [selectedGeoCategory, setSelectedGeoCategory] = useState<'ALL' | 'BEC' | 'HARVESTING' | 'MALWARE' | 'EXPLOIT'>('ALL');
@@ -309,9 +311,13 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
     });
   };
 
+  const displayCases = useMemo(() => {
+    return casesList.length > 0 ? casesList : SAMPLE_ANALYSES;
+  }, [casesList]);
+
   const activeFocusAnalysis = useMemo(() => {
-    return SAMPLE_ANALYSES.find(a => a.id === selectedAnalysisId) || SAMPLE_ANALYSES[0];
-  }, [selectedAnalysisId]);
+    return displayCases.find(a => a.id === selectedAnalysisId) || displayCases[0] || SAMPLE_ANALYSES[0];
+  }, [displayCases, selectedAnalysisId]);
 
   // Real-Time WebSocket Alerts Hook
   const { alerts } = useWebSocketAlerts();
@@ -331,12 +337,21 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [statsData, healthData] = await Promise.all([
+      const [statsData, healthData, rawCases] = await Promise.all([
         forensicApi.getDashboardStats().catch(() => null),
-        forensicApi.getHealth().catch(() => null)
+        forensicApi.getHealth().catch(() => null),
+        forensicApi.getCases({ exclude_demo: false }).catch(() => [])
       ]);
       if (statsData) setStats(statsData);
       if (healthData) setHealth(healthData);
+
+      if (Array.isArray(rawCases) && rawCases.length > 0) {
+        const parsed = rawCases.map(c => mapBackendCaseToAnalysis(c, '', c.title || 'case_email.eml'));
+        setCasesList(parsed);
+        if (!selectedAnalysisId || selectedAnalysisId === SAMPLE_ANALYSES[0]?.id) {
+          setSelectedAnalysisId(parsed[0].id);
+        }
+      }
 
       if (isSupabaseConfigured) {
         try {
@@ -376,48 +391,54 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
     return () => clearInterval(interval);
   }, []);
 
-  // Generate past 30 days email verdict data
+  // Compute 30 days email verdict data from real backend trends or case records
   const verdict30DayData = useMemo(() => {
+    if (stats?.daily_trends && Array.isArray(stats.daily_trends) && stats.daily_trends.length > 0) {
+      return stats.daily_trends.map(item => ({
+        date: item.date,
+        Clean: item.clean,
+        Suspicious: item.suspicious,
+        Malicious: item.malicious,
+        Threats: item.suspicious + item.malicious,
+        Total: item.total
+      }));
+    }
+
     const data = [];
-    const today = new Date('2026-08-30T00:00:00Z');
-
+    const now = new Date();
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+      const d = new Date(now.getTime() - i * 86400000);
       const dayName = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+      const dateStr = d.toISOString().slice(0, 10);
 
-      const baseVal = isWeekend ? 12 : 36;
-      const isSpike = i === 5 || i === 18 || i === 24;
+      const matchingCases = casesList.filter(c => {
+        const created = c.headers?.date || c.analyzedAt;
+        return created && created.slice(0, 10) === dateStr;
+      });
 
-      const clean = Math.floor(baseVal + Math.sin(i) * 6 + 10);
-      const suspicious = Math.floor(baseVal * 0.32 + (isSpike ? 24 : Math.cos(i) * 4 + 5));
-      const malicious = Math.floor(baseVal * 0.14 + (isSpike ? 16 : Math.sin(i * 1.5) * 3 + 3));
-
-      const cleanVal = Math.max(6, clean);
-      const suspiciousVal = Math.max(2, suspicious);
-      const maliciousVal = Math.max(1, malicious);
-      const threatsVal = suspiciousVal + maliciousVal;
+      const cleanCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('clean')).length;
+      const suspCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('suspicious')).length;
+      const malCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('malicious') || c.verdict?.toLowerCase().includes('phish')).length;
 
       data.push({
         date: dayName,
-        Clean: cleanVal,
-        Suspicious: suspiciousVal,
-        Malicious: maliciousVal,
-        Threats: threatsVal,
-        Total: cleanVal + suspiciousVal + maliciousVal
+        Clean: cleanCount,
+        Suspicious: suspCount,
+        Malicious: malCount,
+        Threats: suspCount + malCount,
+        Total: matchingCases.length
       });
     }
 
     return data;
-  }, []);
+  }, [stats?.daily_trends, casesList]);
 
   // Compute 30-day totals & percentages
   const totals30Day = useMemo(() => {
     const cleanTotal = verdict30DayData.reduce((acc, curr) => acc + curr.Clean, 0);
     const suspiciousTotal = verdict30DayData.reduce((acc, curr) => acc + curr.Suspicious, 0);
     const maliciousTotal = verdict30DayData.reduce((acc, curr) => acc + curr.Malicious, 0);
-    const grandTotal = cleanTotal + suspiciousTotal + maliciousTotal;
+    const grandTotal = cleanTotal + suspiciousTotal + maliciousTotal || 1;
 
     return {
       clean: cleanTotal,
@@ -426,7 +447,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       suspiciousPct: Math.round((suspiciousTotal / grandTotal) * 100),
       malicious: maliciousTotal,
       maliciousPct: Math.round((maliciousTotal / grandTotal) * 100),
-      total: grandTotal
+      total: cleanTotal + suspiciousTotal + maliciousTotal
     };
   }, [verdict30DayData]);
 
@@ -684,7 +705,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-              {SAMPLE_ANALYSES.slice(0, 4).map((sample) => {
+              {displayCases.slice(0, 4).map((sample) => {
                 const verdictInfo = getStandardizedVerdict(sample);
                 return (
                   <div
@@ -912,13 +933,13 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             onClick={() => onNavigateToTab?.('cases')}
             className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1 font-mono self-start sm:self-auto cursor-pointer transition-colors"
           >
-            <span>Full Case Inventory ({SAMPLE_ANALYSES.length})</span>
+            <span>Full Case Inventory ({displayCases.length})</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {SAMPLE_ANALYSES.map((sample, idx) => {
+          {displayCases.map((sample, idx) => {
             const verdictInfo = getStandardizedVerdict(sample);
             const isSelected = selectedAnalysisId === sample.id;
             return (
@@ -1065,12 +1086,12 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                     onChange={(e) => {
                       const newId = e.target.value;
                       setSelectedAnalysisId(newId);
-                      const target = SAMPLE_ANALYSES.find(a => a.id === newId);
+                      const target = displayCases.find(a => a.id === newId);
                       if (target && onSelectAnalysis) onSelectAnalysis(target);
                     }}
                     className="bg-transparent text-xs font-semibold text-slate-200 border-none outline-none cursor-pointer pr-1"
                   >
-                    {SAMPLE_ANALYSES.map((sample) => (
+                    {displayCases.map((sample) => (
                       <option key={sample.id} value={sample.id} className="bg-slate-900 text-slate-200">
                         {sample.name || sample.headers?.subject || sample.id}
                       </option>

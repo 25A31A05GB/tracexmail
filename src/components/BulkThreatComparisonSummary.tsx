@@ -71,12 +71,12 @@ export function BulkThreatComparisonSummary({
             const parsed = rawCases.map(c => mapBackendCaseToAnalysis(c, '', c.title || 'imported_email.eml'));
             setCasesList(parsed);
           } else {
-            setCasesList(SAMPLE_ANALYSES);
+            setCasesList([]);
           }
         }
       } catch (err) {
         if (isMounted) {
-          setCasesList(SAMPLE_ANALYSES);
+          setCasesList([]);
         }
       } finally {
         if (isMounted) setLoading(false);
@@ -89,7 +89,7 @@ export function BulkThreatComparisonSummary({
 
   // Transform cases into comparison chart items
   const processedData = useMemo(() => {
-    const list = casesList.length > 0 ? casesList : SAMPLE_ANALYSES;
+    const list = casesList;
 
     return list.map((item, idx) => {
       const id = item.id || `file-${idx}`;

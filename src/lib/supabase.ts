@@ -1,7 +1,11 @@
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 
-const clientEnvUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const clientEnvKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+const clientEnvUrl =
+  (import.meta as any).env?.VITE_SUPABASE_URL ||
+  'https://zinyrzlswkwwzxlgptmq.supabase.co';
+const clientEnvKey =
+  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
 
 /**
  * Returns the canonical Google OAuth callback URL.

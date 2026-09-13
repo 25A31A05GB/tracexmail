@@ -28,6 +28,7 @@ import {
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { forensicApi } from '../lib/api';
+import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
 
 interface ThreatTimelineViewProps {
@@ -103,18 +104,29 @@ export function ThreatTimelineView({
     return originHop?.fromIp || originHop?.byHost || '185.220.101.5';
   }, [analysis]);
 
-  // Fetch timeline from backend if available
+  // Fetch timeline and real database cases from backend if available
+  const [dbCases, setDbCases] = useState<any[]>([]);
+
   useEffect(() => {
     let isMounted = true;
     async function loadBackendTimeline() {
       setLoading(true);
       try {
-        const res = await forensicApi.getTemporalAnalysis({ domain: currentDomain, ip: currentOriginIp });
-        if (isMounted && res && Array.isArray(res.timeline)) {
-          setBackendTimelineEvents(res.timeline);
+        const [res, casesRes] = await Promise.all([
+          forensicApi.getTemporalAnalysis({ domain: currentDomain, ip: currentOriginIp }).catch(() => null),
+          forensicApi.getCases({ exclude_demo: !showDemoCases }).catch(() => [])
+        ]);
+
+        if (isMounted) {
+          if (res && Array.isArray(res.timeline)) {
+            setBackendTimelineEvents(res.timeline);
+          }
+          if (Array.isArray(casesRes)) {
+            setDbCases(casesRes);
+          }
         }
       } catch (err) {
-        console.warn('Backend temporal analysis fetch failed, utilizing correlated dataset fallback:', err);
+        console.warn('Backend temporal analysis fetch failed:', err);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -122,7 +134,7 @@ export function ThreatTimelineView({
 
     loadBackendTimeline();
     return () => { isMounted = false; };
-  }, [currentDomain, currentOriginIp]);
+  }, [currentDomain, currentOriginIp, showDemoCases]);
 
   // Build combined chronological timeline incidents
   const incidents = useMemo<TimelineIncident[]>(() => {
@@ -160,7 +172,51 @@ export function ThreatTimelineView({
     list.push(currentIncident);
     seenIds.add(analysis.id);
 
-    // 2. Add matching samples from SAMPLE_ANALYSES (only if demo fixtures enabled)
+    // 2. Add matching cases from real database cases
+    dbCases.forEach((c) => {
+      if (seenIds.has(c.id)) return;
+      const parsed = mapBackendCaseToAnalysis(c, '', c.title || 'Incident Case');
+      const sEmail = parsed.headers.fromEmail || parsed.headers.from || '';
+      const sDomain = sEmail.includes('@') ? sEmail.split('@')[1].toLowerCase() : sEmail.toLowerCase();
+      const sReturnDomain = parsed.headers.returnPath ? (parsed.headers.returnPath.match(/@([a-zA-Z0-9.-]+)/) || [])[1] : '';
+
+      const matchesDomain = sDomain.includes(currentDomain) || currentDomain.includes(sDomain) || 
+                            (currentReturnPathDomain && sReturnDomain && sReturnDomain.includes(currentReturnPathDomain));
+      const matchesIp = parsed.hops.some(h => h.fromIp === currentOriginIp);
+
+      if (matchesDomain || matchesIp || sEmail === currentSenderEmail || currentDomain === 'example.com') {
+        seenIds.add(parsed.id);
+        const sampleStd = getStandardizedVerdict(parsed);
+        list.push({
+          id: parsed.id,
+          date: parsed.analyzedAt || parsed.headers.date || c.created_at || new Date().toISOString(),
+          timestampMs: new Date(parsed.headers.date || c.created_at || Date.now()).getTime(),
+          caseId: parsed.sessionId || `CASE-${parsed.id.slice(0, 8)}`,
+          subject: parsed.headers.subject,
+          sender: parsed.headers.from,
+          senderEmail: sEmail,
+          returnPath: parsed.headers.returnPath,
+          replyTo: parsed.headers.replyTo,
+          originIp: parsed.hops[0]?.fromIp || '185.220.101.5',
+          asn: parsed.hops[0]?.asn || 'Unmapped ASN',
+          asnOrg: parsed.hops[0]?.org || 'Unmapped Provider',
+          location: parsed.hops[0]?.city ? `${parsed.hops[0].city}, ${parsed.hops[0].countryCode || ''}` : 'Relay Location: Unresolved',
+          verdict: sampleStd.verdict,
+          threatScore: sampleStd.score,
+          spfStatus: (parsed.auth?.spf?.status as any) || 'FAIL',
+          dkimStatus: (parsed.auth?.dkim?.status as any) || 'FAIL',
+          dmarcStatus: (parsed.auth?.dmarc?.status as any) || 'REJECT',
+          campaignName: c.campaign_name || 'Correlated Database Incident',
+          attackVector: sampleStd.isMalicious ? 'Phishing / Impersonation' : 'Standard Delivery',
+          iocs: parsed.urls.map(u => u.domain),
+          heuristics: (parsed.heuristics || []).map(h => h.title),
+          isCurrentAnalysis: false,
+          rawSampleRef: parsed
+        });
+      }
+    });
+
+    // 3. Add matching samples from SAMPLE_ANALYSES (only if demo fixtures enabled)
     if (showDemoCases) {
       SAMPLE_ANALYSES.forEach((sample) => {
         if (seenIds.has(sample.id)) return;

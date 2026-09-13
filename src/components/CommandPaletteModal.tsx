@@ -50,6 +50,7 @@ interface CommandPaletteModalProps {
   onOpenShortcutsHelp?: () => void;
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
   currentAnalysis?: EmailAnalysis;
+  cases?: EmailAnalysis[];
   viewMode?: 'simple' | 'analyst';
   showDemoCases?: boolean;
 }
@@ -78,6 +79,7 @@ export function CommandPaletteModal({
   onOpenShortcutsHelp,
   onSelectAnalysis,
   currentAnalysis,
+  cases = [],
   viewMode = 'simple',
   showDemoCases = false
 }: CommandPaletteModalProps) {
@@ -363,8 +365,9 @@ export function CommandPaletteModal({
       }
     ];
 
-    // 3. Preset Forensic Cases
-    SAMPLE_ANALYSES.forEach((sample) => {
+    // 3. Real / Active Forensic Cases
+    const targetCases = cases.length > 0 ? cases : (showDemoCases ? SAMPLE_ANALYSES : []);
+    targetCases.forEach((sample) => {
       const v = getStandardizedVerdict(sample);
       const isPhish = v.category === 'MALICIOUS';
       const isSuspicious = v.category === 'SUSPICIOUS';
@@ -396,6 +399,7 @@ export function CommandPaletteModal({
     modSymbol,
     viewMode,
     showDemoCases,
+    cases,
     onClose,
     onNewAnalysis,
     onOpenReport,

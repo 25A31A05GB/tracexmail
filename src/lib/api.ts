@@ -281,6 +281,7 @@ export interface DashboardStats {
     total_emails_ingested: number;
     active_campaigns: number;
     active_alerts: number;
+    high_threat_count?: number;
     threat_distribution: {
       CRITICAL: number;
       HIGH: number;
@@ -288,7 +289,15 @@ export interface DashboardStats {
       LOW: number;
       CLEAN: number;
     };
+    avg_threat_score?: number;
     average_threat_score: number;
+  };
+  infrastructure_attribution?: {
+    status: string;
+    infrastructure_breakdown: Array<{
+      type: string;
+      percentage: number;
+    }>;
   };
   threat_actors: Array<{
     name: string;
@@ -296,13 +305,21 @@ export interface DashboardStats {
     target: string;
     status: string;
   }>;
+  daily_trends?: Array<{
+    date: string;
+    clean: number;
+    suspicious: number;
+    malicious: number;
+    total: number;
+  }>;
   recent_alerts: Array<{
     id: string;
     title: string;
     description: string;
     severity: string;
-    status: string;
-    created_at: string;
+    status?: string;
+    created_at?: string;
+    timestamp?: string;
   }>;
 }
 

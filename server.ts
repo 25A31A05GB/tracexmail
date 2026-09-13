@@ -1524,7 +1524,7 @@ async function startServer() {
     const orgId = user?.organizationId || (req.query.organization_id as string);
 
     try {
-      let casesQuery = supabase.from('cases').select('severity, threat_score, is_demo, organization_id');
+      let casesQuery = supabase.from('cases').select('id, title, headers, verdict, severity, threat_score, tags, hops, iocs, is_demo, created_at, organization_id');
       if (orgId) {
         casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
       }
@@ -1533,7 +1533,7 @@ async function startServer() {
         return res.status(500).json({ error: casesError.message });
       }
 
-      let campQuery = supabase.from('campaigns').select('id, organization_id, is_demo');
+      let campQuery = supabase.from('campaigns').select('id, name, organization_id, is_demo, threat_actor, target_sector, status');
       if (orgId) {
         campQuery = campQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
       }
@@ -1560,6 +1560,71 @@ async function startServer() {
         ? Math.round(allCases.reduce((acc, c) => acc + (c.threat_score || 0), 0) / totalCount)
         : 0;
 
+      // Compute dynamic real infrastructure breakdown from actual cases
+      let spoofedCount = 0;
+      let anonymizedRelayCount = 0;
+      let compromisedHostCount = 0;
+      let legitimateRouteCount = 0;
+
+      allCases.forEach(c => {
+        const hops = Array.isArray(c.hops) ? c.hops : [];
+        const hasTor = hops.some((h: any) => h.isTorExit || h.asnOrg?.toLowerCase().includes('tor') || h.asnOrg?.toLowerCase().includes('anonymizing'));
+        const hasSpoof = c.severity === 'CRITICAL' || c.verdict?.toLowerCase().includes('phish') || c.verdict?.toLowerCase().includes('spoof') || (c.tags && c.tags.includes('BEC'));
+        const hasCompromise = c.severity === 'HIGH' || c.verdict?.toLowerCase().includes('malware') || (c.tags && c.tags.includes('Account Takeover'));
+        
+        if (hasSpoof) spoofedCount++;
+        if (hasTor) anonymizedRelayCount++;
+        if (hasCompromise) compromisedHostCount++;
+        if (c.severity === 'CLEAN' || c.severity === 'LOW') legitimateRouteCount++;
+      });
+
+      const totalSignals = (spoofedCount + anonymizedRelayCount + compromisedHostCount + legitimateRouteCount) || 1;
+      const infrastructureBreakdown = totalCount > 0 ? [
+        { type: 'Spoofed Domain Permutations', percentage: Math.round((spoofedCount / totalSignals) * 100) },
+        { type: 'Anonymized / Tor Relays', percentage: Math.round((anonymizedRelayCount / totalSignals) * 100) },
+        { type: 'Compromised Webmail / Hosts', percentage: Math.round((compromisedHostCount / totalSignals) * 100) },
+        { type: 'Legitimate Corporate Routes', percentage: Math.round((legitimateRouteCount / totalSignals) * 100) }
+      ] : [
+        { type: 'Spoofed Domain Permutations', percentage: 0 },
+        { type: 'Anonymized / Tor Relays', percentage: 0 },
+        { type: 'Compromised Webmail / Hosts', percentage: 0 },
+        { type: 'Legitimate Corporate Routes', percentage: 0 }
+      ];
+
+      // Dynamic real threat clusters derived from campaigns and cases
+      const realCampaigns = (campData || []).map(cp => ({
+        name: cp.name || cp.threat_actor || 'Unattributed Incident Cluster',
+        campaign_count: allCases.filter(c => c.campaign_id === cp.id || c.title?.includes(cp.name)).length || 1,
+        target: cp.target_sector || 'Enterprise Communications',
+        status: cp.status || 'ACTIVE'
+      }));
+
+      // Compute past 30 days daily counts from real case timestamps
+      const dailyTrends: { date: string; clean: number; suspicious: number; malicious: number; total: number }[] = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 86400000);
+        const dateStr = d.toISOString().slice(0, 10);
+        const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const dayCases = allCases.filter(c => {
+          if (!c.created_at) return false;
+          return c.created_at.slice(0, 10) === dateStr;
+        });
+
+        const dayClean = dayCases.filter(c => c.severity === 'CLEAN' || c.severity === 'LOW').length;
+        const daySuspicious = dayCases.filter(c => c.severity === 'MEDIUM').length;
+        const dayMalicious = dayCases.filter(c => c.severity === 'HIGH' || c.severity === 'CRITICAL').length;
+
+        dailyTrends.push({
+          date: dayLabel,
+          clean: dayClean,
+          suspicious: daySuspicious,
+          malicious: dayMalicious,
+          total: dayCases.length
+        });
+      }
+
       res.json({
         summary: {
           total_cases: totalCount,
@@ -1580,19 +1645,15 @@ async function startServer() {
           average_threat_score: avgThreatScore
         },
         infrastructure_attribution: {
-          status: 'Unattributed',
-          infrastructure_breakdown: [
-            { type: 'Spoofed Domain Permutations', percentage: 82 },
-            { type: 'Anonymized / Tor Relays', percentage: 71 },
-            { type: 'Compromised Webmail / Hosts', percentage: 18 },
-            { type: 'Legitimate Corporate Routes', percentage: 5 }
-          ]
+          status: totalCount > 0 ? (criticalCount > 0 ? 'Active Adversarial Infrastructure' : 'Monitored') : 'No Active Threats',
+          infrastructure_breakdown: infrastructureBreakdown
         },
-        threat_actors: [
-          { name: 'Unattributed (BEC Spoof Net)', campaign_count: 2, target: 'Financial & Executive HR', status: 'ACTIVE' },
-          { name: 'Unattributed (Credential Phishing Kit)', campaign_count: 1, target: 'Enterprise Office 365', status: 'MONITORED' },
-          { name: 'Unattributed (Deceptive Signature Relay)', campaign_count: 1, target: 'Legal & Consulting', status: 'CONTAINED' }
-        ],
+        threat_actors: realCampaigns.length > 0 ? realCampaigns : (
+          allCases.length > 0 ? [
+            { name: 'Active Correlated Ingestion Feed', campaign_count: allCases.length, target: 'Enterprise Targets', status: 'ANALYZED' }
+          ] : []
+        ),
+        daily_trends: dailyTrends,
         recent_alerts: (alertData || []).slice(0, 5)
       });
     } catch (err: any) {
@@ -4737,8 +4798,14 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
 
   // Auth status and diagnostics endpoint
   app.get('/api/auth/status', publicLimiter, (_req, res) => {
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+    const supabaseUrl =
+      process.env.VITE_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      'https://zinyrzlswkwwzxlgptmq.supabase.co';
+    const supabaseAnonKey =
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
 
     let supabaseConfigured = Boolean(
       supabaseUrl &&
