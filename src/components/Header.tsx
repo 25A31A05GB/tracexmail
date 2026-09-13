@@ -169,19 +169,19 @@ export function Header({
         return {
           bg: 'bg-red-950/60 border-red-800/80 text-red-400',
           icon: ShieldAlert,
-          label: 'MALICIOUS / PHISHING'
+          label: 'High Risk Phishing'
         };
       case 'SUSPICIOUS':
         return {
           bg: 'bg-amber-950/60 border-amber-800/80 text-amber-400',
           icon: AlertTriangle,
-          label: 'SUSPICIOUS'
+          label: 'Suspicious'
         };
       default:
         return {
           bg: 'bg-emerald-950/60 border-emerald-800/80 text-emerald-400',
           icon: ShieldCheck,
-          label: 'LEGITIMATE / CLEAN'
+          label: 'Safe & Verified'
         };
     }
   };
@@ -220,7 +220,7 @@ export function Header({
           {dropdownOpen && (
             <div className="absolute left-0 mt-2 w-72 max-w-[85vw] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2 z-50">
               <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-2 py-1 tracking-wider">
-                Preset Forensic Samples
+                Sample Cases
               </div>
               <div className="space-y-1 mt-1 max-h-60 overflow-y-auto">
                 {SAMPLE_ANALYSES.map((sample) => (
@@ -247,7 +247,7 @@ export function Header({
 
         <div className="hidden lg:flex flex-col min-w-0">
           <h1 className="font-display text-sm font-semibold text-[#ede6d8] truncate max-w-xs xl:max-w-md">
-            {currentAnalysis.subject || 'Forensic Case View'}
+            {currentAnalysis.subject || 'Email Analysis'}
           </h1>
           <span className="text-xs text-[#8a8070] truncate">
             From: <span className="text-[#b9af9c] font-mono">{currentAnalysis.from}</span>
@@ -316,21 +316,21 @@ export function Header({
           {userDropdownOpen && (
             <div className="absolute right-0 mt-1 w-64 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_40px_rgba(0,0,0,0.8)] py-1.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
               <div className="px-3 py-2 text-[11px] text-[#8a8070]">
-                <div className="font-mono text-[10px] uppercase text-[#8a8070]">Operator Identity</div>
+                <div className="font-mono text-[10px] uppercase text-[#8a8070]">Signed in as</div>
                 <div className="truncate text-[#ede6d8] font-semibold mt-0.5">{sessionUser?.email || userLabel}</div>
                 <div className="font-mono text-[10.5px] mt-1 flex items-center justify-between">
-                  <span className="text-[#8a8070]">Organization:</span>
-                  <span className="font-bold text-[var(--stamp)] truncate max-w-[130px]" title={sessionUser?.organizationId || 'Acme Cyber Defense SOC'}>
-                    {accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC'}
+                  <span className="text-[#8a8070]">Workspace:</span>
+                  <span className="font-bold text-[var(--stamp)] truncate max-w-[130px]" title={sessionUser?.organizationId || 'Acme Cyber Defense'}>
+                    {accountType === 'personal' ? 'Personal' : 'Acme Defense Team'}
                   </span>
                 </div>
                 <div className="mt-2 pt-1.5 border-t border-[#3a352c] flex items-center justify-between text-[10px] font-mono">
-                  <span className="text-[#8a8070]">Clearance:</span>
+                  <span className="text-[#8a8070]">Role:</span>
                   <span className={`font-bold flex items-center gap-1 ${
                     role === 'admin' ? 'text-[var(--stamp)]' : role === 'analyst' ? 'text-[var(--slate)]' : 'text-[var(--paper-dim)]'
                   }`}>
                     <Lock className="w-2.5 h-2.5" />
-                    {role === 'admin' ? 'GOLD (ADMIN)' : role === 'analyst' ? 'STEEL (ANALYST)' : 'SILVER (AUDITOR)'}
+                    {role === 'admin' ? 'Administrator' : role === 'analyst' ? 'Security Analyst' : 'Auditor'}
                   </span>
                 </div>
               </div>
@@ -339,10 +339,10 @@ export function Header({
               <div className="px-3 py-2 bg-[rgba(0,0,0,0.3)]">
                 <div className="flex items-center gap-1.5 text-[10px] font-mono text-[var(--forensic-green)] font-semibold">
                   <ShieldCheck className="w-3.5 h-3.5 text-[var(--forensic-green)] shrink-0" />
-                  <span>Verified Strict Enclave Access</span>
+                  <span>Secure Workspace Active</span>
                 </div>
                 <div className="text-[9.5px] text-[#8a8070] mt-0.5 leading-tight">
-                  Tenant tenancy locked to verified organization profile.
+                  Protected with encrypted session tokens.
                 </div>
               </div>
 
@@ -356,7 +356,7 @@ export function Header({
                     className="w-full text-left px-3 py-1.5 text-[#ede6d8] hover:bg-[rgba(201,162,39,0.15)] hover:text-[var(--stamp)] flex items-center gap-2 cursor-pointer transition-colors font-sans font-medium"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
-                    <span>Account &amp; MFA Settings</span>
+                    <span>Settings &amp; Preferences</span>
                   </button>
                 )}
                 {onSignOut && (
@@ -368,7 +368,7 @@ export function Header({
                     className="w-full text-left px-3 py-1.5 text-[var(--rose-400)] hover:bg-[rgba(178,58,46,0.15)] flex items-center gap-2 cursor-pointer transition-colors font-sans font-medium"
                   >
                     <LogOut className="w-3.5 h-3.5 text-[var(--thread)]" />
-                    <span>Sign out of enclave</span>
+                    <span>Sign Out</span>
                   </button>
                 )}
               </div>
@@ -381,10 +381,10 @@ export function Header({
           <button
             onClick={onOpenCommandPalette}
             className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
-            title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
+            title="Search & Quick Actions (⌘K / Ctrl+K)"
           >
             <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
-            <span className="font-sans">Command Deck</span>
+            <span className="font-sans">Search</span>
             <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#26211a] border border-[#3a352c] rounded text-amber-400/90 group-hover:text-amber-300">
               ⌘K
             </kbd>
@@ -396,21 +396,21 @@ export function Header({
           <button
             onClick={onOpenShortcutsHelp}
             className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-[#9d9282] hover:text-amber-300 transition-colors cursor-pointer"
-            title="Keyboard Shortcuts Cheat Sheet (?)"
+            title="Keyboard Shortcuts (?)"
           >
             <Keyboard className="w-3.5 h-3.5" />
           </button>
         )}
 
-        {/* Investigation Objective Setup Prompt */}
+        {/* Investigation Objective / Guide */}
         {onOpenWalkthrough && (
           <button
             onClick={onOpenWalkthrough}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
-            title="Setup Investigation Goal & Tailor Enclave Workspace"
+            title="Getting Started Guide"
           >
             <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
-            <span className="font-bold tracking-wide">OBJECTIVE</span>
+            <span className="font-bold tracking-wide">GUIDE</span>
           </button>
         )}
 
@@ -423,7 +423,7 @@ export function Header({
                 ? 'bg-purple-950/70 border-purple-700 text-purple-200'
                 : 'bg-[#221e17] hover:bg-[#2c271f] border-[#3a352c] text-[#ede6d8]'
             }`}
-            title="Configure Privacy Safeguards, Retention & PII Masking (⌘⇧P)"
+            title="Privacy & Data Protection Settings (⌘⇧P)"
           >
             <Scale className="w-3.5 h-3.5 text-purple-400" />
             <span className="font-mono">Privacy</span>
@@ -437,7 +437,7 @@ export function Header({
         <button
           onClick={onOpenNewModal}
           className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer shrink-0"
-          title="Create New Email Analysis (⌘N / Ctrl+N)"
+          title="New Email Analysis (⌘N / Ctrl+N)"
         >
           <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
           <span className="hidden xs:inline sm:inline">New Analysis</span>
