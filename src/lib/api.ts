@@ -238,6 +238,11 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     await initializeSession();
   }
 
+  let targetUrl = input;
+  if (typeof input === 'string' && input.startsWith('/api') && API_URL) {
+    targetUrl = `${API_URL}${input}`;
+  }
+
   const headers = new Headers(init?.headers);
   if (memorySessionToken && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${memorySessionToken}`);
@@ -246,7 +251,7 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     headers.set('x-organization-id', DEFAULT_ORG_ID);
   }
 
-  return fetch(input, {
+  return fetch(targetUrl, {
     ...init,
     headers
   });

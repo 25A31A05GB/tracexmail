@@ -13,6 +13,13 @@ const clientAppUrl =
   (import.meta as any).env?.VITE_REDIRECT_URL ||
   'https://tracexmail.vercel.app';
 
+const API_URL = (
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.host.includes('vercel.app')
+    ? 'https://tracexmail-l6c7.onrender.com'
+    : '')
+).replace(/\/$/, '');
+
 /**
  * Returns the canonical Google OAuth callback URL.
  * Routes through the deployed frontend/backend URL (https://tracexmail.vercel.app/auth/callback)
@@ -155,7 +162,7 @@ export async function ensureSupabaseClient(): Promise<boolean> {
   initPromise = (async () => {
     try {
       logSupabaseAuthEvent('Init', 'Querying /api/auth/status for runtime configuration...');
-      const res = await fetch('/api/auth/status');
+      const res = await fetch(`${API_URL}/api/auth/status`);
       const data = await res.json();
       if (
         data?.supabaseConfigured &&

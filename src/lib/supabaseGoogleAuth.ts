@@ -150,16 +150,9 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
       }
     }
 
-    // In top-level mode (outside iframe), navigate directly
-    if (!inIframe) {
-      console.log('[Supabase Google Auth] Navigating top-level window to:', authUrl);
-      window.location.assign(authUrl);
-      return { success: true };
-    }
+    console.log('[Supabase Google Auth] Opening Google OAuth popup window to:', authUrl);
 
-    console.log('[Supabase Google Auth] Opening OAuth popup window to:', authUrl);
-
-    // In iframe mode: open provider authorization URL directly in a popup window
+    // Open provider authorization URL in a standard centered popup window
     const width = 560;
     const height = 680;
     const left = window.screenX + (window.outerWidth - width) / 2;
@@ -172,8 +165,12 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
     );
 
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      // Browser popup blocker prevented opening the popup window
-      console.warn('[Supabase Google Auth] Popup window blocked by browser');
+      // If browser blocked popup window, fallback to top-level window redirect
+      console.warn('[Supabase Google Auth] Popup window blocked by browser, falling back to top-level redirection...');
+      if (!inIframe) {
+        window.location.assign(authUrl);
+        return { success: true };
+      }
       return {
         success: false,
         error: 'The Google authentication popup was blocked by your browser. Please allow popups for this site and try again.'
