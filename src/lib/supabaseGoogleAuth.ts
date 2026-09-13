@@ -186,11 +186,98 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
 
       const cleanup = () => {
         window.removeEventListener('message', messageListener);
+        window.removeEventListener('storage', storageListener);
         clearInterval(pollTimer);
+        try {
+          localStorage.removeItem('tracexmail_supabase_auth_callback');
+        } catch {}
+      };
+
+      const handleCallbackPayload = async (payload: any) => {
+        if (resolved) return;
+
+        if (payload?.type === 'SUPABASE_AUTH_ERROR' || payload?.error) {
+          console.error('[Supabase Google Auth] OAuth error reported:', payload);
+          resolved = true;
+          cleanup();
+          const detail = payload.error || payload.errorCode || 'Google OAuth authentication failed.';
+          resolve({
+            success: false,
+            error: detail.includes('access_denied')
+              ? 'Sign in was cancelled or permission was denied.'
+              : `Google authentication failed: ${detail}`
+          });
+          return;
+        }
+
+        if (payload?.type === 'SUPABASE_AUTH_SUCCESS') {
+          console.log('[Supabase Google Auth] Processing auth callback tokens...');
+          try {
+            const hash = payload.hash || '';
+            const search = payload.search || '';
+
+            if (hash) {
+              const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+              const accessToken = hashParams.get('access_token');
+              const refreshToken = hashParams.get('refresh_token');
+              if (accessToken && refreshToken) {
+                console.log('[Supabase Google Auth] Applying tokens via setSession...');
+                await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken
+                });
+              }
+            } else if (search) {
+              const searchParams = new URLSearchParams(search);
+              const code = searchParams.get('code');
+              if (code) {
+                console.log('[Supabase Google Auth] Exchanging PKCE code for session...');
+                await (supabase.auth as any).exchangeCodeForSession?.(code);
+              }
+            }
+
+            // Verify active session
+            const { data: sessionData } = await supabase.auth.getSession();
+            let activeUser = sessionData?.session?.user;
+
+            if (!activeUser) {
+              const { data: userData } = await supabase.auth.getUser();
+              activeUser = userData?.user;
+            }
+
+            if (activeUser) {
+              resolved = true;
+              cleanup();
+              console.log('[Supabase Google Auth] Session successfully established:', activeUser.email);
+              resolve({
+                success: true,
+                user: activeUser
+              });
+              return;
+            } else {
+              console.warn('[Supabase Google Auth] OAuth callback completed but no user session was found.');
+              resolved = true;
+              cleanup();
+              resolve({
+                success: false,
+                error: 'Authentication exchange finished without establishing a session. Please verify that the Google provider is enabled in your Supabase Dashboard.'
+              });
+              return;
+            }
+          } catch (err: any) {
+            console.error('[Supabase Google Auth] Finalization exception:', err);
+            resolved = true;
+            cleanup();
+            resolve({
+              success: false,
+              error: err?.message || 'Failed finalizing Google authentication session.'
+            });
+            return;
+          }
+        }
       };
 
       const messageListener = async (event: MessageEvent) => {
-        // Validate origin: accept matching origin, Vercel, Cloud Run preview, or localhost
         const isAllowedOrigin = 
           !event.origin ||
           event.origin === window.location.origin ||
@@ -199,83 +286,36 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
           event.origin.includes('localhost') ||
           event.origin.includes('127.0.0.1');
 
-        if (!isAllowedOrigin) {
-          return;
+        if (!isAllowedOrigin) return;
+        if (event.data?.type === 'SUPABASE_AUTH_SUCCESS' || event.data?.type === 'SUPABASE_AUTH_ERROR') {
+          await handleCallbackPayload(event.data);
         }
+      };
 
-        if (event.data?.type === 'SUPABASE_AUTH_ERROR') {
-          console.error('[Supabase Google Auth] Popup reported auth error:', event.data);
-          if (resolved) return;
-          resolved = true;
-          cleanup();
-          resolve({
-            success: false,
-            error: event.data.error || 'Google authentication encountered an authorization error.'
-          });
-          return;
-        }
-
-        if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
-          console.log('[Supabase Google Auth] Received SUPABASE_AUTH_SUCCESS from popup');
-          if (resolved) return;
-          resolved = true;
-          cleanup();
-
+      const storageListener = async (e: StorageEvent) => {
+        if (e.key === 'tracexmail_supabase_auth_callback' && e.newValue) {
           try {
-            // Check if tokens were passed via hash or PKCE code via search
-            const hash = event.data.hash || '';
-            const search = event.data.search || '';
-
-            if (hash) {
-              const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
-              const accessToken = hashParams.get('access_token');
-              const refreshToken = hashParams.get('refresh_token');
-              if (accessToken && refreshToken) {
-                console.log('[Supabase Google Auth] Applying tokens via setSession...');
-                const { error: sessionSetErr } = await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken
-                });
-                if (sessionSetErr) {
-                  console.warn('[Supabase Google Auth] setSession notice:', sessionSetErr);
-                }
-              }
-            } else if (search) {
-              const searchParams = new URLSearchParams(search);
-              const code = searchParams.get('code');
-              if (code) {
-                console.log('[Supabase Google Auth] Exchanging PKCE code for session...');
-                const { error: exchangeErr } = await (supabase.auth as any).exchangeCodeForSession?.(code);
-                if (exchangeErr) {
-                  console.warn('[Supabase Google Auth] exchangeCodeForSession notice:', exchangeErr);
-                }
-              }
-            }
-
-            const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-            if (sessionErr) {
-              console.error('[Supabase Google Auth] getSession error after OAuth exchange:', sessionErr);
-            }
-
-            console.log('[Supabase Google Auth] Session successfully finalized. User:', sessionData?.session?.user?.email);
-            resolve({
-              success: true,
-              user: sessionData?.session?.user
-            });
-          } catch (err: any) {
-            console.error('[Supabase Google Auth] Finalization exception:', err);
-            resolve({
-              success: false,
-              error: err?.message || 'Failed finalizing Google authentication session.'
-            });
-          }
+            const payload = JSON.parse(e.newValue);
+            await handleCallbackPayload(payload);
+          } catch {}
         }
       };
 
       window.addEventListener('message', messageListener);
+      window.addEventListener('storage', storageListener);
 
       // Check if user manually closed the popup without authenticating
       const pollTimer = setInterval(async () => {
+        // Also check if localStorage was updated in background
+        try {
+          const storedCallback = localStorage.getItem('tracexmail_supabase_auth_callback');
+          if (storedCallback) {
+            const payload = JSON.parse(storedCallback);
+            await handleCallbackPayload(payload);
+            return;
+          }
+        } catch {}
+
         if (popup.closed) {
           clearInterval(pollTimer);
           if (resolved) return;
@@ -283,7 +323,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
           // Check if session was established despite popup closing
           try {
             const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session) {
+            if (sessionData?.session?.user) {
               resolved = true;
               cleanup();
               resolve({
@@ -300,7 +340,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
               cleanup();
               resolve({
                 success: false,
-                error: 'Authentication cancelled: the Google sign-in window was closed.'
+                error: 'Authentication incomplete: Google sign-in window was closed.'
               });
             }
           }, 600);

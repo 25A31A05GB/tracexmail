@@ -4892,20 +4892,54 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     <div style="font-size: 12px; color: #9d9282; margin-top: 6px;">Closing window and returning to TraceXMail…</div>
   </div>
   <script>
-    try {
-      if (window.opener) {
-        window.opener.postMessage({
-          type: 'SUPABASE_AUTH_SUCCESS',
-          hash: window.location.hash,
-          search: window.location.search
-        }, '*');
-        setTimeout(function() { window.close(); }, 600);
-      } else {
-        window.location.href = '/' + window.location.search + window.location.hash;
+    (function() {
+      try {
+        var hash = window.location.hash || '';
+        var search = window.location.search || '';
+        var searchParams = new URLSearchParams(search);
+        var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+
+        var error = searchParams.get('error') || hashParams.get('error') || searchParams.get('error_description') || hashParams.get('error_description');
+        var errorCode = searchParams.get('error_code') || hashParams.get('error_code');
+
+        var payload = {
+          type: error ? 'SUPABASE_AUTH_ERROR' : 'SUPABASE_AUTH_SUCCESS',
+          error: error || null,
+          errorCode: errorCode || null,
+          hash: hash,
+          search: search,
+          timestamp: Date.now()
+        };
+
+        // 1. Post to opener window if available
+        if (window.opener) {
+          try {
+            window.opener.postMessage(payload, '*');
+          } catch (e) {
+            console.warn('postMessage to opener failed:', e);
+          }
+        }
+
+        // 2. Write to localStorage as redundant cross-window channel
+        try {
+          localStorage.setItem('tracexmail_supabase_auth_callback', JSON.stringify(payload));
+        } catch (e) {}
+
+        // 3. Gracefully close popup or redirect top-level window
+        if (window.opener) {
+          setTimeout(function() {
+            window.close();
+          }, 800);
+        } else {
+          setTimeout(function() {
+            window.location.href = '/' + search + hash;
+          }, 600);
+        }
+      } catch (err) {
+        console.error('Callback error:', err);
+        window.location.href = '/';
       }
-    } catch (e) {
-      window.location.href = '/';
-    }
+    })();
   </script>
 </body>
 </html>`);
