@@ -348,3 +348,254 @@ export async function createDynamicRealWorldCase(
     raw_email: rawRfc822
   };
 }
+
+// ============================================================================
+// LIVE THREAT FEEDS (CISA & OPENPHISH) WITH 15-MINUTE IN-MEMORY TTL CACHING
+// ============================================================================
+
+export interface LiveThreatFeedResult {
+  status: 'live' | 'cached' | 'fallback_simulated';
+  isSimulated: boolean;
+  count: number;
+  last_synced: string;
+  cache_expires_at: string;
+  sources: string[];
+  error?: string;
+  feeds: (RealWorldThreatItem & { isSimulated?: boolean })[];
+}
+
+interface ThreatCache {
+  data: (RealWorldThreatItem & { isSimulated?: boolean })[];
+  fetchedAt: number;
+  sources: string[];
+}
+
+let threatFeedCache: ThreatCache | null = null;
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+function parseHostname(urlStr: string): string {
+  try {
+    const u = new URL(urlStr.startsWith('http') ? urlStr : `https://${urlStr}`);
+    return u.hostname;
+  } catch {
+    return urlStr.replace(/^https?:\/\//i, '').split('/')[0] || urlStr;
+  }
+}
+
+/**
+ * Fetches real-time threats from CISA Known Exploited Vulnerabilities (KEV)
+ * and OpenPhish public threat feeds without requiring API credentials.
+ * Cached in memory for 15 minutes to preserve network efficiency.
+ */
+export async function getLiveThreatFeed(limit = 10): Promise<LiveThreatFeedResult> {
+  const now = Date.now();
+
+  // Return cached result if valid
+  if (threatFeedCache && (now - threatFeedCache.fetchedAt < CACHE_TTL_MS)) {
+    const remainingSec = Math.round((CACHE_TTL_MS - (now - threatFeedCache.fetchedAt)) / 1000);
+    const sliced = threatFeedCache.data.slice(0, limit);
+    return {
+      status: 'cached',
+      isSimulated: false,
+      count: sliced.length,
+      last_synced: new Date(threatFeedCache.fetchedAt).toISOString(),
+      cache_expires_at: new Date(threatFeedCache.fetchedAt + CACHE_TTL_MS).toISOString(),
+      sources: threatFeedCache.sources,
+      feeds: sliced
+    };
+  }
+
+  const liveItems: (RealWorldThreatItem & { isSimulated?: boolean })[] = [];
+  const fetchedSources: string[] = [];
+  let fetchError: string | undefined;
+
+  // 1. Fetch CISA Known Exploited Vulnerabilities catalog (JSON)
+  try {
+    const cisaRes = await fetch('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json', {
+      headers: { 'User-Agent': 'TraceXMail-SOC-ThreatIntel/1.0' },
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (cisaRes.ok) {
+      const cisaJson: any = await cisaRes.json();
+      const vulns: any[] = Array.isArray(cisaJson.vulnerabilities) ? cisaJson.vulnerabilities : [];
+      // Take the most recently cataloged vulnerabilities
+      const recentVulns = vulns.slice(-15).reverse();
+
+      for (const vuln of recentVulns) {
+        const cve = vuln.cveID || 'CVE-UNKNOWN';
+        const vendor = vuln.vendorProject || 'Enterprise';
+        const product = vuln.product || 'Software';
+        const isRansomware = vuln.knownRansomwareCampaignUse === 'Known';
+        const dateAdded = vuln.dateAdded || new Date().toISOString().slice(0, 10);
+
+        const item: RealWorldThreatItem & { isSimulated: boolean } = {
+          id: `cisa-${cve.toLowerCase()}`,
+          source: 'CISA',
+          title: `CISA KEV: ${cve} — ${vuln.vulnerabilityName || `${vendor} ${product}`}`,
+          description: vuln.shortDescription || `Actively exploited vulnerability in ${vendor} ${product}. Required action: ${vuln.requiredAction || 'Apply vendor updates.'}`,
+          threat_type: isRansomware ? 'MALWARE_DROPPER' : 'SUPPLY_CHAIN_FRAUD',
+          severity: 'CRITICAL',
+          threat_score: isRansomware ? 96 : 89,
+          targeted_brand: `${vendor} ${product}`,
+          target_industry: 'Critical Infrastructure, Government & Enterprise IT',
+          ioc_indicators: {
+            sender_domain: `${vendor.toLowerCase().replace(/[^a-z0-9]/g, '')}-security-advisory.org`,
+            sender_ip: '198.51.100.42',
+            malicious_urls: [`https://nvd.nist.gov/vuln/detail/${cve}`],
+            file_hashes: []
+          },
+          sample_headers: {
+            from: `CISA Alert Bulletin <threat-intel@cisa.dhs.gov>`,
+            to: `soc-team@enterprise.internal`,
+            subject: `[CISA KEV ALERT] Active Exploitation of ${cve} (${vendor} ${product})`,
+            date: new Date(dateAdded).toUTCString(),
+            message_id: `<cisa-kev-${cve.toLowerCase()}@cisa.gov>`,
+            received_hops: [
+              `from mail-relay.cisa.dhs.gov (198.51.100.42) by mx.enterprise.internal with ESMTPS; ${new Date(dateAdded).toUTCString()}`
+            ],
+            auth_results: {
+              spf: 'pass (cisa.dhs.gov: 198.51.100.42)',
+              dkim: 'pass (header.d=cisa.dhs.gov)',
+              dmarc: 'pass (p=reject)'
+            }
+          },
+          sample_body: `CISA CYBERSECURITY ADVISORY — KNOWN EXPLOITED VULNERABILITY\n\nCVE ID: ${cve}\nVendor / Project: ${vendor}\nProduct: ${product}\nDate Cataloged: ${dateAdded}\nDue Date for Federal Agencies: ${vuln.dueDate || 'Immediate'}\nRansomware Association: ${vuln.knownRansomwareCampaignUse || 'Investigating'}\n\nDESCRIPTION:\n${vuln.shortDescription || 'No details provided.'}\n\nREQUIRED REMEDIATION:\n${vuln.requiredAction || 'Apply official patches immediately according to vendor instructions.'}\n\nNotes: ${vuln.notes || 'Cataloged in CISA KEV repository under BOD 22-01.'}`,
+          timestamp: new Date(dateAdded).toISOString(),
+          is_active: true,
+          mitigation_advice: vuln.requiredAction || 'Apply security updates immediately and audit outbound network traffic.',
+          isSimulated: false
+        };
+        liveItems.push(item);
+      }
+      fetchedSources.push('cisa');
+    }
+  } catch (err: any) {
+    console.warn('[RealWorldThreatService] CISA live feed fetch warning:', err?.message || err);
+    fetchError = err?.message || 'CISA network timeout';
+  }
+
+  // 2. Fetch OpenPhish active phishing lures (plain text URLs)
+  try {
+    const phishRes = await fetch('https://openphish.com/feed.txt', {
+      headers: { 'User-Agent': 'TraceXMail-SOC-ThreatIntel/1.0' },
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (phishRes.ok) {
+      const phishText = await phishRes.text();
+      const rawUrls = phishText.split(/\r?\n/).map(u => u.trim()).filter(Boolean);
+      const topUrls = rawUrls.slice(0, 15);
+
+      for (let i = 0; i < topUrls.length; i++) {
+        const phishUrl = topUrls[i];
+        const domain = parseHostname(phishUrl);
+        const urlId = `openphish-${Date.now().toString(36)}-${i}`;
+
+        const item: RealWorldThreatItem & { isSimulated: boolean } = {
+          id: urlId,
+          source: 'OPENPHISH',
+          title: `OpenPhish Active Lure: ${domain}`,
+          description: `Active zero-hour phishing link detected by OpenPhish feed targeting domain ${domain}. Malicious credential harvester or deceptive redirection.`,
+          threat_type: 'CREDENTIAL_HARVESTING',
+          severity: 'HIGH',
+          threat_score: 92,
+          targeted_brand: domain,
+          target_industry: 'Financial Services & Enterprise Identity',
+          ioc_indicators: {
+            sender_domain: domain,
+            malicious_urls: [phishUrl],
+            sender_ip: '185.220.101.9'
+          },
+          sample_headers: {
+            from: `Identity Notification <notice@${domain}>`,
+            to: `employee@target-corp.com`,
+            subject: `URGENT: Security confirmation required for ${domain}`,
+            date: new Date().toUTCString(),
+            message_id: `<phish-${Date.now()}-${i}@${domain}>`,
+            received_hops: [
+              `from unverified-gateway.${domain} (185.220.101.9) by mx.target-corp.com; ${new Date().toUTCString()}`
+            ],
+            auth_results: {
+              spf: 'fail (domain does not authorize sending relay)',
+              dkim: 'none',
+              dmarc: 'fail'
+            }
+          },
+          sample_body: `Dear User,\n\nA security review has flagged unauthorized access to your account at ${domain}.\nPlease verify your credentials immediately to avoid suspension:\n\nVerification URL: ${phishUrl}\n\nSecurity Administration`,
+          timestamp: new Date().toISOString(),
+          is_active: true,
+          mitigation_advice: `Block URL ${phishUrl} and domain ${domain} across perimeter web security gateways and endpoint protection agents.`,
+          isSimulated: false
+        };
+        liveItems.push(item);
+      }
+      fetchedSources.push('openphish');
+    }
+  } catch (err: any) {
+    console.warn('[RealWorldThreatService] OpenPhish live feed fetch warning:', err?.message || err);
+    fetchError = fetchError ? `${fetchError}; ${err?.message}` : err?.message;
+  }
+
+  // If we fetched live items successfully from at least one source
+  if (liveItems.length > 0) {
+    // Interleave / balance CISA and OpenPhish items for variety
+    const cisaItems = liveItems.filter(i => i.source === 'CISA');
+    const openPhishItems = liveItems.filter(i => i.source === 'OPENPHISH');
+    const interleaved: (RealWorldThreatItem & { isSimulated?: boolean })[] = [];
+    const maxLen = Math.max(cisaItems.length, openPhishItems.length);
+    for (let i = 0; i < maxLen; i++) {
+      if (cisaItems[i]) interleaved.push(cisaItems[i]);
+      if (openPhishItems[i]) interleaved.push(openPhishItems[i]);
+    }
+
+    threatFeedCache = {
+      data: interleaved,
+      fetchedAt: now,
+      sources: fetchedSources
+    };
+
+    const sliced = interleaved.slice(0, limit);
+    return {
+      status: 'live',
+      isSimulated: false,
+      count: sliced.length,
+      last_synced: new Date(now).toISOString(),
+      cache_expires_at: new Date(now + CACHE_TTL_MS).toISOString(),
+      sources: fetchedSources,
+      feeds: sliced
+    };
+  }
+
+  // Graceful fallback: return previous cache if exists even if expired
+  if (threatFeedCache && threatFeedCache.data.length > 0) {
+    const sliced = threatFeedCache.data.slice(0, limit);
+    return {
+      status: 'cached',
+      isSimulated: false,
+      count: sliced.length,
+      last_synced: new Date(threatFeedCache.fetchedAt).toISOString(),
+      cache_expires_at: new Date(now + 60000).toISOString(),
+      sources: threatFeedCache.sources,
+      error: `Network update failed (${fetchError}), serving stale cached feeds`,
+      feeds: sliced
+    };
+  }
+
+  // Final fallback to static curated library ONLY when network is completely unreachable
+  const fallbackSimulated = REAL_WORLD_THREAT_FEED.map(item => ({
+    ...item,
+    isSimulated: true
+  })).slice(0, limit);
+
+  return {
+    status: 'fallback_simulated',
+    isSimulated: true,
+    count: fallbackSimulated.length,
+    last_synced: new Date(now).toISOString(),
+    cache_expires_at: new Date(now + 60000).toISOString(),
+    sources: ['curated_offline_archive'],
+    error: `Live feeds unreachable (${fetchError || 'network down'}). Fell back to curated benchmark library with isSimulated: true.`,
+    feeds: fallbackSimulated
+  };
+}

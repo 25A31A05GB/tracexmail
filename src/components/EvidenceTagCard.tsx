@@ -468,7 +468,7 @@ export function EvidenceTagCard({
     <div 
       ref={cardRef}
       id="card"
-      className="evidence-card shadow-2xl relative select-text"
+      className="evidence-card relative select-text"
     >
       {/* Folder Tab Header */}
       <div className="tab">

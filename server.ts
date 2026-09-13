@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors, { CorsOptions } from 'cors';
 import http from 'http';
@@ -137,6 +138,7 @@ import {
 } from './src/server/classifierFeedback';
 import {
   REAL_WORLD_THREAT_FEED,
+  getLiveThreatFeed,
   createDynamicRealWorldCase,
   convertThreatItemToRfc822,
   type RealWorldThreatItem
@@ -2100,17 +2102,44 @@ async function startServer() {
   // Real-World Threat Feeds & Live Alert APIs
   // ==========================================
 
-  // Get curated threat scenario library & benchmark feed
+  // Live Threat Intel Feeds (CISA KEV + OpenPhish with 15-minute in-memory caching)
+  app.get('/api/threat-intel/live-feed', publicLimiter, async (req, res) => {
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 50);
+      const feed = await getLiveThreatFeed(limit);
+      res.json(feed);
+    } catch (err: any) {
+      console.error('[API /api/threat-intel/live-feed] Error:', err);
+      res.status(500).json({
+        status: 'error',
+        isSimulated: true,
+        error: err?.message || 'Failed to retrieve live threat feed',
+        feeds: REAL_WORLD_THREAT_FEED.slice(0, 10).map(i => ({ ...i, isSimulated: true }))
+      });
+    }
+  });
+
+  // Get curated threat scenario library & benchmark feed (supports ?live=true)
   app.get('/api/threat-feeds/real-world', publicLimiter, async (req, res) => {
-    res.json({
-      status: 'active',
-      feed_type: 'curated_benchmark_library',
-      count: REAL_WORLD_THREAT_FEED.length,
-      feeds: REAL_WORLD_THREAT_FEED,
-      sources: ['CISA Advisory Archetypes', 'OpenPhish Signatures', 'PhishTank Patterns', 'VirusTotal Telemetry Archetypes', 'Curated Honeypot Scenarios'],
-      description: 'Curated library of verified real-world threat archetypes and IOC campaign benchmarks for SOC testing and incident response evaluation.',
-      last_synced: new Date().toISOString()
-    });
+    try {
+      const isLiveRequested = req.query.live === 'true' || req.query.source === 'live';
+      if (isLiveRequested) {
+        const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 10, 1), 50);
+        const liveFeed = await getLiveThreatFeed(limit);
+        return res.json(liveFeed);
+      }
+      res.json({
+        status: 'active',
+        feed_type: 'curated_benchmark_library',
+        count: REAL_WORLD_THREAT_FEED.length,
+        feeds: REAL_WORLD_THREAT_FEED,
+        sources: ['CISA Advisory Archetypes', 'OpenPhish Signatures', 'PhishTank Patterns', 'VirusTotal Telemetry Archetypes', 'Curated Honeypot Scenarios'],
+        description: 'Curated library of verified real-world threat archetypes and IOC campaign benchmarks for SOC testing and incident response evaluation.',
+        last_synced: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Internal server error' });
+    }
   });
 
   // Sync / Trigger Real-World Threat Feeds & Broadcast Live Alerts
@@ -4173,17 +4202,27 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     if (geminiKey) {
       try {
         const ai = new GoogleGenAI({ apiKey: geminiKey });
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: promptText
-        });
+        let response;
+        let usedModel = 'gemini-2.5-flash';
+        try {
+          response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: promptText
+          });
+        } catch {
+          usedModel = 'gemini-3.8-flash';
+          response = await ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: promptText
+          });
+        }
         const narrativeText = response.text;
         if (narrativeText) {
           return res.json({
             ai_narrative: {
               narrative: narrativeText.trim(),
-              model: 'gemini-3.8-flash',
-              source: 'TraceXMail AI Forensic Reasoning Engine (Gemini)',
+              model: usedModel,
+              source: `TraceXMail AI Forensic Reasoning Engine (${usedModel})`,
               disclaimer: 'AI-generated narrative summary based on deterministic forensic telemetry. Verify independently before regulatory or legal submission.'
             }
           });
@@ -5050,6 +5089,24 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     initializeLocalEmbeddingModel().catch((err) => {
       console.warn('[TraceXMail] Error warming up offline local embedding model:', err?.message || err);
     });
+
+    // Automated background retention cleanup schedule if RETENTION_PURGE_INTERVAL_MS is configured
+    const purgeIntervalMs = parseInt(process.env.RETENTION_PURGE_INTERVAL_MS || '0', 10);
+    if (purgeIntervalMs > 0) {
+      console.log(`[RetentionSchedule] Automated retention scheduler active (interval: ${purgeIntervalMs}ms)`);
+      const retentionTimer = setInterval(async () => {
+        try {
+          console.log('[RetentionSchedule] Executing automated data retention policy cycle...');
+          await runRetentionCleanup({
+            organization_id: DEFAULT_ORG_ID,
+            supabase: getSupabaseClient()
+          });
+        } catch (err: any) {
+          console.warn('[RetentionSchedule] Automated retention cycle warning:', err?.message);
+        }
+      }, purgeIntervalMs);
+      if (retentionTimer.unref) retentionTimer.unref();
+    }
   });
 }
 

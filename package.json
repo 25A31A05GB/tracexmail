@@ -39,6 +39,7 @@
     "helmet": "^8.3.0",
     "html2canvas": "^1.4.1",
     "http-proxy-middleware": "^4.2.0",
+    "js-sha256": "^1.0.0",
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",

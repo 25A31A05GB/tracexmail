@@ -13,6 +13,8 @@
  * `TOKEN_ENCRYPTION_KEY` verification.
  */
 
+import { sha256 as jsSha256 } from 'js-sha256';
+
 // Standard SHA-256 constants (K) from FIPS 180-4
 const K = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -129,10 +131,10 @@ export function sha256Sync(str: string): string {
       const crypto = require('crypto');
       return crypto.createHash('sha256').update(str).digest('hex');
     } catch {
-      // Fallback to pure TS FIPS 180-4 implementation if require fails
+      // Fallback to js-sha256 if require is unavailable
     }
   }
-  return sha256Pure(str);
+  return jsSha256(str);
 }
 
 /**

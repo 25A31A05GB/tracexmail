@@ -107,9 +107,17 @@ export function generateForensicPdfDossier({
 
     pdf.setFont('courier', 'normal');
     pdf.setFontSize(6.5);
-    pdf.setTextColor(125, 135, 148);
-    pdf.text('CONFIDENTIAL & COURT-ADMISSIBLE  •  NIST SP 800-86 & ISO/IEC 27037:2012 COMPLIANT', margin, pageHeight - 7);
-    pdf.text(`Page ${pageNumber}  •  Cryptographic Hash Sealed`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+    const isDegraded = analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
+    if (isDegraded) {
+      pdf.setTextColor(217, 119, 6);
+      pdf.text('DEGRADED MODE — UNVERIFIED CLIENT HEURISTIC  •  NOT CERTIFIED UNDER FRE 902 / ISO 27037', margin, pageHeight - 7);
+      pdf.setTextColor(125, 135, 148);
+      pdf.text(`Page ${pageNumber}  •  Client Local Parse`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+    } else {
+      pdf.setTextColor(125, 135, 148);
+      pdf.text('CONFIDENTIAL & COURT-ADMISSIBLE  •  NIST SP 800-86 & ISO/IEC 27037:2012 COMPLIANT', margin, pageHeight - 7);
+      pdf.text(`Page ${pageNumber}  •  Cryptographic Hash Sealed`, pageWidth - margin, pageHeight - 7, { align: 'right' });
+    }
   };
 
   const checkPageBreak = (neededHeight: number) => {

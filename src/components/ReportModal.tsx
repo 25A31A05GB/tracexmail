@@ -866,21 +866,39 @@ Pursuant to federal law, you are required to preserve these records for a period
           {/* TAB 5: CHAIN OF CUSTODY */}
           {activeTab === 'custody' && (
             <div className="space-y-6">
-              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-emerald-400" />
-                    <span>Evidence Vault &amp; Chain-of-Custody Ledger</span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Immutable event sequence and cryptographic verification checkpoints
-                  </p>
+              {analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback ? (
+                <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/60">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-amber-900/60 text-amber-300 shrink-0 mt-0.5">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-200">
+                        DEGRADED MODE — BACKEND UNREACHABLE, NOT SUITABLE FOR EVIDENTIARY USE
+                      </h3>
+                      <p className="text-xs text-amber-300/80 mt-1 leading-relaxed">
+                        This record was parsed locally via client-side heuristic fallback without server verification. Formal chain-of-custody registration and FRE 902 certification are unavailable. Re-analyze through the active backend pipeline for court-admissible chain of custody.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-mono font-bold flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5" />
-                  SEAL INTACT
-                </span>
-              </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-emerald-400" />
+                      <span>Evidence Vault &amp; Chain-of-Custody Ledger</span>
+                    </h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Immutable event sequence and cryptographic verification checkpoints
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-mono font-bold flex items-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" />
+                    SEAL INTACT
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-3 font-mono text-xs">
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">

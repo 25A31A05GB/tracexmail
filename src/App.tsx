@@ -1,55 +1,77 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
-import { LandingView } from './components/LandingView';
 import { DashboardView } from './components/DashboardView';
-import { CasesView } from './components/CasesView';
-import { CampaignsView } from './components/CampaignsView';
-import { SearchView } from './components/SearchView';
 import { OverviewView } from './components/OverviewView';
-import { ThreatTimelineView } from './components/ThreatTimelineView';
-import { RelationshipGraphView } from './components/RelationshipGraphView';
-import { HopTracerouteView } from './components/HopTracerouteView';
-import { MapView } from './components/MapView';
-import { ThreatLogView } from './components/ThreatLogView';
-import { RawHeaderView } from './components/RawHeaderView';
-import { AlertsView } from './components/AlertsView';
-import { IngestionPipelineView } from './components/IngestionPipelineView';
-import { GmailConnectionView } from './components/GmailConnectionView';
-import { OrganizationView } from './components/OrganizationView';
-import { TeamView } from './components/TeamView';
-import { AccountSettingsView } from './components/AccountSettingsView';
-import { ModeUpgradeModal } from './components/ModeUpgradeModal';
-import { NewAnalysisModal } from './components/NewAnalysisModal';
-import { ReportModal } from './components/ReportModal';
-import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
-import { ForensicWalkthroughModal } from './components/ForensicWalkthroughModal';
-import { InvestigationObjectiveModal, ObjectiveSelection } from './components/InvestigationObjectiveModal';
-import { CommandPaletteModal } from './components/CommandPaletteModal';
-import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { AlertToast } from './components/AlertToast';
-import { LoginView } from './components/LoginView';
-import { SignupView } from './components/SignupView';
-import { ForgotPasswordView } from './components/ForgotPasswordView';
-import { ResetPasswordView } from './components/ResetPasswordView';
-import { AcceptInviteView } from './components/AcceptInviteView';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { SAMPLE_ANALYSES } from './data/samples';
 import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
 import { PrivacyConfig, loadPrivacyConfig, savePrivacyConfig } from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
 import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
-import { OAuthConsentScreen } from './components/OAuthConsentScreen';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
+import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
+
+// Code-split heavy views & third-party bundles (D3, Leaflet, ReactFlow, jsPDF) via React.lazy()
+const LandingView = lazy(() => import('./components/LandingView').then(m => ({ default: m.LandingView })));
+const CasesView = lazy(() => import('./components/CasesView').then(m => ({ default: m.CasesView })));
+const CampaignsView = lazy(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })));
+const SearchView = lazy(() => import('./components/SearchView').then(m => ({ default: m.SearchView })));
+const ThreatTimelineView = lazy(() => import('./components/ThreatTimelineView').then(m => ({ default: m.ThreatTimelineView })));
+const RelationshipGraphView = lazy(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
+const HopTracerouteView = lazy(() => import('./components/HopTracerouteView').then(m => ({ default: m.HopTracerouteView })));
+const MapView = lazy(() => import('./components/MapView').then(m => ({ default: m.MapView })));
+const ThreatLogView = lazy(() => import('./components/ThreatLogView').then(m => ({ default: m.ThreatLogView })));
+const RawHeaderView = lazy(() => import('./components/RawHeaderView').then(m => ({ default: m.RawHeaderView })));
+const AlertsView = lazy(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })));
+const IngestionPipelineView = lazy(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })));
+const GmailConnectionView = lazy(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
+const OrganizationView = lazy(() => import('./components/OrganizationView').then(m => ({ default: m.OrganizationView })));
+const TeamView = lazy(() => import('./components/TeamView').then(m => ({ default: m.TeamView })));
+const AccountSettingsView = lazy(() => import('./components/AccountSettingsView').then(m => ({ default: m.AccountSettingsView })));
+
+// Code-split modals and non-critical dialogs
+const ModeUpgradeModal = lazy(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })));
+const NewAnalysisModal = lazy(() => import('./components/NewAnalysisModal').then(m => ({ default: m.NewAnalysisModal })));
+const ReportModal = lazy(() => import('./components/ReportModal').then(m => ({ default: m.ReportModal })));
+const PrivacyComplianceModal = lazy(() => import('./components/PrivacyComplianceModal').then(m => ({ default: m.PrivacyComplianceModal })));
+const ForensicWalkthroughModal = lazy(() => import('./components/ForensicWalkthroughModal').then(m => ({ default: m.ForensicWalkthroughModal })));
+const InvestigationObjectiveModal = lazy(() => import('./components/InvestigationObjectiveModal').then(m => ({ default: m.InvestigationObjectiveModal })));
+const CommandPaletteModal = lazy(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
+const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
+
+// Code-split authentication flows
+const LoginView = lazy(() => import('./components/LoginView').then(m => ({ default: m.LoginView })));
+const SignupView = lazy(() => import('./components/SignupView').then(m => ({ default: m.SignupView })));
+const ForgotPasswordView = lazy(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })));
+const ResetPasswordView = lazy(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })));
+const AcceptInviteView = lazy(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })));
+const OAuthConsentScreen = lazy(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })));
+
+function ViewSuspenseLoader() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0b0d12] text-[#8a8070] min-h-[350px]">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--stamp)]" />
+        <span className="text-xs font-mono uppercase tracking-widest text-[#b9af9c]">Loading forensic module...</span>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const publicPath = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
 
   if (publicPath === '/oauth/consent' || publicPath === '/oauth/authorize') {
-    return <OAuthConsentScreen />;
+    return (
+      <Suspense fallback={<ViewSuspenseLoader />}>
+        <OAuthConsentScreen />
+      </Suspense>
+    );
   }
 
   // Real Supabase Auth, RBAC, and Account Tiers hook
@@ -369,107 +391,100 @@ export default function App() {
 
   // If user is unauthenticated: First show our Intro Page, then click opens Login / Request Access, and once verified gives role-based access
   if (!session) {
-    if (authView === 'login') {
-      return (
-        <LoginView
-          onBackToIntro={() => setAuthView('intro')}
-          onRequestAccess={() => setAuthView('signup')}
-          onForgotPassword={() => setAuthView('forgot-password')}
-          onSelectRoleLogin={(selectedRole, options) => {
-            setActiveTab('ingest');
-            loginAsRole(selectedRole, options);
-          }}
-          onSuccess={() => {
-            setActiveTab('ingest');
-            setAuthView('intro');
-          }}
-        />
-      );
-    }
-    if (authView === 'signup') {
-      return (
-        <SignupView
-          onBackToLogin={() => setAuthView('login')}
-          onBackToIntro={() => setAuthView('intro')}
-          onSelectRoleLogin={(selectedRole, options) => {
-            setActiveTab('ingest');
-            loginAsRole(selectedRole, options);
-          }}
-          onSuccess={() => {
-            setActiveTab('ingest');
-            setAuthView('intro');
-          }}
-        />
-      );
-    }
-    if (authView === 'forgot-password') {
-      return (
-        <ForgotPasswordView
-          onBackToLogin={() => setAuthView('login')}
-          onBackToIntro={() => setAuthView('intro')}
-          onSuccess={() => {
-            setActiveTab('ingest');
-            setAuthView('intro');
-          }}
-        />
-      );
-    }
-    if (authView === 'reset-password') {
-      return (
-        <ResetPasswordView
-          onSuccess={() => {
-            setActiveTab('ingest');
-            setAuthView('intro');
-            window.location.hash = '';
-          }}
-          onBackToLogin={() => {
-            setAuthView('login');
-            window.location.hash = '';
-          }}
-        />
-      );
-    }
-    if (authView === 'accept-invite') {
-      return (
-        <AcceptInviteView
-          token={inviteToken || ''}
-          onSuccess={(userData) => {
-            if (userData.token && userData.user) {
-              loginAsRole(userData.user.role || 'analyst', {
-                token: userData.token,
-                userId: userData.user.id,
-                email: userData.user.email,
-                fullName: userData.user.fullName,
-                orgName: userData.user.orgName,
-                accountType: userData.user.accountType || 'organization',
-                isEmailVerified: true
-              });
-            }
-            setActiveTab('ingest');
-            setAuthView('intro');
-            window.location.hash = '';
-          }}
-          onBackToLogin={() => {
-            setAuthView('login');
-            window.location.hash = '';
-          }}
-        />
-      );
-    }
-    // Default intro page for visitors
     return (
-      <LandingView
-        onOpenConsole={() => setAuthView('login')}
-        onOpenTrace={() => {
-          setCurrentAnalysis(SAMPLE_ANALYSES[0]);
-          setAuthView('login');
-        }}
-        onRequestAccess={() => setAuthView('signup')}
-        onSelectCase={(sample) => {
-          setCurrentAnalysis(sample);
-          setAuthView('login');
-        }}
-      />
+      <Suspense fallback={<ViewSuspenseLoader />}>
+        {authView === 'login' && (
+          <LoginView
+            onBackToIntro={() => setAuthView('intro')}
+            onRequestAccess={() => setAuthView('signup')}
+            onForgotPassword={() => setAuthView('forgot-password')}
+            onSelectRoleLogin={(selectedRole, options) => {
+              setActiveTab('ingest');
+              loginAsRole(selectedRole, options);
+            }}
+            onSuccess={() => {
+              setActiveTab('ingest');
+              setAuthView('intro');
+            }}
+          />
+        )}
+        {authView === 'signup' && (
+          <SignupView
+            onBackToLogin={() => setAuthView('login')}
+            onBackToIntro={() => setAuthView('intro')}
+            onSelectRoleLogin={(selectedRole, options) => {
+              setActiveTab('ingest');
+              loginAsRole(selectedRole, options);
+            }}
+            onSuccess={() => {
+              setActiveTab('ingest');
+              setAuthView('intro');
+            }}
+          />
+        )}
+        {authView === 'forgot-password' && (
+          <ForgotPasswordView
+            onBackToLogin={() => setAuthView('login')}
+            onBackToIntro={() => setAuthView('intro')}
+            onSuccess={() => {
+              setActiveTab('ingest');
+              setAuthView('intro');
+            }}
+          />
+        )}
+        {authView === 'reset-password' && (
+          <ResetPasswordView
+            onSuccess={() => {
+              setActiveTab('ingest');
+              setAuthView('intro');
+              window.location.hash = '';
+            }}
+            onBackToLogin={() => {
+              setAuthView('login');
+              window.location.hash = '';
+            }}
+          />
+        )}
+        {authView === 'accept-invite' && (
+          <AcceptInviteView
+            token={inviteToken || ''}
+            onSuccess={(userData) => {
+              if (userData.token && userData.user) {
+                loginAsRole(userData.user.role || 'analyst', {
+                  token: userData.token,
+                  userId: userData.user.id,
+                  email: userData.user.email,
+                  fullName: userData.user.fullName,
+                  orgName: userData.user.orgName,
+                  accountType: userData.user.accountType || 'organization',
+                  isEmailVerified: true
+                });
+              }
+              setActiveTab('ingest');
+              setAuthView('intro');
+              window.location.hash = '';
+            }}
+            onBackToLogin={() => {
+              setAuthView('login');
+              window.location.hash = '';
+            }}
+          />
+        )}
+        {authView === 'intro' && (
+          <LandingView
+            onOpenConsole={() => setAuthView('login')}
+            onOpenTrace={() => {
+              setCurrentAnalysis(SAMPLE_ANALYSES[0]);
+              setAuthView('login');
+            }}
+            onRequestAccess={() => setAuthView('signup')}
+            onSelectCase={(sample) => {
+              setCurrentAnalysis(sample);
+              setAuthView('login');
+            }}
+          />
+        )}
+      </Suspense>
     );
   }
 
@@ -650,7 +665,7 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <>
+            <Suspense fallback={<ViewSuspenseLoader />}>
               {effectiveTab === 'dashboard' && (
                 <DashboardView
                   onSelectAnalysis={setCurrentAnalysis}
@@ -784,142 +799,144 @@ export default function App() {
                   onNavigateTab={setActiveTab}
                 />
               )}
-            </>
+            </Suspense>
           )}
         </div>
       </main>
 
-      {/* Mode Upgrade Modal (Individual -> Organization) */}
-      {isUpgradeModalOpen && (
-        <ModeUpgradeModal
-          isOpen={isUpgradeModalOpen}
-          onClose={() => setIsUpgradeModalOpen(false)}
-          onUpgrade={async (newOrgName) => {
-            if (upgradeToOrganization) {
-              await upgradeToOrganization(newOrgName);
-            }
+      <Suspense fallback={null}>
+        {/* Mode Upgrade Modal (Individual -> Organization) */}
+        {isUpgradeModalOpen && (
+          <ModeUpgradeModal
+            isOpen={isUpgradeModalOpen}
+            onClose={() => setIsUpgradeModalOpen(false)}
+            onUpgrade={async (newOrgName) => {
+              if (upgradeToOrganization) {
+                await upgradeToOrganization(newOrgName);
+              }
+            }}
+            featureName={upgradeTargetFeature}
+          />
+        )}
+
+        {/* Modal for Raw Email Analysis & Ingestion */}
+        {isNewModalOpen && (
+          <NewAnalysisModal
+            isOpen={isNewModalOpen}
+            onClose={() => setIsNewModalOpen(false)}
+            onAnalysisCreated={handleAnalysisCreated}
+          />
+        )}
+
+        {/* Forensic Report Modal */}
+        {isReportModalOpen && (
+          <ReportModal
+            isOpen={isReportModalOpen}
+            onClose={() => setIsReportModalOpen(false)}
+            analysis={currentAnalysis}
+            privacyConfig={privacyConfig}
+          />
+        )}
+
+        {/* Privacy, Legal & Compliance Safeguards Modal */}
+        {isPrivacyModalOpen && (
+          <PrivacyComplianceModal
+            isOpen={isPrivacyModalOpen}
+            onClose={() => setIsPrivacyModalOpen(false)}
+            config={privacyConfig}
+            onChangeConfig={handleUpdatePrivacyConfig}
+            currentDate={currentAnalysis?.date}
+          />
+        )}
+
+        {/* Interactive Workspace Objective Setup Questionnaire */}
+        {isObjectiveModalOpen && (
+          <InvestigationObjectiveModal
+            isOpen={isObjectiveModalOpen}
+            onClose={() => setIsObjectiveModalOpen(false)}
+            onApplyObjective={handleApplyObjective}
+            currentRole={role}
+          />
+        )}
+
+        {/* Interactive Get Started Forensic Walkthrough Overlay */}
+        {isWalkthroughOpen && (
+          <ForensicWalkthroughModal
+            isOpen={isWalkthroughOpen}
+            onClose={() => setIsWalkthroughOpen(false)}
+            onNavigateToTab={(tab) => {
+              setActiveTab(tab);
+              setIsWalkthroughOpen(false);
+            }}
+            onOpenNewModal={() => {
+              setIsNewModalOpen(true);
+              setIsWalkthroughOpen(false);
+            }}
+            onOpenReportModal={() => {
+              setIsReportModalOpen(true);
+              setIsWalkthroughOpen(false);
+            }}
+            onOpenPrivacyModal={() => {
+              setIsPrivacyModalOpen(true);
+              setIsWalkthroughOpen(false);
+            }}
+            onSelectAnalysis={(analysis) => {
+              setCurrentAnalysis(analysis);
+            }}
+          />
+        )}
+
+        {/* Global Command Palette / Spotlight Search (Cmd+K / Ctrl+K) */}
+        <CommandPaletteModal
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            setIsCommandPaletteOpen(false);
           }}
-          featureName={upgradeTargetFeature}
+          onNewAnalysis={() => {
+            setIsCommandPaletteOpen(false);
+            setIsNewModalOpen(true);
+          }}
+          onOpenReport={() => {
+            setIsCommandPaletteOpen(false);
+            setIsReportModalOpen(true);
+          }}
+          onOpenPrivacyModal={() => {
+            setIsCommandPaletteOpen(false);
+            setIsPrivacyModalOpen(true);
+          }}
+          onOpenWalkthrough={() => {
+            setIsCommandPaletteOpen(false);
+            setIsObjectiveModalOpen(true);
+          }}
+          onToggleViewMode={() => handleToggleViewMode(viewMode === 'simple' ? 'analyst' : 'simple')}
+          onToggleDemoCases={handleToggleDemoCases}
+          onOpenShortcutsHelp={() => {
+            setIsCommandPaletteOpen(false);
+            setIsShortcutsHelpOpen(true);
+          }}
+          onSelectAnalysis={(analysis) => {
+            setCurrentAnalysis(analysis);
+            setActiveTab('overview');
+          }}
+          currentAnalysis={currentAnalysis}
+          viewMode={viewMode}
+          showDemoCases={showDemoCases}
         />
-      )}
+
+        {/* Keyboard Shortcuts Reference Modal (Cmd+/ or ?) */}
+        <KeyboardShortcutsModal
+          isOpen={isShortcutsHelpOpen}
+          onClose={() => setIsShortcutsHelpOpen(false)}
+        />
+      </Suspense>
 
       {/* Real-time WebSocket Alert Toast */}
       <AlertToast
         alert={activeToast}
         onDismiss={dismissToast}
         onInspect={handleToastInspect}
-      />
-
-      {/* Modal for Raw Email Analysis & Ingestion */}
-      {isNewModalOpen && (
-        <NewAnalysisModal
-          isOpen={isNewModalOpen}
-          onClose={() => setIsNewModalOpen(false)}
-          onAnalysisCreated={handleAnalysisCreated}
-        />
-      )}
-
-      {/* Forensic Report Modal */}
-      {isReportModalOpen && (
-        <ReportModal
-          isOpen={isReportModalOpen}
-          onClose={() => setIsReportModalOpen(false)}
-          analysis={currentAnalysis}
-          privacyConfig={privacyConfig}
-        />
-      )}
-
-      {/* Privacy, Legal & Compliance Safeguards Modal */}
-      {isPrivacyModalOpen && (
-        <PrivacyComplianceModal
-          isOpen={isPrivacyModalOpen}
-          onClose={() => setIsPrivacyModalOpen(false)}
-          config={privacyConfig}
-          onChangeConfig={handleUpdatePrivacyConfig}
-          currentDate={currentAnalysis?.date}
-        />
-      )}
-
-      {/* Interactive Workspace Objective Setup Questionnaire */}
-      {isObjectiveModalOpen && (
-        <InvestigationObjectiveModal
-          isOpen={isObjectiveModalOpen}
-          onClose={() => setIsObjectiveModalOpen(false)}
-          onApplyObjective={handleApplyObjective}
-          currentRole={role}
-        />
-      )}
-
-      {/* Interactive Get Started Forensic Walkthrough Overlay */}
-      {isWalkthroughOpen && (
-        <ForensicWalkthroughModal
-          isOpen={isWalkthroughOpen}
-          onClose={() => setIsWalkthroughOpen(false)}
-          onNavigateToTab={(tab) => {
-            setActiveTab(tab);
-            setIsWalkthroughOpen(false);
-          }}
-          onOpenNewModal={() => {
-            setIsNewModalOpen(true);
-            setIsWalkthroughOpen(false);
-          }}
-          onOpenReportModal={() => {
-            setIsReportModalOpen(true);
-            setIsWalkthroughOpen(false);
-          }}
-          onOpenPrivacyModal={() => {
-            setIsPrivacyModalOpen(true);
-            setIsWalkthroughOpen(false);
-          }}
-          onSelectAnalysis={(analysis) => {
-            setCurrentAnalysis(analysis);
-          }}
-        />
-      )}
-
-      {/* Global Command Palette / Spotlight Search (Cmd+K / Ctrl+K) */}
-      <CommandPaletteModal
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onSelectTab={(tab) => {
-          setActiveTab(tab);
-          setIsCommandPaletteOpen(false);
-        }}
-        onNewAnalysis={() => {
-          setIsCommandPaletteOpen(false);
-          setIsNewModalOpen(true);
-        }}
-        onOpenReport={() => {
-          setIsCommandPaletteOpen(false);
-          setIsReportModalOpen(true);
-        }}
-        onOpenPrivacyModal={() => {
-          setIsCommandPaletteOpen(false);
-          setIsPrivacyModalOpen(true);
-        }}
-        onOpenWalkthrough={() => {
-          setIsCommandPaletteOpen(false);
-          setIsObjectiveModalOpen(true);
-        }}
-        onToggleViewMode={() => handleToggleViewMode(viewMode === 'simple' ? 'analyst' : 'simple')}
-        onToggleDemoCases={handleToggleDemoCases}
-        onOpenShortcutsHelp={() => {
-          setIsCommandPaletteOpen(false);
-          setIsShortcutsHelpOpen(true);
-        }}
-        onSelectAnalysis={(analysis) => {
-          setCurrentAnalysis(analysis);
-          setActiveTab('overview');
-        }}
-        currentAnalysis={currentAnalysis}
-        viewMode={viewMode}
-        showDemoCases={showDemoCases}
-      />
-
-      {/* Keyboard Shortcuts Reference Modal (Cmd+/ or ?) */}
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsHelpOpen}
-        onClose={() => setIsShortcutsHelpOpen(false)}
       />
     </div>
   );

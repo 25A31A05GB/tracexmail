@@ -10,6 +10,17 @@ export default defineConfig({
   ],
   build: {
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-pdf': ['jspdf', 'html2canvas'],
+          'vendor-leaflet': ['leaflet', 'react-leaflet'],
+          'vendor-flow': ['@xyflow/react'],
+          'vendor-charts': ['recharts'],
+          'vendor-supabase': ['@supabase/supabase-js']
+        }
+      }
+    }
   },
   server: {
     host: '0.0.0.0',

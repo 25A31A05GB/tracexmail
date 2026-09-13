@@ -177,14 +177,26 @@ async function callGeminiForensics(text: string, metadata?: { from?: string; sub
 
   const prompt = `${FORENSIC_SYSTEM_PROMPT}\n\n${metaContext}Email Content to Analyze:\n${text.slice(0, 6000)}`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.8-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      temperature: 0.1
-    }
-  });
+  let response;
+  try {
+    response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
+      }
+    });
+  } catch {
+    response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.1
+      }
+    });
+  }
 
   const raw = response.text || (response.candidates?.[0]?.content?.parts?.[0] as any)?.text;
   if (!raw) throw new Error('Empty response from Gemini');
