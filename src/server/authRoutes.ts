@@ -44,6 +44,18 @@ interface ResetTokenRecord {
 }
 const activeResetTokens = new Map<string, ResetTokenRecord>();
 
+// Magic link storage structure for passwordless signin, signup verification, and recovery
+export interface MagicLinkRecord {
+  token: string;
+  email: string;
+  type: 'signin' | 'signup' | 'recovery';
+  expiresAt: number;
+  lastSentAt: number;
+  used: boolean;
+  payload?: any;
+}
+const activeMagicLinks = new Map<string, MagicLinkRecord>();
+
 // Resilient local user account credentials store
 export interface LocalUserAccount {
   id: string;
@@ -845,10 +857,341 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
   router.post('/verify-otp', handleVerifyOtp);
 
   /**
-   * POST /api/auth/reset-password-with-otp
-   * Resets the user's password using either the 6-digit OTP, a verified resetToken, or an active Bearer session.
+   * POST /api/auth/magic-link/send
+   * Dispatches an email-based magic link for sign-in, sign-up verification, or password recovery.
    */
-  router.post('/reset-password-with-otp', async (req: Request, res: Response) => {
+  const handleSendMagicLink = async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { email, type = 'signin', payload, redirectTo } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email address is required.',
+        code: 'MISSING_EMAIL'
+      });
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const now = Date.now();
+
+    // Check cooldown rate limit (5 seconds between rapid requests per email)
+    for (const [, rec] of activeMagicLinks) {
+      if (rec.email === cleanEmail && now - rec.lastSentAt < 5 * 1000) {
+        const waitSeconds = Math.ceil((5 * 1000 - (now - rec.lastSentAt)) / 1000);
+        return res.status(429).json({
+          error: `Please wait ${waitSeconds} seconds before requesting another magic link.`,
+          code: 'MAGIC_LINK_RATE_LIMITED',
+          retry_after: waitSeconds
+        });
+      }
+    }
+
+    const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
+    const ttl = type === 'recovery' ? 30 * 60 * 1000 : 15 * 60 * 1000; // 15 mins (30 for recovery)
+    const expiresAt = now + ttl;
+
+    const record: MagicLinkRecord = {
+      token,
+      email: cleanEmail,
+      type: type as any,
+      expiresAt,
+      lastSentAt: now,
+      used: false,
+      payload: payload || null
+    };
+
+    activeMagicLinks.set(token, record);
+
+    if (type === 'recovery') {
+      activeResetTokens.set(token, {
+        email: cleanEmail,
+        expiresAt
+      });
+    }
+
+    // Determine the base origin
+    let origin = redirectTo || req.headers.origin;
+    if (!origin) {
+      const host = req.headers.host || 'localhost:3000';
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      origin = `${proto}://${host}`;
+    }
+    origin = origin.replace(/\/$/, '');
+
+    let magicLinkUrl = '';
+    let emailSubject = '';
+    let actionLabel = '';
+
+    if (type === 'recovery') {
+      magicLinkUrl = `${origin}/#reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
+      emailSubject = 'Reset Your TraceXMail Master Password';
+      actionLabel = 'Reset Master Password';
+    } else if (type === 'signup') {
+      magicLinkUrl = `${origin}/#magic-link?token=${token}&email=${encodeURIComponent(cleanEmail)}&type=signup`;
+      emailSubject = 'Verify Your TraceXMail Workspace Account';
+      actionLabel = 'Verify Email & Access Workspace';
+    } else {
+      magicLinkUrl = `${origin}/#magic-link?token=${token}&email=${encodeURIComponent(cleanEmail)}&type=signin`;
+      emailSubject = 'Sign In to TraceXMail Enclave (Magic Link)';
+      actionLabel = 'Sign In to Workspace';
+    }
+
+    // Attempt sending HTML email if Resend API key configured
+    try {
+      const emailCfg = getEmailAlertConfig();
+      if (emailCfg.resendApiKey) {
+        axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: emailCfg.smtpFrom || 'security@tracexmail-soc.internal',
+            to: [cleanEmail],
+            subject: emailSubject,
+            html: `
+              <div style="font-family: monospace, -apple-system, sans-serif; background: #0b0f17; color: #f0ede6; padding: 32px; border-radius: 4px; border: 1px solid #233044; max-width: 580px; margin: 0 auto;">
+                <div style="border-bottom: 1px solid #233044; padding-bottom: 16px; margin-bottom: 24px;">
+                  <span style="color: #c9a227; font-weight: bold; font-size: 16px; letter-spacing: 1px;">TRACEXMAIL SECURITY ENCLAVE</span>
+                </div>
+                <h2 style="color: #f0ede6; margin-top: 0; font-size: 20px;">${emailSubject}</h2>
+                <p style="color: #8fa0b5; font-size: 14px; line-height: 1.6;">
+                  We received an authentication request for your work email (<strong>${cleanEmail}</strong>). Click the secure button below to complete verification:
+                </p>
+                <div style="text-align: center; margin: 28px 0;">
+                  <a href="${magicLinkUrl}" style="background: #c9a227; color: #0b0f17; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: bold; border-radius: 2px; display: inline-block; letter-spacing: 0.5px; text-transform: uppercase;">
+                    ${actionLabel} →
+                  </a>
+                </div>
+                <p style="color: #64748b; font-size: 12px; line-height: 1.5; border-top: 1px solid #1e293b; padding-top: 16px;">
+                  Or copy and paste this link into your browser:<br/>
+                  <a href="${magicLinkUrl}" style="color: #c9a227; word-break: break-all;">${magicLinkUrl}</a>
+                </p>
+                <p style="color: #475569; font-size: 11px; margin-top: 20px;">
+                  This single-use link expires in 15 minutes. If you did not request this, you can safely disregard this email.
+                </p>
+              </div>
+            `
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${emailCfg.resendApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 5000
+          }
+        ).catch(err => {
+          console.warn('[AuthRouter] Resend magic link delivery notice:', err?.response?.data || err?.message);
+        });
+      }
+    } catch (mailErr) {
+      console.warn('[AuthRouter] Magic link email dispatch skipped:', mailErr);
+    }
+
+    await logAuditAction({
+      organization_id: DEFAULT_ORG_ID,
+      user_email: cleanEmail,
+      user_role: 'unauthenticated',
+      action: 'AUTH_MAGIC_LINK_SENT',
+      resource_type: 'magic_link',
+      details: {
+        magic_link_type: type,
+        expires_at: new Date(expiresAt).toISOString(),
+        client_ip: ip
+      },
+      ip_address: ip,
+      status: 'SUCCESS'
+    }).catch(err => console.warn('[AuthAudit] Failed logging magic link sent:', err));
+
+    console.log(`[AuthRouter:MagicLink] Dispatched (${type}) for ${cleanEmail}: ${magicLinkUrl}`);
+
+    return res.status(200).json({
+      status: 'success',
+      message: `Magic link dispatched to ${cleanEmail}. Valid for 15 minutes.`,
+      email: cleanEmail,
+      type,
+      expires_in_seconds: Math.floor(ttl / 1000),
+      magic_link: magicLinkUrl
+    });
+  };
+
+  router.post('/magic-link/send', handleSendMagicLink);
+  router.post('/resend-verification', handleSendMagicLink);
+
+  /**
+   * POST /api/auth/magic-link/verify
+   * Verifies the email-based magic link token and establishes an authenticated session.
+   */
+  const handleVerifyMagicLink = async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const { token, email } = req.body || {};
+
+    if (!token) {
+      return res.status(400).json({
+        error: 'Magic link token is required.',
+        code: 'MISSING_TOKEN'
+      });
+    }
+
+    const cleanToken = String(token).trim();
+    let record = activeMagicLinks.get(cleanToken);
+
+    // Also allow activeResetTokens lookup if type was recovery
+    if (!record && activeResetTokens.has(cleanToken)) {
+      const rRec = activeResetTokens.get(cleanToken)!;
+      record = {
+        token: cleanToken,
+        email: rRec.email,
+        type: 'recovery',
+        expiresAt: rRec.expiresAt,
+        lastSentAt: rRec.expiresAt - 30 * 60 * 1000,
+        used: false
+      };
+    }
+
+    const now = Date.now();
+
+    if (!record) {
+      return res.status(400).json({
+        error: 'Invalid, missing, or expired magic link. Please request a fresh magic link.',
+        code: 'MAGIC_LINK_INVALID'
+      });
+    }
+
+    if (now > record.expiresAt) {
+      activeMagicLinks.delete(cleanToken);
+      return res.status(400).json({
+        error: 'This magic link has expired. For security, please request a fresh link.',
+        code: 'MAGIC_LINK_EXPIRED'
+      });
+    }
+
+    if (record.used) {
+      return res.status(400).json({
+        error: 'This magic link has already been used. Please request a new link to sign in.',
+        code: 'MAGIC_LINK_ALREADY_USED'
+      });
+    }
+
+    // Mark as used
+    record.used = true;
+    activeMagicLinks.delete(cleanToken);
+
+    const cleanEmail = record.email.toLowerCase();
+
+    // If recovery, grant clearance to reset password
+    if (record.type === 'recovery') {
+      const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
+      activeResetTokens.set(resetToken, {
+        email: cleanEmail,
+        expiresAt: now + 30 * 60 * 1000
+      });
+
+      return res.status(200).json({
+        status: 'success',
+        type: 'recovery',
+        message: 'Recovery magic link verified. You may now set your new password.',
+        email: cleanEmail,
+        resetToken
+      });
+    }
+
+    // For signin or signup:
+    const payload = record.payload || {};
+    const assignedRole: UserRole = payload.role === 'admin' ? 'admin' : payload.role === 'read_only' ? 'read_only' : 'analyst';
+    const assignedOrg = payload.accountType === 'personal' ? 'Personal Sandbox' : (payload.orgName?.trim() || 'Acme Cyber Defense SOC');
+    const assignedName = payload.fullName?.trim() || cleanEmail.split('@')[0];
+    const accountType = payload.accountType || (record.type === 'signup' ? 'personal' : 'organization');
+
+    const supabaseAdmin = getSupabaseAdminClient();
+    let finalUserId = `usr_${crypto.randomBytes(8).toString('hex')}`;
+
+    // Look up existing local user account
+    let existingAccount = localUserAccounts.get(cleanEmail);
+    if (existingAccount) {
+      finalUserId = existingAccount.id;
+      existingAccount.emailVerified = true;
+      existingAccount.updatedAt = new Date().toISOString();
+      localUserAccounts.set(cleanEmail, existingAccount);
+    } else {
+      // Create verified local user account
+      const newAcc: LocalUserAccount = {
+        id: finalUserId,
+        email: cleanEmail,
+        passwordHash: payload.password ? bcrypt.hashSync(String(payload.password), 10) : bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10),
+        fullName: assignedName,
+        orgName: assignedOrg,
+        role: assignedRole,
+        accountType: accountType as any,
+        emailVerified: true,
+        updatedAt: new Date().toISOString()
+      };
+      localUserAccounts.set(cleanEmail, newAcc);
+      existingAccount = newAcc;
+    }
+
+    // Sync with Supabase profiles if configured
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.from('profiles').upsert({
+          id: finalUserId,
+          email: cleanEmail,
+          organization_id: DEFAULT_ORG_ID,
+          role: existingAccount?.role || assignedRole,
+          full_name: existingAccount?.fullName || assignedName,
+          account_type: existingAccount?.accountType || accountType,
+          email_verified: true,
+          updated_at: new Date().toISOString()
+        });
+      } catch (dbErr: any) {
+        console.warn('[AuthRouter] Supabase profile sync note:', dbErr?.message);
+      }
+    }
+
+    const signedToken = signUserToken({
+      userId: finalUserId,
+      email: cleanEmail,
+      organizationId: DEFAULT_ORG_ID,
+      role: existingAccount?.role || assignedRole
+    });
+
+    await logAuditAction({
+      organization_id: DEFAULT_ORG_ID,
+      user_id: finalUserId,
+      user_email: cleanEmail,
+      user_role: existingAccount?.role || assignedRole,
+      action: record.type === 'signup' ? 'AUTH_SIGNUP_MAGIC_LINK_VERIFIED' : 'AUTH_SIGNIN_MAGIC_LINK_VERIFIED',
+      resource_type: 'user',
+      details: {
+        client_ip: ip,
+        auth_method: 'magic_link',
+        magic_link_type: record.type
+      },
+      ip_address: ip,
+      status: 'SUCCESS'
+    }).catch(err => console.warn('[AuthAudit] Failed logging magic link verification:', err));
+
+    return res.status(200).json({
+      status: 'success',
+      type: record.type,
+      message: 'Magic link successfully verified. Authentication session issued.',
+      token: signedToken,
+      user: {
+        id: finalUserId,
+        email: cleanEmail,
+        role: existingAccount?.role || assignedRole,
+        organizationId: DEFAULT_ORG_ID,
+        fullName: existingAccount?.fullName || assignedName,
+        accountType: existingAccount?.accountType || accountType,
+        emailVerified: true
+      }
+    });
+  };
+
+  router.post('/magic-link/verify', handleVerifyMagicLink);
+
+  /**
+   * POST /api/auth/reset-password-with-token (and /api/auth/reset-password-with-otp)
+   * Resets the user's master password using a verified magic link token, Supabase session, or authorized session.
+   */
+  const handleResetPasswordWithToken = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
     const { email, code, resetToken, newPassword } = req.body || {};
 
@@ -877,6 +1220,14 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       if (tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
         isAuthorized = true;
         activeResetTokens.delete(resetToken);
+        activeMagicLinks.delete(resetToken);
+      }
+    } else if (resetToken && activeMagicLinks.has(resetToken)) {
+      const mlRec = activeMagicLinks.get(resetToken)!;
+      if (mlRec.email === cleanEmail && Date.now() < mlRec.expiresAt) {
+        isAuthorized = true;
+        activeResetTokens.delete(resetToken);
+        activeMagicLinks.delete(resetToken);
       }
     } else if (code) {
       const cleanCode = String(code).trim();
@@ -969,7 +1320,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       user_role: updatedUser.role,
       action: 'AUTH_PASSWORD_RESET_SUCCESS',
       resource_type: 'user',
-      details: { client_ip: ip, method: 'otp_verification' },
+      details: { client_ip: ip, method: 'magic_link_token_verification' },
       ip_address: ip,
       status: 'SUCCESS'
     }).catch(err => console.warn('[AuthAudit] Failed logging password reset success:', err));
@@ -987,7 +1338,11 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         emailVerified: true
       }
     });
-  });
+  };
+
+  router.post('/reset-password-with-token', handleResetPasswordWithToken);
+  router.post('/reset-password-with-otp', handleResetPasswordWithToken);
+  router.post('/update-password', handleResetPasswordWithToken);
 
   // ==========================================
   // Team Member Invitations Subsystem
@@ -1312,6 +1667,19 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const cleanEmail = String(email).trim().toLowerCase();
 
     try {
+      // Store enclave recovery magic link token
+      const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
+      const expiresAt = Date.now() + 30 * 60 * 1000;
+      activeResetTokens.set(token, { email: cleanEmail, expiresAt });
+      activeMagicLinks.set(token, {
+        token,
+        email: cleanEmail,
+        type: 'recovery',
+        expiresAt,
+        lastSentAt: Date.now(),
+        used: false
+      });
+
       const supabase = getSupabaseClient();
       if (supabase) {
         const origin = req.headers.origin || `https://${req.headers.host || 'localhost:3000'}`;

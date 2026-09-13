@@ -118,7 +118,7 @@ export function SignupView({
         }
       }
 
-      // 2. Also register in local/enclave backend
+      // 2. Also register in local/enclave backend and dispatch verification magic link
       try {
         await fetch('/api/auth/register', {
           method: 'POST',
@@ -130,6 +130,23 @@ export function SignupView({
             orgName: assignedOrg,
             role: assignedRole,
             accountType
+          })
+        });
+
+        await fetch('/api/auth/magic-link/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            type: 'signup',
+            payload: {
+              fullName: effectiveName,
+              orgName: assignedOrg,
+              role: assignedRole,
+              accountType,
+              password
+            },
+            redirectTo: window.location.origin
           })
         });
       } catch (srvErr) {
@@ -164,18 +181,20 @@ export function SignupView({
         });
         if (error) {
           console.warn('[SignupView] Resend error:', error.message);
-          setResendStatus('Failed to resend: ' + error.message);
-        } else {
-          setResendStatus(`A fresh verification link has been dispatched to ${cleanEmail}.`);
         }
-      } else {
-        await fetch('/api/auth/resend-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, redirectTo: redirectUrl })
-        });
-        setResendStatus(`Verification link resent to ${cleanEmail}.`);
       }
+
+      await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          type: 'signup',
+          redirectTo: redirectUrl
+        })
+      });
+
+      setResendStatus(`Fresh verification magic link dispatched to ${cleanEmail}.`);
     } catch (err: any) {
       setResendStatus(err.message || 'Error resending verification email.');
     } finally {

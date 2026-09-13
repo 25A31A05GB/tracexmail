@@ -49,6 +49,7 @@ const SignupView = lazy(() => import('./components/SignupView').then(m => ({ def
 const ForgotPasswordView = lazy(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })));
 const ResetPasswordView = lazy(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })));
 const AcceptInviteView = lazy(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })));
+const MagicLinkVerifyView = lazy(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })));
 const OAuthConsentScreen = lazy(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })));
 
 function ViewSuspenseLoader() {
@@ -91,10 +92,10 @@ export default function App() {
     switchAccountType 
   } = useSession();
 
-  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'accept-invite'>('intro');
+  const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'accept-invite' | 'magic-link'>('intro');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
-  // Auto-detect invitation tokens, password resets, or recovery tokens in URL
+  // Auto-detect invitation tokens, password resets, magic links, or recovery tokens in URL
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash || '';
@@ -107,6 +108,13 @@ export default function App() {
           setAuthView('accept-invite');
         }
       } else if (
+        hash.startsWith('#magic-link') ||
+        hash.includes('magic_token') ||
+        search.includes('magic_token') ||
+        (search.includes('token=mlk_') && !hash.startsWith('#reset-password'))
+      ) {
+        setAuthView('magic-link');
+      } else if (
         hash.includes('type=recovery') || 
         hash.startsWith('#reset-password') || 
         search.includes('type=recovery')
@@ -114,6 +122,10 @@ export default function App() {
         setAuthView('reset-password');
       } else if (hash.startsWith('#forgot-password')) {
         setAuthView('forgot-password');
+      } else if (hash.startsWith('#login')) {
+        setAuthView('login');
+      } else if (hash.startsWith('#signup')) {
+        setAuthView('signup');
       }
     };
 
@@ -474,6 +486,33 @@ export default function App() {
             }}
             onBackToLogin={() => {
               setAuthView('login');
+              window.location.hash = '';
+            }}
+          />
+        )}
+        {authView === 'magic-link' && (
+          <MagicLinkVerifyView
+            onBackToLogin={() => {
+              setAuthView('login');
+              window.location.hash = '';
+            }}
+            onBackToIntro={() => {
+              setAuthView('intro');
+              window.location.hash = '';
+            }}
+            onRequestNewLink={() => {
+              setAuthView('login');
+              window.location.hash = '';
+            }}
+            onSelectRoleLogin={(selectedRole, options) => {
+              setActiveTab('ingest');
+              loginAsRole(selectedRole, options);
+              setAuthView('intro');
+              window.location.hash = '';
+            }}
+            onSuccess={() => {
+              setActiveTab('ingest');
+              setAuthView('intro');
               window.location.hash = '';
             }}
           />

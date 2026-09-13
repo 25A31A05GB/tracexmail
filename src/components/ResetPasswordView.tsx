@@ -234,7 +234,7 @@ export function ResetPasswordView({
 
       // 2. Synchronize password with server endpoint
       const activeToken = currentResetToken || manualTokenInput.trim() || undefined;
-      const res = await fetch('/api/auth/reset-password-with-otp', {
+      const res = await fetch('/api/auth/reset-password-with-token', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

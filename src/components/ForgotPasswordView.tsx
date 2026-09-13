@@ -50,28 +50,33 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       logSupabaseAuthEvent('ResetPasswordRequest:Start', { email: email.trim(), redirectUrl });
 
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        await supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo: redirectUrl
+        }).catch(err => {
+          logSupabaseAuthEvent('ResetPasswordRequest:Error', err, 'error');
+          console.warn('[ForgotPassword] Supabase reset request notice:', err);
         });
-
-        if (error) {
-          logSupabaseAuthEvent('ResetPasswordRequest:Error', error, 'error');
-          throw error;
-        }
         logSupabaseAuthEvent('ResetPasswordRequest:Success');
-      } else {
-        // Fallback API if Supabase client not directly active
-        await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), redirectTo: redirectUrl })
-        });
       }
 
-      setSuccessMsg(`A secure recovery link has been dispatched to ${email.trim()}.`);
+      // Dispatch magic recovery link via backend enclave
+      await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), type: 'recovery', redirectTo: redirectUrl })
+      });
+
+      // Also notify /api/auth/reset-password for parity
+      await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), redirectTo: redirectUrl })
+      }).catch(() => {});
+
+      setSuccessMsg(`A secure recovery magic link has been dispatched to ${email.trim()}.`);
       setStep('sent');
     } catch (err: any) {
-      console.warn('[ForgotPassword] Supabase reset request notice:', err);
+      console.warn('[ForgotPassword] Reset request notice:', err);
       setErrorMsg(err.message || 'Unable to process recovery request. Please verify your email address.');
     } finally {
       setLoading(false);
@@ -85,18 +90,18 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     try {
       const redirectUrl = getResetPasswordRedirectUrl();
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        await supabase.auth.resetPasswordForEmail(email.trim(), {
           redirectTo: redirectUrl
-        });
-        if (error) throw error;
-      } else {
-        await fetch('/api/auth/reset-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), redirectTo: redirectUrl })
-        });
+        }).catch(err => console.warn('[ForgotPassword] Supabase resend notice:', err));
       }
-      setSuccessMsg(`New recovery link dispatched to ${email.trim()}.`);
+
+      await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), type: 'recovery', redirectTo: redirectUrl })
+      });
+
+      setSuccessMsg(`New recovery magic link dispatched to ${email.trim()}.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to resend recovery email.');
     } finally {

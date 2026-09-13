@@ -29,6 +29,7 @@ export function LoginView({
   onSuccess,
   onSelectRoleLogin 
 }: LoginViewProps) {
+  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,8 +37,93 @@ export function LoginView({
   const [verificationPending, setVerificationPending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleBack = onBackToIntro || onBackToGate;
+
+  const handleSendMagicLink = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+      setErrorMsg('Please enter a valid work email address.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg(null);
+    setResendStatus(null);
+
+    try {
+      // 1. Supabase native OTP/Magic Link
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            emailRedirectTo: `${window.location.origin}/#magic-link`,
+            shouldCreateUser: false
+          }
+        }).catch(err => console.warn('[LoginView] Supabase magic link notice:', err?.message));
+      }
+
+      // 2. Server-side magic link dispatch
+      const res = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          type: 'signin',
+          redirectTo: window.location.origin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to dispatch magic link.');
+      }
+
+      setMagicLinkSent(true);
+    } catch (err: any) {
+      console.error('[LoginView] Magic link error:', err);
+      setErrorMsg(err.message || 'Error sending magic link. Please check your email address.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendMagicLink = async () => {
+    if (!email) return;
+    setResending(true);
+    setResendStatus(null);
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signInWithOtp({
+          email: email.trim(),
+          options: {
+            emailRedirectTo: `${window.location.origin}/#magic-link`,
+            shouldCreateUser: false
+          }
+        }).catch(err => console.warn('[LoginView] Supabase resend notice:', err?.message));
+      }
+
+      const res = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          type: 'signin',
+          redirectTo: window.location.origin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to resend magic link.');
+
+      setResendStatus(`Fresh magic link dispatched to ${email.trim()}.`);
+    } catch (err: any) {
+      setResendStatus(err.message || 'Error resending magic link.');
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleResendVerification = async () => {
     if (!email) return;
@@ -259,61 +345,195 @@ export function LoginView({
           <div className="flex-1 h-px bg-[var(--line)]" />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          <div>
-            <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
-              Work Email
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="analyst@enterprise.corp"
-              className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
-            />
-          </div>
+        {/* Mode Selector Tabs */}
+        <div className="grid grid-cols-2 gap-1 p-1 bg-[var(--ink)] border border-[var(--line)] rounded-sm mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode('password');
+              setMagicLinkSent(false);
+              setErrorMsg(null);
+            }}
+            className={`py-1.5 px-3 text-xs font-mono font-medium rounded-sm transition-all cursor-pointer border-0 ${
+              authMode === 'password'
+                ? 'bg-[var(--ink-2)] text-[var(--paper)] shadow-sm'
+                : 'text-[var(--paper-dim)] hover:text-[var(--paper)] bg-transparent'
+            }`}
+          >
+            Password
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode('magic-link');
+              setErrorMsg(null);
+            }}
+            className={`py-1.5 px-3 text-xs font-mono font-medium rounded-sm transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
+              authMode === 'magic-link'
+                ? 'bg-[var(--ink-2)] text-[var(--stamp)] shadow-sm'
+                : 'text-[var(--paper-dim)] hover:text-[var(--paper)] bg-transparent'
+            }`}
+          >
+            <MailCheck className="w-3.5 h-3.5" />
+            <span>Magic Link</span>
+          </button>
+        </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
-                Password
-              </label>
-              {onForgotPassword && (
+        {authMode === 'magic-link' ? (
+          magicLinkSent ? (
+            <div className="space-y-4 py-2">
+              <div className="text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-1 shadow-sm">
+                  <MailCheck className="w-6 h-6" />
+                </div>
+                <h3 className="font-display font-bold text-base text-[var(--paper)]">
+                  Magic Link Dispatched
+                </h3>
+                <p className="text-xs text-[var(--paper-dim)] leading-relaxed font-sans">
+                  We sent a single-use sign-in link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span>.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-1.5">
+                <div className="font-medium text-[var(--paper)] flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-[var(--forensic-green)]" />
+                  <span>One-Click Passwordless Authentication</span>
+                </div>
+                <p className="text-[var(--paper-muted)] text-[11.5px] leading-relaxed">
+                  Click the link inside your email to immediately access your TraceXMail workspace without entering a password.
+                </p>
+              </div>
+
+              {resendStatus && (
+                <div className="p-2.5 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-xs text-[var(--paper)] font-mono flex items-center gap-2">
+                  <MailCheck className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
+                  <span>{resendStatus}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={onForgotPassword}
-                  className="text-[11px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
+                  onClick={handleResendMagicLink}
+                  disabled={resending}
+                  className="w-full py-2.5 px-4 bg-[var(--ink-2)] border border-[var(--line)] hover:border-[var(--paper-dim)] text-[var(--paper)] font-semibold text-xs rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Forgot Password?
+                  <Send className={`w-3.5 h-3.5 text-[var(--slate)] ${resending ? 'animate-spin' : ''}`} />
+                  <span>{resending ? 'Resending Link…' : 'Resend Magic Link'}</span>
                 </button>
-              )}
-            </div>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
-            />
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 py-2.5 px-4 bg-[var(--thread)] text-[var(--paper)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Authenticating…</span>
-              </>
-            ) : (
-              <span>Sign In to Workspace</span>
-            )}
-          </button>
-        </form>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                    setAuthMode('password');
+                  }}
+                  className="w-full py-2 px-3 text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
+                >
+                  <span>Sign In with Password Instead →</span>
+                </button>
+              </div>
+
+              <div className="text-center text-[10.5px] text-[var(--paper-muted)] font-mono pt-1">
+                Didn't receive it? Please check your Spam or Promotions folder.
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSendMagicLink} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+                  Work Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="analyst@enterprise.corp"
+                  className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+                />
+              </div>
+
+              <div className="p-3 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs text-[var(--paper-muted)] font-sans leading-relaxed">
+                We will email you a secure, single-use magic link. No passwords or codes required—just one click to authenticate.
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Dispatching Link…</span>
+                  </>
+                ) : (
+                  <>
+                    <MailCheck className="w-4 h-4" />
+                    <span>Send Magic Sign-In Link</span>
+                  </>
+                )}
+              </button>
+            </form>
+          )
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+                Work Email
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="analyst@enterprise.corp"
+                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
+                  Password
+                </label>
+                {onForgotPassword && (
+                  <button
+                    type="button"
+                    onClick={onForgotPassword}
+                    className="text-[11px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
+                  >
+                    Forgot Password?
+                  </button>
+                )}
+              </div>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-2.5 px-4 bg-[var(--thread)] text-[var(--paper)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Authenticating…</span>
+                </>
+              ) : (
+                <span>Sign In with Password</span>
+              )}
+            </button>
+          </form>
+        )}
 
         {/* Footer links */}
         <div className="mt-5 pt-4 border-t border-[var(--line)] flex items-center justify-between text-xs text-[var(--paper-dim)]">
