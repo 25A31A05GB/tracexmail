@@ -517,10 +517,14 @@ export function resolveMasterSecret(): string {
 }
 
 export function assertEncryptionKeyConfigured(): void {
-  const hasRealKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
-  if (process.env.NODE_ENV === 'production' && !hasRealKey) {
+  const envKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !envKey) {
     console.error('[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) environment variable is required in production mode for AES-256-GCM field encryption. Server refused to start.');
     process.exit(1);
+  }
+  if (envKey) {
+    console.log('[Encryption] Master AES-256-GCM encryption key loaded successfully (length: ' + envKey.length + ' chars).');
   }
 }
 
