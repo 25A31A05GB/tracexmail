@@ -796,8 +796,10 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
 
   // Threat Heuristics
   const heuristics: HeuristicSignal[] = [];
+  const bodyText = bodyLines.join('\n');
   const urgencyRegex = /(urgent|immediate|account suspended|verify now|unauthorized|wire|security alert|action required)/i;
-  if (urgencyRegex.test(subject) || urgencyRegex.test(raw)) {
+  // Scope to subject + visible body only — not the full raw text (was matching header noise)
+  if (urgencyRegex.test(subject) || urgencyRegex.test(bodyText)) {
     heuristics.push({
       id: 'h-urgency',
       title: 'High Urgency Phishing Lure',
@@ -807,11 +809,13 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     });
   }
 
-  if (fromEmail && returnPath && !returnPath.includes(fromEmail.split('@')[1] || '---')) {
+  // Skip From/Return-Path mismatch entirely when auth already passed — common in legit mail
+  if (fromEmail && returnPath && !returnPath.includes(fromEmail.split('@')[1] || '---') &&
+      !(spfStatus === 'PASS' && dkimStatus === 'PASS' && dmarcStatus === 'PASS')) {
     heuristics.push({
       id: 'h-align',
       title: 'From & Return-Path Domain Discrepancy',
-      severity: 'CRITICAL',
+      severity: 'MEDIUM',
       description: `From header domain does not match envelope return address (${returnPath})`,
       triggered: true,
     });
@@ -827,8 +831,16 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     });
   }
 
-  const isPhish = heuristics.length >= 2 || spfStatus === 'FAIL';
-  const riskScore = isPhish ? 75 : 15;
+  const fullyAuthenticated = spfStatus === 'PASS' && dkimStatus === 'PASS' && dmarcStatus === 'PASS';
+  const criticalCount = heuristics.filter(h => h.severity === 'CRITICAL').length;
+  const highCount = heuristics.filter(h => h.severity === 'HIGH').length;
+
+  const isPhish = spfStatus === 'FAIL' ? true
+    : fullyAuthenticated ? criticalCount >= 1
+    : criticalCount >= 1 || highCount >= 2 || heuristics.length >= 2;
+
+  const riskScore = isPhish ? Math.min(95, 60 + criticalCount * 15 + highCount * 5)
+    : Math.max(5, heuristics.length * 10);
   const verdict = isPhish ? 'SUSPICIOUS (CLIENT HEURISTIC)' : 'UNVERIFIED (CLIENT PARSER)';
   const mlConfidence = 0;
 

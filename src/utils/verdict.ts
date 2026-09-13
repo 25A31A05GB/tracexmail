@@ -99,7 +99,7 @@ export function getStandardizedVerdict(analysis?: Partial<EmailAnalysis> | null)
     !isScoreLow &&
     !isUncertain &&
     (hasScore
-      ? (hasMaliciousTextLabel && score >= TEXT_LABEL_MALICIOUS_MIN_SCORE) || score >= 75
+      ? hasMaliciousTextLabel && score >= TEXT_LABEL_MALICIOUS_MIN_SCORE
       : hasMaliciousTextLabel);
 
   const isClean =

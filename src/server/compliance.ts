@@ -17,7 +17,8 @@
 
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseAdminClient } from './supabase';
 import type { Request, Response, NextFunction } from 'express';
 
 // ============================================================================
@@ -94,35 +95,8 @@ export const IN_MEMORY_AUDIT_LOGS: AuditLogEntry[] = [];
 // 3. SUPABASE CLIENT FACTORY
 // ============================================================================
 
-let cachedSupabaseClient: SupabaseClient | null = null;
-
 export function getSupabaseClient(): SupabaseClient | null {
-  if (cachedSupabaseClient) return cachedSupabaseClient;
-
-  const url =
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    process.env.SUPABASE_DB_URL ||
-    'https://zinyrzlswkwwzxlgptmq.supabase.co';
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
-
-  if (url && key && url.startsWith('http')) {
-    try {
-      cachedSupabaseClient = createClient(url, key, {
-        auth: { persistSession: false, autoRefreshToken: false }
-      });
-      return cachedSupabaseClient;
-    } catch (err) {
-      console.warn('[Supabase] Failed to initialize Supabase client:', err);
-      return null;
-    }
-  }
-  return null;
+  return getSupabaseAdminClient();
 }
 
 // ============================================================================
@@ -527,39 +501,32 @@ const IV_LENGTH = 12; // 96-bit standard for GCM
 const AUTH_TAG_LENGTH = 16;
 const ENCRYPTED_PREFIX = 'enc:aes-gcm:v1:';
 
-let devEphemeralEncryptionKey: Buffer | null = null;
-
-export function getEncryptionKey(): Buffer {
-  const envKey = (process.env.TOKEN_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || '').trim();
-  if (envKey.length > 0) {
-    return crypto.createHash('sha256').update(envKey).digest();
-  }
-
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction) {
-    throw new Error(
-      '[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) environment variable is required in production mode for AES-256-GCM field encryption. Server refused to start.'
-    );
-  }
-
-  if (!devEphemeralEncryptionKey) {
-    devEphemeralEncryptionKey = crypto.randomBytes(32);
-    console.warn(
-      '\x1b[33m%s\x1b[0m',
-      '[CRITICAL SECURITY WARNING] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) is not set in environment. ' +
-      'Using an ephemeral random 32-byte key for development only. This ephemeral key will be lost on process restart ' +
-      'and MUST NEVER be used in production!'
-    );
-  }
-  return devEphemeralEncryptionKey;
-}
+let processLocalEncryptionKey: string | null = null;
 
 export function resolveMasterSecret(): string {
-  const envKey = (process.env.TOKEN_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY || '').trim();
-  if (envKey.length > 0) {
-    return envKey;
+  if (process.env.TOKEN_ENCRYPTION_KEY?.trim()) return process.env.TOKEN_ENCRYPTION_KEY.trim();
+  if (process.env.ENCRYPTION_KEY?.trim()) return process.env.ENCRYPTION_KEY.trim();
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) is required in production.');
   }
-  return getEncryptionKey().toString('hex');
+  if (!processLocalEncryptionKey) {
+    processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
+    console.warn('[Encryption] No key set — using random ephemeral dev key (not persistent across restarts).');
+  }
+  return processLocalEncryptionKey;
+}
+
+export function assertEncryptionKeyConfigured(): void {
+  const hasRealKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
+  if (process.env.NODE_ENV === 'production' && !hasRealKey) {
+    console.error('[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) environment variable is required in production mode for AES-256-GCM field encryption. Server refused to start.');
+    process.exit(1);
+  }
+}
+
+export function getEncryptionKey(): Buffer {
+  const secret = resolveMasterSecret();
+  return crypto.createHash('sha256').update(secret).digest();
 }
 
 /**

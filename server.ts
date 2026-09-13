@@ -115,6 +115,7 @@ import {
   signUserToken,
   requireAuth,
   requireRole,
+  assertEncryptionKeyConfigured,
   IN_MEMORY_AUDIT_LOGS,
   type UserContext,
   type AuthenticatedRequest
@@ -1415,6 +1416,7 @@ async function verifyGooglePubSubPushToken(req: express.Request): Promise<boolea
 }
 
 async function startServer() {
+  assertEncryptionKeyConfigured();
   const app = express();
   const PORT = 3000;
 
@@ -1430,7 +1432,7 @@ async function startServer() {
     'http://127.0.0.1:3000',
     ...rawAllowedOrigins
       .split(',')
-      .map(origin => origin.trim())
+      .map(origin => origin.trim().replace(/\/+$/, ''))
       .filter(Boolean)
   ];
 
@@ -3266,7 +3268,7 @@ Link: https://verify-auth-portal.net/login`;
   app.get(['/api/gmail/oauth/start', '/api/auth/url'], publicLimiter, (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GMAIL_REDIRECT_URL || process.env.GMAIL_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
     const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
 
     // Return authorization URL
@@ -3291,7 +3293,7 @@ Link: https://verify-auth-portal.net/login`;
       const currentStatus = getGmailStatus();
       const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
       const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-      const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GMAIL_REDIRECT_URL || process.env.GMAIL_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
       const scopesParam = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
 
       res.json({
@@ -3363,7 +3365,7 @@ Link: https://verify-auth-portal.net/login`;
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
-    const redirectUri = process.env.GMAIL_REDIRECT_URL || `${baseUrl}/api/v1/gmail/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GMAIL_REDIRECT_URL || process.env.GMAIL_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
 
     try {
       let accessToken = 'mock_oauth2_access_token_encrypted';
