@@ -7,12 +7,35 @@ const clientEnvKey =
   (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
 
+const clientAppUrl =
+  (import.meta as any).env?.VITE_APP_URL ||
+  (import.meta as any).env?.VITE_SITE_URL ||
+  (import.meta as any).env?.VITE_REDIRECT_URL ||
+  'https://tracexmail.vercel.app';
+
 /**
  * Returns the canonical Google OAuth callback URL.
+ * Routes through the deployed frontend/backend URL (https://tracexmail.vercel.app/auth/callback)
+ * to ensure exact matching with the whitelist in the Supabase Dashboard and Google Cloud Console.
  */
 export function getGoogleOAuthRedirectUrl(): string {
-  if (typeof window === 'undefined') return '/auth/callback';
-  return `${window.location.origin}/auth/callback`;
+  if (typeof window === 'undefined') {
+    return `${clientAppUrl.replace(/\/$/, '')}/auth/callback`;
+  }
+
+  // 1. If running on Vercel or custom production domain
+  if (window.location.origin.includes('vercel.app') || window.location.origin.includes('tracexmail.')) {
+    return `${window.location.origin}/auth/callback`;
+  }
+
+  // 2. If explicitly running on localhost
+  if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+    return `${window.location.origin}/auth/callback`;
+  }
+
+  // 3. If running inside Google AI Studio container sandbox (*.run.app)
+  // Use the deployed production URL to match Supabase's allowed Redirect URIs
+  return `${clientAppUrl.replace(/\/$/, '')}/auth/callback`;
 }
 
 /**

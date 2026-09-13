@@ -42,11 +42,7 @@ import {
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
-
-const API_URL = (
-  (import.meta as any).env?.VITE_API_URL ||
-  ''
-).replace(/\/$/, '');
+import { API_URL } from '../lib/api';
 
 export interface SyncedEmailItem {
   id: string;

@@ -9,10 +9,7 @@
  * and orchestrates automatic renewal before the subscription expires.
  */
 
-const API_BASE_URL = (
-  (import.meta as any).env?.VITE_API_URL ||
-  ''
-).replace(/\/$/, '');
+import { API_URL as API_BASE_URL } from '../lib/api';
 
 export interface WatchSubscriptionState {
   active: boolean;

@@ -12,6 +12,42 @@ interface CacheItem<T> {
   expiresAt: number;
 }
 
+// Module-level tracking for database table availability
+let isDbCacheAvailable: boolean | null = null;
+let lastDbCheckTime = 0;
+const DB_RETRY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes backoff if table is absent
+
+function shouldAttemptDb(): boolean {
+  if (isDbCacheAvailable === true) return true;
+  if (isDbCacheAvailable === false) {
+    if (Date.now() - lastDbCheckTime > DB_RETRY_INTERVAL_MS) {
+      // Periodic retry to see if table has been migrated
+      isDbCacheAvailable = null;
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+
+function handleDbSchemaError(errMessage?: string) {
+  if (!errMessage) return;
+  const lower = errMessage.toLowerCase();
+  if (
+    lower.includes('could not find the table') ||
+    lower.includes('schema cache') ||
+    lower.includes('relation "intelligence_cache" does not exist') ||
+    lower.includes('pgrst205') ||
+    lower.includes('42p01')
+  ) {
+    if (isDbCacheAvailable !== false) {
+      isDbCacheAvailable = false;
+      lastDbCheckTime = Date.now();
+      console.info('[IntelligenceCache] Supabase table "public.intelligence_cache" not detected in database schema. Operating with in-memory L1 cache.');
+    }
+  }
+}
+
 export class IntelligenceCache<T> {
   private readonly store = new Map<string, CacheItem<T>>();
   private readonly inFlight = new Map<string, Promise<T>>();
@@ -49,22 +85,38 @@ export class IntelligenceCache<T> {
       expiresAt
     });
 
-    // Asynchronously save to Supabase L2 persistent cache
-    const supabase = getSupabaseAdminClient();
-    if (supabase) {
-      const sanitizedId = `ic_${this.cacheType}_${Buffer.from(key).toString('base64url').slice(0, 48)}`;
-      supabase.from('intelligence_cache')
-        .upsert({
-          id: sanitizedId,
-          organization_id: DEFAULT_ORG_ID,
-          cache_type: this.cacheType,
-          lookup_key: key,
-          data: value as any,
-          expires_at: new Date(expiresAt).toISOString()
-        }, { onConflict: 'organization_id,cache_type,lookup_key' })
-        .then(({ error }) => {
-          if (error) console.warn(`[IntelligenceCache:${this.cacheType}] Error persisting key ${key} to DB:`, error.message);
-        });
+    // Asynchronously save to Supabase L2 persistent cache if available
+    if (shouldAttemptDb()) {
+      const supabase = getSupabaseAdminClient();
+      if (supabase) {
+        const sanitizedId = `ic_${this.cacheType}_${Buffer.from(key).toString('base64url').slice(0, 48)}`;
+        const serializedData = value instanceof Set ? Array.from(value) : (value as any);
+
+        (async () => {
+          try {
+            const { error } = await supabase.from('intelligence_cache')
+              .upsert({
+                id: sanitizedId,
+                organization_id: DEFAULT_ORG_ID,
+                cache_type: this.cacheType,
+                lookup_key: key,
+                data: serializedData,
+                expires_at: new Date(expiresAt).toISOString()
+              }, { onConflict: 'organization_id,cache_type,lookup_key' });
+
+            if (error) {
+              handleDbSchemaError(error.message);
+              if (isDbCacheAvailable !== false) {
+                console.warn(`[IntelligenceCache:${this.cacheType}] Error persisting key ${key} to DB:`, error.message);
+              }
+            } else {
+              isDbCacheAvailable = true;
+            }
+          } catch (err: any) {
+            handleDbSchemaError(err?.message);
+          }
+        })();
+      }
     }
   }
 
@@ -74,14 +126,22 @@ export class IntelligenceCache<T> {
 
   public delete(key: string): boolean {
     const deleted = this.store.delete(key);
-    const supabase = getSupabaseAdminClient();
-    if (supabase) {
-      supabase.from('intelligence_cache')
-        .delete()
-        .eq('organization_id', DEFAULT_ORG_ID)
-        .eq('cache_type', this.cacheType)
-        .eq('lookup_key', key)
-        .then(() => {});
+    if (shouldAttemptDb()) {
+      const supabase = getSupabaseAdminClient();
+      if (supabase) {
+        (async () => {
+          try {
+            const { error } = await supabase.from('intelligence_cache')
+              .delete()
+              .eq('organization_id', DEFAULT_ORG_ID)
+              .eq('cache_type', this.cacheType)
+              .eq('lookup_key', key);
+            if (error) handleDbSchemaError(error.message);
+          } catch (err: any) {
+            handleDbSchemaError(err?.message);
+          }
+        })();
+      }
     }
     return deleted;
   }
@@ -111,25 +171,34 @@ export class IntelligenceCache<T> {
     }
 
     // 3. Check L2 Supabase persistent cache
-    const supabase = getSupabaseAdminClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('intelligence_cache')
-          .select('data, expires_at')
-          .eq('organization_id', DEFAULT_ORG_ID)
-          .eq('cache_type', this.cacheType)
-          .eq('lookup_key', key)
-          .gt('expires_at', new Date().toISOString())
-          .maybeSingle();
+    if (shouldAttemptDb()) {
+      const supabase = getSupabaseAdminClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('intelligence_cache')
+            .select('data, expires_at')
+            .eq('organization_id', DEFAULT_ORG_ID)
+            .eq('cache_type', this.cacheType)
+            .eq('lookup_key', key)
+            .gt('expires_at', new Date().toISOString())
+            .maybeSingle();
 
-        if (!error && data && data.data) {
-          const expiresAt = new Date(data.expires_at).getTime();
-          this.store.set(key, { value: data.data as T, expiresAt });
-          return { value: data.data as T, cached: true };
+          if (error) {
+            handleDbSchemaError(error.message);
+          } else if (data && data.data !== undefined) {
+            isDbCacheAvailable = true;
+            const expiresAt = new Date(data.expires_at).getTime();
+            let parsedVal = data.data;
+            if (this.cacheType === 'tor' && Array.isArray(parsedVal)) {
+              parsedVal = new Set(parsedVal);
+            }
+            this.store.set(key, { value: parsedVal as T, expiresAt });
+            return { value: parsedVal as T, cached: true };
+          }
+        } catch (err: any) {
+          handleDbSchemaError(err?.message);
         }
-      } catch (err) {
-        console.warn(`[IntelligenceCache:${this.cacheType}] Supabase lookup failed:`, err);
       }
     }
 

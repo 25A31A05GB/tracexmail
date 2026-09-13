@@ -16,11 +16,7 @@ import {
   Check,
   SlidersHorizontal
 } from 'lucide-react';
-
-const API_URL = (
-  (import.meta as any).env?.VITE_API_URL ||
-  ''
-).replace(/\/$/, '');
+import { API_URL } from '../lib/api';
 
 export interface OAuthScopeDetail {
   scope: string;

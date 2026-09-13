@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured, ensureSupabaseClient, getIsSupabaseConfigured, getSupabaseAnonKey } from './supabase';
+import { supabase, isSupabaseConfigured, ensureSupabaseClient, getIsSupabaseConfigured, getSupabaseAnonKey, getGoogleOAuthRedirectUrl } from './supabase';
 
 export interface GoogleAuthResult {
   success: boolean;
@@ -91,7 +91,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
   }
 
   const inIframe = isRunningInIframe();
-  const callbackUrl = `${window.location.origin}/auth/callback`;
+  const callbackUrl = getGoogleOAuthRedirectUrl();
   const anonKey = getSupabaseAnonKey();
 
   try {

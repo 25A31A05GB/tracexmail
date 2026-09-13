@@ -39,8 +39,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import { EmailAnalysis, EmailHop } from '../types';
-
-const API_URL = ((import.meta as any).env?.VITE_API_URL || '').replace(/\/$/, '');
+import { API_URL } from '../lib/api';
 
 // Custom Entity Node
 const CustomGraphNode = ({ data }: any) => {

@@ -22,7 +22,8 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 // In-Memory Tor Exit Cache with 6-hour TTL
 export const torExitNodeCache = new IntelligenceCache<Set<string>>({
   ttlMs: CACHE_TTL_MS,
-  maxEntries: 10
+  maxEntries: 10,
+  cacheType: 'tor'
 });
 
 // Fast in-memory lookup set for sub-millisecond synchronous checks

@@ -1419,12 +1419,18 @@ async function startServer() {
   // Configure reverse proxy trust appropriately for Cloud Run / production load balancers
   app.set('trust proxy', true);
 
-  // Explicit, intentional CORS policy configured from environment allow-list
+  // Explicit CORS policy with support for deployed frontend (Vercel) and backend (Render)
   const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || '';
-  const allowedOriginsList = rawAllowedOrigins
-    .split(',')
-    .map(origin => origin.trim())
-    .filter(Boolean);
+  const allowedOriginsList = [
+    'https://tracexmail.vercel.app',
+    'https://tracexmail-l6c7.onrender.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...rawAllowedOrigins
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean)
+  ];
 
   const corsOptions: CorsOptions = {
     origin: (requestOrigin, callback) => {
@@ -1432,15 +1438,21 @@ async function startServer() {
       if (!requestOrigin) {
         return callback(null, true);
       }
-      if (allowedOriginsList.includes(requestOrigin)) {
+      if (
+        allowedOriginsList.includes(requestOrigin) ||
+        requestOrigin.endsWith('.vercel.app') ||
+        requestOrigin.endsWith('.run.app') ||
+        requestOrigin.includes('localhost') ||
+        requestOrigin.includes('127.0.0.1')
+      ) {
         return callback(null, true);
       }
-      // If origin is not on allow-list, disallow cross-origin access (no Access-Control-Allow-Origin header echoed)
+      // If origin is not on allow-list, disallow cross-origin access
       return callback(null, false);
     },
-    credentials: false,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'X-Goog-PubSub-Token']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'X-Goog-PubSub-Token', 'apikey']
   };
 
   app.use(cors(corsOptions));

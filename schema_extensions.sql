@@ -97,12 +97,13 @@ CREATE TABLE IF NOT EXISTS email_alert_logs (
 -- 6. Intelligence Cache Table (Durable TTL-backed threat intelligence cache)
 CREATE TABLE IF NOT EXISTS intelligence_cache (
     id TEXT PRIMARY KEY,
-    provider TEXT NOT NULL,
+    organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    cache_type TEXT NOT NULL,
     lookup_key TEXT NOT NULL,
-    result JSONB NOT NULL,
+    data JSONB NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
-    CONSTRAINT uq_intelligence_cache_provider_key UNIQUE (provider, lookup_key)
+    CONSTRAINT uq_intelligence_cache_type_key UNIQUE (organization_id, cache_type, lookup_key)
 );
 
 -- 7. Team Invitations Table (RBAC operator clearance provision invites)

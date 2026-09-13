@@ -9,7 +9,10 @@ import { supabase } from './supabase';
 const DEFAULT_ORG_ID = 'org_acme_soc_01';
 
 export const API_URL = (
-  (import.meta as any).env?.VITE_API_URL || ''
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.host.includes('vercel.app')
+    ? 'https://tracexmail-l6c7.onrender.com'
+    : '')
 ).replace(/\/$/, '');
 
 export interface SessionUser {
