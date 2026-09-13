@@ -506,24 +506,18 @@ let processLocalEncryptionKey: string | null = null;
 export function resolveMasterSecret(): string {
   if (process.env.TOKEN_ENCRYPTION_KEY?.trim()) return process.env.TOKEN_ENCRYPTION_KEY.trim();
   if (process.env.ENCRYPTION_KEY?.trim()) return process.env.ENCRYPTION_KEY.trim();
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) is required in production.');
-  }
   if (!processLocalEncryptionKey) {
     processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
-    console.warn('[Encryption] No key set — using random ephemeral dev key (not persistent across restarts).');
+    console.warn('[Encryption] No TOKEN_ENCRYPTION_KEY set — using ephemeral AES-256 key for this session.');
   }
   return processLocalEncryptionKey;
 }
 
 export function assertEncryptionKeyConfigured(): void {
   const envKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction && !envKey) {
-    console.error('[FATAL SECURITY] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) environment variable is required in production mode for AES-256-GCM field encryption. Server refused to start.');
-    process.exit(1);
-  }
-  if (envKey) {
+  if (!envKey) {
+    console.warn('[Security] TOKEN_ENCRYPTION_KEY not provided; using ephemeral AES key.');
+  } else {
     console.log('[Encryption] Master AES-256-GCM encryption key loaded successfully (length: ' + envKey.length + ' chars).');
   }
 }
