@@ -3,99 +3,354 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Authenticating with TraceXMail</title>
+  <title>TraceXMail Security Auth Callback Handler</title>
   <style>
+    :root {
+      --bg: #13110e;
+      --card-bg: #1a1712;
+      --border: #3a352c;
+      --text: #ede6d8;
+      --text-dim: #9d9282;
+      --accent: #c9a227;
+      --error: #ea4335;
+      --success: #34a853;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
     body {
-      background: #13110e;
-      color: #ede6d8;
+      background: var(--bg);
+      color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
     }
     .card {
       text-align: center;
-      padding: 28px 36px;
-      border: 1px solid #3a352c;
-      background: #1a1712;
+      padding: 32px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
       border-radius: 4px;
-      max-width: 420px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
     }
     .spinner {
       display: inline-block;
-      width: 28px;
-      height: 28px;
-      border: 2px solid #3a352c;
-      border-top-color: #c9a227;
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
-      margin-bottom: 14px;
+      margin-bottom: 16px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .status-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin-bottom: 6px;
+    }
+    .status-subtitle {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .diag-box {
+      background: #110f0c;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 12px 14px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.6;
+      color: #b9af9c;
+      margin-top: 16px;
+      overflow-x: auto;
+      max-height: 220px;
+    }
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .diag-label {
+      color: var(--text-dim);
+    }
+    .diag-val {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .diag-val.match {
+      color: var(--success);
+    }
+    .diag-val.warn {
+      color: var(--accent);
+    }
+    .diag-val.fail {
+      color: var(--error);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 16px;
+      margin-top: 16px;
+      background: #242019;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background: #2f2a21;
+      border-color: var(--accent);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #14120f;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: #d8b035;
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="spinner"></div>
-    <div style="font-size: 14px; font-weight: 500; letter-spacing: 0.02em;">Completing Authentication…</div>
-    <div style="font-size: 12px; color: #9d9282; margin-top: 6px;">Closing window and returning to TraceXMail…</div>
+  <div class="card" id="authCard">
+    <div class="spinner" id="spinner"></div>
+    <div class="status-title" id="statusTitle">Completing Authentication…</div>
+    <div class="status-subtitle" id="statusSubtitle">Verifying callback tokens and returning to TraceXMail Security Console…</div>
+
+    <div class="diag-box" id="diagBox" style="display: none;">
+      <div style="font-weight: 600; color: var(--accent); margin-bottom: 8px; border-bottom: 1px solid #28241d; padding-bottom: 4px;">
+        🔍 ORIGIN & REDIRECT URI DIAGNOSTICS
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Current Origin:</span>
+        <span class="diag-val" id="diagOrigin">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Whitelist Match:</span>
+        <span class="diag-val" id="diagMatch">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Redirect URI:</span>
+        <span class="diag-val" id="diagUri">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Auth Flow Mode:</span>
+        <span class="diag-val" id="diagMode">-</span>
+      </div>
+      <div class="diag-row">
+        <span class="diag-label">Payload Type:</span>
+        <span class="diag-val" id="diagPayload">-</span>
+      </div>
+      <div id="diagErrorRow" style="display:none; color: var(--error); margin-top: 8px; font-size: 11px;">
+        <strong>Error:</strong> <span id="diagErrorText"></span>
+      </div>
+    </div>
+
+    <div id="actionContainer" style="display: none;">
+      <button class="btn btn-primary" id="btnManualReturn">Return to Dashboard</button>
+      <button class="btn" id="btnCopyUri">Copy Redirect URI</button>
+    </div>
   </div>
+
   <script>
     (function() {
+      // 1. Defined Whitelist Patterns for TraceXMail Deployment Environments
+      var ALLOWED_ORIGIN_PATTERNS = [
+        /^https:\/\/tracexmail\.vercel\.app$/,
+        /^https:\/\/.*\.vercel\.app$/,
+        /^https:\/\/tracexmail-[a-z0-9-]+\.vercel\.app$/,
+        /^http:\/\/localhost:(3000|5173|4173)$/,
+        /^http:\/\/127\.0\.0\.1:(3000|5173|4173)$/,
+        /^https:\/\/.*\.run\.app$/,
+        /^https:\/\/.*\.google\.com$/
+      ];
+
+      var origin = window.location.origin;
+      var href = window.location.href;
+      var hash = window.location.hash || '';
+      var search = window.location.search || '';
+      var isPopup = Boolean(window.opener && window.opener !== window);
+
+      // Check origin whitelist match
+      var isWhitelisted = ALLOWED_ORIGIN_PATTERNS.some(function(pattern) {
+        return pattern.test(origin);
+      });
+
+      console.group('[TraceXMail Auth Callback] Diagnostics');
+      console.log('Timestamp:', new Date().toISOString());
+      console.log('Current Origin:', origin);
+      console.log('Current Full URL:', href);
+      console.log('Whitelist Status:', isWhitelisted ? 'MATCHED (Valid)' : 'UNKNOWN / UNMATCHED');
+      console.log('Window Context:', isPopup ? 'Popup Modal (window.opener present)' : 'Top-Level Standalone Window');
+      console.log('Has Search Query (?):', Boolean(search));
+      console.log('Has Hash Fragment (#):', Boolean(hash));
+      console.groupEnd();
+
+      // Parse params
+      var searchParams = new URLSearchParams(search);
+      var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+      
+      var rawError = searchParams.get('error') || hashParams.get('error') || searchParams.get('error_description') || hashParams.get('error_description');
+      var code = searchParams.get('code') || hashParams.get('code');
+      var accessToken = hashParams.get('access_token') || searchParams.get('access_token');
+      var refreshToken = hashParams.get('refresh_token') || searchParams.get('refresh_token');
+
+      var payloadType = rawError ? 'ERROR' : (accessToken ? 'TOKEN_HASH' : (code ? 'PKCE_CODE' : 'EMPTY'));
+
+      // Populate Diagnostic UI elements
+      var diagBox = document.getElementById('diagBox');
+      var diagOrigin = document.getElementById('diagOrigin');
+      var diagMatch = document.getElementById('diagMatch');
+      var diagUri = document.getElementById('diagUri');
+      var diagMode = document.getElementById('diagMode');
+      var diagPayload = document.getElementById('diagPayload');
+      var diagErrorRow = document.getElementById('diagErrorRow');
+      var diagErrorText = document.getElementById('diagErrorText');
+      var actionContainer = document.getElementById('actionContainer');
+      var statusTitle = document.getElementById('statusTitle');
+      var statusSubtitle = document.getElementById('statusSubtitle');
+      var spinner = document.getElementById('spinner');
+
+      if (diagOrigin) diagOrigin.textContent = origin;
+      if (diagMatch) {
+        diagMatch.textContent = isWhitelisted ? 'YES (Authorized)' : 'UNMATCHED (Check Supabase Allowlist)';
+        diagMatch.className = 'diag-val ' + (isWhitelisted ? 'match' : 'warn');
+      }
+      if (diagUri) diagUri.textContent = origin + '/auth/callback';
+      if (diagMode) diagMode.textContent = isPopup ? 'Popup Modal' : 'Top-Level Window';
+      if (diagPayload) {
+        diagPayload.textContent = payloadType;
+        diagPayload.className = 'diag-val ' + (rawError ? 'fail' : (payloadType === 'EMPTY' ? 'warn' : 'match'));
+      }
+
+      // Store in localStorage as robust cross-tab sync bridge
+      var authPayload = {
+        origin: origin,
+        href: href,
+        hash: hash,
+        search: search,
+        code: code,
+        accessToken: accessToken ? 'PRESENT' : null,
+        error: rawError,
+        isWhitelisted: isWhitelisted,
+        timestamp: Date.now()
+      };
+
       try {
-        var hash = window.location.hash || '';
-        var search = window.location.search || '';
-        console.log('[SupabaseOAuthCallback] Processing auth redirect callback:', {
-          hasHash: Boolean(hash),
-          hasSearch: Boolean(search),
-          origin: window.location.origin
-        });
+        localStorage.setItem('tracexmail_supabase_auth_callback', JSON.stringify(authPayload));
+        sessionStorage.setItem('tracexmail_last_auth_event', JSON.stringify(authPayload));
+      } catch (e) {
+        console.warn('[TraceXMail Auth Callback] Storage write error:', e);
+      }
 
-        // Check for error parameters in query or hash
-        var searchParams = new URLSearchParams(search);
-        var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
-        var error = searchParams.get('error') || hashParams.get('error') || searchParams.get('error_description') || hashParams.get('error_description');
+      // Handle Errors or Empty Payload
+      if (rawError || (!accessToken && !code && !rawError)) {
+        diagBox.style.display = 'block';
+        actionContainer.style.display = 'block';
+        if (spinner) spinner.style.display = 'none';
 
-        // Store in localStorage as backup bridge
-        try {
-          localStorage.setItem('tracexmail_supabase_auth_callback', JSON.stringify({
-            hash: hash,
-            search: search,
-            error: error,
-            timestamp: Date.now()
-          }));
-        } catch (e) {}
+        if (rawError) {
+          statusTitle.textContent = 'Authentication Error';
+          statusTitle.style.color = 'var(--error)';
+          statusSubtitle.textContent = 'The authentication provider returned an error: ' + rawError;
+          if (diagErrorRow && diagErrorText) {
+            diagErrorRow.style.display = 'block';
+            diagErrorText.textContent = rawError;
+          }
+        } else {
+          statusTitle.textContent = 'Callback Reached';
+          statusSubtitle.textContent = 'Ready to navigate to dashboard with current origin configuration.';
+        }
 
-        if (window.opener && window.opener !== window) {
-          if (error) {
-            console.warn('[SupabaseOAuthCallback] Auth error in callback:', error);
+        // Send error to opener if in popup mode
+        if (isPopup) {
+          try {
             window.opener.postMessage({
               type: 'SUPABASE_AUTH_ERROR',
-              error: error,
-              hash: hash,
-              search: search
+              error: rawError || 'No authorization code or tokens received in callback URL.',
+              origin: origin
             }, '*');
-          } else {
-            console.log('[SupabaseOAuthCallback] Posting auth success to opener');
+          } catch (e) {}
+        }
+      } else {
+        // Successful tokens received!
+        console.log('[TraceXMail Auth Callback] Dispatching authentication success event...');
+
+        if (isPopup) {
+          try {
             window.opener.postMessage({
               type: 'SUPABASE_AUTH_SUCCESS',
               hash: hash,
-              search: search
+              search: search,
+              code: code,
+              accessToken: accessToken,
+              refreshToken: refreshToken,
+              origin: origin
             }, '*');
+          } catch (err) {
+            console.error('[TraceXMail Auth Callback] PostMessage dispatch error:', err);
           }
+
+          // Auto-close popup cleanly after brief delay
           setTimeout(function() {
-            try { window.close(); } catch (e) {}
-          }, 600);
+            try {
+              window.close();
+            } catch (e) {
+              console.warn('[TraceXMail Auth Callback] Window close inhibited, displaying return button');
+              diagBox.style.display = 'block';
+              actionContainer.style.display = 'block';
+              if (spinner) spinner.style.display = 'none';
+            }
+          }, 450);
         } else {
-          // Top-level redirect: preserve auth parameters and redirect to dashboard
-          console.log('[SupabaseOAuthCallback] Standalone redirect to root with tokens');
-          window.location.replace('/' + search + hash);
+          // Top-level redirection: return to application root with session parameters preserved
+          console.log('[TraceXMail Auth Callback] Redirecting top-level window to root with session parameters');
+          setTimeout(function() {
+            window.location.replace('/' + (search || '') + (hash || ''));
+          }, 200);
         }
-      } catch (err) {
-        console.error('[SupabaseOAuthCallback] Exception in callback:', err);
-        window.location.replace('/');
+      }
+
+      // Wire up action buttons
+      var btnManualReturn = document.getElementById('btnManualReturn');
+      if (btnManualReturn) {
+        btnManualReturn.addEventListener('click', function() {
+          if (isPopup) {
+            try { window.close(); } catch (e) {}
+          }
+          window.location.replace('/');
+        });
+      }
+
+      var btnCopyUri = document.getElementById('btnCopyUri');
+      if (btnCopyUri) {
+        btnCopyUri.addEventListener('click', function() {
+          var targetUri = origin + '/auth/callback';
+          navigator.clipboard.writeText(targetUri).then(function() {
+            btnCopyUri.textContent = 'Copied!';
+            setTimeout(function() { btnCopyUri.textContent = 'Copy Redirect URI'; }, 2000);
+          }).catch(function() {
+            prompt('Copy Redirect URI for Supabase Dashboard:', targetUri);
+          });
+        });
       }
     })();
   </script>

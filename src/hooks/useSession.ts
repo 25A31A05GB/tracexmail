@@ -233,9 +233,45 @@ export function useSession(): UseSessionReturn {
       }
     });
 
+    // Cross-window / popup message listener for Google OAuth callback events
+    const handleAuthMessage = async (event: MessageEvent) => {
+      if (!isMounted || !event.data) return;
+      if (event.data.type === 'SUPABASE_AUTH_SUCCESS') {
+        console.log('[useSession] SUPABASE_AUTH_SUCCESS event received from callback popup/window:', event.data);
+        const { code, hash, search } = event.data;
+        try {
+          if (hash) {
+            const hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+            if (accessToken && refreshToken) {
+              await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            }
+          } else if (code) {
+            await (supabase.auth as any).exchangeCodeForSession?.(code);
+          } else if (search) {
+            const searchParams = new URLSearchParams(search);
+            const queryCode = searchParams.get('code');
+            if (queryCode) {
+              await (supabase.auth as any).exchangeCodeForSession?.(queryCode);
+            }
+          }
+          const { data } = await supabase.auth.getSession();
+          if (data.session && isMounted) {
+            syncState(data.session);
+          }
+        } catch (e) {
+          console.warn('[useSession] Error processing auth message tokens:', e);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('message', handleAuthMessage);
     };
   }, [syncState]);
 
