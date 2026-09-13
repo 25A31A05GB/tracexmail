@@ -48,6 +48,7 @@ import {
 import { getStandardizedVerdict } from '../utils/verdict';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { generateForensicPdfDossier } from '../utils/pdfDossierGenerator';
+import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -86,6 +87,18 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
   const originCountry = originHop?.country || originHop?.countryCode || 'Unknown';
   const originCity = originHop?.city || 'Unknown';
   const originAsn = originHop?.asn || 'AS44050';
+
+  // Real human sender (client) IP — distinct from "Origin Relay IP" above, which is
+  // the sending domain's own registered outbound mail server/infra IP. Only populated
+  // when the sending platform actually disclosed it (e.g. X-Originating-IP). Never fabricated.
+  const realSender = analysis.realSenderIp?.resolved
+    ? analysis.realSenderIp
+    : extractRealSenderIp(analysis.headers?.allHeaders);
+  const rawRealSenderIp = realSender.ip || '';
+  const realSenderIpDisplay = realSender.resolved
+    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender))
+    : formatRealSenderIp(realSender);
+  const realSenderLocation = formatRealSenderLocation(realSender);
 
   // Build sanitized telemetry object if masking is active
   const getExportData = () => {
@@ -483,7 +496,7 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                     <div>
                       <div className="text-xs font-bold text-slate-100">Perimeter Gateway Ingress Block</div>
                       <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                        Enforce edge firewall drop rule for Origin IP <span className="font-mono text-amber-300">{originIp}</span> and author domain <span className="font-mono text-amber-300">{analysis.from?.split('@')[1] || 'sender domain'}</span>.
+                        Enforce edge firewall drop rule for Origin Relay IP <span className="font-mono text-amber-300">{originIp}</span>{realSender.resolved ? <span> and Real Sender Client IP <span className="font-mono text-amber-300">{realSenderIpDisplay}</span></span> : ''} and author domain <span className="font-mono text-amber-300">{analysis.from?.split('@')[1] || 'sender domain'}</span>.
                       </p>
                     </div>
                   </div>
@@ -659,7 +672,7 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                     <span>Technical Indicators of Compromise (IOCs)</span>
                   </h3>
                   <button
-                    onClick={() => handleCopyText(`Origin IP: ${originIp}\nSender: ${analysis.from}\nDomain: ${analysis.domain_intelligence?.domain || 'unknown'}\nMessage-ID: ${analysis.messageId}`, 'iocs')}
+                    onClick={() => handleCopyText(`Origin Relay IP: ${originIp}\nReal Sender IP: ${realSenderIpDisplay}${realSender.resolved ? ` (via ${realSender.ipSource})` : ''}\nSender: ${analysis.from}\nDomain: ${analysis.domain_intelligence?.domain || 'unknown'}\nMessage-ID: ${analysis.messageId}`, 'iocs')}
                     className="text-xs text-amber-300 hover:text-amber-200 flex items-center gap-1 bg-amber-950/60 border border-amber-800 px-2 py-1 rounded"
                   >
                     {copiedSection === 'iocs' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -679,11 +692,19 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                     </thead>
                     <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
                       <tr>
-                        <td className="p-3 text-cyan-300 font-semibold">IPv4 (Origin MTA)</td>
+                        <td className="p-3 text-cyan-300 font-semibold">IPv4 (Origin Relay MTA)</td>
                         <td className="p-3 text-slate-200">{originIp}</td>
                         <td className="p-3 text-slate-400">Header Hop #1 (Public Transmission Node)</td>
                         <td className="p-3 text-red-400">Firewall Drop / ACL Block</td>
                       </tr>
+                      {realSender.resolved && (
+                        <tr>
+                          <td className="p-3 text-emerald-300 font-semibold">IPv4 (Real Sender Client)</td>
+                          <td className="p-3 text-slate-200">{realSenderIpDisplay}</td>
+                          <td className="p-3 text-slate-400">{realSender.ipSource} ({realSenderLocation})</td>
+                          <td className="p-3 text-rose-400">Endpoint / Host Isolation &amp; Perimeter Block</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="p-3 text-indigo-300 font-semibold">Author Domain</td>
                         <td className="p-3 text-slate-200">{analysis.from?.split('@')[1] || 'domain.com'}</td>
@@ -789,7 +810,8 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                   </div>
                   <div className="font-mono text-sm font-bold text-white">{originAsn}</div>
                   <div className="text-slate-400 text-[11px]">Organization: <span className="text-slate-200">{originHop?.org || originHop?.isp || 'Host Provider'}</span></div>
-                  <div className="text-slate-400 text-[11px]">Primary IP: <span className="font-mono text-cyan-300">{originIp}</span></div>
+                  <div className="text-slate-400 text-[11px]">Origin Relay IP: <span className="font-mono text-cyan-300">{originIp}</span></div>
+                  <div className="text-slate-400 text-[11px]">Real Sender IP: <span className="font-mono text-emerald-300">{realSenderIpDisplay}</span>{realSender.resolved ? <span className="text-slate-400"> ({realSender.ipSource})</span> : ''}</div>
                   <div className="text-slate-400 text-[11px]">Jurisdiction: <span className="text-slate-200">{originCity}, {originCountry}</span></div>
                 </div>
 
@@ -811,7 +833,7 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                     Formal 18 U.S.C. § 2703(f) Evidence Preservation Request Letter Template
                   </h4>
                   <button
-                    onClick={() => handleCopyText(`RE: FORMAL EVIDENCE PRESERVATION REQUEST PURSUANT TO 18 U.S.C. § 2703(f)\nTo: Abuse & Legal Compliance Desk\nTarget IP: ${originIp}\nTimestamp: ${analysis.date}\nTarget Domain: ${analysis.domain_intelligence?.domain || 'sender domain'}\n\nPlease preserve all transactional logs, DHCP leases, account holder records, source IP connections, and email routing telemetry for a period of 90 days pending legal process.`, 'preservation')}
+                    onClick={() => handleCopyText(`RE: FORMAL EVIDENCE PRESERVATION REQUEST PURSUANT TO 18 U.S.C. § 2703(f)\nTo: Abuse & Legal Compliance Desk\nOrigin Relay IP: ${originIp}\nReal Sender IP: ${realSenderIpDisplay}${realSender.resolved ? ` (via ${realSender.ipSource})` : ''}\nTimestamp: ${analysis.date}\nTarget Domain: ${analysis.domain_intelligence?.domain || 'sender domain'}\n\nPlease preserve all transactional logs, DHCP leases, account holder records, source IP connections, and email routing telemetry for a period of 90 days pending legal process.`, 'preservation')}
                     className="text-xs text-rose-300 hover:text-rose-200 flex items-center gap-1 bg-rose-950/60 border border-rose-800 px-2 py-1 rounded"
                   >
                     {copiedSection === 'preservation' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -827,10 +849,10 @@ ATTN: Subpoena Compliance & Custodian of Records
 Dear Custodian:
 This letter constitutes a formal preservation request pursuant to Title 18, United States Code, Section 2703(f). You are hereby requested to preserve and take all necessary steps to prevent the destruction, alteration, or overwrite of all electronic records, log files, and subscriber data pertaining to:
 
-1. Target IP Address: ${originIp}
-2. Observed Date / Time: ${analysis.date || new Date().toUTCString()}
-3. Target Domain / Hostname: ${analysis.domain_intelligence?.domain || analysis.from?.split('@')[1] || 'Domain'}
-4. Forensic Evidence Hash: ${analysis.sha256 || 'SHA-256 Digest Verified'}
+1. Target Origin Relay IP: ${originIp}
+${realSender.resolved ? `2. Target Real Sender Client IP: ${realSenderIpDisplay} (Disclosed via ${realSender.ipSource} • Location: ${realSenderLocation})\n3.` : '2.'} Observed Date / Time: ${analysis.date || new Date().toUTCString()}
+${realSender.resolved ? '4.' : '3.'} Target Domain / Hostname: ${analysis.domain_intelligence?.domain || analysis.from?.split('@')[1] || 'Domain'}
+${realSender.resolved ? '5.' : '4.'} Forensic Evidence Hash: ${analysis.sha256 || 'SHA-256 Digest Verified'}
 
 Pursuant to federal law, you are required to preserve these records for a period of 90 days, with potential extension upon formal legal notice, pending issuance of a search warrant, court order, or grand jury subpoena.`}
                 </div>
@@ -877,7 +899,7 @@ Pursuant to federal law, you are required to preserve these records for a period
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
                   <div>
                     <span className="text-slate-500 block text-[10px]">EVENT #3: MAXMIND GEOLOCATION &amp; ASN CROSSCHECK</span>
-                    <span className="text-slate-200">Origin IP [{originIp}] matched against local GeoLite2 City &amp; ASN datasets</span>
+                    <span className="text-slate-200">Origin Relay IP [{originIp}]{realSender.resolved ? ` & Real Sender IP [${realSenderIpDisplay} via ${realSender.ipSource}]` : ''} matched against local GeoLite2 City &amp; ASN datasets</span>
                   </div>
                   <span className="text-emerald-400 text-[11px]">VERIFIED</span>
                 </div>

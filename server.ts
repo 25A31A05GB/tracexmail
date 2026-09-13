@@ -4850,7 +4850,7 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   // Serve static files in production / Vite in dev
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);

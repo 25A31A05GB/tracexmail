@@ -3,6 +3,7 @@ import { EmailAnalysis } from '../types';
 import { getStandardizedVerdict } from './verdict';
 import { PrivacyConfig, DEFAULT_PRIVACY_CONFIG, maskEmail, maskText, maskIp, getRetentionPurgeDate } from './privacyCompliance';
 import { sha256Sync } from './crypto';
+import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from './realSenderIp';
 
 export interface GeneratePdfReportOptions {
   analysis: EmailAnalysis;
@@ -48,6 +49,18 @@ export function generateForensicPdfDossier({
   const originCity = originHop?.city || 'Unknown';
   const originAsn = originHop?.asn || 'AS44050';
   const originOrg = originHop?.org || originHop?.isp || 'Bulletproof Hosting / Relay Network';
+
+  // Real human sender (client) IP — distinct from "Origin IP" above, which is the sending
+  // domain's own registered outbound mail relay derived from Received: hop tracing.
+  // Only populated when the sending platform actually disclosed it. Never fabricated.
+  const realSender = analysis.realSenderIp?.resolved
+    ? analysis.realSenderIp
+    : extractRealSenderIp(analysis.headers?.allHeaders);
+  const rawRealSenderIp = realSender.ip || '';
+  const realSenderIp = realSender.resolved
+    ? (enforceMasking ? maskIp(rawRealSenderIp, false, privacyConfig.maskingMode) : formatRealSenderIp(realSender))
+    : formatRealSenderIp(realSender);
+  const realSenderLocation = formatRealSenderLocation(realSender);
 
   const caseId = analysis.id || 'CASE-2026-8894';
   const evidenceId = analysis.evidenceId || `EV-${caseId.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 8)}`;
@@ -185,6 +198,51 @@ export function generateForensicPdfDossier({
 
   curY += 49;
 
+  // 2B. REAL SENDER (CLIENT / HUMAN DEVICE) ATTRIBUTION
+  // Distinct from ORIGIN IP above, which is the sending domain's own registered mail
+  // relay/infrastructure. This box only renders populated values when the sending
+  // platform actually disclosed a client IP header (e.g. X-Originating-IP) — zero fake data.
+  checkPageBreak(24);
+
+  const realSenderBg = realSender.resolved ? [16, 30, 22] : [26, 23, 18];
+  const realSenderBorder = realSender.resolved ? [72, 169, 117] : [58, 53, 44];
+  pdf.setFillColor(realSenderBg[0], realSenderBg[1], realSenderBg[2]);
+  pdf.setDrawColor(realSenderBorder[0], realSenderBorder[1], realSenderBorder[2]);
+  pdf.setLineWidth(0.4);
+  pdf.roundedRect(margin, curY, contentWidth, 20, 1.5, 1.5, 'FD');
+
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(178, 58, 46);
+  pdf.text('SECTION 01B: REAL SENDER (CLIENT / HUMAN DEVICE) ATTRIBUTION', margin + 4, curY + 6);
+
+  pdf.setDrawColor(58, 53, 44);
+  pdf.line(margin + 4, curY + 8, pageWidth - margin - 4, curY + 8);
+
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(7);
+  pdf.setTextColor(140, 133, 120);
+  pdf.text('REAL SENDER IP:', margin + 4, curY + 13);
+
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(realSender.resolved ? 72 : 190, realSender.resolved ? 220 : 182, realSender.resolved ? 129 : 169);
+  const realSenderIpLine = realSender.resolved ? `${realSenderIp}  (via ${realSender.ipSource})` : realSenderIp;
+  pdf.text(realSenderIpLine.length > 60 ? realSenderIpLine.slice(0, 57) + '...' : realSenderIpLine, margin + 34, curY + 13);
+
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(7);
+  pdf.setTextColor(140, 133, 120);
+  pdf.text('SENDER GEOLOCATION:', margin + 4, curY + 18);
+
+  pdf.setFont('courier', 'normal');
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(237, 230, 216);
+  const geoLine = realSenderLocation.length > 62 ? realSenderLocation.slice(0, 59) + '...' : realSenderLocation;
+  pdf.text(geoLine, margin + 34, curY + 18);
+
+  curY += 25;
+
   // 3. AUTHENTICATION TRUTH MATRIX (SPF / DKIM / DMARC / ARC / REVERSE DNS)
   pdf.setFillColor(26, 23, 18);
   pdf.setDrawColor(58, 53, 44);
@@ -289,7 +347,8 @@ export function generateForensicPdfDossier({
   curY += 6;
 
   const iocRows = [
-    { type: 'IPv4 Origin', val: originIp, ctx: `Origin MTA (${originCountry})`, action: 'Edge ACL / Firewall Drop' },
+    { type: 'IPv4 Origin (Relay)', val: originIp, ctx: `Origin MTA (${originCountry})`, action: 'Edge ACL / Firewall Drop' },
+    ...(realSender.resolved ? [{ type: 'IPv4 Real Sender', val: realSenderIp, ctx: `${realSenderLocation} • via ${realSender.ipSource}`, action: 'Endpoint / User Investigation' }] : []),
     { type: 'Sender Domain', val: (analysis.from?.split('@')[1] || 'domain.com').slice(0, 30), ctx: 'Registered Ingress Domain', action: 'DNS Sinkhole & MX Quarantine' },
     { type: 'Autonomous Sys', val: originAsn, ctx: originOrg.slice(0, 24), action: 'SIEM Feed Correlation' },
     { type: 'Message Hash', val: sha256Digest.slice(0, 32) + '...', ctx: 'RFC 822 Cryptographic Digest', action: 'Global Mailbox Purge (M365/GW)' }

@@ -3,6 +3,7 @@ import { EmailAnalysis, EvidenceCardData } from '../types';
 import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { sha256Sync, generateEvidenceId } from '../utils/crypto';
 import { resolveOrigin, formatOriginLocation, formatOriginIp } from '../utils/originResolution';
+import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { generateAttackNarrative } from '../utils/attackNarrative';
 import { computeCounterfactuals, CounterfactualFactor } from '../utils/counterfactual';
@@ -84,6 +85,15 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
   const isTor = Boolean(matchedOriginHop?.is_tor || matchedOriginHop?.reverseDns?.includes('tor'));
   const torRdns = matchedOriginHop?.reverseDns || 'No PTR record';
   const abuseScore = origin.resolved ? (matchedOriginHop?.abuseScore ?? 0) : 0;
+
+  // Real human sender (client) IP — distinct from the "Origin Relay IP" above, which is
+  // the sending domain's own registered outbound mail server/infra IP. Only populated
+  // when the sending platform actually disclosed it (e.g. X-Originating-IP). Never fabricated.
+  const realSender = analysis.realSenderIp?.resolved
+    ? analysis.realSenderIp
+    : extractRealSenderIp(analysis.headers?.allHeaders);
+  const realSenderIpStr = formatRealSenderIp(realSender);
+  const realSenderLocStr = formatRealSenderLocation(realSender);
 
   // Relay Chain
   let chainString = '';
@@ -209,7 +219,17 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
       mapsUrl,
       extraRows: [
         ...(isTor ? [{ k: 'TOR EXIT', v: `ACTIVE — ${torRdns}`, status: 'bad' }] : []),
-        { k: 'ABUSEIPDB', v: `${abuseScore} / 100 blacklisted`, status: abuseScore > 50 ? 'bad' : abuseScore > 20 ? 'warn' : 'good' }
+        { k: 'ABUSEIPDB', v: `${abuseScore} / 100 blacklisted`, status: abuseScore > 50 ? 'bad' : abuseScore > 20 ? 'warn' : 'good' },
+        {
+          k: 'REAL SENDER IP',
+          v: realSender.resolved ? `${realSenderIpStr} (via ${realSender.ipSource})` : realSenderIpStr,
+          status: realSender.resolved ? (realSender.isProxyOrVpn || realSender.isTor ? 'bad' : 'good') : ''
+        },
+        {
+          k: 'SENDER GEOLOCATION',
+          v: realSenderLocStr,
+          status: realSender.resolved ? '' : ''
+        }
       ]
     },
     relay: {

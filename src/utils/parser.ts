@@ -2,6 +2,7 @@ import { EmailAnalysis, EmailHop, ExtractedUrl, AttachmentInfo, HeuristicSignal,
 import { sha256Sync, generateEvidenceId } from './crypto';
 import { lookupMaxMindGeo } from './maxmindService';
 import { parseAuthenticationHeaders } from './authParser';
+import { extractRealSenderIp } from './realSenderIp';
 
 export function defangUrl(url: string): string {
   return url
@@ -542,6 +543,7 @@ export function mapBackendCaseToAnalysis(
     graph: data.graph || null,
     riskScore: calculatedRiskScore,
     threatScore: calculatedRiskScore,
+    realSenderIp: data.real_sender_ip || data.realSenderIp || extractRealSenderIp(allHeadersMap),
     threatVerdict: resolvedVerdict,
     verdict: resolvedVerdict,
     mlConfidence: resolvedMlConfidence,
@@ -904,6 +906,8 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     heuristics,
     logs,
     riskScore,
+    threatScore: riskScore,
+    realSenderIp: extractRealSenderIp(headerMap),
     verdict,
     mlConfidence,
     rawEml: raw,

@@ -362,6 +362,31 @@ export interface EmailAnalysis {
     value: string;
     autoMergeEligible?: boolean;
   }>;
+  /**
+   * The real human sender's client IP — recovered from webmail/MTA-injected headers
+   * such as X-Originating-IP, X-Client-IP, etc. — as distinct from the "Origin Relay IP"
+   * (the sending domain's own registered outbound mail server/infra IP derived from
+   * Received: hop tracing). Only populated when the sending platform actually discloses
+   * it; never fabricated. See src/utils/realSenderIp.ts.
+   */
+  realSenderIp?: {
+    ip: string | null;
+    ipSource: string | null;
+    city: string | null;
+    region: string | null;
+    country: string | null;
+    countryCode: string | null;
+    lat: number | null;
+    lng: number | null;
+    asn: string | null;
+    org: string | null;
+    isp: string | null;
+    reverseDns: string | null;
+    isProxyOrVpn: boolean;
+    isTor: boolean;
+    maxmindVerified: boolean;
+    resolved: boolean;
+  };
 }
 
 export interface EvidenceCardData {

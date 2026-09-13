@@ -7,6 +7,7 @@ import {
   maskIp, 
   getRetentionPurgeDate 
 } from './privacyCompliance';
+import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from './realSenderIp';
 
 export const MAXMIND_README_CONTENT = `# MaxMind GeoLite2 Data Directory
 
@@ -30,6 +31,18 @@ export function generateForensicMarkdownReport(
   const displayTo = enforceMasking ? maskEmail(analysis.to || analysis.headers?.to, privacyConfig.maskingMode) : (analysis.to || analysis.headers?.to || 'UNKNOWN');
   const displaySubject = enforceMasking ? maskText(analysis.name || analysis.subject || analysis.headers?.subject, privacyConfig.maskingMode) : (analysis.name || analysis.subject || analysis.headers?.subject || 'NO SUBJECT');
   const purgeInfo = getRetentionPurgeDate(privacyConfig.retentionPolicy, analysis.analyzedAt);
+
+  // Real human sender (client) IP — distinct from the "Origin Relay IP" above, which is
+  // the sending domain's own registered outbound mail server/infra IP. Only populated
+  // when the sending platform actually disclosed it (e.g. X-Originating-IP). Never fabricated.
+  const realSender = analysis.realSenderIp?.resolved
+    ? analysis.realSenderIp
+    : extractRealSenderIp(analysis.headers?.allHeaders);
+  const realSenderIpRaw = formatRealSenderIp(realSender);
+  const realSenderIpDisplay = realSender.resolved
+    ? (enforceMasking ? maskIp(realSender.ip || undefined, false, privacyConfig.maskingMode) : realSenderIpRaw)
+    : realSenderIpRaw;
+  const realSenderLocation = formatRealSenderLocation(realSender);
 
   const hopsTable = (analysis.hops || []).map((h, i) => {
     const ip = enforceMasking ? maskIp(h.fromIp, h.isPrivate, privacyConfig.maskingMode) : (h.fromIp || '0.0.0.0');
@@ -66,6 +79,8 @@ export function generateForensicMarkdownReport(
 | **Origin Relay IP** | \`${originIp}\` |
 | **Geographical Origin** | ${originHop?.city || 'Unknown'}, ${originHop?.country || 'Unknown'} |
 | **Origin ASN / Org** | \`${originHop?.asn || 'AS44050'}\` (${originHop?.org || originHop?.isp || 'Transit Operator'}) |
+| **Real Sender IP (Human Device)** | \`${realSenderIpDisplay}\`${realSender.resolved ? ` (via \`${realSender.ipSource}\`)` : ''} |
+| **Real Sender Geolocation** | ${realSenderLocation} |
 | **DKIM Signature** | \`${analysis.auth?.dkim?.status || 'NONE'}\` |
 | **SPF Validation** | \`${analysis.auth?.spf?.status || 'NONE'}\` |
 | **DMARC Policy** | \`${analysis.auth?.dmarc?.status || 'NONE'}\` |
