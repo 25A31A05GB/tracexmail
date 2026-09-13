@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, ShieldAlert, Lock, MailCheck, Send } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface LoginViewProps {
@@ -37,11 +37,6 @@ export function LoginView({
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
 
-  // MFA state
-  const [mfaChallenge, setMfaChallenge] = useState<{ factorId: string; challengeId: string } | null>(null);
-  const [totpCode, setTotpCode] = useState('');
-  const [mfaVerifying, setMfaVerifying] = useState(false);
-
   const handleBack = onBackToIntro || onBackToGate;
 
   const handleResendVerification = async () => {
@@ -52,7 +47,10 @@ export function LoginView({
       if (isSupabaseConfigured && supabase) {
         const { error } = await supabase.auth.resend({
           type: 'signup',
-          email: email.trim()
+          email: email.trim(),
+          options: {
+            emailRedirectTo: window.location.origin
+          }
         });
         if (error) {
           setResendStatus('Failed to resend: ' + error.message);
@@ -60,43 +58,17 @@ export function LoginView({
           setResendStatus('Verification link dispatched to ' + email.trim() + '. Please check your inbox.');
         }
       } else {
-        setResendStatus('Verification link dispatched to ' + email.trim() + '.');
+        await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), redirectTo: window.location.origin })
+        });
+        setResendStatus('Verification link dispatched to ' + email.trim() + '. Please check your inbox.');
       }
     } catch (err: any) {
       setResendStatus(err.message || 'Error sending verification link.');
     } finally {
       setResending(false);
-    }
-  };
-
-  const handleVerifyMfa = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!totpCode || totpCode.trim().length < 6 || !mfaChallenge) {
-      setErrorMsg('Please enter your 6-digit authenticator security code.');
-      return;
-    }
-    setMfaVerifying(true);
-    setErrorMsg(null);
-    try {
-      if (supabase) {
-        const { error } = await supabase.auth.mfa.verify({
-          factorId: mfaChallenge.factorId,
-          challengeId: mfaChallenge.challengeId,
-          code: totpCode.trim()
-        });
-        if (error) {
-          setErrorMsg('Invalid or expired MFA code. Please check your authenticator app and try again.');
-          setMfaVerifying(false);
-          return;
-        }
-      }
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'MFA verification failed.');
-    } finally {
-      setMfaVerifying(false);
     }
   };
 
@@ -116,7 +88,6 @@ export function LoginView({
     setErrorMsg(null);
     setVerificationPending(false);
     setResendStatus(null);
-    setMfaChallenge(null);
 
     try {
       // 1. Primary: Supabase Auth
@@ -147,37 +118,6 @@ export function LoginView({
             setErrorMsg('Access Restricted: Email verification pending. Please verify your email before logging in.');
             setLoading(false);
             return;
-          }
-
-          // Check if user requires MFA challenge
-          try {
-            const { data: aalData, error: aalErr } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-            if (aalErr) {
-              console.warn('[LoginView] Supabase getAuthenticatorAssuranceLevel notice:', aalErr.message);
-            }
-            if (aalData && aalData.currentLevel === 'aal1' && aalData.nextLevel === 'aal2') {
-              console.log('[LoginView] User requires AAL2 MFA verification. Fetching factors...');
-              const { data: factorsData, error: factorsErr } = await supabase.auth.mfa.listFactors();
-              if (factorsErr) {
-                console.warn('[LoginView] /auth/v1/factors listFactors notice during login:', factorsErr.message, factorsErr);
-              }
-              const totpFactor = factorsData?.totp?.find((f: any) => f.status === 'verified');
-              if (totpFactor) {
-                const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-                  factorId: totpFactor.id
-                });
-                if (!challengeError && challengeData) {
-                  setMfaChallenge({
-                    factorId: totpFactor.id,
-                    challengeId: challengeData.id
-                  });
-                  setLoading(false);
-                  return;
-                }
-              }
-            }
-          } catch (mfaErr) {
-            console.warn('[LoginView] MFA challenge check notice:', mfaErr);
           }
 
           if (onSuccess) onSuccess();
@@ -319,105 +259,61 @@ export function LoginView({
           <div className="flex-1 h-px bg-[var(--line)]" />
         </div>
 
-        {mfaChallenge ? (
-          <form onSubmit={handleVerifyMfa} className="space-y-4">
-            <div className="p-3 bg-[rgba(201,162,39,0.12)] border border-[var(--stamp)] rounded-[2px] text-xs text-[var(--paper)]">
-              <div className="font-semibold text-[var(--stamp)] flex items-center gap-1.5 mb-1">
-                <ShieldAlert className="w-4 h-4" />
-                Multi-Factor Authentication Required
-              </div>
-              <p className="text-[11.5px] text-[var(--paper-dim)]">
-                Enter the 6-digit verification code from your authenticator app (Google Authenticator, 1Password, Authy).
-              </p>
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div>
+            <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
+              Work Email
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="analyst@enterprise.corp"
+              className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+            />
+          </div>
 
-            <div>
-              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
-                6-Digit Security Code
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
+                Password
               </label>
-              <input
-                type="text"
-                maxLength={6}
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
-                autoFocus
-                className="w-full text-center tracking-[0.5em] font-mono text-lg py-2.5 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)]"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={mfaVerifying || totpCode.length < 6}
-              className="w-full py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {mfaVerifying ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Verifying Code…</span>
-                </>
-              ) : (
-                <span>Confirm & Sign In</span>
+              {onForgotPassword && (
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-[11px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
+                >
+                  Forgot Password?
+                </button>
               )}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
-                Work Email
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="analyst@enterprise.corp"
-                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
-              />
             </div>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••••••"
+              className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+            />
+          </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
-                  Password
-                </label>
-                {onForgotPassword && (
-                  <button
-                    type="button"
-                    onClick={onForgotPassword}
-                    className="text-[11px] text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer transition-colors bg-transparent border-0 p-0"
-                  >
-                    Forgot Password?
-                  </button>
-                )}
-              </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-2.5 px-4 bg-[var(--thread)] text-[var(--paper)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Authenticating…</span>
-                </>
-              ) : (
-                <span>Sign In to Workspace</span>
-              )}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 py-2.5 px-4 bg-[var(--thread)] text-[var(--paper)] font-semibold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Authenticating…</span>
+              </>
+            ) : (
+              <span>Sign In to Workspace</span>
+            )}
+          </button>
+        </form>
 
         {/* Footer links */}
         <div className="mt-5 pt-4 border-t border-[var(--line)] flex items-center justify-between text-xs text-[var(--paper-dim)]">

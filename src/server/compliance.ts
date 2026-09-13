@@ -734,6 +734,10 @@ function getKnownApiKeys(): Record<string, { userId: string; email: string; orga
  * Verifies Supabase Auth tokens using the service-role client and queries the profiles table.
  */
 export async function authenticateUser(req: Request, _res: Response, next: NextFunction) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   const apiKeyHeader = req.headers['x-api-key'] as string | undefined;
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { 
   ShieldCheck, 
   ShieldAlert, 
@@ -46,11 +46,12 @@ import { computeSha256 } from '../utils/crypto';
 import { classifyIp } from '../utils/parser';
 import { lookupMaxMindGeo } from '../utils/maxmindService';
 import { WhyAffordance } from './WhyAffordance';
-import { RelationshipGraphView } from './RelationshipGraphView';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
+
+const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
 interface AICaseSummaryProps {
   analysis: EmailAnalysis;
@@ -1406,10 +1407,16 @@ export function OverviewView({
           </div>
 
           <div className="h-[480px] w-full rounded-xl overflow-hidden border border-slate-800">
-            <RelationshipGraphView
-              analysis={analysis}
-              caseId={analysis.id}
-            />
+            <React.Suspense fallback={
+              <div className="flex-1 flex items-center justify-center h-full bg-[#0b0d12]">
+                <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+              </div>
+            }>
+              <RelationshipGraphView
+                analysis={analysis}
+                caseId={analysis.id}
+              />
+            </React.Suspense>
           </div>
         </div>
 

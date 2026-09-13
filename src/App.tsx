@@ -1,8 +1,15 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
-import { DashboardView } from './components/DashboardView';
+import { LandingView } from './components/LandingView';
 import { OverviewView } from './components/OverviewView';
+import { ThreatTimelineView } from './components/ThreatTimelineView';
+import { HopTracerouteView } from './components/HopTracerouteView';
+import { ThreatLogView } from './components/ThreatLogView';
+import { RawHeaderView } from './components/RawHeaderView';
+import { OrganizationView } from './components/OrganizationView';
+import { TeamView } from './components/TeamView';
+import { AccountSettingsView } from './components/AccountSettingsView';
 import { AlertToast } from './components/AlertToast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { SAMPLE_ANALYSES } from './data/samples';
@@ -16,23 +23,15 @@ import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
 
-// Code-split heavy views & third-party bundles (D3, Leaflet, ReactFlow, jsPDF) via React.lazy()
-const LandingView = lazy(() => import('./components/LandingView').then(m => ({ default: m.LandingView })));
+const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const CasesView = lazy(() => import('./components/CasesView').then(m => ({ default: m.CasesView })));
 const CampaignsView = lazy(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })));
 const SearchView = lazy(() => import('./components/SearchView').then(m => ({ default: m.SearchView })));
-const ThreatTimelineView = lazy(() => import('./components/ThreatTimelineView').then(m => ({ default: m.ThreatTimelineView })));
 const RelationshipGraphView = lazy(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
-const HopTracerouteView = lazy(() => import('./components/HopTracerouteView').then(m => ({ default: m.HopTracerouteView })));
 const MapView = lazy(() => import('./components/MapView').then(m => ({ default: m.MapView })));
-const ThreatLogView = lazy(() => import('./components/ThreatLogView').then(m => ({ default: m.ThreatLogView })));
-const RawHeaderView = lazy(() => import('./components/RawHeaderView').then(m => ({ default: m.RawHeaderView })));
 const AlertsView = lazy(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })));
 const IngestionPipelineView = lazy(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })));
 const GmailConnectionView = lazy(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
-const OrganizationView = lazy(() => import('./components/OrganizationView').then(m => ({ default: m.OrganizationView })));
-const TeamView = lazy(() => import('./components/TeamView').then(m => ({ default: m.TeamView })));
-const AccountSettingsView = lazy(() => import('./components/AccountSettingsView').then(m => ({ default: m.AccountSettingsView })));
 
 // Code-split modals and non-critical dialogs
 const ModeUpgradeModal = lazy(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })));
@@ -434,6 +433,10 @@ export default function App() {
         )}
         {authView === 'reset-password' && (
           <ResetPasswordView
+            onRequestResetLink={() => {
+              setAuthView('forgot-password');
+              window.location.hash = '#forgot-password';
+            }}
             onSuccess={() => {
               setActiveTab('ingest');
               setAuthView('intro');
@@ -441,6 +444,11 @@ export default function App() {
             }}
             onBackToLogin={() => {
               setAuthView('login');
+              window.location.hash = '';
+            }}
+            onSelectRoleLogin={(selectedRole, options) => {
+              setActiveTab('ingest');
+              loginAsRole(selectedRole, options);
               window.location.hash = '';
             }}
           />
@@ -665,7 +673,11 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <Suspense fallback={<ViewSuspenseLoader />}>
+            <Suspense fallback={
+              <div className="flex-1 flex items-center justify-center h-full">
+                <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+              </div>
+            }>
               {effectiveTab === 'dashboard' && (
                 <DashboardView
                   onSelectAnalysis={setCurrentAnalysis}

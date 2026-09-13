@@ -1,9 +1,8 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, ShieldAlert, Shield, Eye, User, Building2, MailCheck, KeyRound } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, User, Building2, MailCheck, Send, RefreshCw, Mail } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
-import { OtpVerificationModal } from './OtpVerificationModal';
 
 interface SignupViewProps {
   onBackToLogin: () => void;
@@ -26,7 +25,7 @@ export function SignupView({
   onSuccess,
   onSelectRoleLogin 
 }: SignupViewProps) {
-  const [step, setStep] = useState<'form' | 'otp'>('form');
+  const [step, setStep] = useState<'form' | 'verification-sent'>('form');
   const [accountType, setAccountType] = useState<AccountType>('personal');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -34,6 +33,8 @@ export function SignupView({
   const [orgName, setOrgName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('analyst');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -59,25 +60,126 @@ export function SignupView({
     setLoading(true);
     setErrorMsg(null);
     setSuccessMsg(null);
+    setResendStatus(null);
 
-    // Transition to 6-digit OTP verification
-    setStep('otp');
-    setLoading(false);
+    const cleanEmail = email.trim().toLowerCase();
+    const assignedOrg = accountType === 'organization' ? (orgName.trim() || 'Acme Cyber Defense SOC') : 'Personal Sandbox';
+    const assignedRole = accountType === 'organization' ? (selectedRole || 'admin') : 'analyst';
+    const effectiveName = fullName.trim() || cleanEmail.split('@')[0];
+
+    try {
+      const redirectUrl = window.location.origin;
+
+      // 1. Register with Supabase if configured
+      if (isSupabaseConfigured && supabase) {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              full_name: effectiveName,
+              org_name: assignedOrg,
+              role: assignedRole,
+              account_type: accountType
+            }
+          }
+        });
+
+        if (error) {
+          const errMsg = error.message.toLowerCase();
+          if (errMsg.includes('pwned') || errMsg.includes('compromised') || errMsg.includes('breach') || errMsg.includes('leaked')) {
+            setErrorMsg('Security Warning: This password has appeared in a known public data breach. Please choose a different, unique passphrase.');
+            setLoading(false);
+            return;
+          }
+          if (!errMsg.includes('already registered') && !errMsg.includes('already exists') && !errMsg.includes('user already in use')) {
+            console.warn('[SignupView] Supabase signUp notice:', error.message);
+          }
+        } else {
+          // If Supabase auto-confirmed session
+          if (data.session && data.user?.email_confirmed_at) {
+            if (onSelectRoleLogin) {
+              onSelectRoleLogin(assignedRole, {
+                token: data.session.access_token,
+                userId: data.user.id,
+                email: cleanEmail,
+                fullName: effectiveName,
+                orgName: assignedOrg,
+                accountType,
+                isEmailVerified: true
+              });
+              return;
+            } else if (onSuccess) {
+              onSuccess();
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Also register in local/enclave backend
+      try {
+        await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: cleanEmail,
+            password,
+            fullName: effectiveName,
+            orgName: assignedOrg,
+            role: assignedRole,
+            accountType
+          })
+        });
+      } catch (srvErr) {
+        console.warn('[SignupView] Backend registration notice:', srvErr);
+      }
+
+      // Transition to email verification link confirmation
+      setStep('verification-sent');
+    } catch (err: any) {
+      console.error('[SignupView] Registration error:', err);
+      setErrorMsg(err.message || 'An error occurred during registration. Please verify your details.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleOtpVerified = (data: any) => {
-    if (data.token && data.user && onSelectRoleLogin) {
-      onSelectRoleLogin(data.user.role || selectedRole, {
-        token: data.token,
-        userId: data.user.id,
-        email: data.user.email,
-        fullName: data.user.fullName || fullName,
-        orgName: orgName || data.user.orgName,
-        accountType: data.user.accountType || accountType,
-        isEmailVerified: true
-      });
-    } else if (onSuccess) {
-      onSuccess();
+  const handleResendVerification = async () => {
+    if (!email) return;
+    setResending(true);
+    setResendStatus(null);
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const redirectUrl = window.location.origin;
+
+      if (isSupabaseConfigured && supabase) {
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email: cleanEmail,
+          options: {
+            emailRedirectTo: redirectUrl
+          }
+        });
+        if (error) {
+          console.warn('[SignupView] Resend error:', error.message);
+          setResendStatus('Failed to resend: ' + error.message);
+        } else {
+          setResendStatus(`A fresh verification link has been dispatched to ${cleanEmail}.`);
+        }
+      } else {
+        await fetch('/api/auth/resend-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, redirectTo: redirectUrl })
+        });
+        setResendStatus(`Verification link resent to ${cleanEmail}.`);
+      }
+    } catch (err: any) {
+      setResendStatus(err.message || 'Error resending verification email.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -85,22 +187,61 @@ export function SignupView({
     <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
       <div className="w-full max-w-[490px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
         
-        {step === 'otp' ? (
-          <OtpVerificationModal
-            email={email.trim()}
-            type="signup"
-            title="Verify One-Time Password"
-            subtitle={`Enter the 6-digit OTP dispatched to ${email.trim()} to activate your forensic workspace.`}
-            extraPayload={{
-              password,
-              fullName: fullName.trim() || (accountType === 'personal' ? 'Forensic User' : 'Team Member'),
-              orgName: accountType === 'organization' ? (orgName.trim() || 'Enterprise Cyber SOC') : 'Personal Sandbox',
-              role: accountType === 'organization' ? (selectedRole || 'admin') : 'analyst',
-              accountType
-            }}
-            onVerified={handleOtpVerified}
-            onBack={() => setStep('form')}
-          />
+        {step === 'verification-sent' ? (
+          <div className="space-y-4">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-2 shadow-sm">
+                <Mail className="w-7 h-7" />
+              </div>
+              <h2 className="font-display font-bold text-xl text-[var(--paper)]">
+                Verify Your Email Address
+              </h2>
+              <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
+                We sent a secure verification link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span>.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-2.5">
+              <div className="font-semibold text-[var(--paper)] flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
+                <span>One Click to Activate:</span>
+              </div>
+              <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
+                Click the confirmation link inside the email to verify your email and unlock full access to your TraceXMail forensic workspace.
+              </p>
+            </div>
+
+            {resendStatus && (
+              <div className="p-3 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-[var(--paper)] text-xs flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[var(--forensic-green)]" />
+                <div className="leading-relaxed font-sans">{resendStatus}</div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resending}
+                className="w-full py-2.5 px-4 bg-[var(--ink-2)] border border-[var(--line)] hover:border-[var(--paper-dim)] text-[var(--paper)] font-semibold text-xs rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-[var(--slate)] ${resending ? 'animate-spin' : ''}`} />
+                <span>{resending ? 'Resending Link…' : 'Resend Verification Email'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onBackToLogin}
+                className="w-full py-2 px-3 text-xs text-[var(--stamp)] hover:underline flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
+              >
+                <span>Return to Sign In →</span>
+              </button>
+            </div>
+
+            <div className="pt-2 text-center text-[10.5px] text-[var(--paper-muted)] font-mono">
+              Didn't see it? Please check your Spam or Promotions folder.
+            </div>
+          </div>
         ) : (
           <>
             <div className="flex items-center justify-between mb-4 border-b border-[var(--line)] pb-3">
@@ -323,10 +464,13 @@ export function SignupView({
                 {loading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing…</span>
+                    <span>Creating Account…</span>
                   </>
                 ) : (
-                  <span>Continue to OTP Verification →</span>
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Create Account & Send Verification Link →</span>
+                  </>
                 )}
               </button>
             </form>

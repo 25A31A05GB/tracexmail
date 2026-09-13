@@ -42,7 +42,7 @@ import {
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
-import { API_URL } from '../lib/api';
+import { API_URL, apiFetch } from '../lib/api';
 
 export interface SyncedEmailItem {
   id: string;
@@ -488,11 +488,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       setErrorMsg('');
       setSyncResult('');
 
-      const res = await fetch(`${API_URL}/api/gmail/oauth/start`, {
-        headers: {
-          'x-organization-id': 'org_acme_soc_01',
-        },
-      });
+      const res = await apiFetch('/api/gmail/oauth/start');
 
       const data = await res.json();
       if (!res.ok || !data?.url) {

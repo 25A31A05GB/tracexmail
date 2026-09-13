@@ -188,18 +188,18 @@ export function formatRealSenderIp(info: RealSenderIpInfo, senderDomain?: string
   if (!info.resolved || !info.ip) {
     const domain = (senderDomain || '').toLowerCase();
     if (domain === 'gmail.com' || domain === 'googlemail.com' || domain.endsWith('.google.com')) {
-      return 'Not disclosed by Gmail (Google strips client device IP for privacy; outbound Google relay MTA shown above)';
+      return "Not disclosed by Gmail (Google strips client device IP for privacy; outbound Google relay MTA shown above). Only Google holds this — law enforcement can request it via Google's Law Enforcement Request System, or civil parties via subpoena through legal counsel. Cite the exact Message-ID and UTC send time below.";
     }
     if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com' || domain.endsWith('.microsoft.com')) {
-      return 'Not disclosed by Microsoft (client device IP omitted by webmail; outbound Microsoft relay MTA shown above)';
+      return "Not disclosed by Microsoft (client device IP omitted by webmail; outbound Microsoft relay MTA shown above). Only Microsoft holds this — law enforcement can request it via Microsoft's Law Enforcement Request System, or civil parties via subpoena through legal counsel. Cite the exact Message-ID and UTC send time below.";
     }
     if (domain === 'yahoo.com' || domain === 'aol.com') {
-      return 'Not disclosed by Yahoo/AOL (client device IP omitted; outbound relay MTA shown above)';
+      return "Not disclosed by Yahoo/AOL (client device IP omitted; outbound relay MTA shown above). Only Yahoo holds this — law enforcement can request it via Yahoo's Law Enforcement Portal, or civil parties via subpoena through legal counsel. Cite the exact Message-ID and UTC send time below.";
     }
     if (domain === 'icloud.com' || domain === 'me.com' || domain === 'mac.com') {
-      return 'Not disclosed by Apple iCloud (Apple omits client device IP for privacy; outbound relay MTA shown above)';
+      return "Not disclosed by Apple iCloud (Apple omits client device IP for privacy; outbound relay MTA shown above). Only Apple holds this — law enforcement can request it via Apple's Law Enforcement Portal, or civil parties via subpoena through legal counsel. Cite the exact Message-ID and UTC send time below.";
     }
-    return 'Not disclosed by sending platform (no client-IP header present; relay MTA IP shown above)';
+    return "Not disclosed by sending platform (no client-IP header present; relay MTA IP shown above). Only the sending mail provider holds this — law enforcement can request it via legal process, or civil parties via subpoena through legal counsel. Cite the exact Message-ID and UTC send time below.";
   }
   return info.ip;
 }
@@ -211,12 +211,18 @@ export function formatRealSenderLocation(info: RealSenderIpInfo, senderDomain?: 
   if (!info.resolved) {
     const domain = (senderDomain || '').toLowerCase();
     if (domain === 'gmail.com' || domain === 'googlemail.com' || domain.endsWith('.google.com')) {
-      return 'Unresolved — Gmail client devices connect via HTTPS and Google does not leak client IP in headers';
+      return 'Unresolved — Gmail client devices connect via HTTPS; Google retains client IP logs internally (accessible via Google LERS / legal process).';
     }
     if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com' || domain.endsWith('.microsoft.com')) {
-      return 'Unresolved — Microsoft webmail does not publish client device IP in headers';
+      return 'Unresolved — Microsoft webmail does not publish client device IP in headers; retained in Azure/M365 audit logs.';
     }
-    return "Unresolved — sending platform did not disclose the sender's real client IP";
+    if (domain === 'yahoo.com' || domain === 'aol.com') {
+      return 'Unresolved — Yahoo/AOL webmail omits client device IP from modern headers; retained in Yahoo legal response records.';
+    }
+    if (domain === 'icloud.com' || domain === 'me.com' || domain === 'mac.com') {
+      return 'Unresolved — Apple iCloud strips client device IP for privacy; retained in Apple Law Enforcement Records.';
+    }
+    return "Unresolved — sending platform did not disclose the sender's real client IP; retained in provider authentication/session logs.";
   }
   const parts: string[] = [];
   if (info.city && info.country) {

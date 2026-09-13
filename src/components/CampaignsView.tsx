@@ -21,7 +21,6 @@ import {
   TrendingUp,
   AlertCircle
 } from 'lucide-react';
-import { RelationshipGraphView } from './RelationshipGraphView';
 import { forensicApi, CampaignItem, CampaignTimelineResponse, TimelineEvent } from '../lib/api';
 
 export function CampaignsView() {

@@ -1434,30 +1434,65 @@ async function startServer() {
       .filter(Boolean)
   ];
 
-  const corsOptions: CorsOptions = {
-    origin: (requestOrigin, callback) => {
-      // Allow requests with no origin (e.g. server-to-server, curl, mobile apps, or same-origin)
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
-      if (
-        allowedOriginsList.includes(requestOrigin) ||
-        requestOrigin.endsWith('.vercel.app') ||
-        requestOrigin.endsWith('.run.app') ||
-        requestOrigin.includes('localhost') ||
-        requestOrigin.includes('127.0.0.1')
-      ) {
-        return callback(null, true);
-      }
-      // If origin is not on allow-list, disallow cross-origin access
-      return callback(null, false);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'X-Goog-PubSub-Token', 'apikey']
+  const standardAllowedHeaders = [
+    'Content-Type',
+    'Authorization',
+    'X-API-Key',
+    'x-api-key',
+    'X-Requested-With',
+    'X-Goog-PubSub-Token',
+    'apikey',
+    'x-organization-id',
+    'X-Organization-Id',
+    'x-user-email',
+    'X-User-Email',
+    'Accept',
+    'Cache-Control',
+    'Pragma',
+    'Origin'
+  ];
+
+  const corsOptionsDelegate = (req: express.Request, callback: (err: Error | null, options?: CorsOptions) => void) => {
+    const requestOrigin = req.header('Origin');
+
+    let isAllowedOrigin = false;
+    if (!requestOrigin) {
+      isAllowedOrigin = true;
+    } else if (
+      allowedOriginsList.includes(requestOrigin) ||
+      requestOrigin.endsWith('.vercel.app') ||
+      requestOrigin.endsWith('.run.app') ||
+      requestOrigin.endsWith('.onrender.com') ||
+      requestOrigin.endsWith('.pages.dev') ||
+      requestOrigin.includes('localhost') ||
+      requestOrigin.includes('127.0.0.1')
+    ) {
+      isAllowedOrigin = true;
+    }
+
+    if (!isAllowedOrigin) {
+      return callback(null, { origin: false });
+    }
+
+    // Dynamically include any requested headers from Access-Control-Request-Headers alongside standard headers
+    const reqHeaders = req.header('access-control-request-headers');
+    const dynamicHeaders = reqHeaders
+      ? reqHeaders.split(',').map(h => h.trim()).filter(Boolean)
+      : [];
+    const mergedAllowedHeaders = Array.from(new Set([...standardAllowedHeaders, ...dynamicHeaders]));
+
+    callback(null, {
+      origin: requestOrigin || true,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: mergedAllowedHeaders,
+      exposedHeaders: ['Content-Range', 'X-Content-Range'],
+      optionsSuccessStatus: 200
+    });
   };
 
-  app.use(cors(corsOptions));
+  app.use(cors(corsOptionsDelegate));
+  app.options('*', cors(corsOptionsDelegate));
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));

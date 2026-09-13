@@ -5,7 +5,6 @@ import {
   AlertCircle, 
   ArrowLeft, 
   CheckCircle2, 
-  KeyRound, 
   Mail, 
   ShieldCheck, 
   Lock, 
@@ -15,7 +14,6 @@ import {
   ChevronUp,
   RefreshCw
 } from 'lucide-react';
-import { OtpVerificationModal } from './OtpVerificationModal';
 import { ResetPasswordView } from './ResetPasswordView';
 
 interface ForgotPasswordViewProps {
@@ -25,7 +23,7 @@ interface ForgotPasswordViewProps {
 }
 
 export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: ForgotPasswordViewProps) {
-  const [step, setStep] = useState<'request' | 'sent' | 'otp' | 'new-password'>('request');
+  const [step, setStep] = useState<'request' | 'sent' | 'new-password'>('request');
   const [email, setEmail] = useState('');
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,7 +56,6 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
 
         if (error) {
           logSupabaseAuthEvent('ResetPasswordRequest:Error', error, 'error');
-          // If rate limited or error, surface helpful explanation
           throw error;
         }
         logSupabaseAuthEvent('ResetPasswordRequest:Success');
@@ -75,7 +72,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       setStep('sent');
     } catch (err: any) {
       console.warn('[ForgotPassword] Supabase reset request notice:', err);
-      setErrorMsg(err.message || 'Unable to process recovery request. Please verify your email or use One-Time Password verification.');
+      setErrorMsg(err.message || 'Unable to process recovery request. Please verify your email address.');
     } finally {
       setLoading(false);
     }
@@ -92,6 +89,12 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
           redirectTo: redirectUrl
         });
         if (error) throw error;
+      } else {
+        await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), redirectTo: redirectUrl })
+        });
       }
       setSuccessMsg(`New recovery link dispatched to ${email.trim()}.`);
     } catch (err: any) {
@@ -99,13 +102,6 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     } finally {
       setResending(false);
     }
-  };
-
-  const handleOtpVerified = (data: any) => {
-    if (data.resetToken) {
-      setResetToken(data.resetToken);
-    }
-    setStep('new-password');
   };
 
   if (step === 'new-password') {
@@ -125,23 +121,6 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     );
   }
 
-  if (step === 'otp') {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
-        <div className="w-full max-w-[460px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
-          <OtpVerificationModal
-            email={email.trim()}
-            type="recovery"
-            title="Account Recovery Code"
-            subtitle={`Enter the 6-digit one-time password dispatched to ${email.trim()} to authorize your password change.`}
-            onVerified={handleOtpVerified}
-            onBack={() => setStep('request')}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
       <div className="w-full max-w-[460px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
@@ -158,22 +137,22 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
           </button>
 
           <div className="font-mono text-[10.5px] text-[var(--stamp)] uppercase tracking-wider ml-auto flex items-center gap-1">
-            <KeyRound className="w-3 h-3 text-[var(--stamp)]" />
-            <span>SUPABASE AUTH RECOVERY</span>
+            <Lock className="w-3 h-3 text-[var(--stamp)]" />
+            <span>EMAIL LINK RECOVERY</span>
           </div>
         </div>
 
         {step === 'sent' ? (
           <div className="space-y-4">
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-2">
+              <div className="w-14 h-14 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-2 shadow-sm">
                 <Mail className="w-7 h-7" />
               </div>
               <h2 className="font-display font-bold text-xl text-[var(--paper)]">
                 Check Your Email Inbox
               </h2>
               <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
-                We sent a password reset link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span> using the Supabase <span className="font-mono">resetPasswordForEmail</span> service.
+                We sent a password reset link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span>.
               </p>
             </div>
 
@@ -197,7 +176,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
                 <span>Next Step:</span>
               </div>
               <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
-                Click the confirmation button or link in the email. You will be redirected securely back to TraceXMail to choose a new password.
+                Click the confirmation button or link in the email. You will be redirected securely back to TraceXMail to set your new master password.
               </p>
             </div>
 
@@ -210,15 +189,6 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-[var(--slate)] ${resending ? 'animate-spin' : ''}`} />
                 <span>{resending ? 'Resending Link…' : 'Resend Recovery Email'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStep('otp')}
-                className="w-full py-2 px-3 text-xs text-[var(--stamp)] hover:underline flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Prefer 6-Digit One-Time Password? Verify with OTP →</span>
               </button>
             </div>
 
@@ -240,12 +210,12 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
                 <div className="w-2 h-2 rounded-full bg-[var(--thread)]" />
               </div>
               <span className="font-display font-bold text-xl text-[var(--paper)] tracking-tight">
-                Forgot Your Password?
+                Reset Master Password
               </span>
             </div>
 
             <div className="text-[var(--paper-dim)] text-[13.5px] mb-5">
-              Enter your verified email to receive a password reset link from Supabase Auth or verify instantly with an OTP.
+              Enter your work email address to receive a secure password recovery link.
             </div>
 
             {errorMsg && (
@@ -276,7 +246,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
                 </div>
               </div>
 
-              {/* Primary Action: Send Supabase Password Reset Email */}
+              {/* Primary Action: Send Password Reset Email */}
               <button
                 type="submit"
                 disabled={loading}
@@ -294,31 +264,9 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
                   </>
                 )}
               </button>
-
-              <div className="flex items-center gap-3 my-2 text-xs text-[var(--line)]">
-                <div className="flex-1 h-px bg-[var(--line)]" />
-                <span className="font-sans text-[11px] text-[var(--paper-dim)] font-medium">or instant verification</span>
-                <div className="flex-1 h-px bg-[var(--line)]" />
-              </div>
-
-              {/* Secondary Option: Instant OTP code */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!email) {
-                    setErrorMsg('Please enter your work email first.');
-                    return;
-                  }
-                  setStep('otp');
-                }}
-                className="w-full py-2 px-3 text-xs font-semibold text-[var(--paper-dim)] border border-[var(--line)] rounded-sm hover:text-[var(--paper)] hover:border-[var(--paper-dim)] transition-all cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <KeyRound className="w-3.5 h-3.5 text-[var(--slate)]" />
-                <span>Verify with 6-Digit One-Time Password</span>
-              </button>
             </form>
 
-            {/* Supabase Email Template Configuration helper */}
+            {/* Email Template Configuration helper */}
             <div className="mt-5 pt-3 border-t border-[var(--line)]">
               <button
                 type="button"
@@ -327,19 +275,19 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
               >
                 <span className="flex items-center gap-1">
                   <HelpCircle className="w-3 h-3 text-[var(--slate)]" />
-                  <span>Supabase Email Template Configuration</span>
+                  <span>Password Reset Link Instructions</span>
                 </span>
                 {showConfigGuide ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
 
               {showConfigGuide && (
                 <div className="mt-2 p-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[11px] font-mono text-[var(--paper-dim)] space-y-2">
-                  <div className="text-[var(--stamp)] font-semibold">Supabase Dashboard &gt; Auth &gt; Email Templates:</div>
-                  <div className="p-2 bg-[var(--ink-2)] rounded-[2px] text-[10.5px] leading-relaxed text-[var(--paper)] select-all overflow-x-auto">
-                    <code>&lt;a href=&quot;&#123;&#123; .ConfirmationURL &#125;&#125;&quot;&gt;Reset TraceXMail Password&lt;/a&gt;</code>
-                  </div>
+                  <div className="text-[var(--stamp)] font-semibold">How recovery works:</div>
+                  <p className="text-[11px] leading-relaxed">
+                    You will receive an email containing a secure single-use recovery link. Clicking that link brings you directly back to choose your new master password.
+                  </p>
                   <p className="text-[10px] text-[var(--paper-muted)]">
-                    Supabase replaces <code className="text-[var(--slate)]">&#123;&#123; .ConfirmationURL &#125;&#125;</code> with the secure recovery token and redirects back to the configured <code className="text-[var(--slate)]">redirectTo</code> URL (`/#reset-password`).
+                    If you don't receive the email within 2 minutes, check your junk or spam folder.
                   </p>
                 </div>
               )}
@@ -355,7 +303,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
               </button>
               <span className="text-[11px] text-[var(--paper-dim)] font-mono flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-[var(--forensic-green)]" />
-                <span>Supabase Enclave</span>
+                <span>Security Enclave</span>
               </span>
             </div>
           </>
