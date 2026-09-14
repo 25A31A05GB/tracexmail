@@ -29,35 +29,36 @@ import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
 import { UserOnboardingModal, UserPersona, OnboardingAnswers } from './components/UserOnboardingModal';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
-const CasesView = lazy(() => import('./components/CasesView').then(m => ({ default: m.CasesView })));
-const CampaignsView = lazy(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })));
-const SearchView = lazy(() => import('./components/SearchView').then(m => ({ default: m.SearchView })));
-const RelationshipGraphView = lazy(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
-const MapView = lazy(() => import('./components/MapView').then(m => ({ default: m.MapView })));
-const AlertsView = lazy(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })));
-const IngestionPipelineView = lazy(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })));
-const GmailConnectionView = lazy(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
+const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })), 'DashboardView');
+const CasesView = lazyWithRetry(() => import('./components/CasesView').then(m => ({ default: m.CasesView })), 'CasesView');
+const CampaignsView = lazyWithRetry(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })), 'CampaignsView');
+const SearchView = lazyWithRetry(() => import('./components/SearchView').then(m => ({ default: m.SearchView })), 'SearchView');
+const RelationshipGraphView = lazyWithRetry(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })), 'RelationshipGraphView');
+const MapView = lazyWithRetry(() => import('./components/MapView').then(m => ({ default: m.MapView })), 'MapView');
+const AlertsView = lazyWithRetry(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })), 'AlertsView');
+const IngestionPipelineView = lazyWithRetry(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })), 'IngestionPipelineView');
+const GmailConnectionView = lazyWithRetry(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })), 'GmailConnectionView');
 
-// Code-split modals and non-critical dialogs
-const ModeUpgradeModal = lazy(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })));
-const NewAnalysisModal = lazy(() => import('./components/NewAnalysisModal').then(m => ({ default: m.NewAnalysisModal })));
-const ReportModal = lazy(() => import('./components/ReportModal').then(m => ({ default: m.ReportModal })));
-const PrivacyComplianceModal = lazy(() => import('./components/PrivacyComplianceModal').then(m => ({ default: m.PrivacyComplianceModal })));
-const ForensicWalkthroughModal = lazy(() => import('./components/ForensicWalkthroughModal').then(m => ({ default: m.ForensicWalkthroughModal })));
-const InvestigationObjectiveModal = lazy(() => import('./components/InvestigationObjectiveModal').then(m => ({ default: m.InvestigationObjectiveModal })));
-const CommandPaletteModal = lazy(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
-const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
+// Code-split modals and non-critical dialogs with resilient lazy loading
+const ModeUpgradeModal = lazyWithRetry(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })), 'ModeUpgradeModal');
+const NewAnalysisModal = lazyWithRetry(() => import('./components/NewAnalysisModal').then(m => ({ default: m.NewAnalysisModal })), 'NewAnalysisModal');
+const ReportModal = lazyWithRetry(() => import('./components/ReportModal').then(m => ({ default: m.ReportModal })), 'ReportModal');
+const PrivacyComplianceModal = lazyWithRetry(() => import('./components/PrivacyComplianceModal').then(m => ({ default: m.PrivacyComplianceModal })), 'PrivacyComplianceModal');
+const ForensicWalkthroughModal = lazyWithRetry(() => import('./components/ForensicWalkthroughModal').then(m => ({ default: m.ForensicWalkthroughModal })), 'ForensicWalkthroughModal');
+const InvestigationObjectiveModal = lazyWithRetry(() => import('./components/InvestigationObjectiveModal').then(m => ({ default: m.InvestigationObjectiveModal })), 'InvestigationObjectiveModal');
+const CommandPaletteModal = lazyWithRetry(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })), 'CommandPaletteModal');
+const KeyboardShortcutsModal = lazyWithRetry(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })), 'KeyboardShortcutsModal');
 
 // Code-split authentication flows
-const LoginView = lazy(() => import('./components/LoginView').then(m => ({ default: m.LoginView })));
-const SignupView = lazy(() => import('./components/SignupView').then(m => ({ default: m.SignupView })));
-const ForgotPasswordView = lazy(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })));
-const ResetPasswordView = lazy(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })));
-const AcceptInviteView = lazy(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })));
-const MagicLinkVerifyView = lazy(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })));
-const OAuthConsentScreen = lazy(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })));
+const LoginView = lazyWithRetry(() => import('./components/LoginView').then(m => ({ default: m.LoginView })), 'LoginView');
+const SignupView = lazyWithRetry(() => import('./components/SignupView').then(m => ({ default: m.SignupView })), 'SignupView');
+const ForgotPasswordView = lazyWithRetry(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })), 'ForgotPasswordView');
+const ResetPasswordView = lazyWithRetry(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })), 'ResetPasswordView');
+const AcceptInviteView = lazyWithRetry(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })), 'AcceptInviteView');
+const MagicLinkVerifyView = lazyWithRetry(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })), 'MagicLinkVerifyView');
+const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
 
 function ViewSuspenseLoader() {
   return (
