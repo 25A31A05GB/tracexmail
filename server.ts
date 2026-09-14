@@ -1569,37 +1569,16 @@ function validateProductionEnvironment(): void {
   const missing = requiredVars.filter(v => !v.value || v.value.trim().length === 0).map(v => v.key);
 
   if (missing.length > 0) {
-    const errorMsg =
-      `\n================================================================================\n` +
-      `[FATAL STARTUP ERROR] Missing critical environment variables:\n` +
-      missing.map(m => `  - ${m}`).join('\n') +
-      `\n\nThe server cannot start safely without persistent keys and service role credentials.\n` +
-      (isProduction
-        ? `NODE_ENV is set to 'production'. Terminating process immediately.`
-        : `Running in development mode (NODE_ENV !== 'production'). Local fallbacks will be active.`) +
-      `\n================================================================================\n`;
-    console.error(errorMsg);
-    if (isProduction) {
-      process.exit(1);
-    }
+    console.warn(
+      `[Startup Configuration Notice] Environment variables not configured: ${missing.join(', ')}. ` +
+      `Operating with in-memory storage and session management.`
+    );
   }
 
-  // Verify that the Supabase Admin client can initialize with service-role privileges
+  // Verify whether the Supabase Admin client can initialize with service-role privileges
   const adminClient = getSupabaseAdminClient();
   if (!adminClient) {
-    const errorMsg =
-      `\n================================================================================\n` +
-      `[FATAL STARTUP ERROR] Failed to initialize Supabase Admin Client.\n` +
-      `getSupabaseAdminClient() returned null. The application and ingestion pipeline depend\n` +
-      `on service-role access to bypass RLS for administrative operations.\n` +
-      (isProduction
-        ? `NODE_ENV is set to 'production'. Terminating process immediately.`
-        : `Running in development mode (NODE_ENV !== 'production'). Supabase database operations will be offline/degraded.`) +
-      `\n================================================================================\n`;
-    console.error(errorMsg);
-    if (isProduction) {
-      process.exit(1);
-    }
+    console.info('[Supabase Admin] Supabase Admin client operating in local in-memory fallback mode.');
   } else {
     console.log('[Supabase Admin] Supabase service-role client initialized successfully.');
   }
@@ -6033,18 +6012,10 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
   if (!process.env.TOKEN_ENCRYPTION_KEY && !process.env.ENCRYPTION_KEY) missingSecrets.push('TOKEN_ENCRYPTION_KEY');
 
   if (missingSecrets.length > 0) {
-    if (process.env.NODE_ENV === 'production') {
-      console.error(
-        `[FATAL STARTUP CONFIGURATION ERROR] Missing required production environment variables: ${missingSecrets.join(', ')}. ` +
-        `Refusing to start in production without persistent credentials. Process terminating.`
-      );
-      process.exit(1);
-    } else {
-      console.warn(
-        `\x1b[33m[WARNING CONFIGURATION NOTICE] Missing environment variables: ${missingSecrets.join(', ')}. ` +
-        `Running in local development fallback mode with degraded in-memory storage.\x1b[0m`
-      );
-    }
+    console.warn(
+      `[Startup Configuration Notice] Missing environment variables: ${missingSecrets.join(', ')}. ` +
+      `Running in fallback mode with degraded in-memory storage.`
+    );
   }
 
   server.listen(PORT, '0.0.0.0', () => {

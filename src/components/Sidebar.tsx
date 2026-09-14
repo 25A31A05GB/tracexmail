@@ -738,22 +738,9 @@ export function Sidebar({
           )}
         </div>
 
-        {/* Quick Actions in Sidebar */}
-        <div className={`p-3 space-y-2 ${isDesktopCollapsed ? 'px-1.5' : ''}`}>
-          {!isDesktopCollapsed && onOpenWalkthrough && (
-            <motion.button
-              onClick={onOpenWalkthrough}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className="w-full py-1.5 px-3 rounded-[2px] text-xs font-mono font-bold flex items-center justify-center gap-2 transition-all bg-[rgba(201,162,39,0.12)] hover:bg-[rgba(201,162,39,0.22)] border border-[rgba(201,162,39,0.35)] text-[var(--stamp)] cursor-pointer shadow-xs"
-              title="Launch Interactive Forensic Walkthrough Overlay"
-            >
-              <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
-              <span>GET STARTED GUIDE</span>
-            </motion.button>
-          )}
-
+        {/* Quick Actions in Sidebar (Streamlined for Progressive Disclosure) */}
+        <div className={`p-3 space-y-1.5 ${isDesktopCollapsed ? 'px-1.5' : ''}`}>
+          {/* Primary Sidebar Action: Ingest .EML */}
           <motion.button
             onClick={() => handleTabClick('ingest', 'Upload & Inspect Email')}
             disabled={role === 'read_only'}
@@ -766,7 +753,7 @@ export function Sidebar({
             } rounded-md text-xs font-semibold flex items-center transition-colors ${
               role === 'read_only'
                 ? 'bg-[#1e1b15] border border-[#2e2a22] text-[#6b6255] cursor-not-allowed opacity-60'
-                : 'bg-[#26221b] hover:bg-[#322c23] border border-[#3a352c] text-[#ede6d8] cursor-pointer'
+                : 'bg-[#26221b] hover:bg-[#322c23] border border-[#3a352c] text-[#ede6d8] cursor-pointer shadow-xs'
             }`}
           >
             <Upload className="w-3.5 h-3.5 text-[var(--thread)] shrink-0" />
@@ -775,20 +762,32 @@ export function Sidebar({
             )}
           </motion.button>
 
-          {!isDesktopCollapsed && onOpenShortcutsHelp && (
-            <button
-              onClick={onOpenShortcutsHelp}
-              className="w-full py-1 px-2 rounded text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8] hover:bg-[#221e17] flex items-center justify-between transition-colors cursor-pointer"
-              title="View Keyboard Shortcuts Cheat Sheet (?)"
-            >
-              <span className="flex items-center gap-1.5">
-                <Keyboard className="w-3 h-3 text-amber-400/80" />
-                <span>Shortcuts</span>
-              </span>
-              <kbd className="px-1.5 py-0.2 bg-[#26211a] border border-[#3a352c] rounded text-[9.5px] font-mono text-amber-400/90">
-                ⌘K / ?
-              </kbd>
-            </button>
+          {/* Secondary Utilities Row */}
+          {!isDesktopCollapsed && (
+            <div className="flex items-center gap-1.5 pt-0.5">
+              {onOpenWalkthrough && (
+                <button
+                  onClick={onOpenWalkthrough}
+                  className="flex-1 py-1.5 px-2 rounded text-[11px] font-mono text-[var(--stamp)] hover:text-amber-300 bg-[rgba(201,162,39,0.08)] hover:bg-[rgba(201,162,39,0.18)] border border-[rgba(201,162,39,0.25)] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="Launch Interactive Forensic Walkthrough Guide"
+                >
+                  <Compass className="w-3 h-3 text-[var(--stamp)] shrink-0" />
+                  <span>Guide</span>
+                </button>
+              )}
+
+              {onOpenShortcutsHelp && (
+                <button
+                  onClick={onOpenShortcutsHelp}
+                  className="flex-1 py-1.5 px-2 rounded text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8] bg-[#1a1713] hover:bg-[#221e17] border border-[#2e2a22] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="View Keyboard Shortcuts Cheat Sheet (?)"
+                >
+                  <Keyboard className="w-3 h-3 text-amber-400/80 shrink-0" />
+                  <span>Shortcuts</span>
+                  <kbd className="text-[9px] text-amber-400/90 font-mono">?</kbd>
+                </button>
+              )}
+            </div>
           )}
 
           {/* Desktop Toggle Menu Collapse Option at Bottom */}

@@ -424,12 +424,13 @@ export default function App() {
     // Trigger case list refresh signal across all views
     setCasesRefreshSignal(prev => prev + 1);
 
-    // If new case was created and case details are attached, follow pattern for consistency
+    // If new case was created and case details are attached, synchronize active analysis
     if (lastCaseUpdate?.type === 'CASE_CREATED' && lastCaseUpdate.case) {
       try {
         const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
         if (mapped) {
           console.log('[App] Real-time WebSocket CASE_CREATED synchronized:', mapped.id);
+          setCurrentAnalysis(mapped);
         }
       } catch (err) {
         console.warn('[App] Could not map real-time WebSocket case update:', err);

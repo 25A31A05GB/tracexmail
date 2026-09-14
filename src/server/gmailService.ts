@@ -1033,12 +1033,12 @@ export function buildQuarantineReportNotePayload(params: {
   if (!cleanReason) {
     cleanReason = 'High threat risk anomalies flagged by enterprise mail defense policies';
   }
-  const maxReasonLen = 85;
+  const maxReasonLen = 60;
   const truncatedReason = cleanReason.length > maxReasonLen
     ? `${cleanReason.substring(0, maxReasonLen - 1)}…`
     : cleanReason;
 
-  const snippetLine = `[TraceXMail: QUARANTINED (Threat Score: ${params.threatScore}/100)] — ${truncatedReason}. Intercepted and isolated under TraceXMail-Quarantine.`;
+  const snippetLine = `${truncatedReason} — TraceXMail-Quarantine (${params.verdict}, ${params.threatScore}/100)`;
 
   // 1. Plain Text Representation
   const bodyLines = [
@@ -1206,7 +1206,7 @@ export function buildQuarantineReportNotePayload(params: {
   const rfcHeaders: string[] = [
     `From: TraceXMail Security <${selfEmail}>`,
     `To: <${selfEmail}>`,
-    `Subject: ${params.subject || 'Inbound Mail Evaluation'}`,
+    `Subject: [TraceXMail: ${params.verdict} ${params.threatScore}/100] ${params.subject || 'Inbound Mail Evaluation'}`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: ${noteMessageId}`,
     'X-TraceXMail-Report: true',

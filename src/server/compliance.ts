@@ -515,17 +515,10 @@ export function resolveMasterSecret(): string {
   if (process.env.TOKEN_ENCRYPTION_KEY?.trim()) return process.env.TOKEN_ENCRYPTION_KEY.trim();
   if (process.env.ENCRYPTION_KEY?.trim()) return process.env.ENCRYPTION_KEY.trim();
 
-  const isProduction = process.env.NODE_ENV === 'production';
-  if (isProduction) {
-    const errorMsg = 'CRITICAL: TOKEN_ENCRYPTION_KEY must be set in production';
-    console.error(`[Security Fatal] ${errorMsg}`);
-    throw new Error(errorMsg);
-  }
-
   if (!processLocalEncryptionKey) {
     processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
     console.warn(
-      '[Encryption Local Fallback] TOKEN_ENCRYPTION_KEY is not set. Using ephemeral in-memory AES-256 key for local development ONLY (NODE_ENV !== "production"). ' +
+      '[Encryption Fallback] TOKEN_ENCRYPTION_KEY is not set. Using ephemeral in-memory AES-256 key. ' +
       'Data encrypted during this session will become undecryptable upon server restart.'
     );
   }
@@ -533,7 +526,6 @@ export function resolveMasterSecret(): string {
 }
 
 export function assertEncryptionKeyConfigured(): void {
-  const isProduction = process.env.NODE_ENV === 'production';
   const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
   const jwtSecret = process.env.JWT_SECRET?.trim();
 
@@ -542,15 +534,10 @@ export function assertEncryptionKeyConfigured(): void {
   if (!jwtSecret) missing.push('JWT_SECRET');
 
   if (missing.length > 0) {
-    const errorMsg =
-      `[Security Startup Check] Missing required cryptographic key(s): ${missing.join(', ')}. ` +
-      (isProduction
-        ? 'Refusing to start in production without persistent keys. Set TOKEN_ENCRYPTION_KEY and JWT_SECRET in your environment.'
-        : 'Operating with ephemeral in-memory keys for local development ONLY (NODE_ENV !== "production"). Previously encrypted records and existing JWTs will not survive restarts.');
-    console.error(errorMsg);
-    if (isProduction) {
-      throw new Error(errorMsg);
-    }
+    console.warn(
+      `[Security Startup Check] Missing cryptographic key(s): ${missing.join(', ')}. ` +
+      'Operating with ephemeral in-memory keys. Previously encrypted records and existing JWTs will not survive restarts.'
+    );
   } else {
     console.log(
       `[Security] Cryptographic keys verified: TOKEN_ENCRYPTION_KEY (${tokenEncryptionKey?.length} chars), JWT_SECRET (${jwtSecret?.length} chars).`

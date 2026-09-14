@@ -246,66 +246,72 @@ export function Header({
           </button>
         )}
 
-        <div className="relative dropdown-container">
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
-            title="Switch Case / Dataset Presets"
-          >
-            <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
-            <span className="max-w-[110px] sm:max-w-[160px] md:max-w-[180px] truncate font-mono text-xs text-[#ede6d8]">
-              {currentAnalysis.id || 'CASE-ACTIVE'}
-            </span>
-            <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
-          </button>
+        {/* Unified Case & Ingestion Sync Group (Progressive Disclosure) */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="relative dropdown-container">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
+              title="Switch Case / Dataset Presets"
+            >
+              <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
+              <span className="max-w-[110px] sm:max-w-[160px] md:max-w-[180px] truncate font-mono text-xs text-[#ede6d8]">
+                {currentAnalysis.id || 'CASE-ACTIVE'}
+              </span>
+              <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
+            </button>
 
-          {dropdownOpen && (
-            <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-              <div className="flex items-center justify-between pb-2 border-b border-[#2d2820] mb-2 px-1">
-                <span className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] tracking-wider">
-                  Case &amp; Ingestion Hub
-                </span>
-                <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Enclave
-                </span>
-              </div>
+            {dropdownOpen && (
+              <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="flex items-center justify-between pb-2 border-b border-[#2d2820] mb-2 px-1">
+                  <span className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] tracking-wider">
+                    Case &amp; Ingestion Hub
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Enclave
+                  </span>
+                </div>
 
-              <div className="p-2 rounded bg-[#12100d] border border-[#2d2820] mb-2.5 text-xs">
-                <div className="text-[10px] font-mono text-[#8a8070]">Active Investigation:</div>
-                <div className="font-semibold text-[#ede6d8] truncate mt-0.5">{currentAnalysis.subject}</div>
-                <div className="text-[10.5px] font-mono text-[#b9af9c] truncate mt-0.5">{currentAnalysis.from}</div>
-              </div>
+                <div className="p-2 rounded bg-[#12100d] border border-[#2d2820] mb-2.5 text-xs">
+                  <div className="text-[10px] font-mono text-[#8a8070]">Active Investigation:</div>
+                  <div className="font-semibold text-[#ede6d8] truncate mt-0.5">{currentAnalysis.subject}</div>
+                  <div className="text-[10.5px] font-mono text-[#b9af9c] truncate mt-0.5">{currentAnalysis.from}</div>
+                </div>
 
-              <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-1 py-1 tracking-wider">
-                Benchmark Forensic Samples
+                <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-1 py-1 tracking-wider">
+                  Benchmark Forensic Samples
+                </div>
+                <div className="space-y-1 mt-1 max-h-52 overflow-y-auto">
+                  {SAMPLE_ANALYSES.map((sample) => (
+                    <button
+                      key={sample.id}
+                      onClick={() => {
+                        onSelectAnalysis(sample);
+                        setDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                        sample.id === currentAnalysis.id
+                          ? 'bg-[#b23a2e]/20 border border-[#b23a2e]/40 text-[#ede6d8]'
+                          : 'hover:bg-[#221e17] text-[#b9af9c]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-display font-semibold truncate text-[#ede6d8]">{sample.subject}</span>
+                        <span className="text-[9.5px] font-mono uppercase px-1 py-0.2 rounded bg-black/40 text-amber-300 shrink-0">
+                          {sample.threatVerdict || sample.verdict}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-[#8a8070] font-mono truncate">{sample.from}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-1 mt-1 max-h-52 overflow-y-auto">
-                {SAMPLE_ANALYSES.map((sample) => (
-                  <button
-                    key={sample.id}
-                    onClick={() => {
-                      onSelectAnalysis(sample);
-                      setDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-2.5 py-2 rounded text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
-                      sample.id === currentAnalysis.id
-                        ? 'bg-[#b23a2e]/20 border border-[#b23a2e]/40 text-[#ede6d8]'
-                        : 'hover:bg-[#221e17] text-[#b9af9c]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-display font-semibold truncate text-[#ede6d8]">{sample.subject}</span>
-                      <span className="text-[9.5px] font-mono uppercase px-1 py-0.2 rounded bg-black/40 text-amber-300 shrink-0">
-                        {sample.threatVerdict || sample.verdict}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-[#8a8070] font-mono truncate">{sample.from}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* Integrated Auto-Sync / Auto-Refresh Control */}
+          <AutoRefreshControl onSyncCases={onSyncCases} />
         </div>
 
         <div className="hidden lg:flex flex-col min-w-0">
@@ -327,8 +333,6 @@ export function Header({
 
       {/* Right: Consolidated Actions with Progressive Disclosure */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        {/* Background Auto-Sync / Auto-Refresh Control */}
-        <AutoRefreshControl onSyncCases={onSyncCases} />
 
         {/* Command Palette / Quick Search Trigger */}
         {onOpenCommandPalette && (
