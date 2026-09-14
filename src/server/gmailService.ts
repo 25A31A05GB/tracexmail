@@ -14,6 +14,86 @@ import axios from 'axios';
 import { EventEmitter } from 'events';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 import { encryptToken, decryptToken } from './compliance';
+import { TokenBucket, SlidingWindowLimiter } from './rateLimiter';
+
+// -----------------------------------------------------------------------------
+// Gmail API Quota Costs & Rate Limiting Token-Bucket (Google 250 units/sec limit)
+// -----------------------------------------------------------------------------
+export const GMAIL_QUOTA_COSTS = {
+  MESSAGES_GET_RAW: 5,
+  MESSAGES_GET_METADATA: 5,
+  MESSAGES_LIST: 5,
+  MESSAGES_MODIFY: 50,
+  MESSAGES_BATCH_MODIFY: 50,
+  LABELS_CREATE: 50,
+  LABELS_LIST: 5,
+  WATCH_START: 100,
+  WATCH_STOP: 50
+} as const;
+
+// Token Bucket for Google's standard 250 quota units per second per user limit
+const gmailTokenBucket = new TokenBucket({
+  capacity: 250,
+  refillTokensPerSecond: 250, // 250 quota units per second
+  initialTokens: 250
+});
+
+// Sliding Window limiter to smooth bursts across 1-second intervals (max 50 calls/sec)
+const gmailSlidingWindow = new SlidingWindowLimiter({
+  windowMs: 1000,
+  maxRequests: 50
+});
+
+/**
+ * Acquire quota tokens before making external requests to the Gmail API.
+ * Smooths traffic and prevents HTTP 429 quota exhaustion errors.
+ */
+export async function acquireGmailQuota(
+  cost: number = 5,
+  opName: string = 'gmail_api_call',
+  waitIfThrottled: boolean = true,
+  maxWaitMs: number = 3000
+): Promise<{ allowed: boolean; waitedMs: number; error?: string }> {
+  const windowCheck = gmailSlidingWindow.check('gmail_api_sliding_window');
+  if (!windowCheck.allowed) {
+    if (waitIfThrottled && windowCheck.resetAfterMs <= maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, windowCheck.resetAfterMs));
+    } else {
+      return {
+        allowed: false,
+        waitedMs: 0,
+        error: `Gmail API request rate limit exceeded for ${opName}. Sliding window active (${windowCheck.count}/${windowCheck.limit} req/sec).`
+      };
+    }
+  }
+
+  const bucketResult = gmailTokenBucket.consume(cost);
+  if (!bucketResult.allowed) {
+    if (waitIfThrottled && bucketResult.retryAfterMs <= maxWaitMs) {
+      await new Promise(resolve => setTimeout(resolve, bucketResult.retryAfterMs));
+      const retryBucket = gmailTokenBucket.consume(cost);
+      if (retryBucket.allowed) {
+        return { allowed: true, waitedMs: bucketResult.retryAfterMs };
+      }
+    }
+    return {
+      allowed: false,
+      waitedMs: 0,
+      error: `Gmail API quota token bucket exhausted (${bucketResult.remainingTokens}/250 units available, needed ${cost} for ${opName}).`
+    };
+  }
+
+  return { allowed: true, waitedMs: 0 };
+}
+
+export function getGmailQuotaStatus() {
+  return {
+    availableUnits: Math.floor(gmailTokenBucket.getAvailableTokens()),
+    capacityUnits: gmailTokenBucket.getCapacity(),
+    rateLimitPerSec: '250 quota units / sec',
+    algorithm: 'Token-Bucket (250 units/sec) + Sliding-Window (50 req/sec)'
+  };
+}
 
 export interface QuarantineConfig {
   enabled: boolean;
@@ -336,7 +416,8 @@ export function getGmailStatus(userEmail?: string) {
       post_delivery_alerts: state.metrics.postDeliveryAlerts,
       last_delivery_stage: state.metrics.lastDeliveryStage,
       last_quarantine_at: state.metrics.lastQuarantineAt
-    }
+    },
+    quota: getGmailQuotaStatus()
   };
 }
 
@@ -494,6 +575,12 @@ export async function startGmailWatch(options?: {
         if (fresh) token = fresh;
       }
 
+      // Enforce Google 250 units/sec token bucket quota rate limiting
+      const quotaCheck = await acquireGmailQuota(GMAIL_QUOTA_COSTS.WATCH_START, 'users.watch');
+      if (!quotaCheck.allowed) {
+        console.warn(`[GmailWatch] Quota throttled: ${quotaCheck.error}`);
+      }
+
       console.log(`[GmailWatch] Calling Gmail API users.watch() for topic: ${topicName}`);
       let response;
       try {
@@ -598,6 +685,12 @@ export async function stopGmailWatch(options?: {
         if (fresh) token = fresh;
       }
 
+      // Enforce Google 250 units/sec token bucket quota rate limiting
+      const quotaCheck = await acquireGmailQuota(GMAIL_QUOTA_COSTS.WATCH_STOP, 'users.stop');
+      if (!quotaCheck.allowed) {
+        console.warn(`[GmailWatch] stop quota throttled: ${quotaCheck.error}`);
+      }
+
       console.log('[GmailWatch] Calling Gmail API users.stop()');
       await axios.post(
         'https://gmail.googleapis.com/gmail/v1/users/me/stop',
@@ -658,6 +751,8 @@ export async function fetchGmailMessageRaw(messageId: string, accessToken?: stri
       if (fresh) token = fresh;
     }
 
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_GET_RAW, 'messages.get.raw');
+
     let res;
     try {
       res = await axios.get(
@@ -715,6 +810,8 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
       const fresh = await ensureFreshAccessToken();
       if (fresh) token = fresh;
     }
+
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.LABELS_LIST, 'labels.list');
 
     // 1. Check existing labels
     let listRes;
@@ -837,6 +934,8 @@ export async function modifyGmailMessageLabels(
       }
     }
 
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_MODIFY, 'messages.modify');
+
     try {
       await axios.post(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
@@ -905,6 +1004,8 @@ export async function listGmailMessages(
       const fresh = await ensureFreshAccessToken();
       if (fresh) token = fresh;
     }
+
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_LIST, 'messages.list');
 
     try {
       const res = await axios.get(
@@ -1696,6 +1797,8 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
     let fetchedCount = 0;
     if (isLiveToken) {
       try {
+        await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_LIST, 'messages.list.unread');
+
         let listResp;
         try {
           listResp = await axios.get(

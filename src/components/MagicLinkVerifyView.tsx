@@ -219,15 +219,17 @@ export function MagicLinkVerifyView({
     setResendStatus(null);
     try {
       const cleanEmail = userEmail.trim().toLowerCase();
+      // 1. Supabase best-effort secondary attempt (safely wrapped)
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
           email: cleanEmail,
           options: {
             emailRedirectTo: window.location.origin
           }
-        });
+        }).catch(err => console.warn('[MagicLinkVerifyView] Supabase resend notice:', err?.message));
       }
 
+      // 2. Authoritative reliable server dispatch
       const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +241,9 @@ export function MagicLinkVerifyView({
       });
 
       const data = await res.json();
-      if (!res.ok && !isSupabaseConfigured) throw new Error(data.error || 'Failed to dispatch new magic link.');
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to dispatch new magic link.');
+      }
 
       setResendStatus(`Fresh magic link dispatched to ${cleanEmail}. Please check your inbox.`);
     } catch (err: any) {

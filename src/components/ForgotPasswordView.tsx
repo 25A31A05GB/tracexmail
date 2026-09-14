@@ -45,12 +45,15 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
       const redirectUrl = getResetPasswordRedirectUrl();
-      logSupabaseAuthEvent('ResetPasswordRequest:Start', { email: email.trim(), redirectUrl });
+      logSupabaseAuthEvent('ResetPasswordRequest:Start', { email: cleanEmail, redirectUrl });
 
+      // 1. Supabase secondary/best-effort reset dispatch
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.resetPasswordForEmail(email.trim(), {
+        await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl
         }).catch(err => {
           logSupabaseAuthEvent('ResetPasswordRequest:Error', err, 'error');
@@ -59,21 +62,26 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
         logSupabaseAuthEvent('ResetPasswordRequest:Success');
       }
 
-      // Dispatch magic recovery link via backend enclave
-      await fetch('/api/auth/magic-link/send', {
+      // 2. Reliable server-side magic link dispatch (authoritative)
+      const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), type: 'recovery', redirectTo: redirectUrl })
+        body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
       });
 
-      // Also notify /api/auth/reset-password for parity
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to dispatch password recovery link.');
+      }
+
+      // 3. Also notify /api/auth/reset-password for parity
       await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), redirectTo: redirectUrl })
+        body: JSON.stringify({ email: cleanEmail, redirectTo: redirectUrl })
       }).catch(() => {});
 
-      setSuccessMsg(`A secure recovery magic link has been dispatched to ${email.trim()}.`);
+      setSuccessMsg(`A secure recovery magic link has been dispatched to ${cleanEmail}.`);
       setStep('sent');
     } catch (err: any) {
       console.warn('[ForgotPassword] Reset request notice:', err);
@@ -87,21 +95,29 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     if (!email) return;
     setResending(true);
     setErrorMsg(null);
+    const cleanEmail = email.trim().toLowerCase();
     try {
       const redirectUrl = getResetPasswordRedirectUrl();
+      // 1. Supabase secondary/best-effort attempt
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.resetPasswordForEmail(email.trim(), {
+        await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl
         }).catch(err => console.warn('[ForgotPassword] Supabase resend notice:', err));
       }
 
-      await fetch('/api/auth/magic-link/send', {
+      // 2. Reliable server-side dispatch (authoritative)
+      const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), type: 'recovery', redirectTo: redirectUrl })
+        body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
       });
 
-      setSuccessMsg(`New recovery magic link dispatched to ${email.trim()}.`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resend recovery email.');
+      }
+
+      setSuccessMsg(`New recovery magic link dispatched to ${cleanEmail}.`);
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to resend recovery email.');
     } finally {

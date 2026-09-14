@@ -54,7 +54,7 @@ export function LoginView({
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-      // 1. Supabase native OTP/Magic Link
+      // 1. Supabase native OTP/Magic Link (best-effort secondary attempt)
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
           email: cleanEmail,
@@ -64,7 +64,7 @@ export function LoginView({
         }).catch(err => console.warn('[LoginView] Supabase magic link notice:', err?.message));
       }
 
-      // 2. Server-side magic link dispatch
+      // 2. Server-side reliable magic link dispatch (authoritative)
       const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,7 +76,7 @@ export function LoginView({
       });
 
       const data = await res.json();
-      if (!res.ok && !isSupabaseConfigured) {
+      if (!res.ok) {
         throw new Error(data.error || 'Failed to dispatch magic link.');
       }
 
@@ -95,6 +95,7 @@ export function LoginView({
     setResendStatus(null);
     try {
       const cleanEmail = email.trim().toLowerCase();
+      // 1. Supabase best-effort secondary attempt
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
           email: cleanEmail,
@@ -104,6 +105,7 @@ export function LoginView({
         }).catch(err => console.warn('[LoginView] Supabase resend notice:', err?.message));
       }
 
+      // 2. Authoritative reliable server dispatch
       const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,7 +117,9 @@ export function LoginView({
       });
 
       const data = await res.json();
-      if (!res.ok && !isSupabaseConfigured) throw new Error(data.error || 'Failed to resend magic link.');
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resend magic link.');
+      }
 
       setResendStatus(`Fresh magic link dispatched to ${cleanEmail}.`);
     } catch (err: any) {
@@ -131,26 +135,33 @@ export function LoginView({
     setResendStatus(null);
     try {
       const cleanEmail = email.trim().toLowerCase();
+      // 1. Supabase best-effort secondary attempt
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.auth.signInWithOtp({
+        await supabase.auth.signInWithOtp({
           email: cleanEmail,
           options: {
             emailRedirectTo: window.location.origin
           }
-        });
-        if (error) {
-          setResendStatus('Failed to resend: ' + error.message);
-        } else {
-          setResendStatus('Verification magic link dispatched to ' + cleanEmail + '. Please check your inbox.');
-        }
-      } else {
-        await fetch('/api/auth/magic-link/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, type: 'signin', redirectTo: window.location.origin })
-        });
-        setResendStatus('Verification magic link dispatched to ' + cleanEmail + '. Please check your inbox.');
+        }).catch(err => console.warn('[LoginView] Supabase verification resend notice:', err?.message));
       }
+
+      // 2. Authoritative reliable server dispatch
+      const res = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          type: 'signin',
+          redirectTo: window.location.origin
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resend verification magic link.');
+      }
+
+      setResendStatus(`Verification magic link dispatched to ${cleanEmail}. Please check your inbox.`);
     } catch (err: any) {
       setResendStatus(err.message || 'Error sending verification magic link.');
     } finally {

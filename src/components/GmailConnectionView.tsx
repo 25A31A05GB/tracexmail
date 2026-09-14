@@ -1487,29 +1487,45 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               <Mail className="w-5 h-5" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-xs font-bold text-[#f4efe6]">No Synced Messages in this View</h4>
+              <h4 className="text-xs font-bold text-[#f4efe6]">
+                {status?.is_connected ? 'No Emails Synced Yet' : 'Authentication Required'}
+              </h4>
               <p className="text-[11px] text-[#9d9282] max-w-md mx-auto">
-                No analyzed emails match your active filter. You can trigger a live inbox sync or simulate an inbound test.
+                {status?.is_connected
+                  ? "No emails synced yet. Emails will appear here as they're detected and analyzed."
+                  : 'Connect your Gmail account above to start streaming, analyzing, and protecting inbound emails in real time.'}
               </p>
             </div>
-            <div className="flex items-center justify-center gap-2 pt-2">
-              <button
-                onClick={handleSyncNow}
-                disabled={syncing}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-                <span>Sync Mailbox Now</span>
-              </button>
-              <button
-                onClick={() => handleTriggerPubSubTest(true)}
-                disabled={testingPubSub}
-                className="px-3 py-1.5 bg-[#25201a] hover:bg-[#2e2820] text-[#f4efe6] border border-[#3e372e] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Zap className="w-3.5 h-3.5 text-rose-400" />
-                <span>Simulate Inbound Test</span>
-              </button>
-            </div>
+            {status?.is_connected ? (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={handleSyncNow}
+                  disabled={syncing}
+                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
+                  <span>Sync Mailbox Now</span>
+                </button>
+                <button
+                  onClick={() => handleTriggerPubSubTest(true)}
+                  disabled={testingPubSub}
+                  className="px-3.5 py-1.5 bg-[#25201a] hover:bg-[#2e2820] text-[#f4efe6] border border-[#3e372e] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Simulate Inbound Test</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  onClick={handleConnectGmail}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>Connect Gmail Account</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">

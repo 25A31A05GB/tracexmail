@@ -252,8 +252,236 @@ export const strictRateLimiter: RateLimitRequestHandler = rateLimit({
   }
 });
 
+// -----------------------------------------------------------------------------
+// Generic Token Bucket Algorithm Implementation
+// -----------------------------------------------------------------------------
+export class TokenBucket {
+  private capacity: number;
+  private tokens: number;
+  private refillRatePerMs: number;
+  private lastRefillAt: number;
+
+  constructor(options: { capacity: number; refillTokensPerSecond: number; initialTokens?: number }) {
+    this.capacity = Math.max(1, options.capacity);
+    this.refillRatePerMs = Math.max(0.000001, options.refillTokensPerSecond / 1000);
+    this.tokens = options.initialTokens !== undefined ? Math.min(this.capacity, options.initialTokens) : this.capacity;
+    this.lastRefillAt = Date.now();
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsedMs = Math.max(0, now - this.lastRefillAt);
+    if (elapsedMs > 0) {
+      const addedTokens = elapsedMs * this.refillRatePerMs;
+      this.tokens = Math.min(this.capacity, this.tokens + addedTokens);
+      this.lastRefillAt = now;
+    }
+  }
+
+  public getAvailableTokens(): number {
+    this.refill();
+    return this.tokens;
+  }
+
+  public getCapacity(): number {
+    return this.capacity;
+  }
+
+  public consume(cost: number = 1): {
+    allowed: boolean;
+    remainingTokens: number;
+    retryAfterMs: number;
+    retryAfterSeconds: number;
+  } {
+    this.refill();
+    if (this.tokens >= cost) {
+      this.tokens -= cost;
+      return {
+        allowed: true,
+        remainingTokens: Math.floor(this.tokens),
+        retryAfterMs: 0,
+        retryAfterSeconds: 0
+      };
+    }
+
+    const deficit = cost - this.tokens;
+    const retryAfterMs = Math.ceil(deficit / this.refillRatePerMs);
+    const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+
+    return {
+      allowed: false,
+      remainingTokens: Math.floor(this.tokens),
+      retryAfterMs,
+      retryAfterSeconds
+    };
+  }
+
+  public reset(): void {
+    this.tokens = this.capacity;
+    this.lastRefillAt = Date.now();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Sliding Window Rate Limiter Implementation
+// -----------------------------------------------------------------------------
+export class SlidingWindowLimiter {
+  private windowMs: number;
+  private maxRequests: number;
+  private requestBuckets = new Map<string, number[]>();
+
+  constructor(options: { windowMs: number; maxRequests: number }) {
+    this.windowMs = Math.max(1000, options.windowMs);
+    this.maxRequests = Math.max(1, options.maxRequests);
+  }
+
+  public check(key: string): {
+    allowed: boolean;
+    count: number;
+    limit: number;
+    remaining: number;
+    resetAfterMs: number;
+    resetAfterSeconds: number;
+  } {
+    const now = Date.now();
+    const windowStart = now - this.windowMs;
+    let timestamps = this.requestBuckets.get(key) || [];
+
+    // Prune entries older than sliding window
+    timestamps = timestamps.filter(t => t > windowStart);
+
+    if (timestamps.length >= this.maxRequests) {
+      this.requestBuckets.set(key, timestamps);
+      const oldestInWindow = timestamps[0] || now;
+      const resetAfterMs = Math.max(0, (oldestInWindow + this.windowMs) - now);
+      const resetAfterSeconds = Math.max(1, Math.ceil(resetAfterMs / 1000));
+      return {
+        allowed: false,
+        count: timestamps.length,
+        limit: this.maxRequests,
+        remaining: 0,
+        resetAfterMs,
+        resetAfterSeconds
+      };
+    }
+
+    timestamps.push(now);
+    this.requestBuckets.set(key, timestamps);
+    const oldestInWindow = timestamps[0] || now;
+    const resetAfterMs = Math.max(0, (oldestInWindow + this.windowMs) - now);
+    const resetAfterSeconds = Math.max(1, Math.ceil(resetAfterMs / 1000));
+
+    return {
+      allowed: true,
+      count: timestamps.length,
+      limit: this.maxRequests,
+      remaining: Math.max(0, this.maxRequests - timestamps.length),
+      resetAfterMs,
+      resetAfterSeconds
+    };
+  }
+
+  public reset(key?: string): void {
+    if (key) {
+      this.requestBuckets.delete(key);
+    } else {
+      this.requestBuckets.clear();
+    }
+  }
+
+  public prune(): void {
+    const now = Date.now();
+    const windowStart = now - this.windowMs;
+    for (const [key, timestamps] of this.requestBuckets.entries()) {
+      const filtered = timestamps.filter(t => t > windowStart);
+      if (filtered.length === 0) {
+        this.requestBuckets.delete(key);
+      } else {
+        this.requestBuckets.set(key, filtered);
+      }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Dedicated Token-Bucket + Sliding Window Limiter for Gmail Disconnect
+// -----------------------------------------------------------------------------
+// 1. Sliding Window: max 5 disconnect attempts per 5 minutes (300,000 ms)
+const disconnectSlidingWindow = new SlidingWindowLimiter({
+  windowMs: 5 * 60 * 1000,
+  maxRequests: 5
+});
+
+// 2. Token Bucket: capacity of 3 tokens, refilling 1 token every 60 seconds (0.0166 tokens/sec)
+const disconnectTokenBuckets = new Map<string, TokenBucket>();
+
+function getDisconnectTokenBucket(key: string): TokenBucket {
+  let bucket = disconnectTokenBuckets.get(key);
+  if (!bucket) {
+    bucket = new TokenBucket({
+      capacity: 3,
+      refillTokensPerSecond: 1 / 60, // 1 token every 60 seconds
+      initialTokens: 3
+    });
+    disconnectTokenBuckets.set(key, bucket);
+  }
+  return bucket;
+}
+
+// Periodic cleanup of stale disconnect rate limiter state
+setInterval(() => {
+  disconnectSlidingWindow.prune();
+}, 5 * 60 * 1000).unref();
+
+export const gmailDisconnectRateLimiter: RequestHandler = (req: Request, res: Response, next: NextFunction) => {
+  const user = (req as any).user;
+  const ip = getClientIp(req);
+  const identifier = user?.organizationId 
+    ? `org_${user.organizationId}` 
+    : (user?.id || user?.userId ? `usr_${user.id || user.userId}` : `ip_${ip}`);
+
+  // 1. Check sliding window limit (max 5 in 5m)
+  const windowResult = disconnectSlidingWindow.check(identifier);
+  if (!windowResult.allowed) {
+    res.setHeader('Retry-After', windowResult.resetAfterSeconds);
+    res.setHeader('X-RateLimit-Limit', '5');
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.setHeader('X-RateLimit-Reset', Math.ceil((Date.now() + windowResult.resetAfterMs) / 1000));
+    return res.status(429).json({
+      error: 'Too many Gmail disconnect attempts in a short timeframe. Sliding window rate limit active to prevent integration flapping.',
+      code: 'GMAIL_DISCONNECT_RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: windowResult.resetAfterSeconds,
+      retryAfterMs: windowResult.resetAfterMs,
+      limit: 5,
+      windowMinutes: 5
+    });
+  }
+
+  // 2. Check token bucket limit (burst protection: capacity 3, 1 token/min)
+  const tokenBucket = getDisconnectTokenBucket(identifier);
+  const bucketResult = tokenBucket.consume(1);
+  if (!bucketResult.allowed) {
+    res.setHeader('Retry-After', bucketResult.retryAfterSeconds);
+    res.setHeader('X-RateLimit-Limit', '3');
+    res.setHeader('X-RateLimit-Remaining', '0');
+    res.setHeader('X-RateLimit-Reset', Math.ceil((Date.now() + bucketResult.retryAfterMs) / 1000));
+    return res.status(429).json({
+      error: 'Gmail disconnect burst quota exhausted. Token bucket replenishment active to protect Google API quotas.',
+      code: 'GMAIL_DISCONNECT_BURST_EXCEEDED',
+      retryAfterSeconds: bucketResult.retryAfterSeconds,
+      retryAfterMs: bucketResult.retryAfterMs
+    });
+  }
+
+  res.setHeader('X-RateLimit-Limit', '5');
+  res.setHeader('X-RateLimit-Remaining', windowResult.remaining.toString());
+  next();
+};
+
 // Aliases for backwards compatibility
 export const authLimiter = authRateLimiter;
 export const publicLimiter = publicRateLimiter;
 export const authenticatedLimiter = authenticatedRateLimiter;
 export const strictLimiter = strictRateLimiter;
+export const gmailDisconnectLimiter = gmailDisconnectRateLimiter;
+

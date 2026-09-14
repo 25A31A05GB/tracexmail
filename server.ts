@@ -149,7 +149,7 @@ import {
   convertThreatItemToRfc822,
   type RealWorldThreatItem
 } from './src/server/realWorldThreatService';
-import { authLimiter, publicLimiter, authenticatedLimiter, strictRateLimiter } from './src/server/rateLimiter';
+import { authLimiter, publicLimiter, authenticatedLimiter, strictRateLimiter, gmailDisconnectLimiter } from './src/server/rateLimiter';
 import {
   validateRequest,
   isPlausibleRfc822,
@@ -358,17 +358,23 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     }
 
     if (!rawEml) {
-      const emailAddr = queueItem.emailAddress || 'user@tracexmail-enterprise.internal';
-      rawEml = `From: "Corporate Security Intercept" <security-notice@internal-sys-verify.co>
-To: ${emailAddr}
-Subject: [AUTO-QUEUED ANALYSIS] Inbound Mail Intercepted for Forensic Evaluation
-Date: ${new Date().toUTCString()}
-Message-ID: <msg-queued-${Date.now()}@internal-sys-verify.co>
-Received: from gateway.internal-sys-verify.co ([185.220.101.8]) by mx.google.com; ${new Date().toUTCString()}
-Authentication-Results: mx.google.com; spf=fail; dkim=fail; dmarc=fail
+      updateQueueItemStatus(queueItem.queueId, {
+        status: 'FAILED',
+        completedAt: new Date().toISOString(),
+        error: 'Could not retrieve real message content from Gmail (missing or invalid access token, or Gmail API fetch failed)'
+      });
 
-Dear User,
-This email was intercepted by the TraceXMail ingestion service and automatically queued for forensic triage.`;
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'GMAIL_EMAIL_QUEUE_FAILED',
+          queueId: queueItem.queueId,
+          messageId: queueItem.messageId,
+          reason: 'content_unavailable'
+        });
+      }
+
+      console.error(`[IngestionQueueWorker] Failed to process queue item ${queueItem.queueId}: Could not retrieve real message content from Gmail (missing or invalid access token, or Gmail API fetch failed)`);
+      return;
     }
 
     const deliveryStage = queueItem.deliveryStage || 'pre-delivery-hold';
@@ -4087,8 +4093,8 @@ Thanks!`;
     res.json({ status: 'ok', watch: updated });
   });
 
-  // 13. Disconnect Gmail (Protected by strictRateLimiter and admin role check against abuse/flapping)
-  app.post('/api/gmail/disconnect', strictRateLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+  // 13. Disconnect Gmail (Protected by token-bucket/sliding-window gmailDisconnectLimiter and admin role check against abuse/flapping)
+  app.post('/api/gmail/disconnect', gmailDisconnectLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const user = (req as any).user;
       const orgId = user?.organizationId || DEFAULT_ORG_ID;
@@ -4218,108 +4224,6 @@ Thanks!`;
             console.warn('[GmailSynced] DB query fallback:', dbErr);
           }
         }
-      }
-
-      // If still empty (first boot / new user), provide authoritative default seed email so user sees the interface in action
-      if (emails.length === 0) {
-        const seedEmails = [
-          {
-            id: 'gmail-seed-01',
-            messageId: 'msg-seed-9921@internal-verify.co',
-            subject: '🚨 URGENT: Corporate Two-Factor Authentication Token Expiration',
-            from: '"Global Security Operations" <security-alert@internal-sys-verify.co>',
-            to: status.emailAddress || 'user@tracexmail-enterprise.internal',
-            date: new Date(Date.now() - 1000 * 60 * 4).toUTCString(),
-            timestamp: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-            threatScore: 94,
-            threatCategory: 'CRITICAL',
-            verdict: 'MALICIOUS_CREDENTIAL_PHISH',
-            deliveryStage: 'pre-delivery-hold',
-            actionTaken: 'HOLD_QUARANTINED',
-            isQuarantined: true,
-            appliedLabel: 'TraceXMail-Quarantine',
-            authResults: {
-              spf: { status: 'fail', ip: '185.220.101.8', domain: 'internal-sys-verify.co', details: 'Sender IP not authorized in SPF record' },
-              dkim: { status: 'fail', domain: 'internal-sys-verify.co', details: 'DKIM signature missing or invalid header hash' },
-              dmarc: { status: 'fail', policy: 'reject', details: 'SPF and DKIM alignment both failed' },
-              arc: { status: 'pass', details: 'Google MTA evaluated' }
-            },
-            securitySignals: [
-              'Pre-Delivery Quarantine Hold Active',
-              'Credential Harvesting Landing Page',
-              'Typosquatting Sender Domain',
-              'Tor Exit Relay Origin IP'
-            ],
-            whyNarrative: 'Sender domain mimics corporate IT gateway with zero reputation and failed cryptographic authentication. Intercepted and quarantined before user mailbox delivery.',
-            linksCount: 1,
-            attachmentsCount: 0,
-            caseId: 'case-gmail-seed-01'
-          },
-          {
-            id: 'gmail-seed-02',
-            messageId: 'msg-seed-8812@partners-vendor-billing.net',
-            subject: 'Invoice #INV-2026-8941 Overdue - Immediate Wire Transfer Required',
-            from: '"Vendor Accounts Payable" <billing-dept@partners-vendor-billing.net>',
-            to: status.emailAddress || 'user@tracexmail-enterprise.internal',
-            date: new Date(Date.now() - 1000 * 60 * 25).toUTCString(),
-            timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-            threatScore: 78,
-            threatCategory: 'MALICIOUS',
-            verdict: 'BEC_WIRE_FRAUD',
-            deliveryStage: 'pre-delivery-hold',
-            actionTaken: 'HOLD_QUARANTINED',
-            isQuarantined: true,
-            appliedLabel: 'TraceXMail-Quarantine',
-            authResults: {
-              spf: { status: 'softfail', ip: '194.26.29.112', domain: 'partners-vendor-billing.net' },
-              dkim: { status: 'fail', domain: 'partners-vendor-billing.net' },
-              dmarc: { status: 'none', policy: 'none' },
-              arc: { status: 'pass' }
-            },
-            securitySignals: [
-              'Business Email Compromise (BEC) Pattern',
-              'Wire Transfer Urgent Lure',
-              'Unregistered Lookalike Domain'
-            ],
-            whyNarrative: 'High financial urgency with unverified payment account substitution. Withheld in quarantine gate.',
-            linksCount: 2,
-            attachmentsCount: 1,
-            caseId: 'case-gmail-seed-02'
-          },
-          {
-            id: 'gmail-seed-03',
-            messageId: 'msg-seed-7719@github.com',
-            subject: '[GitHub] Security Advisory: New Dependabot alerts for repo',
-            from: '"GitHub Support" <notifications@github.com>',
-            to: status.emailAddress || 'user@tracexmail-enterprise.internal',
-            date: new Date(Date.now() - 1000 * 60 * 60).toUTCString(),
-            timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-            threatScore: 8,
-            threatCategory: 'CLEAN',
-            verdict: 'VERIFIED_AUTHENTIC',
-            deliveryStage: 'delivered-clean',
-            actionTaken: 'INSPECTED_CLEAN',
-            isQuarantined: false,
-            authResults: {
-              spf: { status: 'pass', ip: '192.30.252.204', domain: 'github.com' },
-              dkim: { status: 'pass', domain: 'github.com' },
-              dmarc: { status: 'pass', policy: 'reject' },
-              arc: { status: 'pass' }
-            },
-            securitySignals: [
-              'Cryptographically Verified (SPF, DKIM, DMARC Pass)',
-              'Reputable Sender Domain',
-              'Standard Notification Format'
-            ],
-            whyNarrative: 'Legitimate automated notice from verified GitHub infrastructure. Passed gate cleanly.',
-            linksCount: 3,
-            attachmentsCount: 0,
-            caseId: 'case-gmail-seed-03'
-          }
-        ];
-
-        seedEmails.forEach(s => recordSyncedEmail(s as any));
-        emails = getSyncedEmails();
       }
 
       // Optional filters

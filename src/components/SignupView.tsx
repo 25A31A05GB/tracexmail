@@ -132,25 +132,31 @@ export function SignupView({
             accountType
           })
         });
-
-        await fetch('/api/auth/magic-link/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            type: 'signup',
-            payload: {
-              fullName: effectiveName,
-              orgName: assignedOrg,
-              role: assignedRole,
-              accountType,
-              password
-            },
-            redirectTo: window.location.origin
-          })
-        });
       } catch (srvErr) {
         console.warn('[SignupView] Backend registration notice:', srvErr);
+      }
+
+      // 3. Reliable server-side magic link dispatch (authoritative)
+      const mlRes = await fetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          type: 'signup',
+          payload: {
+            fullName: effectiveName,
+            orgName: assignedOrg,
+            role: assignedRole,
+            accountType,
+            password
+          },
+          redirectTo: window.location.origin
+        })
+      });
+
+      const mlData = await mlRes.json();
+      if (!mlRes.ok) {
+        throw new Error(mlData.error || 'Failed to dispatch verification email.');
       }
 
       // Transition to email verification link confirmation
@@ -171,6 +177,7 @@ export function SignupView({
       const cleanEmail = email.trim().toLowerCase();
       const redirectUrl = window.location.origin;
 
+      // 1. Supabase best-effort secondary attempts (safely wrapped)
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.signInWithOtp({
           email: cleanEmail,
@@ -179,19 +186,17 @@ export function SignupView({
           }
         }).catch(err => console.warn('[SignupView] Supabase magic link resend notice:', err?.message));
         
-        const { error } = await supabase.auth.resend({
+        await supabase.auth.resend({
           type: 'signup',
           email: cleanEmail,
           options: {
             emailRedirectTo: redirectUrl
           }
-        });
-        if (error) {
-          console.warn('[SignupView] Resend error:', error.message);
-        }
+        }).catch(err => console.warn('[SignupView] Resend error:', err?.message));
       }
 
-      await fetch('/api/auth/magic-link/send', {
+      // 2. Authoritative reliable server dispatch
+      const res = await fetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,6 +205,11 @@ export function SignupView({
           redirectTo: redirectUrl
         })
       });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resend verification email.');
+      }
 
       setResendStatus(`Fresh verification magic link dispatched to ${cleanEmail}.`);
     } catch (err: any) {
