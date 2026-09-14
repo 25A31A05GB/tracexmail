@@ -306,7 +306,6 @@ export async function createDynamicRealWorldCase(
     updated_at: now,
     tags: [threatItem.source, threatItem.threat_type, threatItem.targeted_brand],
     assigned_user: assignedUser,
-    is_demo: false,
     source: `threat_feed_${threatItem.source.toLowerCase()}`,
     ml_confidence: Math.round(threatItem.threat_score * 0.95),
     phishing_probability: Math.round(threatItem.threat_score * 0.9)

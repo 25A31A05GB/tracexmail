@@ -196,21 +196,18 @@ export function CasesView({
     setFetchError(null);
     try {
       if (isSupabaseConfigured) {
-        let query = supabase
+        const { data, error } = await supabase
           .from('cases')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!showDemoCases) {
-          query = query.eq('is_demo', false);
-        }
-
-        const { data, error } = await query;
-        if (!error && data && data.length > 0) {
-          const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-          setCases(sorted);
-          if (!isSilent) setLoading(false);
-          return;
+        if (!error && data) {
+          if (data.length > 0 || !showDemoCases) {
+            const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+            setCases(sorted);
+            if (!isSilent) setLoading(false);
+            return;
+          }
         }
       }
 
@@ -455,7 +452,6 @@ export function CasesView({
               created_at: new Date().toISOString(),
               tags: ['Forensic'],
               assigned_user: 'Lead Analyst',
-              is_demo: false,
               source: 'manual'
             }])
             .select()

@@ -1068,7 +1068,6 @@ async function parseRawEmailToAnalysis(
       ...(classification.topVectors.slice(0, 2))
     ],
     assigned_user: 'TraceXMail Engine',
-    is_demo: false,
     source: 'ingest',
     ml_confidence: mlConfidence,
     phishing_probability: phishingProbability,
@@ -1108,7 +1107,6 @@ async function parseRawEmailToAnalysis(
         created_at: newCaseItem.created_at,
         assigned_user: newCaseItem.assigned_user,
         tags: newCaseItem.tags,
-        is_demo: false,
         source: 'ingest',
         raw_analysis: newCaseItem
       }]);
@@ -1779,15 +1777,9 @@ async function startServer() {
     const includeDemo = req.query.include_demo === 'true';
 
     try {
-      let casesQuery = supabase.from('cases').select('id, title, classification, severity, threat_score, tags, is_demo, created_at, organization_id, raw_analysis');
+      let casesQuery = supabase.from('cases').select('*');
       if (orgId) {
-        if (includeDemo) {
-          casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        } else {
-          casesQuery = casesQuery.eq('organization_id', orgId).eq('is_demo', false);
-        }
-      } else if (!includeDemo) {
-        casesQuery = casesQuery.eq('is_demo', false);
+        casesQuery = casesQuery.eq('organization_id', orgId);
       }
       const { data: casesData, error: casesError } = await casesQuery;
       if (casesError) {
@@ -1969,15 +1961,8 @@ async function startServer() {
 
     try {
       let query = supabase.from('cases').select('*').order('created_at', { ascending: false });
-      if (excludeDemo) {
-        query = query.eq('is_demo', false);
-        if (orgId) {
-          query = query.eq('organization_id', orgId);
-        }
-      } else {
-        if (orgId) {
-          query = query.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        }
+      if (orgId) {
+        query = query.eq('organization_id', orgId);
       }
 
       const { data, error } = await query;
@@ -2062,7 +2047,6 @@ async function startServer() {
       created_at: new Date().toISOString(),
       tags,
       assigned_user: user.email || 'Lead Analyst',
-      is_demo: false,
       source: 'manual'
     };
 
