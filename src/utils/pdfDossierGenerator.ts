@@ -96,7 +96,8 @@ export function generateForensicPdfDossier({
     pdf.setTextColor(125, 135, 148);
     const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
     pdf.text(`EVIDENCE ID: ${evidenceId}  •  AUTHENTICATED UTC: ${nowUtc}`, margin, 17.5);
-    pdf.text(enforceMasking ? '[PII REDACTED MODE]' : '[OFFICIAL FORENSIC RECORD]', pageWidth - margin, 17.5, { align: 'right' });
+    const isDegradedHeader = analysis.degradedAnalysis === true || analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
+    pdf.text(enforceMasking ? '[PII REDACTED MODE]' : (isDegradedHeader ? '[PARTIAL ANALYSIS — DEGRADED FALLBACK]' : '[OFFICIAL FORENSIC RECORD]'), pageWidth - margin, 17.5, { align: 'right' });
   };
 
   // Helper: Draw Footer on current page
@@ -107,10 +108,10 @@ export function generateForensicPdfDossier({
 
     pdf.setFont('courier', 'normal');
     pdf.setFontSize(6.5);
-    const isDegraded = analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
+    const isDegraded = analysis.degradedAnalysis === true || analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
     if (isDegraded) {
       pdf.setTextColor(217, 119, 6);
-      pdf.text('DEGRADED MODE — UNVERIFIED CLIENT HEURISTIC  •  NOT CERTIFIED UNDER FRE 902 / ISO 27037', margin, pageHeight - 7);
+      pdf.text('PARTIAL ANALYSIS — BACKEND FORENSIC PIPELINE UNAVAILABLE AT TIME OF INGESTION  •  NOT CERTIFIED UNDER FRE 902 / ISO 27037', margin, pageHeight - 7);
       pdf.setTextColor(125, 135, 148);
       pdf.text(`Page ${pageNumber}  •  Client Local Parse`, pageWidth - margin, pageHeight - 7, { align: 'right' });
     } else {
@@ -163,6 +164,26 @@ export function generateForensicPdfDossier({
   pdf.text(`Confidence Rating: ${confidenceVal}%  •  Attack Vector: ${analysis.heuristics?.[0]?.title || 'Spearphishing & Header Forgery'}  •  Purge: ${purgeInfo.date}`, margin + 5, curY + 16.5);
 
   curY += 27;
+
+  const isDegradedDossier = analysis.degradedAnalysis === true || analysis.analysisSource === 'client_fallback_unverified' || analysis.isClientFallback === true;
+  if (isDegradedDossier) {
+    pdf.setFillColor(45, 30, 10);
+    pdf.setDrawColor(217, 119, 6);
+    pdf.setLineWidth(0.6);
+    pdf.roundedRect(margin, curY, contentWidth, 14, 1.5, 1.5, 'FD');
+
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(245, 158, 11);
+    pdf.text('CAVEAT: PARTIAL ANALYSIS — backend forensic pipeline unavailable at time of ingestion.', margin + 4, curY + 5.5);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    pdf.setTextColor(237, 230, 216);
+    pdf.text('This dossier was generated using local client heuristic fallback. Server-side hash anchoring, DNSSEC validation, and ML models are unverified.', margin + 4, curY + 10);
+
+    curY += 18;
+  }
 
   // 2. PRIMARY EVIDENCE METADATA SECTION
   pdf.setFillColor(26, 23, 18); // #1a1712

@@ -15,7 +15,13 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { SAMPLE_ANALYSES } from './data/samples';
 import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
-import { PrivacyConfig, loadPrivacyConfig, savePrivacyConfig } from './utils/privacyCompliance';
+import { 
+  PrivacyConfig, 
+  loadPrivacyConfig, 
+  savePrivacyConfig, 
+  fetchOrgPrivacyConfigServer, 
+  saveOrgPrivacyConfigServer 
+} from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
 import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
 import { forensicApi } from './lib/api';
@@ -248,6 +254,12 @@ export default function App() {
     };
   }, [session]);
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
+
+  useEffect(() => {
+    fetchOrgPrivacyConfigServer().then(cfg => {
+      setPrivacyConfig(cfg);
+    });
+  }, [session]);
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'simple' | 'analyst'>(() => {
     try {
@@ -325,13 +337,13 @@ export default function App() {
     if (selection.privacyMasking) {
       const updatedCfg = { ...privacyConfig, maskingEnabled: true };
       setPrivacyConfig(updatedCfg);
-      savePrivacyConfig(updatedCfg);
+      saveOrgPrivacyConfigServer(updatedCfg);
     }
   };
 
   const handleUpdatePrivacyConfig = (newCfg: PrivacyConfig) => {
     setPrivacyConfig(newCfg);
-    savePrivacyConfig(newCfg);
+    saveOrgPrivacyConfigServer(newCfg);
   };
 
   // Real-Time WebSockets Alerting Hook - only active if session is present

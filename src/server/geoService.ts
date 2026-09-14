@@ -37,7 +37,7 @@ export interface GeoLocationResult {
   reverseDns?: string | null;
   isTor?: boolean;
   isProxyOrVpn?: boolean;
-  infra?: 'vpn' | 'hosting' | null;
+  infra?: 'botnet' | 'vpn' | 'hosting' | null;
   abuseScore?: number;
   isBlacklisted?: boolean;
   source: 'maxmind-local' | 'ip-api' | 'ipwho' | 'ipgeolocation' | 'unavailable' | 'RFC_1918_CLASSIFIER' | string;
@@ -344,7 +344,7 @@ export async function resolveIpGeolocationWithFallback(ip?: string): Promise<Geo
       countryCode.toUpperCase() !== rirCountry.toUpperCase()
     );
 
-    const abuseScore = isTor ? 88 : (infraSignal === 'vpn' ? 50 : (isHosting ? 25 : 0));
+    const abuseScore = infraSignal === 'botnet' ? 95 : (isTor ? 88 : (infraSignal === 'vpn' ? 50 : (isHosting ? 25 : 0)));
 
     const finalResult: GeoLocationResult = {
       ip,
@@ -372,7 +372,7 @@ export async function resolveIpGeolocationWithFallback(ip?: string): Promise<Geo
       isProxyOrVpn,
       infra: infraSignal || (isTor ? 'vpn' : isHosting ? 'hosting' : null),
       abuseScore,
-      isBlacklisted: isTor,
+      isBlacklisted: isTor || infraSignal === 'botnet',
       source: (resolvedData.source as any) || 'unavailable',
       lookupMethod: resolvedData.lookupMethod || 'Live Geolocation Resolution',
       lookupStatus: 'success'

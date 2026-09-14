@@ -28,6 +28,7 @@ export const DEFAULT_PRIVACY_CONFIG: PrivacyConfig = {
 const STORAGE_KEY = 'tracexmail_privacy_config';
 
 export function loadPrivacyConfig(): PrivacyConfig {
+  if (typeof window === 'undefined') return DEFAULT_PRIVACY_CONFIG;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -40,11 +41,55 @@ export function loadPrivacyConfig(): PrivacyConfig {
 }
 
 export function savePrivacyConfig(config: PrivacyConfig): void {
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   } catch {
     // ignore
   }
+}
+
+/**
+ * Fetches organization PrivacyConfig from server endpoint with fallback to localStorage
+ */
+export async function fetchOrgPrivacyConfigServer(): Promise<PrivacyConfig> {
+  try {
+    const res = await fetch('/api/organization/privacy-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        const merged = { ...DEFAULT_PRIVACY_CONFIG, ...data };
+        savePrivacyConfig(merged);
+        return merged;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return loadPrivacyConfig();
+}
+
+/**
+ * Saves organization PrivacyConfig to server endpoint and updates localStorage
+ */
+export async function saveOrgPrivacyConfigServer(config: PrivacyConfig): Promise<PrivacyConfig> {
+  savePrivacyConfig(config);
+  try {
+    const res = await fetch('/api/organization/privacy-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const merged = { ...DEFAULT_PRIVACY_CONFIG, ...data };
+      savePrivacyConfig(merged);
+      return merged;
+    }
+  } catch {
+    // ignore server errors, local saved
+  }
+  return config;
 }
 
 /**

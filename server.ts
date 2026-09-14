@@ -52,6 +52,7 @@ import {
 } from './src/server/structuralFeatures';
 import { isSpamhausListed } from './src/server/intelligence/spamhausDrop';
 import { isTorExitNode } from './src/server/intelligence/torExitNodes';
+import { isBotnetC2 } from './src/server/intelligence/botnetC2';
 import { classifyInfra } from './src/server/intelligence/vpnHostingList';
 import { getRegisteredCountry } from './src/server/intelligence/rirCountryCheck';
 import { parseAuthenticationHeaders } from './src/utils/authParser';
@@ -111,6 +112,9 @@ import {
   logAuditAction,
   getAuditLogs,
   runRetentionCleanup,
+  getOrgPrivacyConfig,
+  saveOrgPrivacyConfig,
+  maskCasePii,
   encryptSensitiveField,
   decryptSensitiveField,
   encryptToken,
@@ -389,8 +393,8 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     const threatScore = analysisResult.analysis?.threatScore ?? analysisResult.case?.threat_score ?? 0;
     const isQuarantined = analysisResult.case?.status === 'QUARANTINED' || threatScore >= 70;
     const caseId = analysisResult.case?.id;
-    const subject = analysisResult.case?.title || analysisResult.analysis?.email?.subject || 'Inbound Mail Evaluation';
-    const fromAddr = analysisResult.analysis?.email?.from || 'Unknown Sender';
+    const subject = analysisResult.case?.title || (analysisResult.analysis as any)?.headers?.subject || 'Inbound Mail Evaluation';
+    const fromAddr = (analysisResult.analysis as any)?.headers?.from || 'Unknown Sender';
 
     updateQueueItemStatus(queueItem.queueId, {
       status: 'COMPLETED',
@@ -407,14 +411,13 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     recordSyncedEmail({
       id: caseId || `case_${Date.now()}`,
       messageId: queueItem.messageId,
-      threadId: `thread_${queueItem.messageId}`,
       subject,
       from: fromAddr,
       to: queueItem.emailAddress || 'User',
       date: new Date().toISOString(),
-      snippet: analysisResult.analysis?.email?.snippet || 'Analyzed inbound email artifact.',
+      snippet: (analysisResult.analysis as any)?.email?.snippet || 'Analyzed inbound email artifact.',
       fullAnalysis: analysisResult.analysis
-    });
+    } as any);
 
     // Update deduplication ledger with final caseId and verdict
     if (queueItem.messageId) {
@@ -547,47 +550,7 @@ function broadcastAnalysisProgress(
 const maxmindCopyrightNotice = 'Database and Contents Copyright (c) 2026 MaxMind, Inc.';
 const maxmindLicenseNotice = "Use of this MaxMind product is governed by MaxMind's GeoLite End User License Agreement (https://www.maxmind.com/en/geolite/eula).";
 
-// PII Masking utility for case data
-function maskCasePii(caseItem: any): any {
-  if (!caseItem) return caseItem;
-  const copy = { ...caseItem };
-  if (copy.description) {
-    copy.description = copy.description
-      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]')
-      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[REDACTED_IP]');
-  }
-  if (copy.assigned_user) {
-    copy.assigned_user = 'Analyst (Masked)';
-  }
-  if (copy.from) {
-    copy.from = copy.from.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]');
-  }
-  if (copy.to) {
-    copy.to = copy.to.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]');
-  }
-  if (copy.origin_ip) {
-    copy.origin_ip = '[REDACTED_IP]';
-  }
-  if (copy.headers) {
-    const h = { ...copy.headers };
-    if (h.from) h.from = h.from.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]');
-    if (h.to) h.to = h.to.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]');
-    copy.headers = h;
-  }
-  if (Array.isArray(copy.members)) {
-    copy.members = copy.members.map((m: any) => ({
-      ...m,
-      sender: m.sender ? m.sender.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]') : m.sender,
-      from: m.from ? m.from.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]') : m.from,
-      recipient: m.recipient ? m.recipient.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]') : m.recipient,
-      to: m.to ? m.to.replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]') : m.to,
-    }));
-  }
-  if (Array.isArray(copy.tags)) {
-    copy.tags = copy.tags.map((t: string) => (t.includes('@') ? '[REDACTED_TAG]' : t));
-  }
-  return copy;
-}
+
 
 function buildEvidenceWhyNarrative(analysisOrCase: any) {
   const threatScore = analysisOrCase.threat_score ?? analysisOrCase.threatScore ?? 0;
@@ -791,8 +754,8 @@ async function parseRawEmailToAnalysis(
       is_botnet_indicator: ipIsSpamhaus,
       infra: geo.infra,
       infrastructureType: infraType,
-      isOrigin: cand.isOrigin ?? (idx === 0),
-      isPublicGateway: cand.isPublicGateway ?? false,
+      isOrigin: (cand as any).isOrigin ?? (idx === 0),
+      isPublicGateway: (cand as any).isPublicGateway ?? false,
       maxmindVerified: true,
       maxmindSource: geo.source,
       maxmindCopyright: maxmindCopyrightNotice,
@@ -894,7 +857,7 @@ async function parseRawEmailToAnalysis(
     returnPath,
     hops,
     auth: synthesizedAuth,
-    domainIntelligence
+    domainIntelligence: domainIntelligence as any
   });
 
   // Forensic threat evaluation from classifier (no double-counting)
@@ -1019,7 +982,7 @@ async function parseRawEmailToAnalysis(
     try {
       await supabase.from('cases').insert([{
         id: newCaseItem.id,
-        organization_id: options?.organizationId || '00000000-0000-0000-0000-000000000000',
+        organization_id: (options as any)?.organizationId || '00000000-0000-0000-0000-000000000000',
         title: newCaseItem.title,
         description: newCaseItem.description,
         status: newCaseItem.status,
@@ -1323,7 +1286,7 @@ async function parseRawEmailToAnalysis(
     try {
       await supabase.from('alerts').insert([{
         id: newAlert.id,
-        organization_id: options?.organizationId || DEFAULT_ORG_ID,
+        organization_id: (options as any)?.organizationId || DEFAULT_ORG_ID,
         case_id: newId,
         timestamp: newAlert.timestamp,
         severity: newAlert.severity,
@@ -1750,7 +1713,7 @@ async function startServer() {
 
       activeCasesForStats.forEach(c => {
         const rawAnalysis = c.raw_analysis || {};
-        const hops = Array.isArray(rawAnalysis.hops) ? rawAnalysis.hops : (Array.isArray(c.hops) ? c.hops : []);
+        const hops = Array.isArray(rawAnalysis.hops) ? rawAnalysis.hops : (Array.isArray((c as any).hops) ? (c as any).hops : []);
         const classification = (c.classification || rawAnalysis.classification || rawAnalysis.verdict || '').toLowerCase();
         const hasTor = hops.some((h: any) => h.isTorExit || h.asnOrg?.toLowerCase().includes('tor') || h.asnOrg?.toLowerCase().includes('anonymizing'));
         const hasSpoof = c.severity === 'CRITICAL' || classification.includes('phish') || classification.includes('spoof') || (c.tags && c.tags.includes('BEC'));
@@ -1778,7 +1741,7 @@ async function startServer() {
       // Dynamic real threat clusters derived from campaigns and cases
       const realCampaigns = (campData || []).map(cp => ({
         name: cp.name || cp.threat_actor || 'Unattributed Incident Cluster',
-        campaign_count: activeCasesForStats.filter(c => c.campaign_id === cp.id || c.title?.includes(cp.name)).length || 1,
+        campaign_count: activeCasesForStats.filter(c => (c as any).campaign_id === cp.id || c.title?.includes(cp.name)).length || 1,
         target: cp.target_sector || 'Enterprise Communications',
         status: cp.status || 'ACTIVE'
       }));
@@ -1923,9 +1886,13 @@ async function startServer() {
   app.get('/api/cases', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     const user = (req as AuthenticatedRequest).user;
-    const shouldMask = !user || user.role === 'read_only' || req.query.mask_pii === 'true';
+    const orgId = user?.organizationId || (req.query.organization_id as string) || 'org-default';
+    const privacyConfig = await getOrgPrivacyConfig(orgId);
+
+    const userRole = user?.role || 'read_only';
+    const isViewerOrAuditor = ['read_only', 'viewer', 'auditor'].includes(userRole);
+    const shouldMask = !user || isViewerOrAuditor || req.query.mask_pii === 'true' || privacyConfig.maskingEnabled;
     const excludeDemo = req.query.exclude_demo === 'true' || req.query.real_only === 'true';
-    const orgId = user?.organizationId || (req.query.organization_id as string);
 
     const getFallbackCases = () => {
       let cases = Array.from(inMemoryCases.values());
@@ -1935,7 +1902,7 @@ async function startServer() {
       } else if (orgId) {
         cases = cases.filter(c => c.organization_id === orgId || c.is_demo);
       }
-      return shouldMask ? cases.map((c: any) => maskCasePii(c)) : cases;
+      return shouldMask ? cases.map((c: any) => maskCasePii(c, privacyConfig)) : cases;
     };
 
     if (!supabase) {
@@ -1965,7 +1932,7 @@ async function startServer() {
         tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : ['Custom']),
         is_demo: Boolean(c.is_demo)
       }));
-      const results = shouldMask ? formatted.map((c: any) => maskCasePii(c)) : formatted;
+      const results = shouldMask ? formatted.map((c: any) => maskCasePii(c, privacyConfig)) : formatted;
       res.json(results);
     } catch (err: any) {
       console.warn('[API /api/cases] Exception fallback triggered:', err?.message);
@@ -1976,13 +1943,18 @@ async function startServer() {
   app.get('/api/cases/:caseId', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     const user = (req as AuthenticatedRequest).user;
-    const shouldMask = !user || user.role === 'read_only' || req.query.mask_pii === 'true';
     const caseId = req.params.caseId;
+    const orgId = user?.organizationId || (req.query.organization_id as string) || 'org-default';
+    const privacyConfig = await getOrgPrivacyConfig(orgId);
+
+    const userRole = user?.role || 'read_only';
+    const isViewerOrAuditor = ['read_only', 'viewer', 'auditor'].includes(userRole);
+    const shouldMask = !user || isViewerOrAuditor || req.query.mask_pii === 'true' || privacyConfig.maskingEnabled;
 
     const getFallbackCase = () => {
       const c = inMemoryCases.get(caseId);
       if (!c) return null;
-      return shouldMask ? maskCasePii(c) : c;
+      return shouldMask ? maskCasePii(c, privacyConfig) : c;
     };
 
     if (!supabase) {
@@ -2004,7 +1976,7 @@ async function startServer() {
         tags: Array.isArray(data.tags) ? data.tags : (typeof data.tags === 'string' ? JSON.parse(data.tags || '[]') : ['Custom']),
         is_demo: Boolean(data.is_demo)
       };
-      res.json(shouldMask ? maskCasePii(formatted) : formatted);
+      res.json(shouldMask ? maskCasePii(formatted, privacyConfig) : formatted);
     } catch (err: any) {
       const fallback = getFallbackCase();
       if (fallback) return res.json(fallback);
@@ -2980,6 +2952,33 @@ async function startServer() {
     }
   });
 
+  // Organization Privacy & Compliance Config REST Endpoints
+  app.get('/api/organization/privacy-config', publicLimiter, async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId || (req.query.organization_id as string) || 'org-default';
+    const config = await getOrgPrivacyConfig(orgId);
+    res.json(config);
+  });
+
+  app.post('/api/organization/privacy-config', authenticatedLimiter, async (req, res) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId || (req.body && req.body.organizationId) || 'org-default';
+    const updatedConfig = await saveOrgPrivacyConfig(orgId, req.body);
+    if (user) {
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: user.userId,
+        user_email: user.email,
+        user_role: user.role,
+        action: 'UPDATE_PRIVACY_CONFIG',
+        resource_type: 'organization_settings',
+        details: { privacy_config: updatedConfig },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+    }
+    res.json(updatedConfig);
+  });
+
   // Campaigns Management via Supabase
   app.get('/api/campaigns', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
@@ -3412,11 +3411,11 @@ Link: https://verify-auth-portal.net/login`;
     }
   };
 
-  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
-  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyzeBatch);
-  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
-  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyzeBatch);
-  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20), postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
 
   // Machine Learning Model Metrics & Forensic Evaluation Telemetry
   const handleMlMetrics = (_req: express.Request, res: express.Response) => {
@@ -4551,7 +4550,7 @@ Thanks!`;
                   messageId: `msg-${c.id}`,
                   subject: c.title || 'Inbound Evaluated Email',
                   from: c.from_domain ? `security@${c.from_domain}` : 'sender@external-domain.com',
-                  to: status.emailAddress || 'user@tracexmail-enterprise.internal',
+                  to: status.email_address || 'user@tracexmail-enterprise.internal',
                   date: c.created_at || new Date().toISOString(),
                   timestamp: c.created_at || new Date().toISOString(),
                   threatScore,
@@ -4560,7 +4559,7 @@ Thanks!`;
                   deliveryStage: c.delivery_stage || (isQuar ? 'pre-delivery-hold' : 'post-delivery-alert'),
                   actionTaken: isQuar ? 'HOLD_QUARANTINED' : (threatScore >= 40 ? 'ALERT_DISPATCHED' : 'INSPECTED_CLEAN'),
                   isQuarantined: isQuar,
-                  appliedLabel: isQuar ? (status.quarantine.quarantineLabelName || 'TraceXMail-Quarantine') : undefined,
+                  appliedLabel: isQuar ? (status.quarantine.quarantine_label || 'TraceXMail-Quarantine') : undefined,
                   authResults: {
                     spf: c.auth?.spf || { status: threatScore >= 70 ? 'fail' : 'pass', domain: c.from_domain },
                     dkim: c.auth?.dkim || { status: threatScore >= 70 ? 'fail' : 'pass', domain: c.from_domain },
@@ -4613,14 +4612,14 @@ Thanks!`;
         filtered_count: filtered.length,
         synced_emails: filtered,
         metrics: {
-          total_ingested: Math.max(emails.length, status.metrics.totalIngested),
+          total_ingested: Math.max(emails.length, status.metrics.total_ingested),
           pre_delivery_quarantined: emails.filter(e => e.isQuarantined).length,
           clean_delivered: emails.filter(e => !e.isQuarantined && e.threatScore < 30).length,
           suspicious_alerts: emails.filter(e => e.threatScore >= 30 && e.threatScore < 70).length,
           quarantine_threshold: status.quarantine.threshold
         },
-        monitored_email: status.emailAddress,
-        last_polled_at: status.lastPolledAt || new Date().toISOString()
+        monitored_email: status.email_address,
+        last_polled_at: status.last_polled_at || new Date().toISOString()
       });
     } catch (err: any) {
       console.error('[GmailSyncedEmails] Error:', err);

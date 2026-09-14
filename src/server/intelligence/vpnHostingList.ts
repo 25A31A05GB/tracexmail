@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import { isIpInCidr } from '../maxmindService';
+import { isBotnetC2 } from './botnetC2';
 
 const X4B_VPN_URLS = [
   'https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/vpn/ipv4.txt',
@@ -216,13 +217,18 @@ export async function initVpnHostingList(): Promise<void> {
 initVpnHostingList().catch(() => {});
 
 /**
- * Classifies an IP as 'vpn', 'hosting', or null (if residential/standard public).
+ * Classifies an IP as 'botnet', 'vpn', 'hosting', or null (if residential/standard public).
  */
-export function classifyInfra(ip: string): 'vpn' | 'hosting' | null {
+export function classifyInfra(ip: string): 'botnet' | 'vpn' | 'hosting' | null {
   if (!ip) return null;
   const cleanIp = ip.trim();
 
-  // 1. Check VPN CIDR ranges first
+  // 1. Check Botnet Command & Control (C2) first
+  if (isBotnetC2(cleanIp)) {
+    return 'botnet';
+  }
+
+  // 2. Check VPN CIDR ranges
   for (let i = 0; i < vpnCidrs.length; i++) {
     const cidr = vpnCidrs[i];
     if (isIpInCidr(cleanIp, cidr)) {
@@ -230,7 +236,7 @@ export function classifyInfra(ip: string): 'vpn' | 'hosting' | null {
     }
   }
 
-  // 2. Check Datacenter / Cloud Hosting CIDR ranges
+  // 3. Check Datacenter / Cloud Hosting CIDR ranges
   for (let i = 0; i < dcCidrs.length; i++) {
     const cidr = dcCidrs[i];
     if (isIpInCidr(cleanIp, cidr)) {

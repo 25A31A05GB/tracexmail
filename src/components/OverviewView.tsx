@@ -717,6 +717,42 @@ export function OverviewView({
         </div>
       </div>
 
+      {/* Degraded Analysis / Fallback Warning Banner */}
+      {(analysis.degradedAnalysis || analysis.isClientFallback || analysis.analysisSource === 'client_fallback_unverified') && (
+        <div 
+          id="degraded-analysis-warning-banner"
+          className="mb-6 p-4 rounded-lg bg-amber-950/40 border-2 border-amber-600/80 text-amber-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-sm"
+        >
+          <div className="flex items-start gap-3.5">
+            <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider font-mono px-2 py-0.5 bg-amber-500/25 text-amber-300 border border-amber-500/50 rounded">
+                  PARTIAL ANALYSIS
+                </span>
+                <span className="text-sm font-bold text-amber-100 font-sans">
+                  Backend forensic pipeline unavailable at time of ingestion
+                </span>
+              </div>
+              <p className="text-xs text-amber-200/90 font-sans leading-relaxed">
+                This case was processed using local client-side heuristic fallback. Authoritative backend reputation lookups, server-side hash sealing, ML threat classification, and DNSSEC telemetry are degraded. Not certified under FRE 902 / ISO 27037 for court admissibility.
+              </p>
+            </div>
+          </div>
+          {onOpenNewModal && (
+            <button
+              onClick={onOpenNewModal}
+              className="shrink-0 px-3.5 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs font-mono transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm whitespace-nowrap self-end md:self-center"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Re-analyze via Pipeline</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Top-of-view Plain-Language Summary for Non-Technical Reviewers */}
       <div className="mb-6">
         <PlainLanguageSummaryCard
@@ -1571,7 +1607,7 @@ export function OverviewView({
                     <div>
                       <div className="text-xs font-mono font-medium text-slate-200">{att.filename}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        Size: {att.size} | SHA256: {att.sha256.slice(0, 16)}...
+                        Size: {att.size || 'size unavailable'} | SHA256: {att.sha256 ? `${att.sha256.slice(0, 16)}...` : 'hash unavailable'}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

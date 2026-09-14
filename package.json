@@ -14,7 +14,8 @@
     "test:forensics": "tsx scripts/test_forensics.ts",
     "test:intelligence": "tsx scripts/test_intelligence.ts",
     "test:network": "tsx scripts/test_network_intelligence.ts",
-    "test": "tsx scripts/test_forensics.ts && tsx scripts/test_intelligence.ts && tsx scripts/test_network_intelligence.ts",
+    "test:unit": "vitest run",
+    "test": "vitest run && tsx scripts/test_forensics.ts && tsx scripts/test_intelligence.ts && tsx scripts/test_network_intelligence.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -81,6 +82,7 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^5.0.0"
   }
 }

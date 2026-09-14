@@ -147,10 +147,10 @@ export interface ExtractedUrl {
 
 export interface AttachmentInfo {
   filename: string;
-  size: string;
+  size: string | null;
   mimeType: string;
-  sha256: string;
-  md5: string;
+  sha256: string | null;
+  md5: string | null;
   status: 'CLEAN' | 'MALICIOUS' | 'SUSPICIOUS';
   vtDetection?: string;
 }
@@ -260,6 +260,7 @@ export interface EmailAnalysis {
   evidenceId?: string;
   analysisSource?: 'server_verified' | 'client_fallback_unverified';
   isClientFallback?: boolean;
+  degradedAnalysis?: boolean;
   sha256Hash?: string;
   sha256?: string;
   custodyHash?: string;

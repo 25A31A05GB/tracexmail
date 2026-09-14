@@ -253,7 +253,7 @@ Received: from client.internal.lan (unknown [192.168.10.50]) by mail-relay.strip
   assert(typeof irsNarrative === 'string' && irsNarrative.length > 50, 'Attack narrative generated for malicious sample');
   assert(!irsNarrative.includes('undefined') && !irsNarrative.includes('null') && !irsNarrative.includes('NaN'), 'Attack narrative has zero undefined/null/NaN values');
 
-  const legitNarrative = generateAttackNarrative(cleanLegitAnalysis);
+  const legitNarrative = generateAttackNarrative(cleanLegitAnalysis as any);
   assert(typeof legitNarrative === 'string' && legitNarrative.includes('alignment'), 'Legitimate sample receives clean non-malicious narrative');
 
   // Graceful degradation on empty object
@@ -283,7 +283,7 @@ Received: from client.internal.lan (unknown [192.168.10.50]) by mail-relay.strip
   assert(Array.isArray(citibankFlags) && citibankFlags.length > 0, 'Regulatory breach flags mapped for financial/wire phish');
   assert(citibankFlags.some(f => f.regime.includes('CERT-In')), 'CERT-In mandatory reporting flag triggered for high severity phish');
 
-  const legitFlags = mapComplianceFlags(cleanLegitAnalysis);
+  const legitFlags = mapComplianceFlags(cleanLegitAnalysis as any);
   assert(Array.isArray(legitFlags) && legitFlags.length === 0, 'Zero compliance breach flags mapped for legitimate email');
 
   // --------------------------------------------------------------------------

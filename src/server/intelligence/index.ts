@@ -118,6 +118,7 @@ export * from './errors';
 export * from './provenance';
 export * from './virustotal';
 export * from './torExitNodes';
+export * from './botnetC2';
 export {
   validateAndClassifyIp,
   resolveGeoIp,
