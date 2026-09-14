@@ -10,6 +10,7 @@ import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon
 
 interface LandingViewProps {
   onOpenConsole: () => void;
+  onSignIn?: () => void;
   onOpenTrace: () => void;
   onRequestAccess?: () => void;
   onSelectCase?: (analysis: EmailAnalysis) => void;
@@ -17,6 +18,7 @@ interface LandingViewProps {
 
 export function LandingView({
   onOpenConsole,
+  onSignIn,
   onOpenTrace,
   onRequestAccess,
   onSelectCase
@@ -137,7 +139,7 @@ export function LandingView({
 
           <div className="flex items-center gap-2 sm:gap-4">
             <button
-              onClick={onOpenConsole}
+              onClick={onSignIn || onOpenConsole}
               className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] sm:text-[14.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
             >
               Sign in
@@ -207,9 +209,15 @@ export function LandingView({
             <div className="pt-3 border-t border-[#3a352c] flex flex-col gap-2">
               <button
                 onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
-                className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
+                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer transition-colors shadow-md"
               >
                 Launch Free Analyst Console
+              </button>
+              <button
+                onClick={() => { if (onSignIn) { onSignIn(); } else { onOpenConsole(); } setMobileMenuOpen(false); }}
+                className="w-full bg-[#1e1b15] hover:bg-[#28231b] border border-[#3a352c] text-[#ede6d8] py-2 rounded text-[13.5px] font-medium text-center cursor-pointer transition-colors"
+              >
+                Sign In to Account
               </button>
             </div>
           </div>

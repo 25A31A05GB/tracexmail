@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { 
@@ -27,153 +27,17 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  Radio
+  Radio,
+  Activity
 } from 'lucide-react';
 import { EmailAnalysis } from '../../types';
-import { SAMPLE_ANALYSES } from '../../data/samples';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { forensicApi } from '../../lib/api';
-
-export type NodeType = 'USER' | 'ATTACKER' | 'CHECKPOINT' | 'RELAY';
-
-export interface Dynamic3DNode {
-  id: string;
-  name: string;
-  category: NodeType;
-  role: string;
-  status: 'MALICIOUS' | 'WARNING' | 'CLEAN';
-  riskScore: number;
-  position: [number, number, number];
-  simpleExplanation: string;
-  technicalDetails: string;
-  actionAdvice: string;
-  colorHex: number;
-  shape: 'diamond' | 'spiked' | 'ring' | 'sphere';
-}
-
-export interface LiveDbCase {
-  id: string;
-  title: string;
-  source: 'supabase' | 'backend' | 'sample';
-  analysis: EmailAnalysis;
-  updatedAt: string;
-  threatLevel: 'HIGH' | 'MEDIUM' | 'CLEAN';
-}
+import { useLiveForensicCases3D, Dynamic3DNode, LiveDbCase } from '../../hooks/useLiveForensicCases3D';
 
 interface Forensic3DDataVisualizerProps {
   currentAnalysis?: EmailAnalysis;
   onSelectCase?: (analysis: EmailAnalysis) => void;
   onOpenConsole?: () => void;
   onExploreCase?: (caseIndex?: number) => void;
-}
-
-// Convert real case record into dynamic 3D nodes
-function deriveNodesFromCase(analysis: EmailAnalysis): Dynamic3DNode[] {
-  const nodes: Dynamic3DNode[] = [];
-  const isMalicious = (analysis.riskScore ?? (analysis.threatScore ?? 80)) >= 60;
-  const threatScore = analysis.riskScore ?? (analysis.threatScore ?? 85);
-
-  // 1. Traced User / Recipient Node (Protected User) - DIAMOND GREEN/CYAN
-  const recipientEmail = analysis.headers?.to || 'targeted-employee@company.com';
-  const cleanRecipient = recipientEmail.split('<').pop()?.replace('>', '') || 'Protected User';
-  nodes.push({
-    id: 'node-user',
-    name: cleanRecipient,
-    category: 'USER',
-    role: 'Traced Recipient (Protected)',
-    status: 'CLEAN',
-    riskScore: 0,
-    position: [2.9, -0.3, 0.4],
-    simpleExplanation: 'The target employee mailbox. TraceXMail verified the identity and shielded the account from credential theft.',
-    technicalDetails: `Recipient: ${cleanRecipient} | Envelope: Validated | Security Status: Shielded`,
-    actionAdvice: 'Safe. User account protected by gateway.',
-    colorHex: 0x10b981,
-    shape: 'diamond'
-  });
-
-  // 2. Attacker / Origin Node - SPIKED RED / AMBER
-  const originHop = analysis.hops?.[0];
-  const originIp = originHop?.fromIp || '185.220.101.5';
-  const originLocation = originHop?.city && originHop?.country 
-    ? `${originHop.city}, ${originHop.country}` 
-    : 'Sofia, Bulgaria (Tor Exit)';
-  
-  nodes.push({
-    id: 'node-attacker',
-    name: isMalicious ? `Attacker IP (${originIp})` : `Sender Gateway (${originIp})`,
-    category: isMalicious ? 'ATTACKER' : 'RELAY',
-    role: isMalicious ? 'Attacker Origin (Malicious Source)' : 'Verified Mail Origin',
-    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
-    riskScore: isMalicious ? threatScore : 4,
-    position: [-2.9, 0.9, -0.4],
-    simpleExplanation: isMalicious 
-      ? `Real computer that sent the phish. Located in ${originLocation}, disguised as a legitimate service.` 
-      : `Authorized sending server in ${originLocation} verified by company domain records.`,
-    technicalDetails: `Origin IP: ${originIp} | ASN: ${originHop?.asn || 'AS200548'} | PTR: ${originHop?.reverseDns || 'unresolved'}`,
-    actionAdvice: isMalicious ? 'Blacklisted across all perimeter firewalls.' : 'Legitimate sender confirmed.',
-    colorHex: isMalicious ? 0xef4444 : 0x38bdf8,
-    shape: isMalicious ? 'spiked' : 'sphere'
-  });
-
-  // 3. Security Checkpoint (SPF / DKIM / DMARC verification) - RING GOLD/RED
-  const dmarcStatus = analysis.authResults?.dmarc?.status || (isMalicious ? 'FAIL' : 'PASS');
-  const spfStatus = analysis.authResults?.spf?.status || (isMalicious ? 'SOFTFAIL' : 'PASS');
-  const dkimStatus = analysis.authResults?.dkim?.status || (isMalicious ? 'FAIL' : 'PASS');
-  
-  nodes.push({
-    id: 'node-security',
-    name: 'Cryptographic Auth Gate',
-    category: 'CHECKPOINT',
-    role: 'SPF / DKIM / DMARC Gate',
-    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
-    riskScore: isMalicious ? 94 : 2,
-    position: [-0.2, 2.0, 0.6],
-    simpleExplanation: isMalicious
-      ? `Security checkpoint failed: The cryptographic signature did not match the claimed domain, proving spoofing.`
-      : `All cryptographic checks passed: Signature matches the registered domain keys perfectly.`,
-    technicalDetails: `SPF: ${spfStatus} | DKIM: ${dkimStatus} | DMARC: ${dmarcStatus}`,
-    actionAdvice: isMalicious ? 'Quarantine rule triggered.' : 'Cryptographic authenticity verified.',
-    colorHex: isMalicious ? 0xf59e0b : 0x10b981,
-    shape: 'ring'
-  });
-
-  // 4. Mail Transit Relay - SPHERE BLUE
-  const secondHop = analysis.hops?.[1] || { fromHost: 'inbound-mta.company.net', fromIp: '198.51.100.22' };
-  nodes.push({
-    id: 'node-relay',
-    name: secondHop.fromHost || 'Mail Transit Gateway',
-    category: 'RELAY',
-    role: 'Legitimate Mail MTA',
-    status: 'CLEAN',
-    riskScore: 6,
-    position: [0.7, -1.6, -0.6],
-    simpleExplanation: 'Standard internet mail server that routed the message and performed automated malware analysis.',
-    technicalDetails: `Hop: ${secondHop.fromIp || '198.51.100.22'} | Protocol: TLS 1.3 | Latency: 0.6s`,
-    actionAdvice: 'Verified safe delivery route.',
-    colorHex: 0x3b82f6,
-    shape: 'sphere'
-  });
-
-  // 5. Domain / Typosquat Entity - CUBE OR DIAMOND
-  const fromDomain = analysis.headers?.from?.split('@')[1]?.replace('>', '') || 'paypal-security-update.com';
-  nodes.push({
-    id: 'node-domain',
-    name: fromDomain,
-    category: isMalicious ? 'ATTACKER' : 'USER',
-    role: isMalicious ? 'Deceptive Phish Domain' : 'Verified Domain',
-    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
-    riskScore: isMalicious ? 96 : 3,
-    position: [-1.4, -0.9, 1.3],
-    simpleExplanation: isMalicious
-      ? `A fraudulent website name created to trick employees into giving away corporate credentials.`
-      : `Legitimate registered organization domain.`,
-    technicalDetails: `Domain: ${fromDomain} | Age: 3 days | Registrar: Anonymous Privacy`,
-    actionAdvice: isMalicious ? 'Domain DNS sinkholed globally.' : 'Reputable domain record.',
-    colorHex: isMalicious ? 0xdc2626 : 0x34d399,
-    shape: isMalicious ? 'spiked' : 'diamond'
-  });
-
-  return nodes;
 }
 
 export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> = ({
@@ -186,143 +50,36 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
   const controlsRef = useRef<OrbitControls | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
-  // Live Database State
-  const [dbCases, setDbCases] = useState<LiveDbCase[]>([]);
-  const [activeCaseIndex, setActiveCaseIndex] = useState<number>(0);
-  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(currentAnalysis || SAMPLE_ANALYSES[0]);
-  const [selectedNode, setSelectedNode] = useState<Dynamic3DNode | null>(null);
-  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
-  const [dbSourceStatus, setDbSourceStatus] = useState<string>('Syncing Supabase...');
-  const [lastSyncTime, setLastSyncTime] = useState<string>(new Date().toLocaleTimeString());
+  // Unified Live Supabase Forensic Hook
+  const {
+    cases,
+    activeCase,
+    activeCaseIndex,
+    activeAnalysis,
+    nodes,
+    selectedNode,
+    setSelectedNode,
+    connectionStatus,
+    dbSourceStatus,
+    lastSyncTimestamp,
+    realtimeUpdatesCount,
+    selectCaseByIndex,
+    refreshLiveCases
+  } = useLiveForensicCases3D(currentAnalysis);
+
+  // Notify parent on active analysis change
+  useEffect(() => {
+    if (activeAnalysis && onSelectCase) {
+      onSelectCase(activeAnalysis);
+    }
+  }, [activeAnalysis, onSelectCase]);
 
   // Viewport Settings
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [explanationMode, setExplanationMode] = useState<'simple' | 'technical'>('simple');
   const [nodeScreenCoords, setNodeScreenCoords] = useState<{ id: string; x: number; y: number; visible: boolean; depth: number }[]>([]);
 
-  // Fetch real data from Supabase / Backend API
-  const fetchLiveDatabaseData = useCallback(async () => {
-    setIsLoadingDb(true);
-    setDbSourceStatus('Connecting to Supabase...');
-
-    try {
-      let fetchedCases: LiveDbCase[] = [];
-
-      // 1. Try direct Supabase query if configured
-      if (supabase && isSupabaseConfigured) {
-        try {
-          const { data: sbCases, error: sbErr } = await supabase
-            .from('cases')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(6);
-
-          if (!sbErr && sbCases && sbCases.length > 0) {
-            fetchedCases = sbCases.map((c: any, idx: number) => ({
-              id: c.id || `sb-case-${idx}`,
-              title: c.title || c.subject || `Case #${c.id?.slice(0, 8)}`,
-              source: 'supabase',
-              updatedAt: c.created_at || new Date().toISOString(),
-              threatLevel: (c.threat_score ?? 80) >= 60 ? 'HIGH' : 'CLEAN',
-              analysis: {
-                ...SAMPLE_ANALYSES[idx % SAMPLE_ANALYSES.length],
-                id: c.id,
-                name: c.title || c.subject || 'Supabase Threat Case',
-                riskScore: c.threat_score ?? 92,
-                verdict: c.threat_score >= 60 ? 'MALICIOUS PHISH' : 'CLEAN',
-                headers: {
-                  ...SAMPLE_ANALYSES[idx % SAMPLE_ANALYSES.length].headers,
-                  subject: c.title || c.subject || SAMPLE_ANALYSES[idx % SAMPLE_ANALYSES.length].headers?.subject,
-                }
-              }
-            }));
-            setDbSourceStatus('Supabase Live (Connected)');
-          }
-        } catch (e) {
-          console.warn('[3D Visualizer] Supabase direct query fallback:', e);
-        }
-      }
-
-      // 2. Fallback to API endpoint if direct Supabase returned empty
-      if (fetchedCases.length === 0) {
-        try {
-          const apiCases = await forensicApi.getCases({ exclude_demo: false });
-          if (apiCases && apiCases.length > 0) {
-            fetchedCases = apiCases.slice(0, 5).map((c: any, idx: number) => ({
-              id: c.id || `api-case-${idx}`,
-              title: c.title || `Live Case ${c.id?.slice(0, 6)}`,
-              source: 'backend',
-              updatedAt: c.created_at || new Date().toISOString(),
-              threatLevel: (c.threat_score ?? 85) >= 60 ? 'HIGH' : 'CLEAN',
-              analysis: {
-                ...SAMPLE_ANALYSES[idx % SAMPLE_ANALYSES.length],
-                id: c.id,
-                name: c.title,
-                riskScore: c.threat_score ?? 88,
-              }
-            }));
-            setDbSourceStatus('API Database Live');
-          }
-        } catch (apiErr) {
-          console.warn('[3D Visualizer] API fallback:', apiErr);
-        }
-      }
-
-      // 3. Fallback to verified sample repository if offline
-      if (fetchedCases.length === 0) {
-        fetchedCases = SAMPLE_ANALYSES.map((s, idx) => ({
-          id: s.id || `sample-${idx}`,
-          title: s.name || `Scenario ${idx + 1}`,
-          source: 'sample',
-          updatedAt: new Date().toISOString(),
-          threatLevel: (s.riskScore ?? 80) >= 60 ? 'HIGH' : 'CLEAN',
-          analysis: s
-        }));
-        setDbSourceStatus('Verified Threat Corpus');
-      }
-
-      setDbCases(fetchedCases);
-      if (fetchedCases.length > 0) {
-        setActiveAnalysis(fetchedCases[0].analysis);
-        if (onSelectCase) onSelectCase(fetchedCases[0].analysis);
-      }
-      setLastSyncTime(new Date().toLocaleTimeString());
-    } catch (err) {
-      console.error('[3D Visualizer] Error loading live cases:', err);
-      setDbSourceStatus('Local Verified Fallback');
-    } finally {
-      setIsLoadingDb(false);
-    }
-  }, [onSelectCase]);
-
-  // Initial Load
-  useEffect(() => {
-    fetchLiveDatabaseData();
-  }, [fetchLiveDatabaseData]);
-
-  // Derive dynamic 3D nodes from active analysis
-  const nodes = useMemo(() => {
-    return deriveNodesFromCase(activeAnalysis);
-  }, [activeAnalysis]);
-
-  useEffect(() => {
-    if (nodes.length > 0) {
-      setSelectedNode(nodes[0]);
-    }
-  }, [nodes]);
-
-  const handleSelectCase = (idx: number) => {
-    setActiveCaseIndex(idx);
-    const selected = dbCases[idx];
-    if (selected) {
-      setActiveAnalysis(selected.analysis);
-      if (onSelectCase) {
-        onSelectCase(selected.analysis);
-      }
-    }
-  };
-
-  // Three.js Render Loop & Viewport Setup
+  // Three.js Render Loop & Viewport Setup with Dynamic Node Positioning
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -350,7 +107,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
     controls.minPolarAngle = Math.PI / 6;
     controlsRef.current = controls;
 
-    // Advanced Lighting
+    // Advanced Lighting Setup
     const ambientLight = new THREE.AmbientLight(0xfff8f0, 1.4);
     scene.add(ambientLight);
 
@@ -370,7 +127,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
     const graphGroup = new THREE.Group();
     scene.add(graphGroup);
 
-    // Modern Holographic Matrix Core Sphere
+    // Holographic Matrix Core Sphere
     const coreInnerGeo = new THREE.IcosahedronGeometry(0.75, 1);
     const coreInnerMat = new THREE.MeshStandardMaterial({
       color: 0xc9a227,
@@ -399,7 +156,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
     graphGroup.add(orbitRing2);
 
     // Node Meshes & Energy Packets
-    const nodeMeshes: { mesh: THREE.Mesh; nodeData: Dynamic3DNode }[] = [];
+    const nodeMeshes: { mesh: THREE.Mesh; nodeData: Dynamic3DNode; group: THREE.Group }[] = [];
     const pulsePackets: { mesh: THREE.Mesh; startPos: THREE.Vector3; endPos: THREE.Vector3 }[] = [];
 
     nodes.forEach((node) => {
@@ -434,7 +191,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       const mesh = new THREE.Mesh(geom, mat);
       mesh.userData = { nodeData: node };
       nodeSubGroup.add(mesh);
-      nodeMeshes.push({ mesh, nodeData: node });
+      nodeMeshes.push({ mesh, nodeData: node, group: nodeSubGroup });
 
       // Holographic protective halo
       const halo = new THREE.Mesh(
@@ -565,8 +322,11 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       coreMesh.rotation.y += delta * 0.12;
       coreMesh.rotation.x += delta * 0.06;
 
-      // Animate node meshes
-      nodeMeshes.forEach(({ mesh, nodeData }) => {
+      // Animate node meshes with smooth floating and rotational dynamics
+      nodeMeshes.forEach(({ mesh, nodeData, group }) => {
+        // Floating sinusoidal offset
+        group.position.y = nodeData.position[1] + Math.sin(elapsed * 2.0 + nodeData.position[0]) * 0.05;
+
         if (nodeData.shape === 'diamond') {
           mesh.rotation.y += delta * 0.85;
           mesh.rotation.x += delta * 0.4;
@@ -623,7 +383,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       domElement.removeEventListener('click', handlePointerDown);
       renderer.dispose();
     };
-  }, [nodes, autoRotate]);
+  }, [nodes, autoRotate, setSelectedNode]);
 
   const handleZoom = (direction: 'in' | 'out') => {
     if (!cameraRef.current) return;
@@ -647,8 +407,13 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
         {/* Simple & Clean Header */}
         <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227] mb-3">
-            <Radio className="w-3.5 h-3.5 text-[#22c55e] animate-pulse" />
+            <Radio className={`w-3.5 h-3.5 ${connectionStatus === 'connected' ? 'text-[#22c55e] animate-pulse' : 'text-[#f59e0b]'}`} />
             <span>Live 3D Telemetry Matrix • {dbSourceStatus}</span>
+            {realtimeUpdatesCount > 0 && (
+              <span className="bg-[#10b981]/20 text-[#4ade80] px-1.5 py-0.2 rounded text-[10px]">
+                {realtimeUpdatesCount} Live Updates
+              </span>
+            )}
           </div>
 
           <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[34px] md:text-[38px] font-medium text-[#ede6d8] leading-tight">
@@ -656,7 +421,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
           </h2>
 
           <p className="mt-2.5 text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
-            Reconstructed dynamically from active database cases. Differentiating protected employees from malicious spoofing infrastructure.
+            Reconstructed dynamically from active Supabase cases. Differentiating protected employees from malicious spoofing infrastructure.
           </p>
 
           {/* Real Database Case Selector */}
@@ -666,13 +431,13 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
               <span>Database Cases:</span>
             </div>
 
-            {dbCases.map((dbCase, idx) => {
+            {cases.map((dbCase, idx) => {
               const isSelected = activeCaseIndex === idx;
               const isHigh = dbCase.threatLevel === 'HIGH';
               return (
                 <button
                   key={dbCase.id}
-                  onClick={() => handleSelectCase(idx)}
+                  onClick={() => selectCaseByIndex(idx)}
                   className={`px-3 py-1.5 rounded-[4px] text-[12px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
                     isSelected
                       ? isHigh 
@@ -689,13 +454,13 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
             })}
 
             <button
-              onClick={fetchLiveDatabaseData}
-              disabled={isLoadingDb}
+              onClick={refreshLiveCases}
+              disabled={connectionStatus === 'syncing'}
               className="p-1.5 rounded bg-[#1f1a14] hover:bg-[#2a241b] border border-[#3d2f1f] text-[#c9a227] transition-all cursor-pointer ml-1"
               title="Sync latest live cases from Supabase database"
               aria-label="Refresh Database Cases"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDb ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${connectionStatus === 'syncing' ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
@@ -838,7 +603,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
             <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] bg-[#14120f]/85 backdrop-blur-sm px-3 py-1.5 rounded border border-[#3a352c]">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-ping" />
-                <span>Supabase Live Sync: {lastSyncTime}</span>
+                <span>Supabase Live Sync: {lastSyncTimestamp}</span>
               </span>
               <span>{nodes.length} Live Verified Nodes</span>
             </div>
