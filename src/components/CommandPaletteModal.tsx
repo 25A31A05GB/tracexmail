@@ -60,7 +60,7 @@ interface PaletteItem {
   title: string;
   subtitle?: string;
   category: 'Actions' | 'Navigation' | 'Cases' | 'Tools';
-  icon: React.ElementType;
+  icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;
   badge?: { label: string; color: string };
   action: () => void;

@@ -39,6 +39,7 @@ import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { UserRole } from '../hooks/useSession';
 import { Sparkles, Building2 as OrgIcon, ShieldCheck, Keyboard } from 'lucide-react';
+import { TraceXLogo3D } from './3d/TraceXLogo3D';
 
 export type NavTab = 
   | 'dashboard'
@@ -285,9 +286,7 @@ export function Sidebar({
         {/* Mobile Header Bar with dedicated Close / Collapse Button */}
         <div className="md:hidden flex items-center justify-between p-3.5 border-b border-[#3a352c] bg-[#14120f]">
           <div className="flex items-center gap-2.5">
-            <div className="w-[22px] h-[22px] border-[1.5px] border-[var(--thread)] rounded-full relative shrink-0">
-              <div className="absolute inset-[4px] rounded-full bg-[var(--thread)]" />
-            </div>
+            <TraceXLogo3D size="sm" onClick={() => handleTabClick('dashboard', 'Dashboard')} />
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-display font-bold text-base tracking-tight text-[#ede6d8] leading-none">
@@ -321,9 +320,7 @@ export function Sidebar({
                 className="flex items-center gap-2.5 text-left hover:opacity-90 transition-opacity cursor-pointer min-w-0"
                 title="TraceXMail Workspace Dashboard"
               >
-                <div className="w-[24px] h-[24px] border-[1.5px] border-[var(--thread)] rounded-full relative shrink-0">
-                  <div className="absolute inset-[5px] rounded-full bg-[var(--thread)]" />
-                </div>
+                <TraceXLogo3D size="sm" onClick={() => handleTabClick('dashboard', 'Dashboard')} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="font-display font-bold text-base tracking-tight text-[#ede6d8] leading-none">
@@ -350,13 +347,7 @@ export function Sidebar({
             </>
           ) : (
             <div className="w-full flex flex-col items-center gap-2 py-1">
-              <button
-                onClick={() => handleTabClick('dashboard', 'Dashboard')}
-                className="w-[26px] h-[26px] border-[1.5px] border-[var(--thread)] rounded-full relative hover:scale-105 transition-transform cursor-pointer"
-                title="TraceXMail Dashboard"
-              >
-                <div className="absolute inset-[5px] rounded-full bg-[var(--thread)]" />
-              </button>
+              <TraceXLogo3D size="sm" onClick={() => handleTabClick('dashboard', 'Dashboard')} title="TraceXMail Dashboard" />
               <button
                 onClick={toggleDesktopCollapsed}
                 className="p-1.5 rounded-md hover:bg-[#221e17] text-[#8a8070] hover:text-[#ede6d8] border border-[#3a352c] transition-colors cursor-pointer"

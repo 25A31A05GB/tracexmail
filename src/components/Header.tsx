@@ -39,6 +39,7 @@ import { AuthModal } from './AuthModal';
 import { UserRole } from '../hooks/useSession';
 import { AutoRefreshControl } from './AutoRefreshControl';
 import { LogOut, Keyboard, Command } from 'lucide-react';
+import { TraceXLogo3D } from './3d/TraceXLogo3D';
 
 interface HeaderProps {
   currentAnalysis: EmailAnalysis;
@@ -248,6 +249,9 @@ export function Header({
 
         {/* Unified Case & Ingestion Sync Group (Progressive Disclosure) */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="hidden sm:flex items-center">
+            <TraceXLogo3D size="sm" title="TraceXMail Cryptographic Core" />
+          </div>
           <div className="relative dropdown-container">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}

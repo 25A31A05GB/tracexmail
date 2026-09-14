@@ -133,7 +133,7 @@ import {
   type AuthenticatedRequest
 } from './src/server/compliance';
 import { createAuthRouter } from './src/server/authRoutes';
-import { getAllStoredProfiles } from './src/server/userProfileStore';
+import { getAllStoredProfiles, getStoredProfile } from './src/server/userProfileStore';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
@@ -509,6 +509,46 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
   }
 });
 
+/**
+ * Resolves the organization_id for cases and alerts created in background jobs (e.g., Gmail auto-sync / quarantine)
+ * without an active HTTP request session (no req.user.organizationId).
+ * Queries the profiles table for the organization_id belonging to the currently connected Gmail account's owner
+ * (matched on email = state.emailAddress from gmailService.ts), falling back to 'org_acme_soc_01' (the seeded default organization id).
+ * Never falls back to a fake UUID that does not exist in the organizations table.
+ */
+async function resolveDefaultOrganizationId(): Promise<string> {
+  try {
+    const gmailStatus = getGmailStatus();
+    const connectedEmail = gmailStatus?.email_address?.trim().toLowerCase();
+
+    if (connectedEmail) {
+      // Check in-memory profile store first for fast resolution
+      const cached = getStoredProfile(connectedEmail);
+      if (cached?.organizationId) {
+        return cached.organizationId;
+      }
+
+      // Query Supabase profiles table for the owner's organization_id
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('email', connectedEmail)
+          .maybeSingle();
+
+        if (!error && data?.organization_id) {
+          return data.organization_id;
+        }
+      }
+    }
+  } catch (err) {
+    // Non-blocking fallback to seeded default organization
+  }
+
+  return DEFAULT_ORG_ID || 'org_acme_soc_01';
+}
+
 // Central Alert Broadcaster (WebSocket + Real-Time Slack Security Alerts)
 async function broadcastAlert(alert: any, extraData?: any) {
   if (!alert) return;
@@ -517,9 +557,10 @@ async function broadcastAlert(alert: any, extraData?: any) {
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
+      const resolvedOrgId = alert.organization_id || (await resolveDefaultOrganizationId());
       await supabase.from('alerts').insert([{
         id: alert.id,
-        organization_id: alert.organization_id || '00000000-0000-0000-0000-000000000000',
+        organization_id: resolvedOrgId,
         case_id: alert.case_id || null,
         timestamp: alert.timestamp || new Date().toISOString(),
         severity: alert.severity || 'HIGH',
@@ -1084,9 +1125,10 @@ async function parseRawEmailToAnalysis(
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      await supabase.from('cases').insert([{
+      const resolvedOrgId = (options as any)?.organizationId || (await resolveDefaultOrganizationId());
+      const { error: insertError } = await supabase.from('cases').insert([{
         id: newCaseItem.id,
-        organization_id: (options as any)?.organizationId || '00000000-0000-0000-0000-000000000000',
+        organization_id: resolvedOrgId,
         title: newCaseItem.title,
         description: newCaseItem.description,
         status: newCaseItem.status,
@@ -1110,8 +1152,13 @@ async function parseRawEmailToAnalysis(
         source: 'ingest',
         raw_analysis: newCaseItem
       }]);
+      if (insertError) {
+        // A failed insert means the case only exists in memory and will be lost on restart
+        console.error('[Supabase] Failed to persist analyzed case to DB (case only exists in in-memory storage and will be lost on restart):', insertError);
+      }
     } catch (dbErr) {
-      console.warn('[Supabase] Failed to persist analyzed case to DB:', dbErr);
+      // A failed insert means the case only exists in memory and will be lost on restart
+      console.error('[Supabase] Exception while persisting analyzed case to DB (case only exists in in-memory storage and will be lost on restart):', dbErr);
     }
   }
 
@@ -2066,7 +2113,8 @@ async function startServer() {
     try {
       const { data, error } = await supabase.from('cases').insert([newCase]).select().single();
       if (error) {
-        console.error('[Supabase] Failed to insert case, using memory fallback:', error);
+        // A failed insert means the case only exists in memory and will be lost on restart
+        console.error('[Supabase] Failed to insert case in DB (case only exists in in-memory storage and will be lost on restart):', error);
         inMemoryCases.set(newCase.id, newCase);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
@@ -2104,6 +2152,8 @@ async function startServer() {
 
       res.status(201).json(data);
     } catch (err) {
+      // A failed insert means the case only exists in memory and will be lost on restart
+      console.error('[Supabase] Exception while creating case in DB (case only exists in in-memory storage and will be lost on restart):', err);
       inMemoryCases.set(newCase.id, newCase);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({

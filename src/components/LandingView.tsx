@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Menu, X, Terminal, ArrowUpRight } from 'lucide-react';
+import { Menu, X, Terminal, ArrowUpRight, Sparkles, Box, Layers, Globe, ShieldAlert, CheckCircle2, ArrowRight, Upload, Zap, FileSearch } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
+import { HeroForensicNexus3D } from './landing/HeroForensicNexus3D';
+import { Forensic3DDataVisualizer } from './landing/Forensic3DDataVisualizer';
+import { HeaderXRayInspector } from './landing/HeaderXRayInspector';
+import { TraceXLogo3D } from './3d/TraceXLogo3D';
+import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -18,6 +23,7 @@ export function LandingView({
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [heroViewMode, setHeroViewMode] = useState<'3d' | 'board'>('3d');
 
   const sampleCases = [
     {
@@ -89,12 +95,10 @@ export function LandingView({
       <div id="top" />
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-[#14120f] border-b border-[#3a352c]">
+      <nav className="sticky top-0 z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-[22px] h-[22px] border-[1.5px] border-[#b23a2e] rounded-full relative shrink-0">
-              <div className="absolute inset-[5px] rounded-full bg-[#b23a2e]" />
-            </div>
+            <TraceXLogo3D size="sm" onClick={onOpenConsole} title="TraceXMail 3D Cryptographic Core - Click to open Console" />
             <span className="font-['Fraunces',serif] text-[18px] sm:text-[19px] font-semibold text-[#ede6d8]">
               TraceXMail
             </span>
@@ -104,6 +108,10 @@ export function LandingView({
           </div>
 
           <div className="hidden lg:flex items-center gap-8 text-[14.5px]">
+            <button onClick={() => scrollToSection('r3f-forensic-matrix')} className="text-[#ede6d8] hover:text-[#ff8d7d] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5 font-medium">
+              <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
+              <span>3D Forensic Matrix</span>
+            </button>
             <button onClick={() => scrollToSection('pipeline')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               How it works
             </button>
@@ -118,9 +126,6 @@ export function LandingView({
             </button>
             <button onClick={() => scrollToSection('roles')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               For your team
-            </button>
-            <button onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              Team
             </button>
             <button onClick={() => scrollToSection('pricing')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               Pricing
@@ -138,10 +143,10 @@ export function LandingView({
               Sign in
             </button>
             <button
-              onClick={onRequestAccess || onOpenConsole}
-              className="hidden sm:inline-block bg-[#ede6d8] hover:bg-white text-[#14120f] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-colors cursor-pointer"
+              onClick={onOpenConsole}
+              className="hidden sm:inline-block bg-[#ede6d8] hover:bg-white text-[#14120f] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-colors cursor-pointer shadow-sm"
             >
-              Request access
+              Open Console (Free)
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -156,6 +161,13 @@ export function LandingView({
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-4 flex flex-col gap-2">
+            <button
+              onClick={() => { scrollToSection('r3f-forensic-matrix'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-semibold flex items-center gap-2 text-[#ff8d7d]"
+            >
+              <Sparkles className="w-4 h-4 text-[#c9a227]" />
+              <span>3D Forensic Matrix</span>
+            </button>
             <button
               onClick={() => { scrollToSection('pipeline'); setMobileMenuOpen(false); }}
               className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
@@ -181,18 +193,6 @@ export function LandingView({
               Under the hood
             </button>
             <button
-              onClick={() => { scrollToSection('roles'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
-            >
-              For your team
-            </button>
-            <button
-              onClick={() => { scrollToSection('team'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
-            >
-              Team
-            </button>
-            <button
               onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }}
               className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
             >
@@ -206,10 +206,10 @@ export function LandingView({
             </button>
             <div className="pt-3 border-t border-[#3a352c] flex flex-col gap-2">
               <button
-                onClick={() => { (onRequestAccess || onOpenConsole)(); setMobileMenuOpen(false); }}
+                onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
                 className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
               >
-                Request access
+                Launch Free Analyst Console
               </button>
             </div>
           </div>
@@ -229,25 +229,56 @@ export function LandingView({
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5 mt-6 sm:mt-8">
               <button
-                onClick={onRequestAccess || onOpenConsole}
-                className="w-full sm:w-auto text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3 sm:py-3.5 rounded-[3px] font-semibold text-[14.5px] sm:text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg"
+                onClick={onOpenConsole}
+                className="w-full sm:w-auto text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3 sm:py-3.5 rounded-[3px] font-semibold text-[14.5px] sm:text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg flex items-center justify-center gap-2 group"
               >
-                Request access
+                <span>Analyze Email Now Free</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => scrollToSection('pipeline')}
-                className="w-full sm:w-auto text-center px-6 py-3 sm:py-3.5 rounded-[3px] font-medium text-[14.5px] sm:text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer"
+                onClick={() => scrollToSection('r3f-forensic-matrix')}
+                className="w-full sm:w-auto text-center px-6 py-3 sm:py-3.5 rounded-[3px] font-medium text-[14.5px] sm:text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                Walk through a trace
+                <Sparkles className="w-4 h-4 text-[#c9a227]" />
+                <span>Explore 3D Matrix</span>
               </button>
             </div>
-            {/* TODO: Add response-time SLA copy here (e.g., "We review every request within 48 hours") once a team review turnaround SLA is agreed upon */}
 
-            <div className="mt-6 sm:mt-8 text-[13px] sm:text-[13.5px] text-[#b9af9c] max-w-md border-l-2 border-[#3a352c] pl-3.5">
-              Built for security teams who need to prove what happened, not guess at it.
+            {/* Quick 1-Click Sample Previews for instant conversion */}
+            <div className="mt-6 p-3 rounded-[4px] bg-[#181510] border border-[#3a352c] max-w-lg">
+              <div className="flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] mb-2">
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-[#c9a227]" />
+                  <span>Instant 1-Click Forensic Demonstrations:</span>
+                </span>
+                <span className="text-[#c9a227]">No Signup Required</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleCaseClick(0)}
+                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e]" />
+                  <span>Nazario PayPal Phish (Tor)</span>
+                </button>
+                <button
+                  onClick={() => handleCaseClick(1)}
+                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e]" />
+                  <span>Executive BEC Fraud</span>
+                </button>
+                <button
+                  onClick={() => handleCaseClick(2)}
+                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#22c55e]/20 border border-[#3a352c] hover:border-[#4ade80] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                  <span>GitHub Clean Notice</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-5 sm:mt-6">
+            <div className="flex flex-wrap gap-2 mt-5">
               <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
                 Real SPF/DKIM/DMARC verification
               </span>
@@ -260,94 +291,146 @@ export function LandingView({
             </div>
           </div>
 
-          {/* Evidence Board Visual (Responsive Cork + Pinned Cards) */}
-          <div className="w-full max-w-[500px] mx-auto relative h-[380px] sm:h-[440px] rounded-[6px] border border-[#3d2f1f] bg-[repeating-radial-gradient(circle_at_12%_18%,rgba(0,0,0,0.10)_0px,rgba(0,0,0,0.10)_1px,transparent_2px,transparent_34px),repeating-radial-gradient(circle_at_70%_62%,rgba(0,0,0,0.08)_0px,rgba(0,0,0,0.08)_1px,transparent_2px,transparent_41px),linear-gradient(155deg,#2e2318,#241b12_55%,#1d1610)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55),0_40px_90px_-30px_rgba(0,0,0,0.7)] select-none overflow-hidden">
-            {/* SVG Connecting Thread Paths */}
-            <svg className="absolute inset-0 w-full h-full drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] pointer-events-none" viewBox="0 0 400 440">
-              <path
-                d="M 60 106 C 120 78, 155 66, 196 76 C 246 88, 274 138, 306 186"
-                fill="none"
-                stroke="#b23a2e"
-                strokeWidth="1.5"
-                opacity="0.92"
-                strokeDasharray="600"
-                className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards]"
-              />
-              <path
-                d="M 196 76 C 205 148, 196 200, 232 224"
-                fill="none"
-                stroke="#b23a2e"
-                strokeWidth="1.5"
-                opacity="0.92"
-                strokeDasharray="600"
-                className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.15s]"
-              />
-              <path
-                d="M 306 186 C 256 236, 200 268, 116 300"
-                fill="none"
-                stroke="#b23a2e"
-                strokeWidth="1.5"
-                opacity="0.92"
-                strokeDasharray="600"
-                className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.3s]"
-              />
-            </svg>
-
-            {/* Card 1: Tor Exit Node */}
-            <div className="absolute top-[12%] left-[22%] -translate-x-1/2 -rotate-4 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
-              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">185.220.101.5</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TOR EXIT NODE</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                  <div className="h-full bg-[#b23a2e] w-[92%]" />
-                </div>
+          {/* Hero Visual Area with View Switcher (3D WebGL vs Physical Cork Board) */}
+          <div className="w-full max-w-[500px] mx-auto flex flex-col gap-2.5">
+            
+            {/* Segmented Mode Switcher */}
+            <div className="flex items-center justify-between px-1">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574] uppercase tracking-wider font-semibold">
+                Hero Perspective:
+              </span>
+              <div className="flex items-center gap-1 p-0.5 bg-[#1a1712] border border-[#3a352c] rounded-[4px]">
+                <button
+                  onClick={() => setHeroViewMode('3d')}
+                  className={`px-2.5 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    heroViewMode === '3d'
+                      ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
+                      : 'text-[#b9af9c] hover:text-[#ede6d8]'
+                  }`}
+                  title="Switch to interactive 3D WebGL Threat Nexus"
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  <span>3D Nexus</span>
+                </button>
+                <button
+                  onClick={() => setHeroViewMode('board')}
+                  className={`px-2.5 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    heroViewMode === 'board'
+                      ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
+                      : 'text-[#b9af9c] hover:text-[#ede6d8]'
+                  }`}
+                  title="Switch to classic pin-and-thread evidence cork board"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Evidence Board</span>
+                </button>
               </div>
             </div>
 
-            {/* Card 2: SPF Softfail */}
-            <div className="absolute top-[6%] left-[64%] sm:left-[60%] -translate-x-1/2 rotate-3 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(1)}>
-              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">SPF · SOFTFAIL</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">UNAUTHORIZED SENDER</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                  <div className="h-full bg-[#b23a2e] w-[70%]" />
-                </div>
-              </div>
-            </div>
+            {/* Container for Visual */}
+            <div className="w-full relative h-[390px] sm:h-[450px]">
+              {heroViewMode === '3d' ? (
+                <HeroForensicNexus3D
+                  onExploreCase={handleCaseClick}
+                />
+              ) : (
+                /* Evidence Board Visual (Responsive Cork + Pinned Cards) */
+                <div className="w-full h-full relative rounded-[6px] border border-[#3d2f1f] bg-[repeating-radial-gradient(circle_at_12%_18%,rgba(0,0,0,0.10)_0px,rgba(0,0,0,0.10)_1px,transparent_2px,transparent_34px),repeating-radial-gradient(circle_at_70%_62%,rgba(0,0,0,0.08)_0px,rgba(0,0,0,0.08)_1px,transparent_2px,transparent_41px),linear-gradient(155deg,#2e2318,#241b12_55%,#1d1610)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55),0_40px_90px_-30px_rgba(0,0,0,0.7)] select-none overflow-hidden">
+                  {/* SVG Connecting Thread Paths */}
+                  <svg className="absolute inset-0 w-full h-full drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] pointer-events-none" viewBox="0 0 400 440">
+                    <path
+                      d="M 60 106 C 120 78, 155 66, 196 76 C 246 88, 274 138, 306 186"
+                      fill="none"
+                      stroke="#b23a2e"
+                      strokeWidth="1.5"
+                      opacity="0.92"
+                      strokeDasharray="600"
+                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards]"
+                    />
+                    <path
+                      d="M 196 76 C 205 148, 196 200, 232 224"
+                      fill="none"
+                      stroke="#b23a2e"
+                      strokeWidth="1.5"
+                      opacity="0.92"
+                      strokeDasharray="600"
+                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.15s]"
+                    />
+                    <path
+                      d="M 306 186 C 256 236, 200 268, 116 300"
+                      fill="none"
+                      stroke="#b23a2e"
+                      strokeWidth="1.5"
+                      opacity="0.92"
+                      strokeDasharray="600"
+                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.3s]"
+                    />
+                  </svg>
 
-            {/* Card 3: ASN Bulgaria */}
-            <div className="absolute top-[36%] left-[72%] sm:left-[76%] -translate-x-1/2 -rotate-2 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(2)}>
-              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">AS200548</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">BULGARIA · ZETTAHOST</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                  <div className="h-full bg-[#b23a2e] w-[55%]" />
-                </div>
-              </div>
-            </div>
+                  {/* Card 1: Tor Exit Node */}
+                  <div className="absolute top-[12%] left-[22%] -translate-x-1/2 -rotate-4 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
+                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">185.220.101.5</div>
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TOR EXIT NODE</div>
+                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
+                        <div className="h-full bg-[#b23a2e] w-[92%]" />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Card 4: Typosquat Domain */}
-            <div className="absolute top-[60%] left-[28%] sm:left-[32%] -translate-x-1/2 rotate-[2.5deg] shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
-              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-              <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10.5px] font-medium text-[#2a2620] truncate">paypal-secure-update.com</div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TYPOSQUAT DOMAIN</div>
-                <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                  <div className="h-full bg-[#b23a2e] w-[88%]" />
-                </div>
-              </div>
-            </div>
+                  {/* Card 2: SPF Softfail */}
+                  <div className="absolute top-[6%] left-[64%] sm:left-[60%] -translate-x-1/2 rotate-3 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(1)}>
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
+                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">SPF · SOFTFAIL</div>
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">UNAUTHORIZED SENDER</div>
+                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
+                        <div className="h-full bg-[#b23a2e] w-[70%]" />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* Stamp Overlay */}
-            <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-wider text-[#b23a2e] bg-[radial-gradient(circle,transparent_58%,rgba(178,58,46,0.10)_60%,transparent_62%)] shadow-[0_0_0_2px_#b23a2e,0_0_0_4px_transparent,0_0_0_5.5px_rgba(178,58,46,0.35)] -rotate-12 transform hover:rotate-0 transition-transform">
-              VERDICT<br />PHISHING<br />CONFIRMED
+                  {/* Card 3: ASN Bulgaria */}
+                  <div className="absolute top-[36%] left-[72%] sm:left-[76%] -translate-x-1/2 -rotate-2 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(2)}>
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
+                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">AS200548</div>
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">BULGARIA · ZETTAHOST</div>
+                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
+                        <div className="h-full bg-[#b23a2e] w-[55%]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 4: Typosquat Domain */}
+                  <div className="absolute top-[60%] left-[28%] sm:left-[32%] -translate-x-1/2 rotate-[2.5deg] shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
+                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10.5px] font-medium text-[#2a2620] truncate">paypal-secure-update.com</div>
+                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TYPOSQUAT DOMAIN</div>
+                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
+                        <div className="h-full bg-[#b23a2e] w-[88%]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stamp Overlay */}
+                  <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-wider text-[#b23a2e] bg-[radial-gradient(circle,transparent_58%,rgba(178,58,46,0.10)_60%,transparent_62%)] shadow-[0_0_0_2px_#b23a2e,0_0_0_4px_transparent,0_0_0_5.5px_rgba(178,58,46,0.35)] -rotate-12 transform hover:rotate-0 transition-transform">
+                    VERDICT<br />PHISHING<br />CONFIRMED
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
+
+      {/* Live Dynamic Real-User Telemetry & Evidence Stream Ribbon */}
+      <LiveDynamicTelemetryRibbon
+        onSelectCase={onSelectCase}
+        onOpenConsole={onOpenConsole}
+      />
 
       {/* Problem Section */}
       <section className="py-16 border-b border-[#3a352c]">
@@ -498,6 +581,12 @@ export function LandingView({
           </div>
         </div>
       </section>
+
+      {/* Interactive 3D Forensic Threat Laboratory */}
+      <Forensic3DDataVisualizer
+        onExploreCase={onOpenConsole}
+        onSelectCase={onSelectCase}
+      />
 
       {/* 6-Stage Pipeline Section */}
       <section id="pipeline" className="py-20 border-b border-[#3a352c]">
@@ -792,6 +881,11 @@ export function LandingView({
                 One email rarely stands alone. Shared infrastructure and timing surface the wider campaign, tiered by how strong the link really is.
               </p>
             </div>
+          </div>
+
+          {/* Interactive RFC822 Header X-Ray Inspector */}
+          <div className="mt-14">
+            <HeaderXRayInspector />
           </div>
         </div>
       </section>
@@ -1191,29 +1285,30 @@ export function LandingView({
       </section>
 
       {/* Final Call to Action */}
-      <section className="py-24">
+      <section className="py-24 bg-[radial-gradient(ellipse_800px_400px_at_50%_100%,rgba(178,58,46,0.1),transparent_70%)]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] lg:text-[40px] font-medium text-[#ede6d8] max-w-[16ch]">
-            Stop guessing where a threat came from.
+          <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] lg:text-[40px] font-medium text-[#ede6d8] max-w-[20ch]">
+            Stop guessing where an email threat came from.
           </h2>
-          <p className="text-[#b9af9c] my-4 text-[16px] max-w-[48ch]">
-            Request access and bring your team's next suspicious email. We'll trace it with you.
+          <p className="text-[#b9af9c] my-4 text-[16px] max-w-[54ch] leading-relaxed">
+            Drop your raw .eml file or paste email headers into the console. TraceXMail will reconstruct the cryptographic route, verify BGP hops, and generate forensic evidence in seconds.
           </p>
           <div className="flex flex-wrap items-center gap-3.5 mt-8">
             <button
-              onClick={onRequestAccess || onOpenConsole}
-              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-colors cursor-pointer"
+              onClick={onOpenConsole}
+              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg flex items-center gap-2 group"
             >
-              Request access
+              <span>Analyze Email Free in Console</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={onRequestAccess || onOpenConsole}
-              className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-colors cursor-pointer"
+              onClick={() => scrollToSection('r3f-forensic-matrix')}
+              className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center gap-2"
             >
-              Talk to us first
+              <Sparkles className="w-4 h-4 text-[#c9a227]" />
+              <span>Explore 3D Threat Lab</span>
             </button>
           </div>
-          {/* TODO: Add response-time SLA copy here (e.g., "We review every request within 48 hours") once a team review turnaround SLA is agreed upon */}
         </div>
       </section>
 
@@ -1280,10 +1375,11 @@ export function LandingView({
       >
         <div className="w-full max-w-[1180px] mx-auto px-1">
           <button
-            onClick={onRequestAccess || onOpenConsole}
-            className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-4 rounded-[3px] font-semibold text-[14.5px] border border-[#b23a2e] shadow-lg text-center cursor-pointer transition-colors active:scale-[0.99]"
+            onClick={onOpenConsole}
+            className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-4 rounded-[3px] font-semibold text-[14.5px] border border-[#b23a2e] shadow-lg text-center cursor-pointer transition-colors active:scale-[0.99] flex items-center justify-center gap-2"
           >
-            Request access
+            <span>Analyze Email Free in Console</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </aside>
