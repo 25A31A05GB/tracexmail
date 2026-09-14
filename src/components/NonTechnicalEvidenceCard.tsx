@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, type Variants } from 'motion/react';
 import { 
   AlertTriangle, 
   CheckCircle2, 
@@ -217,10 +218,42 @@ export function NonTechnicalEvidenceCard({
     setTimeout(() => setActionFeedback(null), 3500);
   };
 
+  const containerVariants: Variants = {
+    hidden: { opacity: 0, y: 24, scale: 0.985 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.45,
+        ease: 'easeOut',
+        staggerChildren: 0.05,
+        delayChildren: 0.04
+      }
+    }
+  };
+
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: 'easeOut'
+      }
+    }
+  };
+
   return (
     <div className="w-full min-h-full bg-[#0E0B09] text-[#EDE6DC] font-sans antialiased selection:bg-[#D3A039] selection:text-[#241A05] overflow-y-auto">
       {/* Top Bar Navigation */}
-      <div className="max-w-[640px] mx-auto px-5 pt-7 pb-2 flex items-center justify-between border-b border-[#2B241E]/40">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="max-w-[640px] mx-auto px-5 pt-7 pb-2 flex items-center justify-between border-b border-[#2B241E]/40"
+      >
         <div className="flex items-center gap-2.5 font-semibold text-[15px] tracking-tight">
           <span className="w-2.5 h-2.5 rounded-full bg-[#D3A039] shadow-[0_0_8px_rgba(211,160,57,0.6)]"></span>
           <span>TraceXMail</span>
@@ -250,21 +283,31 @@ export function NonTechnicalEvidenceCard({
             </button>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Content Card Container */}
-      <main className="max-w-[640px] mx-auto px-5 pt-8 pb-20">
+      <motion.main 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="max-w-[640px] mx-auto px-5 pt-8 pb-20"
+      >
 
         {/* Action feedback toast */}
         {actionFeedback && (
-          <div className="mb-5 p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-600 text-emerald-300 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <motion.div 
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-5 p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-600 text-emerald-300 text-xs font-semibold flex items-center gap-2"
+          >
             <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{actionFeedback}</span>
-          </div>
+          </motion.div>
         )}
 
         {/* Verdict Box */}
-        <div 
+        <motion.div 
+          variants={itemVariants}
           className={`rounded-[14px] p-7 mb-7 transition-all border ${
             isMalicious 
               ? 'bg-[rgba(193,68,58,0.14)] border-[#F2CACA]/80 text-[#EDE6DC]' 
@@ -306,10 +349,10 @@ export function NonTechnicalEvidenceCard({
           }`}>
             {rationaleText}
           </p>
-        </div>
+        </motion.div>
 
         {/* Section: Why we think that */}
-        <section className="mb-7">
+        <motion.section variants={itemVariants} className="mb-7">
           <p className="text-[13px] font-semibold text-[#9C9186] mb-3">
             Why we think that
           </p>
@@ -340,10 +383,10 @@ export function NonTechnicalEvidenceCard({
               </li>
             ))}
           </ul>
-        </section>
+        </motion.section>
 
         {/* Section: This email at a glance */}
-        <section className="mb-7">
+        <motion.section variants={itemVariants} className="mb-7">
           <p className="text-[13px] font-semibold text-[#9C9186] mb-3">
             This email at a glance
           </p>
@@ -380,10 +423,10 @@ export function NonTechnicalEvidenceCard({
               </span>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Action Buttons */}
-        <div className="flex flex-col gap-2.5 mb-8">
+        <motion.div variants={itemVariants} className="flex flex-col gap-2.5 mb-8">
           <button 
             onClick={() => handleAction(
               isMalicious ? 'Sender blocked and added to threat blacklist.' : 'Email marked verified safe in your audit log.'
@@ -412,10 +455,11 @@ export function NonTechnicalEvidenceCard({
             <ShieldAlert className="w-[17px] h-[17px] text-[#D3564A]" />
             <span>Report as phishing</span>
           </button>
-        </div>
+        </motion.div>
 
         {/* Technical Disclosure Accordion */}
-        <details 
+        <motion.details 
+          variants={itemVariants}
           open={isDetailsOpen}
           onToggle={(e) => setIsDetailsOpen((e.currentTarget as HTMLDetailsElement).open)}
           className="bg-[#17130F] border border-[#2B241E] rounded-xl overflow-hidden transition-all group"
@@ -521,9 +565,9 @@ export function NonTechnicalEvidenceCard({
               </div>
             )}
           </div>
-        </details>
+        </motion.details>
 
-      </main>
+      </motion.main>
 
       {/* Footer */}
       <footer className="max-w-[640px] mx-auto px-5 pb-10 text-[#9C9186] text-[12.5px] text-center">

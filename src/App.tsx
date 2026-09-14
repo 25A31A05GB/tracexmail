@@ -23,13 +23,16 @@ import {
   saveOrgPrivacyConfigServer 
 } from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
-import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
+import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles, FolderOpen, Database, Menu, Activity } from 'lucide-react';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
 import { UserOnboardingModal, UserPersona, OnboardingAnswers } from './components/UserOnboardingModal';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { useInactivityTimer } from './hooks/useInactivityTimer';
+import { InactivityWarningModal } from './components/InactivityWarningModal';
+import { WorkspaceLockScreen } from './components/WorkspaceLockScreen';
 
 const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })), 'DashboardView');
 const CasesView = lazyWithRetry(() => import('./components/CasesView').then(m => ({ default: m.CasesView })), 'CasesView');
@@ -338,7 +341,22 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
 
-  // Global Keyboard Shortcuts (Cmd+K for search, Cmd+N for new analysis, Cmd+E for report, 1-9 for tabs, ? for help)
+  // Session Inactivity & Auto-Lock Compliance Engine (NIST SP 800-53 Rev 5 AC-11)
+  const {
+    config: inactivityConfig,
+    updateConfig: updateInactivityConfig,
+    lockState,
+    isLocked: isWorkspaceLocked,
+    isWarning: isWorkspaceInactivityWarning,
+    secondsRemaining: inactivitySecondsRemaining,
+    lockNow: lockWorkspaceNow,
+    extendSession: extendInactivitySession,
+    unlockWorkspace,
+    unlocking: workspaceUnlocking,
+    unlockError: workspaceUnlockError
+  } = useInactivityTimer(Boolean(session));
+
+  // Global Keyboard Shortcuts (Cmd+K for search, Cmd+N for new analysis, Cmd+E for report, Cmd+Shift+L for lock, 1-9 for tabs, ? for help)
   useKeyboardShortcuts({
     onOpenCommandPalette: () => setIsCommandPaletteOpen(prev => !prev),
     onNewAnalysis: () => setIsNewModalOpen(true),
@@ -349,6 +367,7 @@ export default function App() {
     onToggleDemoCases: handleToggleDemoCases,
     onOpenShortcutsHelp: () => setIsShortcutsHelpOpen(prev => !prev),
     onSelectTab: (tab) => setActiveTab(tab),
+    onLockWorkspace: () => lockWorkspaceNow('manual'),
     onCloseModals: () => {
       setIsCommandPaletteOpen(false);
       setIsShortcutsHelpOpen(false);
@@ -732,7 +751,7 @@ export default function App() {
   const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers', 'settings'].includes(effectiveTab);
 
   return (
-    <div className="flex h-screen w-screen bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
+    <div className="flex h-screen h-[100dvh] w-full max-w-[100vw] bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
       {/* Sidebar with role-differentiated navigation */}
       <Sidebar
         activeTab={effectiveTab}
@@ -751,7 +770,7 @@ export default function App() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 max-w-full w-full overflow-hidden">
         {/* Top Header with clearance badge, avatar, role switcher, and sign-out */}
         <Header
           currentAnalysis={currentAnalysis}
@@ -780,10 +799,12 @@ export default function App() {
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onSyncCases={() => setCasesRefreshSignal(prev => prev + 1)}
+          inactivityRemainingSecs={inactivitySecondsRemaining}
+          onLockWorkspace={() => lockWorkspaceNow('manual')}
         />
 
         {/* View Switcher Container */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full w-full overflow-hidden">
           {isPersonalRestrictedTab ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0b0d12]">
               <div className="max-w-lg p-6 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] space-y-4">
@@ -955,10 +976,73 @@ export default function App() {
                   userPersona={userPersona}
                   onSetPersona={handleSetPersona}
                   onOpenOnboarding={() => setIsOnboardingOpen(true)}
+                  inactivityConfig={inactivityConfig}
+                  onUpdateInactivityConfig={updateInactivityConfig}
+                  onLockWorkspaceNow={() => lockWorkspaceNow('manual')}
+                  lockState={lockState}
                 />
               )}
             </Suspense>
           )}
+        </div>
+        {/* Mobile Navigation Bottom Bar */}
+        <div className="md:hidden border-t border-[#3a352c] bg-[#14120f]/95 backdrop-blur px-2 py-1.5 flex items-center justify-around shrink-0 z-30 select-none">
+          <button
+            type="button"
+            id="mobile-nav-dashboard"
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+              effectiveTab === 'dashboard' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <Activity className="w-4 h-4 mb-0.5" />
+            <span>Dashboard</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-nav-cases"
+            onClick={() => setActiveTab('cases')}
+            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+              effectiveTab === 'cases' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <FolderOpen className="w-4 h-4 mb-0.5" />
+            <span>Cases</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-nav-overview"
+            onClick={() => setActiveTab('overview')}
+            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+              effectiveTab === 'overview' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 mb-0.5" />
+            <span>Analysis</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-nav-ingest"
+            onClick={() => setActiveTab('ingest')}
+            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+              effectiveTab === 'ingest' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <Database className="w-4 h-4 mb-0.5" />
+            <span>Ingest</span>
+          </button>
+          <button
+            type="button"
+            id="mobile-nav-menu"
+            onClick={() => setIsMobileSidebarOpen(prev => !prev)}
+            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
+              isMobileSidebarOpen ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+            aria-label="Toggle navigation drawer"
+          >
+            <Menu className="w-4 h-4 mb-0.5" />
+            <span>More</span>
+          </button>
         </div>
       </main>
 
@@ -1110,6 +1194,37 @@ export default function App() {
         onDismiss={dismissToast}
         onInspect={handleToastInspect}
       />
+
+      {/* NIST SP 800-53 Rev 5 AC-11 Pre-Lock Session Inactivity Warning Modal */}
+      <InactivityWarningModal
+        isOpen={isWorkspaceInactivityWarning && !isWorkspaceLocked && Boolean(session)}
+        secondsRemaining={inactivitySecondsRemaining}
+        totalWarningSeconds={inactivityConfig.warningSeconds}
+        onExtendSession={extendInactivitySession}
+        onLockNow={() => lockWorkspaceNow('manual')}
+        complianceStandard={inactivityConfig.complianceStandard}
+      />
+
+      {/* NIST SP 800-53 Rev 5 AC-11 Restricted Workspace Lock Screen Overlay */}
+      {isWorkspaceLocked && Boolean(session) && (
+        <WorkspaceLockScreen
+          userEmail={user?.email || session?.user?.email}
+          userRole={role}
+          userLabel={userInitials}
+          organizationName={
+            accountType === 'personal' 
+              ? 'Personal Forensic Sandbox' 
+              : (profile?.organization_id || organizationId || 'Acme Cyber Defense SOC')
+          }
+          currentAnalysis={currentAnalysis}
+          lockedAt={lockState.lockedAt}
+          lockReason={lockState.lockReason}
+          onUnlock={unlockWorkspace}
+          onSignOut={signOut}
+          unlockError={workspaceUnlockError}
+          unlocking={workspaceUnlocking}
+        />
+      )}
     </div>
   );
 }

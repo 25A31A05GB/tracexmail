@@ -29,7 +29,7 @@ export function LoginView({
   onSuccess,
   onSelectRoleLogin 
 }: LoginViewProps) {
-  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('magic-link');
+  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -460,7 +460,7 @@ export function LoginView({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="analyst@enterprise.corp"
+                  placeholder="name@company.com"
                   className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
                 />
               </div>
@@ -499,7 +499,7 @@ export function LoginView({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="analyst@enterprise.corp"
+                placeholder="name@company.com"
                 className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
               />
             </div>
@@ -543,38 +543,6 @@ export function LoginView({
                 <span>Sign In with Password</span>
               )}
             </button>
-
-            {/* Quick Demo Fill Buttons */}
-            <div className="pt-2 border-t border-[var(--line)]">
-              <div className="text-[11px] font-mono text-[var(--paper-dim)] mb-1.5 flex items-center justify-between">
-                <span>Fast Fill Demo Role:</span>
-                <span className="text-[10px] text-[var(--forensic-green)] font-mono">Password: Password1234!</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('analyst@enterprise.corp');
-                    setPassword('Password1234!');
-                    setErrorMsg(null);
-                  }}
-                  className="py-1 px-2 text-[10.5px] font-mono bg-[var(--ink)] hover:bg-[var(--ink-2)] border border-[var(--line)] text-[var(--paper)] rounded transition-colors text-left truncate cursor-pointer"
-                >
-                  🛡️ Lead Analyst
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEmail('admin@tracexmail.sec');
-                    setPassword('Password1234!');
-                    setErrorMsg(null);
-                  }}
-                  className="py-1 px-2 text-[10.5px] font-mono bg-[var(--ink)] hover:bg-[var(--ink-2)] border border-[var(--line)] text-[var(--paper)] rounded transition-colors text-left truncate cursor-pointer"
-                >
-                  ⚡ Admin Enclave
-                </button>
-              </div>
-            </div>
           </form>
         )}
 

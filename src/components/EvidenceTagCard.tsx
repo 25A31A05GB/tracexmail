@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
 import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2 } from 'lucide-react';
 import { sha256Sync, generateEvidenceId } from '../utils/crypto';
@@ -642,46 +643,83 @@ export function EvidenceTagCard({
 
   const stampClass = cardData.verdict.status === 'good' ? 'good' : cardData.verdict.status === 'warn' ? 'warn' : '';
 
+  const cardContainerVariants: Variants = {
+    hidden: { 
+      opacity: 0, 
+      y: 28,
+      scale: 0.985
+    },
+    visible: {
+      opacity: 1, 
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.45,
+        ease: 'easeOut',
+        staggerChildren: 0.045,
+        delayChildren: 0.05
+      }
+    }
+  };
+
+  const cardItemVariants: Variants = {
+    hidden: { 
+      opacity: 0, 
+      y: 12
+    },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: 'easeOut'
+      }
+    }
+  };
+
   const cardHtml = (
-    <div 
+    <motion.div 
       ref={cardRef}
       id="card"
       className="evidence-card relative select-text"
+      variants={cardContainerVariants}
+      initial="hidden"
+      animate="visible"
     >
       {/* Folder Tab Header */}
-      <div className="tab">
+      <motion.div variants={cardItemVariants} className="tab">
         <div className="caseid">
           CASE <b>{cardData.caseId}</b>
         </div>
         <div className="meta">
           {cardData.evidenceId} · {cardData.timestamp}
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Body */}
       <div className="body">
         {/* Rubber-Stamp Verdict Badge */}
-        <div className={`stamp ${stampClass}`}>
+        <motion.div variants={cardItemVariants} className={`stamp ${stampClass}`}>
           {cardData.verdict.text}
           <small>{cardData.verdict.scoreLabel}</small>
-        </div>
+        </motion.div>
 
         {/* Subject */}
-        <div className="subject">
+        <motion.div variants={cardItemVariants} className="subject">
           <h1>{cardData.subject}</h1>
-        </div>
+        </motion.div>
 
         {/* Identity Rows */}
         {cardData.identityRows.map((r, idx) => (
-          <div key={idx} className="row">
+          <motion.div variants={cardItemVariants} key={idx} className="row">
             <div className="k">{r.k}</div>
             <div className={`v ${r.status || ''}`}>{r.v}</div>
-          </div>
+          </motion.div>
         ))}
 
         {/* Authentication Checks */}
         {cardData.checks && cardData.checks.length > 0 && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">AUTHENTICATION</div>
             <div className="chips">
               {cardData.checks.map((c, idx) => (
@@ -691,12 +729,12 @@ export function EvidenceTagCard({
                 </div>
               ))}
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Origin & Relay */}
         {cardData.origin && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.origin.sectionTitle || 'ORIGIN & RELAY'}</div>
             <div className="row">
               <div className="k">FIRST-HOP IP</div>
@@ -725,11 +763,11 @@ export function EvidenceTagCard({
                 <div className={`v ${r.status || ''}`}>{r.v}</div>
               </div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {cardData.relay && (
-          <div className="relay mt-1.5">
+          <motion.div variants={cardItemVariants} className="relay mt-1.5">
             <span 
               className="chain leading-relaxed" 
               dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} 
@@ -741,12 +779,12 @@ export function EvidenceTagCard({
             >
               Full graph ↗
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* Domain Intelligence */}
         {cardData.entity && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.entity.sectionTitle || 'DOMAIN INTELLIGENCE'}</div>
             {cardData.entity.rows.map((r, idx) => (
               <div key={idx} className="row">
@@ -766,12 +804,12 @@ export function EvidenceTagCard({
                 ))}
               </div>
             )}
-          </>
+          </motion.div>
         )}
 
         {/* AI Case Summary */}
         {cardData.aiSummary && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">AI CASE SUMMARY</div>
             <div className="ai-box">
               <p>{cardData.aiSummary.text}</p>
@@ -786,12 +824,12 @@ export function EvidenceTagCard({
                 </button>
               </div>
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Links & Attachments */}
         {cardData.findings && cardData.findings.length > 0 && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">LINKS &amp; ATTACHMENTS</div>
             {cardData.findings.map((f, idx) => (
               <div key={idx} className="link-item">
@@ -799,12 +837,12 @@ export function EvidenceTagCard({
                 <span className={`badge ${f.status}`}>{f.badge}</span>
               </div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {/* ML Verdict */}
         {cardData.score && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">ML VERDICT</div>
             <div className="gauge-wrap">
               <div className="gauge-top">
@@ -837,7 +875,7 @@ export function EvidenceTagCard({
                 </div>
               )}
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Threat Score Breakdown */}
@@ -845,7 +883,7 @@ export function EvidenceTagCard({
           const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
           if (!bd || !bd.components) return null;
           return (
-            <>
+            <motion.div variants={cardItemVariants}>
               <div className="section-label flex items-center justify-between">
                 <span>THREAT SCORE BREAKDOWN</span>
                 <button
@@ -898,12 +936,12 @@ export function EvidenceTagCard({
                   </div>
                 )}
               </div>
-            </>
+            </motion.div>
           );
         })()}
 
         {/* Expandable Deep Analysis Section */}
-        <div className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
+        <motion.div variants={cardItemVariants} className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
           {/* Main Deep Analysis Toggle Header */}
           <button
             type="button"
@@ -1267,13 +1305,13 @@ export function EvidenceTagCard({
               )}
             </div>
           )}
-        </div>
+        </motion.div>
 
       </div>
 
       {/* Footer */}
       {cardData.footer && (
-        <div className="footer">
+        <motion.div variants={cardItemVariants} className="footer">
           <div className="hashline">
             {cardData.footer.hashLabel}{' '}
             <b className={cardData.footer.hash.startsWith('Hash unavailable') ? 'font-normal text-slate-400 italic text-[11px]' : ''}>
@@ -1291,17 +1329,28 @@ export function EvidenceTagCard({
             <span>{cardData.footer.actionLabel}</span>
             <b className={cardData.footer.actionGood ? 'good' : ''}>{cardData.footer.action}</b>
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto"
+      >
         <div className="flex flex-col items-center max-w-full my-auto">
           {/* Action Bar */}
-          <div className="w-full max-w-[520px] flex items-center justify-between mb-3 px-1 text-xs">
+          <motion.div 
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
+            className="w-full max-w-[520px] flex items-center justify-between mb-3 px-1 text-xs"
+          >
             <div className="flex items-center gap-2 text-[#F2EFE7] font-mono font-medium">
               <span className="w-2 h-2 rounded-full bg-[#CC9A4A] animate-pulse" />
               <span>FORENSIC EVIDENCE CARD</span>
@@ -1356,12 +1405,12 @@ export function EvidenceTagCard({
                 </button>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Render Card */}
           {cardHtml}
         </div>
-      </div>
+      </motion.div>
     );
   }
 

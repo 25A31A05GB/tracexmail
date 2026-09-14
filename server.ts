@@ -1454,6 +1454,38 @@ async function parseRawEmailToAnalysis(
     fullAnalysis: emailAnalysis
   });
 
+  // 4b. If message is quarantined or high threat, automatically inject rich forensic report note into Gmail thread
+  if (quarantineOutcome.isQuarantined || threatScore >= 50) {
+    const threadId = (options as any)?.threadId || (options as any)?.messageId || messageId;
+    const effectiveToken = (options as any)?.accessToken || (await ensureFreshAccessToken()) || getGmailAccessToken();
+    if (effectiveToken && !effectiveToken.startsWith('mock_') && !effectiveToken.startsWith('enclave_')) {
+      insertQuarantineReportNote({
+        threadId,
+        accessToken: effectiveToken,
+        subject: subject || 'Security Briefing: Inbound Quarantine Notice',
+        reportSummary: combinedHeuristics.map(h => `• ${h.title}: ${h.description}`).join('\n') || `High threat risk score (${threatScore}/100) identified by TraceXMail pre-delivery gate.`,
+        caseId: newId,
+        threatScore,
+        verdict,
+        originalMessageId: messageId,
+        topReason: combinedHeuristics[0]?.title || `Flagged as ${verdict}`,
+        auth: {
+          spf: { status: spfStatus, details: spfDetails, domain: fromDomain, ip: primaryGeoHop?.fromIp },
+          dkim: { status: dkimStatus, details: dkimDetails, domain: dkimDomain },
+          dmarc: { status: dmarcStatus, details: dmarcDetails, policy: dmarcPolicy },
+          arc: { status: arcStatus, details: arcDetails }
+        },
+        originIp: primaryGeoHop?.fromIp,
+        originCountry: primaryGeoHop?.country,
+        heuristics: combinedHeuristics,
+        whyNarrative: whyNarrative?.why,
+        alsoSendToInbox: true
+      }).catch(noteErr => {
+        console.warn('[QuarantineReportNote] Auto injection note notification:', noteErr?.message || noteErr);
+      });
+    }
+  }
+
   // 5. Broadcast real-time alert via WebSockets + Slack Security Alerts
   broadcastAlert(newAlert, {
     caseItem: newCaseItem,
@@ -4498,6 +4530,89 @@ Link: https://verify-auth-portal.net/login`;
       });
     } catch (err: any) {
       console.error('[SyncQuarantineReports] Error:', err);
+      res.status(500).json({ status: 'error', error: err.message });
+    }
+  });
+
+  // 6b.2 Endpoint: Dispatch Forensic Report Directly to Gmail (by Case ID or Thread)
+  app.post(['/api/gmail/dispatch-report', '/api/gmail/cases/:caseId/dispatch-report'], authenticatedLimiter, async (req, res) => {
+    try {
+      const caseIdParam = req.params.caseId || req.body?.case_id || req.body?.caseId;
+      const threadIdParam = req.body?.threadId || req.body?.thread_id || req.body?.messageId || req.body?.message_id;
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const token = req.body?.access_token || bearerToken;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+
+      const effectiveToken = (token && !token.startsWith('mock_') && !token.startsWith('enclave_'))
+        ? token
+        : (storedToken && !storedToken.startsWith('mock_') && !storedToken.startsWith('enclave_'))
+          ? storedToken
+          : null;
+
+      if (!effectiveToken) {
+        return res.status(400).json({
+          status: 'error',
+          error: 'No active Google OAuth access token available. Please connect your Gmail account.'
+        });
+      }
+
+      let caseData: any = null;
+      if (caseIdParam) {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            const { data } = await supabase.from('cases').select('*').eq('id', caseIdParam).maybeSingle();
+            caseData = data;
+          } catch (dbErr) {
+            console.warn('[DispatchReport] DB query fallback:', dbErr);
+          }
+        }
+        if (!caseData) {
+          caseData = inMemoryCases.get(caseIdParam) || null;
+        }
+      }
+
+      const rawAnalysis = caseData?.raw_analysis || {};
+      const threatScore = caseData?.threat_score ?? rawAnalysis?.threatScore ?? req.body?.threatScore ?? 85;
+      const verdict = caseData?.severity || rawAnalysis?.verdict || req.body?.verdict || 'MALICIOUS_PHISH';
+      const subject = caseData?.title || rawAnalysis?.subject || req.body?.subject || 'Security Briefing: Inbound Quarantine Notice';
+      const heuristics = rawAnalysis?.heuristics || caseData?.heuristics || [];
+      const whyNarrative = caseData?.why?.why || rawAnalysis?.why?.why || req.body?.whyNarrative;
+      const auth = rawAnalysis?.auth || caseData?.auth;
+      const originIp = rawAnalysis?.hops?.[0]?.fromIp || caseData?.origin_ip;
+      const originCountry = rawAnalysis?.hops?.[0]?.country || caseData?.origin_country;
+      const targetThreadId = threadIdParam || rawAnalysis?.threadId || (caseData?.id ? `thread-${caseData.id}` : undefined);
+
+      const inserted = await insertQuarantineReportNote({
+        threadId: targetThreadId,
+        accessToken: effectiveToken,
+        subject,
+        reportSummary: req.body?.reportSummary || heuristics.map((h: any) => `• ${h.title}: ${h.description}`).join('\n') || `High threat risk score (${threatScore}/100) identified by TraceXMail pre-delivery gate.`,
+        caseId: caseIdParam || 'case-direct',
+        threatScore,
+        verdict,
+        originalMessageId: rawAnalysis?.messageId,
+        topReason: heuristics[0]?.title || `Flagged as ${verdict}`,
+        auth,
+        originIp,
+        originCountry,
+        heuristics,
+        whyNarrative,
+        alsoSendToInbox: req.body?.alsoSendToInbox !== false
+      });
+
+      res.json({
+        status: inserted ? 'success' : 'skipped',
+        case_id: caseIdParam,
+        thread_id: targetThreadId,
+        message: inserted 
+          ? 'Forensic report note successfully injected into Gmail thread and tagged with TraceXMail-Quarantine.'
+          : 'Report note is already present or was skipped.'
+      });
+    } catch (err: any) {
+      console.error('[DispatchReport] Error:', err);
       res.status(500).json({ status: 'error', error: err.message });
     }
   });

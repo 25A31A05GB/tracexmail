@@ -20,10 +20,15 @@ import {
   Radio, 
   FileText,
   SlidersHorizontal,
-  ExternalLink
+  ExternalLink,
+  Clock,
+  Volume2,
+  VolumeX,
+  EyeOff
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { UserRole, AccountType } from '../hooks/useSession';
+import { InactivityConfig, WorkspaceLockState } from '../types';
 import { Sparkles, Terminal } from 'lucide-react';
 
 interface AccountSettingsViewProps {
@@ -40,6 +45,10 @@ interface AccountSettingsViewProps {
   userPersona?: 'technical' | 'non_technical';
   onSetPersona?: (persona: 'technical' | 'non_technical') => void;
   onOpenOnboarding?: () => void;
+  inactivityConfig?: InactivityConfig;
+  onUpdateInactivityConfig?: (config: Partial<InactivityConfig>) => void;
+  onLockWorkspaceNow?: () => void;
+  lockState?: WorkspaceLockState;
 }
 
 interface TotpFactor {
@@ -64,7 +73,11 @@ export function AccountSettingsView({
   onNavigateTab,
   userPersona = 'technical',
   onSetPersona,
-  onOpenOnboarding
+  onOpenOnboarding,
+  inactivityConfig,
+  onUpdateInactivityConfig,
+  onLockWorkspaceNow,
+  lockState
 }: AccountSettingsViewProps) {
   // Factors state
   const [factors, setFactors] = useState<TotpFactor[]>([]);
@@ -827,7 +840,128 @@ export function AccountSettingsView({
             </div>
           )}
 
-          {/* Section 3: Session Management & Revocation */}
+          {/* Section 3: Session Inactivity & Auto-Lock Compliance (NIST SP 800-53 AC-11) */}
+          <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-5">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+              <div>
+                <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>SESSION INACTIVITY &amp; AUTO-LOCK COMPLIANCE (NIST SP 800-53 AC-11)</span>
+                </div>
+                <div className="text-[11.5px] text-[var(--paper-dim)] mt-0.5">
+                  Automatically safeguards evidence confidentiality by locking the workspace after unattended idle periods.
+                </div>
+              </div>
+
+              {onLockWorkspaceNow && (
+                <button
+                  type="button"
+                  onClick={onLockWorkspaceNow}
+                  className="px-3 py-1.5 rounded-[2px] border border-[#3a352c] hover:border-amber-500/80 bg-[#16130f] hover:bg-[#221e17] text-amber-300 transition-all text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Lock Workspace Now (Cmd+Shift+L / Ctrl+Shift+L)"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Lock Workspace Now</span>
+                  <kbd className="px-1 py-0.2 text-[9px] bg-black/40 border border-[#3a352c] rounded text-[#8a8070]">
+                    ⌘⇧L
+                  </kbd>
+                </button>
+              )}
+            </div>
+
+            {/* Inactivity Status Pill */}
+            <div className="p-3 bg-[var(--ink)] border border-[var(--line)] rounded-[2px] flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${inactivityConfig?.enabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="font-semibold text-[var(--paper)]">
+                  Compliance Status: {inactivityConfig?.enabled ? 'Active Enforcement (Compliant)' : 'Disabled / Suspended'}
+                </span>
+              </div>
+
+              {lockState && (
+                <div className="font-mono text-[11px] text-[#8a8070] flex items-center gap-2">
+                  <span>Idle: <strong className="text-amber-300">{lockState.idleSeconds}s</strong></span>
+                  <span>•</span>
+                  <span>Next Auto-Lock in: <strong className="text-emerald-400">{Math.floor(lockState.secondsRemaining / 60)}m {lockState.secondsRemaining % 60}s</strong></span>
+                </div>
+              )}
+            </div>
+
+            {/* Inactivity Configuration Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Timeout Duration Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--paper)] block">
+                  Inactivity Timeout Threshold:
+                </label>
+                <select
+                  value={inactivityConfig?.timeoutMinutes ?? 15}
+                  onChange={(e) => onUpdateInactivityConfig?.({ timeoutMinutes: Number(e.target.value) })}
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-amber-500/80 rounded-[2px] px-3 py-2 text-xs font-mono text-[var(--paper)] cursor-pointer"
+                >
+                  <option value={1}>1 Minute (Demo / Rapid Test)</option>
+                  <option value={5}>5 Minutes (Strict Security Zone)</option>
+                  <option value={10}>10 Minutes (High Risk Area)</option>
+                  <option value={15}>15 Minutes (NIST SP 800-53 Default Standard)</option>
+                  <option value={30}>30 Minutes (Standard SOC)</option>
+                  <option value={60}>60 Minutes (Extended Lab)</option>
+                </select>
+                <span className="text-[10px] text-[var(--paper-muted)] block">
+                  Recommended: 15 minutes per NIST SP 800-53 Rev 5 control AC-11.
+                </span>
+              </div>
+
+              {/* Warning Window Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--paper)] block">
+                  Pre-Lock Warning Duration:
+                </label>
+                <select
+                  value={inactivityConfig?.warningSeconds ?? 60}
+                  onChange={(e) => onUpdateInactivityConfig?.({ warningSeconds: Number(e.target.value) })}
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-amber-500/80 rounded-[2px] px-3 py-2 text-xs font-mono text-[var(--paper)] cursor-pointer"
+                >
+                  <option value={30}>30 Seconds Before Lock</option>
+                  <option value={60}>60 Seconds Before Lock (Recommended)</option>
+                  <option value={120}>120 Seconds (2 Minutes)</option>
+                </select>
+                <span className="text-[10px] text-[var(--paper-muted)] block">
+                  Displays interactive countdown modal before locking.
+                </span>
+              </div>
+            </div>
+
+            {/* Checkbox Options */}
+            <div className="space-y-2 pt-1 border-t border-[var(--line)] text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={inactivityConfig?.soundAlert ?? true}
+                  onChange={(e) => onUpdateInactivityConfig?.({ soundAlert: e.target.checked })}
+                  className="rounded border-[var(--line)] bg-[var(--ink)] text-amber-500 focus:ring-0 w-3.5 h-3.5"
+                />
+                <span className="text-[var(--paper)] font-medium flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Audible Alert Chime on Countdown Warning</span>
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={inactivityConfig?.autoLockOnBlur ?? false}
+                  onChange={(e) => onUpdateInactivityConfig?.({ autoLockOnBlur: e.target.checked })}
+                  className="rounded border-[var(--line)] bg-[var(--ink)] text-amber-500 focus:ring-0 w-3.5 h-3.5"
+                />
+                <span className="text-[var(--paper)] font-medium flex items-center gap-1.5">
+                  <EyeOff className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Zero-Trust Strict Mode: Lock immediately when switching browser tabs or minimizing window</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Section 4: Session Management & Revocation */}
           <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
             <div className="border-b border-[var(--line)] pb-3">
               <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">

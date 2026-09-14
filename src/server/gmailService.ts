@@ -1002,7 +1002,7 @@ export async function modifyGmailMessageLabels(
  * The user sees this note immediately alongside the quarantined email in their mailbox.
  */
 /**
- * Builds RFC 822 compliant Quarantine Report Note payload with snippet header.
+ * Builds RFC 822 compliant Quarantine Report Note payload with snippet header and rich multipart HTML.
  */
 export function buildQuarantineReportNotePayload(params: {
   subject: string;
@@ -1014,6 +1014,16 @@ export function buildQuarantineReportNotePayload(params: {
   topReason?: string;
   parentReferences?: string;
   senderEmail?: string;
+  auth?: {
+    spf?: { status: string; details?: string; domain?: string; ip?: string };
+    dkim?: { status: string; details?: string; domain?: string };
+    dmarc?: { status: string; details?: string; policy?: string };
+    arc?: { status: string; details?: string };
+  };
+  originIp?: string;
+  originCountry?: string;
+  heuristics?: Array<{ id?: string; title?: string; severity?: string; description?: string }>;
+  whyNarrative?: string;
 }) {
   let cleanReason = (params.topReason || '').trim();
   if (!cleanReason && params.reportSummary) {
@@ -1030,6 +1040,7 @@ export function buildQuarantineReportNotePayload(params: {
 
   const snippetLine = `[TraceXMail: QUARANTINED (Threat Score: ${params.threatScore}/100)] — ${truncatedReason}. Intercepted and isolated under TraceXMail-Quarantine.`;
 
+  // 1. Plain Text Representation
   const bodyLines = [
     snippetLine,
     '',
@@ -1045,15 +1056,152 @@ export function buildQuarantineReportNotePayload(params: {
     '',
     'FORENSIC SUMMARY & ANOMALIES:',
     params.reportSummary.trim(),
+    ...(params.whyNarrative ? ['', 'ANALYST REASONING:', params.whyNarrative.trim()] : []),
+    ...(params.auth ? [
+      '',
+      'CRYPTOGRAPHIC AUTHENTICATION:',
+      `• SPF:   ${params.auth.spf?.status || 'N/A'} (${params.auth.spf?.details || 'N/A'})`,
+      `• DKIM:  ${params.auth.dkim?.status || 'N/A'} (${params.auth.dkim?.details || 'N/A'})`,
+      `• DMARC: ${params.auth.dmarc?.status || 'N/A'} (${params.auth.dmarc?.details || 'N/A'})`,
+      `• ARC:   ${params.auth.arc?.status || 'N/A'}`
+    ] : []),
+    ...(params.originIp ? [
+      '',
+      'ORIGIN INFRASTRUCTURE:',
+      `• IP: ${params.originIp} (${params.originCountry || 'Unknown Location'})`
+    ] : []),
     '',
     'SECURITY INCIDENT DOSSIER & REMEDIATION:',
     `Inspect raw MIME headers, routing hops, and IOC telemetry:`,
     `https://tracexmail.vercel.app/cases/${params.caseId}`,
     '================================================================'
   ];
-  const bodyText = bodyLines.join('\r\n');
+  const plainText = bodyLines.join('\r\n');
+
+  // 2. Rich HTML Representation (Gmail compatible responsive card layout)
+  const isCritical = params.threatScore >= 75;
+  const isHigh = params.threatScore >= 50 && params.threatScore < 75;
+  const accentColor = isCritical ? '#dc2626' : isHigh ? '#d97706' : '#2563eb';
+  const badgeBg = isCritical ? '#fef2f2' : isHigh ? '#fffbeb' : '#eff6ff';
+  const badgeBorder = isCritical ? '#fecaca' : isHigh ? '#fde68a' : '#bfdbfe';
+
+  const htmlBody = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TraceXMail Forensic Briefing</title>
+</head>
+<body style="margin: 0; padding: 16px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <!-- Snippet preview text for Gmail list view -->
+  <div style="display: none; max-height: 0px; overflow: hidden;">
+    ${snippetLine}
+  </div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+    <!-- Header Banner -->
+    <tr>
+      <td style="background-color: #0f172a; padding: 20px 24px; color: #ffffff;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td>
+              <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #94a3b8; text-transform: uppercase;">TraceXMail Automated SOC Defense</div>
+              <div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-top: 4px;">🛡️ Forensic Quarantine Briefing</div>
+            </td>
+            <td align="right">
+              <span style="display: inline-block; padding: 6px 12px; background-color: ${accentColor}; color: #ffffff; font-size: 12px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                ${params.verdict}
+              </span>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Summary Box -->
+    <tr>
+      <td style="padding: 24px;">
+        <div style="background-color: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="vertical-align: top; width: 32px; font-size: 20px;">⚠️</td>
+              <td style="vertical-align: top; padding-left: 8px;">
+                <div style="font-size: 14px; font-weight: 700; color: ${accentColor};">
+                  Quarantine Gate: Isolated from Primary Inbox
+                </div>
+                <div style="font-size: 13px; color: #475569; margin-top: 4px; line-height: 1.5;">
+                  ${snippetLine}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Telemetry Details Table -->
+        <table width="100%" cellpadding="8" cellspacing="0" style="font-size: 13px; border-collapse: collapse; margin-bottom: 20px;">
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; width: 140px; font-weight: 600;">Threat Risk Score</td>
+            <td style="font-weight: 700; color: ${accentColor};">${params.threatScore} / 100</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; font-weight: 600;">Target Subject</td>
+            <td style="font-weight: 600; color: #0f172a;">${params.subject || '(No Subject)'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; font-weight: 600;">Case Reference</td>
+            <td style="font-family: monospace; color: #334155;">${params.caseId}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; font-weight: 600;">Quarantine Label</td>
+            <td><span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">TraceXMail-Quarantine</span></td>
+          </tr>
+          ${params.originIp ? `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; font-weight: 600;">Origin IP & Geo</td>
+            <td style="color: #334155;">${params.originIp} (${params.originCountry || 'Unknown'})</td>
+          </tr>` : ''}
+          ${params.auth ? `
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="color: #64748b; font-weight: 600;">Authentication</td>
+            <td style="font-size: 12px; color: #334155;">
+              SPF: <b>${params.auth.spf?.status || 'N/A'}</b> | 
+              DKIM: <b>${params.auth.dkim?.status || 'N/A'}</b> | 
+              DMARC: <b>${params.auth.dmarc?.status || 'N/A'}</b>
+            </td>
+          </tr>` : ''}
+        </table>
+
+        <!-- Summary & Anomalies -->
+        <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+          Forensic Indicators & Threat Findings
+        </div>
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; font-size: 13px; color: #334155; line-height: 1.6; white-space: pre-line; margin-bottom: 24px;">
+          ${params.reportSummary.trim()}
+        </div>
+
+        <!-- Action Button -->
+        <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
+          <a href="https://tracexmail.vercel.app/cases/${params.caseId}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em;">
+            Open Forensic Case in SOC Console →
+          </a>
+        </div>
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 24px; font-size: 11px; color: #94a3b8; text-align: center;">
+        TraceXMail Enterprise Security Suite • Automated Inbound Quarantine Note • ${new Date().toUTCString()}
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
   const selfEmail = params.senderEmail || state.emailAddress || 'security@tracexmail.internal';
   const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${Math.random().toString(36).slice(2, 7)}@tracexmail.internal>`;
+
+  const boundary = `----=_Part_TraceXMail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const rfcHeaders: string[] = [
     `From: TraceXMail Security <${selfEmail}>`,
@@ -1079,14 +1227,30 @@ export function buildQuarantineReportNotePayload(params: {
   }
 
   rfcHeaders.push('MIME-Version: 1.0');
-  rfcHeaders.push('Content-Type: text/plain; charset="UTF-8"');
-  rfcHeaders.push('Content-Transfer-Encoding: 8bit');
+  rfcHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
 
-  const fullRfcContent = rfcHeaders.join('\r\n') + '\r\n\r\n' + bodyText;
+  const multipartContent = [
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    plainText,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: 8bit',
+    '',
+    htmlBody,
+    '',
+    `--${boundary}--`
+  ].join('\r\n');
+
+  const fullRfcContent = rfcHeaders.join('\r\n') + '\r\n\r\n' + multipartContent;
 
   return {
     snippetLine,
-    bodyText,
+    bodyText: plainText,
+    htmlBody,
     rfcHeaders,
     fullRfcContent,
     selfEmail,
@@ -1107,8 +1271,8 @@ export function buildQuarantineReportNotePayload(params: {
  * 5. Uses users.messages.insert to write directly to mailbox without external delivery.
  */
 export async function insertQuarantineReportNote(params: {
-  threadId: string;
-  accessToken: string;
+  threadId?: string;
+  accessToken?: string;
   subject: string;
   reportSummary: string;
   caseId: string;
@@ -1116,6 +1280,12 @@ export async function insertQuarantineReportNote(params: {
   verdict: string;
   originalMessageId?: string;
   topReason?: string;
+  auth?: any;
+  originIp?: string;
+  originCountry?: string;
+  heuristics?: any[];
+  whyNarrative?: string;
+  alsoSendToInbox?: boolean;
 }): Promise<boolean> {
   let token = params.accessToken || state.accessToken;
   if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
@@ -1152,7 +1322,7 @@ export async function insertQuarantineReportNote(params: {
 
     // 1. Resolve canonical threadId, exact Subject, and parent Message-ID from Gmail API
     // Attempt lookup by message ID first if available
-    const lookupCandidate = params.originalMessageId || (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') ? targetThreadId : '');
+    const lookupCandidate = params.originalMessageId || (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-') ? targetThreadId : '');
     
     if (lookupCandidate && !lookupCandidate.startsWith('<')) {
       try {
@@ -1181,7 +1351,7 @@ export async function insertQuarantineReportNote(params: {
     }
 
     // 2. Query target thread to verify thread metadata, check for existing report, and extract latest Message-ID
-    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_')) {
+    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-')) {
       try {
         const threadRes = await axios.get(
           `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(targetThreadId)}?format=full`,
@@ -1239,84 +1409,28 @@ export async function insertQuarantineReportNote(params: {
       threadSubject = 'Inbound Mail Evaluation';
     }
 
-    // 3. Format first-line snippet to trigger Gmail's thread snippet preview view
-    // Gmail list view displays the first ~100-140 chars of the latest message body.
-    let cleanReason = (params.topReason || '').trim();
-    if (!cleanReason && params.reportSummary) {
-      const firstLine = params.reportSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
-      cleanReason = firstLine;
-    }
-    if (!cleanReason) {
-      cleanReason = 'High threat risk anomalies flagged by enterprise mail defense policies';
-    }
-    const maxReasonLen = 85;
-    const truncatedReason = cleanReason.length > maxReasonLen
-      ? `${cleanReason.substring(0, maxReasonLen - 1)}…`
-      : cleanReason;
+    // 3. Build rich payload using buildQuarantineReportNotePayload
+    const payload = buildQuarantineReportNotePayload({
+      subject: threadSubject,
+      reportSummary: params.reportSummary,
+      caseId: params.caseId,
+      threatScore: params.threatScore,
+      verdict: params.verdict,
+      originalMessageId: parentMessageId,
+      topReason: params.topReason,
+      parentReferences,
+      auth: params.auth,
+      originIp: params.originIp,
+      originCountry: params.originCountry,
+      heuristics: params.heuristics,
+      whyNarrative: params.whyNarrative
+    });
 
-    // Snippet line (starts immediately at line 1 with no leading space or decorators)
-    const snippetLine = `[TraceXMail: QUARANTINED (Threat Score: ${params.threatScore}/100)] — ${truncatedReason}. Intercepted and isolated under TraceXMail-Quarantine.`;
-
-    // 4. Construct detailed RFC 822 forensic briefing body
-    const bodyLines = [
-      snippetLine,
-      '',
-      '================================================================',
-      '🛡️ TRACEXMAIL ENTERPRISE FORENSIC INCIDENT BRIEFING',
-      '================================================================',
-      `Verdict:          ${params.verdict}`,
-      `Threat Score:     ${params.threatScore} / 100`,
-      `Quarantine Gate:  PRE-DELIVERY HOLD (Isolated from Inbox)`,
-      `Applied Label:    TraceXMail-Quarantine`,
-      `Case ID:          ${params.caseId}`,
-      `Timestamp:        ${new Date().toUTCString()}`,
-      '',
-      'FORENSIC SUMMARY & ANOMALIES:',
-      params.reportSummary.trim(),
-      '',
-      'SECURITY INCIDENT DOSSIER & REMEDIATION:',
-      `Inspect raw MIME headers, routing hops, and IOC telemetry:`,
-      `https://tracexmail.vercel.app/cases/${params.caseId}`,
-      '================================================================'
-    ];
-    const bodyText = bodyLines.join('\r\n');
-
-    // 5. Build RFC 822 / 2822 compliant message structure
-    const selfEmail = state.emailAddress || 'security@tracexmail.internal';
-    const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${Math.random().toString(36).slice(2, 7)}@tracexmail.internal>`;
-
-    const rfcHeaders: string[] = [
-      `From: TraceXMail Security <${selfEmail}>`,
-      `To: <${selfEmail}>`,
-      `Subject: ${threadSubject}`,
-      `Date: ${new Date().toUTCString()}`,
-      `Message-ID: ${noteMessageId}`,
-      'X-TraceXMail-Report: true',
-      `X-TraceXMail-Case: ${params.caseId}`,
-      `X-TraceXMail-Threat-Score: ${params.threatScore}`,
-      `X-TraceXMail-Verdict: ${params.verdict}`
-    ];
-
-    if (parentMessageId) {
-      const formattedParent = parentMessageId.startsWith('<') && parentMessageId.endsWith('>')
-        ? parentMessageId
-        : `<${parentMessageId}>`;
-      rfcHeaders.push(`In-Reply-To: ${formattedParent}`);
-      
-      const combinedRefs = parentReferences
-        ? `${parentReferences} ${formattedParent}`
-        : formattedParent;
-      rfcHeaders.push(`References: ${combinedRefs}`);
-    }
-
-    rfcHeaders.push('MIME-Version: 1.0');
-    rfcHeaders.push('Content-Type: text/plain; charset="UTF-8"');
-    rfcHeaders.push('Content-Transfer-Encoding: 8bit');
-
-    const fullRfcContent = rfcHeaders.join('\r\n') + '\r\n\r\n' + bodyText;
-
-    // 6. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
+    // 4. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
     const labelIds: string[] = ['UNREAD'];
+    if (params.alsoSendToInbox) {
+      labelIds.push('INBOX');
+    }
     const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
     if (quarantineLabelId && !labelIds.includes(quarantineLabelId)) {
       labelIds.push(quarantineLabelId);
@@ -1331,14 +1445,12 @@ export async function insertQuarantineReportNote(params: {
 
     await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_INSERT, 'messages.insert');
 
-    // 7. Insert message directly into target thread using users.messages.insert
-    // internalDateSource=receivedTime ensures it is placed at the end of the thread,
-    // making its snippet view immediately active in the Gmail mailbox.
+    // 5. Insert message directly into target thread using users.messages.insert
     const insertPayload: any = {
-      raw: encodeBase64Url(fullRfcContent),
+      raw: encodeBase64Url(payload.fullRfcContent),
       labelIds
     };
-    if (targetThreadId) {
+    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-')) {
       insertPayload.threadId = targetThreadId;
     }
 
@@ -1369,7 +1481,7 @@ export async function insertQuarantineReportNote(params: {
 
       // Fallback: If Gmail rejected threadId (e.g. malformed or nonexistent thread), insert standalone without threadId
       const fallbackPayload: any = {
-        raw: encodeBase64Url(fullRfcContent),
+        raw: encodeBase64Url(payload.fullRfcContent),
         labelIds
       };
 

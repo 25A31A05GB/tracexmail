@@ -67,6 +67,8 @@ interface HeaderProps {
   onToggleMobileSidebar?: () => void;
   isMobileSidebarOpen?: boolean;
   onSyncCases?: () => void | Promise<void>;
+  inactivityRemainingSecs?: number;
+  onLockWorkspace?: () => void;
 }
 
 export function Header({
@@ -95,7 +97,9 @@ export function Header({
   onOpenShortcutsHelp,
   onToggleMobileSidebar,
   isMobileSidebarOpen = false,
-  onSyncCases
+  onSyncCases,
+  inactivityRemainingSecs,
+  onLockWorkspace
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
@@ -256,7 +260,7 @@ export function Header({
           </button>
 
           {dropdownOpen && (
-            <div className="absolute left-0 mt-2 w-80 max-w-[85vw] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+            <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
               <div className="flex items-center justify-between pb-2 border-b border-[#2d2820] mb-2 px-1">
                 <span className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] tracking-wider">
                   Case &amp; Ingestion Hub
@@ -361,7 +365,7 @@ export function Header({
           </button>
 
           {toolsDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-72 bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl p-2.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 space-y-2.5">
+            <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-24px)] bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl p-2.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 space-y-2.5">
               <div className="text-[10px] font-mono uppercase text-[#8a8070] font-semibold tracking-wider pb-1 border-b border-[#2d2820]">
                 Workspace View &amp; Safety Controls
               </div>
@@ -494,7 +498,7 @@ export function Header({
           </button>
 
           {userDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-68 bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl py-2 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
+            <div className="absolute right-0 mt-1.5 w-68 max-w-[calc(100vw-24px)] bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl py-2 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
               <div className="px-3 py-2 text-[11px] text-[#8a8070]">
                 <div className="font-mono text-[10px] uppercase text-[#8a8070]">Workspace Operator</div>
                 <div className="truncate text-[#ede6d8] font-semibold mt-0.5">{sessionUser?.email || userLabel}</div>
@@ -553,6 +557,23 @@ export function Header({
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
                     <span>Account &amp; MFA Settings</span>
+                  </button>
+                )}
+                {onLockWorkspace && (
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      onLockWorkspace();
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-amber-300 hover:bg-[rgba(201,162,39,0.15)] flex items-center justify-between cursor-pointer transition-colors font-sans font-medium"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Lock Workspace Now</span>
+                    </div>
+                    <kbd className="px-1 py-0.2 text-[9px] font-mono bg-black/40 border border-[#3a352c] rounded text-[#8a8070]">
+                      ⌘⇧L
+                    </kbd>
                   </button>
                 )}
                 {onSignOut && (

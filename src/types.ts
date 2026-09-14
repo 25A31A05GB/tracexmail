@@ -530,4 +530,23 @@ export interface CaseClosurePayload {
   resolution_type?: string;
 }
 
+export interface InactivityConfig {
+  enabled: boolean;
+  timeoutMinutes: number;
+  warningSeconds: number;
+  soundAlert: boolean;
+  autoLockOnBlur: boolean;
+  complianceStandard: 'NIST SP 800-53 AC-11' | 'ISO/IEC 27001' | 'SOC 2 Type II' | 'CJIS Security Policy';
+}
+
+export interface WorkspaceLockState {
+  isLocked: boolean;
+  isWarning: boolean;
+  secondsRemaining: number;
+  totalTimeoutSeconds: number;
+  idleSeconds: number;
+  lockedAt: string | null;
+  lockReason: 'inactivity' | 'manual' | 'policy';
+}
+
 

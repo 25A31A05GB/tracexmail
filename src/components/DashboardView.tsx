@@ -469,7 +469,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   }, [totals30Day]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
+    <div className="flex-1 overflow-y-auto w-full max-w-full min-w-0 p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
       {/* Top Banner / Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

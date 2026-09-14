@@ -181,6 +181,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   // In-Thread Quarantine Reports Sync State
   const [syncingReports, setSyncingReports] = useState<boolean>(false);
   const [syncReportsResult, setSyncReportsResult] = useState<string | null>(null);
+  const [dispatchingReportId, setDispatchingReportId] = useState<string | null>(null);
+  const [reportDispatchedMap, setReportDispatchedMap] = useState<Record<string, string>>({});
 
   // Synced & Analyzed Emails Stream State
   const [syncedEmails, setSyncedEmails] = useState<SyncedEmailItem[]>([]);
@@ -640,6 +642,42 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     }
   };
 
+  const handleDispatchReport = async (email: SyncedEmailItem) => {
+    setDispatchingReportId(email.id);
+    try {
+      const res = await apiFetch('/api/gmail/dispatch-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_id: email.caseId || email.id,
+          threadId: email.messageId,
+          subject: email.subject,
+          threatScore: email.threatScore,
+          verdict: email.verdict,
+          whyNarrative: email.whyNarrative,
+          alsoSendToInbox: true
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReportDispatchedMap(prev => ({ ...prev, [email.id]: 'Report Sent to Gmail!' }));
+        setTimeout(() => {
+          setReportDispatchedMap(prev => {
+            const next = { ...prev };
+            delete next[email.id];
+            return next;
+          });
+        }, 5000);
+      } else {
+        setErrorMsg(data.error || 'Failed to dispatch report note to Gmail.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Error dispatching report to Gmail: ' + err.message);
+    } finally {
+      setDispatchingReportId(null);
+    }
+  };
+
   const handleSimulateInboundInterception = async (isMalicious: boolean = true) => {
     setSimulating(true);
     setSyncResult(null);
@@ -846,9 +884,9 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   }
 
   return (
-    <div className="bg-[#181613] border border-[#342e26] rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
+    <div className="bg-[#181613] border border-[#342e26] rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-6 shadow-sm w-full max-w-full min-w-0">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2820] pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2820] pb-4 sm:pb-5">
         <div className="flex items-start gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
             <Mail className="w-5 h-5" />
@@ -1749,6 +1787,22 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                           <FileText className="w-3.5 h-3.5 text-[#9d9282]" />
                           <span>{isExpanded ? 'Hide Raw Details' : 'View Headers'}</span>
                           {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        <button
+                          onClick={() => handleDispatchReport(email)}
+                          disabled={dispatchingReportId === email.id}
+                          className="px-2.5 py-1.5 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-700/50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                          title="Inject HTML forensic security report note directly into your real Gmail thread"
+                        >
+                          {dispatchingReportId === email.id ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                          ) : (
+                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                          <span>
+                            {reportDispatchedMap[email.id] || (dispatchingReportId === email.id ? 'Sending Report...' : 'Send Report to Gmail')}
+                          </span>
                         </button>
                       </div>
 

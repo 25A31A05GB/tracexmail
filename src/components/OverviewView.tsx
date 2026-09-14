@@ -663,7 +663,7 @@ export function OverviewView({
   const evidenceCardData = mapAnalysisToEvidenceCardData(analysis);
 
   return (
-    <div id="overview-dashboard" className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#0B0C0F] text-slate-100 font-mono">
+    <div id="overview-dashboard" className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#0B0C0F] text-slate-100 font-mono w-full max-w-full min-w-0">
       {/* Top Bar Header & Action Controls */}
       <div className="flex flex-col gap-3 bg-[#16181D] border border-[#2A2D34] p-3.5 rounded-lg mb-6 shadow-sm">
         {/* Row 1: Mode Switcher + Case Status */}

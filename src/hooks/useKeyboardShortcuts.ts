@@ -12,6 +12,7 @@ export interface ShortcutHandlers {
   onOpenShortcutsHelp?: () => void;
   onSelectTab?: (tab: NavTab) => void;
   onCloseModals?: () => void;
+  onLockWorkspace?: () => void;
   enabled?: boolean;
 }
 
@@ -56,6 +57,7 @@ export const SHORTCUT_DEFINITIONS = [
   {
     category: 'Forensic Actions',
     items: [
+      { key: '⌘ + Shift + L', description: 'Lock Forensic Workspace (NIST AC-11 Auto-Lock)' },
       { key: '⌘ + Shift + D', description: 'Toggle Sample & Demo Cases Feed' },
       { key: '⌘ + Shift + P', description: 'Privacy & Retention Compliance Controls' },
       { key: '⌘ + Shift + O', description: 'Investigation Objective & Role Setup' },
@@ -123,6 +125,13 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         if (lowerKey === 'j') {
           e.preventDefault();
           handlers.onToggleViewMode?.();
+          return;
+        }
+
+        // Cmd/Ctrl + Shift + L -> Lock Workspace
+        if (e.shiftKey && lowerKey === 'l') {
+          e.preventDefault();
+          handlers.onLockWorkspace?.();
           return;
         }
 
