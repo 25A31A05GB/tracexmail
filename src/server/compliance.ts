@@ -19,6 +19,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from './supabase';
+import { resolveUserProfile } from './userProfileStore';
 import type { Request, Response, NextFunction } from 'express';
 
 // ============================================================================
@@ -718,60 +719,16 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
         const { data, error } = await supabaseAdmin.auth.getUser(token);
         if (!error && data?.user) {
           const authUser = data.user;
-          // Look up that user's profiles row (organization_id, role) via service-role client
-          const { data: profile, error: profileErr } = await supabaseAdmin
-            .from('profiles')
-            .select('organization_id, role')
-            .eq('id', authUser.id)
-            .maybeSingle();
-
-          if (profile && profile.organization_id && profile.role) {
-            userContext = {
-              userId: authUser.id,
-              email: authUser.email || '',
-              organizationId: profile.organization_id,
-              role: profile.role as UserRole,
-              authMethod: 'jwt'
-            };
-          } else {
-            // SECURITY DEFENSE: Profile row missing or not yet populated.
-            // NEVER trust user_metadata or app_metadata for authorization, role, or organization_id.
-            // Supabase user_metadata is client-writable via supabase.auth.updateUser().
-            // Auto-provision a profile row strictly with the lowest-privilege role ('read_only')
-            // using the server service-role client, or treat as unauthenticated if provisioning fails.
-            const defaultOrg = '00000000-0000-0000-0000-000000000000';
-            const lowestRole: UserRole = 'read_only';
-
-            try {
-              const { data: newProfile, error: upsertErr } = await supabaseAdmin
-                .from('profiles')
-                .upsert({
-                  id: authUser.id,
-                  email: authUser.email || '',
-                  role: lowestRole,
-                  organization_id: defaultOrg,
-                  updated_at: new Date().toISOString()
-                })
-                .select('organization_id, role')
-                .maybeSingle();
-
-              if (!upsertErr && newProfile && newProfile.role === lowestRole) {
-                userContext = {
-                  userId: authUser.id,
-                  email: authUser.email || '',
-                  organizationId: newProfile.organization_id || defaultOrg,
-                  role: lowestRole,
-                  authMethod: 'jwt'
-                };
-              } else {
-                console.warn(`[Auth] User ${authUser.id} has no valid profiles row and auto-provisioning failed:`, upsertErr?.message);
-                userContext = null;
-              }
-            } catch (createErr) {
-              console.warn(`[Auth] Profile creation exception for user ${authUser.id}:`, createErr);
-              userContext = null;
-            }
-          }
+          // Resilient profile resolution: queries Supabase 'profiles' if available,
+          // falls back gracefully to in-memory store and authenticated metadata if table is missing.
+          const resolved = await resolveUserProfile(authUser);
+          userContext = {
+            userId: authUser.id,
+            email: authUser.email || '',
+            organizationId: resolved.organizationId,
+            role: resolved.role,
+            authMethod: 'jwt'
+          };
         }
       } catch (authErr) {
         console.warn('[Auth] Supabase service-role token validation error:', authErr);

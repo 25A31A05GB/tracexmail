@@ -108,25 +108,33 @@ export function TeamView() {
       setLoading(true);
 
       // 1. Fetch team members
+      let loadedTeam = false;
       if (isSupabaseConfigured && supabase) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .order('created_at', { ascending: false });
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-        if (data && data.length > 0) {
-          const members: TeamMember[] = data.map((p: any) => ({
-            id: p.id,
-            name: p.full_name || p.email?.split('@')[0] || 'Security Analyst',
-            email: p.email || 'analyst@defense.sec',
-            employeeId: p.employee_id || `EMP-${p.id.substring(0, 4).toUpperCase()}`,
-            role: (p.role as UserRole) || 'analyst',
-            status: 'ACTIVE',
-            lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
-          }));
-          setTeam(members);
+          if (!error && data && data.length > 0) {
+            const members: TeamMember[] = data.map((p: any) => ({
+              id: p.id,
+              name: p.full_name || p.email?.split('@')[0] || 'Security Analyst',
+              email: p.email || 'analyst@defense.sec',
+              employeeId: p.employee_id || `EMP-${p.id.substring(0, 4).toUpperCase()}`,
+              role: (p.role as UserRole) || 'analyst',
+              status: 'ACTIVE',
+              lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
+            }));
+            setTeam(members);
+            loadedTeam = true;
+          }
+        } catch {
+          // Fall back to server roster
         }
-      } else {
+      }
+
+      if (!loadedTeam) {
         const res = await fetch('/api/team/members');
         if (res.ok) {
           const data = await res.json();

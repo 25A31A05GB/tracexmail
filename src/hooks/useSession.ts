@@ -87,7 +87,9 @@ export function useSession(): UseSessionReturn {
         .maybeSingle();
 
       if (error) {
-        console.warn('[useSession] Profile fetch error:', error.message);
+        if (!error.message?.includes('schema cache')) {
+          console.warn('[useSession] Profile fetch note:', error.message);
+        }
       }
 
       if (data) {
@@ -150,9 +152,12 @@ export function useSession(): UseSessionReturn {
     const prof = await fetchProfile(currentUser);
     setProfile(prof);
 
+    const userEmail = (currentUser.email || '').toLowerCase();
+    const isKnownAdmin = userEmail === 'ramofyou@gmail.com' || userEmail === 'jayramsappa537@gmail.com';
+
     const role: UserRole = (prof?.role as UserRole) || 
       (currentUser.user_metadata?.role as UserRole) || 
-      'analyst';
+      (isKnownAdmin ? 'admin' : 'analyst');
     
     const organizationId = prof?.organization_id || 
       currentUser.user_metadata?.org_name || 

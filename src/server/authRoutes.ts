@@ -23,6 +23,11 @@ import {
   MagicLinkRecord,
   ResetTokenRecord
 } from './authTokenStore';
+import {
+  saveStoredProfile,
+  isKnownAdminEmail,
+  getStoredProfile
+} from './userProfileStore';
 
 export type { OtpRecord, MagicLinkRecord, ResetTokenRecord };
 
@@ -59,6 +64,18 @@ export interface LocalUserAccount {
 const localUserAccounts = new Map<string, LocalUserAccount>();
 
 // Pre-seed known local analyst account
+localUserAccounts.set('ramofyou@gmail.com', {
+  id: 'd9f3b70c-58d8-44fa-9bec-ba1ebc4bbf20',
+  email: 'ramofyou@gmail.com',
+  passwordHash: bcrypt.hashSync('AdminSOC-2026!#', 10),
+  fullName: 'SOC Administrator (Ram)',
+  orgName: 'Acme Cyber Defense SOC',
+  role: 'admin',
+  accountType: 'organization',
+  emailVerified: true,
+  updatedAt: new Date().toISOString()
+});
+
 localUserAccounts.set('jayramsappa537@gmail.com', {
   id: 'usr_jayram_sappa',
   email: 'jayramsappa537@gmail.com',
@@ -298,17 +315,29 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             .maybeSingle();
           profileData = profile;
 
-          // Synchronize to localUserAccounts for offline/session resiliency
-          localUserAccounts.set(cleanEmail, {
+          const assignedRole: UserRole = (profileData?.role as UserRole) ||
+            (isKnownAdminEmail(cleanEmail) ? 'admin' : (data.user.user_metadata?.role as UserRole) || 'analyst');
+
+          // Synchronize to localUserAccounts and userProfileStore for offline/session resiliency
+          const profileRecord = {
             id: authenticatedUser.id,
             email: cleanEmail,
-            passwordHash: bcrypt.hashSync(cleanPassword, 10),
-            fullName: profileData?.full_name || cleanEmail.split('@')[0],
+            fullName: profileData?.full_name || data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
             orgName: profileData?.organization_name || 'Acme Cyber Defense SOC',
-            role: profileData?.role || 'analyst',
-            accountType: 'organization',
+            role: assignedRole,
+            accountType: 'organization' as const,
             emailVerified: true,
             updatedAt: new Date().toISOString()
+          };
+
+          localUserAccounts.set(cleanEmail, {
+            ...profileRecord,
+            passwordHash: bcrypt.hashSync(cleanPassword, 10)
+          });
+
+          await saveStoredProfile({
+            ...profileRecord,
+            organizationId: profileData?.organization_id || data.user.user_metadata?.organization_id || DEFAULT_ORG_ID
           });
         }
       }

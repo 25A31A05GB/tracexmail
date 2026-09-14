@@ -122,6 +122,7 @@ import {
   type AuthenticatedRequest
 } from './src/server/compliance';
 import { createAuthRouter } from './src/server/authRoutes';
+import { getAllStoredProfiles } from './src/server/userProfileStore';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
@@ -4631,7 +4632,24 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
             });
           }
         });
-      } else if (members.length === 0) {
+      }
+
+      // Merge resilient stored profiles
+      const storedProfiles = getAllStoredProfiles();
+      storedProfiles.forEach(sp => {
+        if (!members.some(m => m.email?.toLowerCase() === sp.email?.toLowerCase())) {
+          members.push({
+            id: sp.id,
+            name: sp.fullName,
+            email: sp.email,
+            role: sp.role,
+            status: 'ACTIVE',
+            lastActive: sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString() : 'Active'
+          });
+        }
+      });
+
+      if (members.length === 0) {
         members.push(...defaultRoster);
       }
 
