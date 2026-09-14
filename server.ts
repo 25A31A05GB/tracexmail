@@ -1040,6 +1040,7 @@ async function parseRawEmailToAnalysis(
         created_at: newCaseItem.created_at,
         assigned_user: newCaseItem.assigned_user,
         tags: newCaseItem.tags,
+        is_demo: false,
         source: 'ingest',
         raw_analysis: newCaseItem
       }]);
@@ -1598,9 +1599,9 @@ async function startServer() {
     const orgId = user?.organizationId || (req.query.organization_id as string);
 
     try {
-      let casesQuery = supabase.from('cases').select('id, title, headers, verdict, severity, threat_score, tags, hops, iocs, created_at, organization_id');
+      let casesQuery = supabase.from('cases').select('id, title, headers, verdict, severity, threat_score, tags, hops, iocs, is_demo, created_at, organization_id');
       if (orgId) {
-        casesQuery = casesQuery.eq('organization_id', orgId);
+        casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
       }
       const { data: casesData, error: casesError } = await casesQuery;
       if (casesError) {
@@ -1834,8 +1835,15 @@ async function startServer() {
 
     try {
       let query = supabase.from('cases').select('*').order('created_at', { ascending: false });
-      if (orgId) {
-        query = query.eq('organization_id', orgId);
+      if (excludeDemo) {
+        query = query.eq('is_demo', false);
+        if (orgId) {
+          query = query.eq('organization_id', orgId);
+        }
+      } else {
+        if (orgId) {
+          query = query.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        }
       }
 
       const { data, error } = await query;
@@ -1918,6 +1926,7 @@ async function startServer() {
       created_at: new Date().toISOString(),
       tags,
       assigned_user: user.email || 'Lead Analyst',
+      is_demo: false,
       source: 'manual'
     };
 

@@ -192,12 +192,17 @@ export function CasesView({
     setFetchError(null);
     try {
       if (isSupabaseConfigured) {
-        const { data, error } = await supabase
+        let query = supabase
           .from('cases')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data) {
+        if (!showDemoCases) {
+          query = query.eq('is_demo', false);
+        }
+
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
           setCases(data);
           setLoading(false);
           return;
@@ -367,6 +372,7 @@ export function CasesView({
               created_at: new Date().toISOString(),
               tags: ['Forensic'],
               assigned_user: 'Lead Analyst',
+              is_demo: false,
               source: 'manual'
             }])
             .select()
