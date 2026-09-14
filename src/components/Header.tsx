@@ -572,6 +572,19 @@ export function Header({
           )}
         </div>
 
+        {/* Forensic Dossier & Executive Compliance Report Button */}
+        {onOpenReportModal && (
+          <button
+            onClick={onOpenReportModal}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-sm bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[var(--stamp)] text-xs font-mono font-semibold text-[#ede6d8] transition-all cursor-pointer shrink-0 group shadow-sm"
+            title="Open Forensic Dossier & Executive Incident Report"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
+            <span className="hidden sm:inline">Forensic Report</span>
+            <span className="inline sm:hidden">Report</span>
+          </button>
+        )}
+
         {/* Primary CTA: New Analysis Button with Shortcut Badge */}
         <button
           onClick={onOpenNewModal}

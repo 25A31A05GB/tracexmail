@@ -81,6 +81,8 @@ import {
   modifyGmailMessageLabels,
   insertQuarantineReportNote,
   backfillQuarantineReportNotes,
+  buildQuarantineReportNotePayload,
+  syncGmailConnectionFromDb,
   ensureGmailLabel,
   ensureFreshAccessToken,
   gmailEvents,
@@ -5750,6 +5752,10 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[TraceXMail] Express + WebSocket server running on http://0.0.0.0:${PORT}`);
+    // Sync stored Gmail connection credentials from database or secure local cache
+    syncGmailConnectionFromDb().catch((err) => {
+      console.warn('[TraceXMail] Error initializing stored Gmail connection:', err?.message || err);
+    });
     // Cold-start download & initialization of offline semantic transformer model
     initializeLocalEmbeddingModel().catch((err) => {
       console.warn('[TraceXMail] Error warming up offline local embedding model:', err?.message || err);

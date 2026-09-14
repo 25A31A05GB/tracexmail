@@ -743,6 +743,7 @@ export default function App() {
         accountType={accountType}
         onOpenUpgradeModal={handleOpenUpgradeModal}
         onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
+        onOpenReportModal={() => setIsReportModalOpen(true)}
         viewMode={viewMode}
         onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}

@@ -68,6 +68,7 @@ interface SidebarProps {
   accountType?: 'personal' | 'organization';
   onOpenUpgradeModal?: (featureName?: string) => void;
   onOpenWalkthrough?: () => void;
+  onOpenReportModal?: () => void;
   viewMode?: 'simple' | 'analyst';
   onOpenShortcutsHelp?: () => void;
   onOpenCommandPalette?: () => void;
@@ -84,6 +85,7 @@ export function Sidebar({
   accountType = 'organization',
   onOpenUpgradeModal,
   onOpenWalkthrough,
+  onOpenReportModal,
   viewMode = 'simple',
   onOpenShortcutsHelp,
   onOpenCommandPalette,
@@ -464,6 +466,26 @@ export function Sidebar({
                 </div>
               );
             })}
+            {onOpenReportModal && (
+              <div className="relative group pt-0.5">
+                <button
+                  id="nav-btn-forensic-report"
+                  onClick={() => {
+                    onOpenReportModal();
+                    if (onCloseMobile) onCloseMobile();
+                  }}
+                  className={`relative w-full ${
+                    isDesktopCollapsed ? 'justify-center p-2.5' : 'px-3 py-2 gap-2.5'
+                  } rounded-md font-sans text-xs flex items-center cursor-pointer text-left transition-colors duration-200 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30`}
+                  title="Open Forensic Dossier & Executive Compliance Report"
+                >
+                  <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                  {!isDesktopCollapsed && (
+                    <span className="font-semibold truncate">Forensic Report Dossier</span>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Forensic Tools (Collapsible Section) */}
