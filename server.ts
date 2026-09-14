@@ -79,6 +79,7 @@ import {
   fetchGmailMessageRaw,
   listGmailMessages,
   modifyGmailMessageLabels,
+  insertQuarantineReportNote,
   ensureGmailLabel,
   ensureFreshAccessToken,
   gmailEvents,
@@ -423,6 +424,7 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     if (queueItem.messageId) {
       await markMessageProcessed({
         messageId: queueItem.messageId,
+        threadId: queueItem.threadId,
         queueId: queueItem.queueId,
         caseId,
         threatScore,
@@ -439,6 +441,34 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
         await modifyGmailMessageLabels(queueItem.messageId, ['TraceXMail-Quarantine'], ['INBOX'], accessToken).catch(err => {
           console.warn('[IngestionQueueWorker] Failed to apply quarantine label in Gmail:', err?.message);
         });
+
+        // Insert quarantine report note directly into the same Gmail thread
+        const effectiveThreadId = queueItem.threadId || queueItem.messageId;
+        const analysisObj = (analysisResult.analysis as any) || {};
+        const caseObj = (analysisResult.case as any) || {};
+        const verdictStr = analysisObj.verdict || caseObj.classification || (threatScore >= 75 ? 'MALICIOUS' : 'SUSPICIOUS');
+        const heuristics = analysisObj.heuristics || caseObj.heuristics || [];
+        const triggered = Array.isArray(heuristics) ? heuristics.filter((h: any) => h.triggered) : [];
+        const topFinding = triggered[0]?.title || triggered[0]?.description || 'High-risk security anomaly detected';
+        const topFindingsSummary = triggered.slice(0, 2).map((h: any) => `• ${h.title || h.description}`).join('\n');
+        const auth = analysisObj.auth;
+        const authInfo = auth ? `Auth: SPF ${auth.spf?.status || 'none'}, DKIM ${auth.dkim?.status || 'none'}, DMARC ${auth.dmarc?.status || 'none'}` : '';
+        const reportSummary = [
+          topFindingsSummary || '• Deceptive content and routing anomalies flagged by TraceXMail engine.',
+          authInfo
+        ].filter(Boolean).join('\n');
+
+        await insertQuarantineReportNote({
+          threadId: effectiveThreadId,
+          accessToken,
+          subject,
+          reportSummary,
+          caseId: caseId || `case_${Date.now()}`,
+          threatScore,
+          verdict: verdictStr,
+          originalMessageId: analysisObj.headers?.messageId,
+          topReason: topFinding
+        }).catch(err => console.warn('[Quarantine] Failed to insert report note into Gmail thread:', err?.message));
       }
     }
 
@@ -4154,6 +4184,7 @@ Link: https://verify-auth-portal.net/login`;
               // Automatically queue email for immediate forensic analysis
               queueEmailForAnalysis({
                 messageId: msg.id,
+                threadId: msg.threadId,
                 source: 'poll_now',
                 emailAddress: status.email_address || undefined,
                 rawEml,
@@ -4171,6 +4202,34 @@ Link: https://verify-auth-portal.net/login`;
               // Check if high threat -> apply quarantine label in real Gmail account
               if (result.analysis?.threatScore >= 70) {
                 await modifyGmailMessageLabels(msg.id, ['TraceXMail-Quarantine'], ['INBOX'], effectiveToken);
+
+                const effectiveThreadId = msg.threadId || msg.id;
+                const analysisObj = (result.analysis as any) || {};
+                const caseObj = (result.case as any) || {};
+                const currentScore = analysisObj.threatScore ?? 70;
+                const verdictStr = analysisObj.verdict || caseObj.classification || (currentScore >= 75 ? 'MALICIOUS' : 'SUSPICIOUS');
+                const heuristics = analysisObj.heuristics || caseObj.heuristics || [];
+                const triggered = Array.isArray(heuristics) ? heuristics.filter((h: any) => h.triggered) : [];
+                const topFinding = triggered[0]?.title || triggered[0]?.description || 'High-risk security anomaly detected';
+                const topFindingsSummary = triggered.slice(0, 2).map((h: any) => `• ${h.title || h.description}`).join('\n');
+                const auth = analysisObj.auth;
+                const authInfo = auth ? `Auth: SPF ${auth.spf?.status || 'none'}, DKIM ${auth.dkim?.status || 'none'}, DMARC ${auth.dmarc?.status || 'none'}` : '';
+                const reportSummary = [
+                  topFindingsSummary || '• Deceptive content and routing anomalies flagged by TraceXMail engine.',
+                  authInfo
+                ].filter(Boolean).join('\n');
+
+                await insertQuarantineReportNote({
+                  threadId: effectiveThreadId,
+                  accessToken: effectiveToken,
+                  subject: caseObj.title || analysisObj.headers?.subject || 'Inbound Mail Evaluation',
+                  reportSummary,
+                  caseId: caseObj.id || `case_${Date.now()}`,
+                  threatScore: currentScore,
+                  verdict: verdictStr,
+                  originalMessageId: analysisObj.headers?.messageId,
+                  topReason: topFinding
+                }).catch(err => console.warn('[Quarantine] Failed to insert report note into Gmail thread:', err?.message));
               }
             }
           }

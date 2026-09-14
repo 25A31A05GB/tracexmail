@@ -25,6 +25,7 @@ export const GMAIL_QUOTA_COSTS = {
   MESSAGES_LIST: 5,
   MESSAGES_MODIFY: 50,
   MESSAGES_BATCH_MODIFY: 50,
+  MESSAGES_INSERT: 25,
   LABELS_CREATE: 50,
   LABELS_LIST: 5,
   WATCH_START: 100,
@@ -195,6 +196,7 @@ export interface SyncedGmailEmail {
 export interface IngestionQueueItem {
   queueId: string;
   messageId: string;
+  threadId?: string;
   source: 'gmail_sync_loop' | 'pubsub_push' | 'poll_now' | 'simulation';
   queuedAt: string;
   startedAt?: string;
@@ -991,6 +993,151 @@ export async function modifyGmailMessageLabels(
 }
 
 /**
+ * Inserts a short summarized forensic security report note directly into a Gmail thread
+ * via the Gmail API messages.insert endpoint (WITHOUT sending an email to anyone).
+ * The user sees this note immediately alongside the quarantined email in their mailbox.
+ */
+export async function insertQuarantineReportNote(params: {
+  threadId: string;
+  accessToken: string;
+  subject: string;
+  reportSummary: string; // short plain-text summary, a few lines
+  caseId: string;
+  threatScore: number;
+  verdict: string;
+  originalMessageId?: string;
+  topReason?: string;
+}): Promise<boolean> {
+  let token = params.accessToken || state.accessToken;
+  if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
+    console.log('[GmailInsert] Skipped inserting quarantine report note: mock or missing access token.');
+    return false;
+  }
+
+  try {
+    if (token === state.accessToken) {
+      const fresh = await ensureFreshAccessToken();
+      if (fresh) token = fresh;
+    }
+
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_INSERT, 'messages.insert');
+
+    // 1. Determine punchy one-line reason (under ~100 characters for visible snippet in Gmail list view)
+    const prefix = `⚠️ ${params.verdict} (${params.threatScore}/100) — `;
+    const maxReasonLen = Math.max(15, 96 - prefix.length);
+    let rawReason = (params.topReason || '').trim();
+    if (!rawReason && params.reportSummary) {
+      const firstLine = params.reportSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
+      rawReason = firstLine;
+    }
+    if (!rawReason) {
+      rawReason = 'High-risk malicious indicators detected';
+    }
+    const oneLineReason = rawReason.length > maxReasonLen
+      ? `${rawReason.substring(0, maxReasonLen - 1)}…`
+      : rawReason;
+
+    const line1 = `${prefix}${oneLineReason}`;
+
+    // 2. Build short RFC 822 plain-text body (4-6 lines total)
+    const bodyLines = [
+      line1,
+      '',
+      params.reportSummary.trim(),
+      '',
+      `Full analysis: https://tracexmail.vercel.app/cases/${params.caseId}`
+    ];
+    const bodyText = bodyLines.join('\r\n');
+
+    // 3. Assemble RFC 822 Headers
+    const selfEmail = state.emailAddress || 'me';
+    const headers: string[] = [
+      `From: TraceXMail Security <${selfEmail}>`,
+      `To: <${selfEmail}>`,
+      `Subject: [TraceXMail: ${params.verdict}] ${params.subject}`,
+      `Date: ${new Date().toUTCString()}`,
+      `Message-ID: <tracexmail-report-${params.caseId || Date.now()}@tracexmail.internal>`
+    ];
+
+    if (params.originalMessageId) {
+      const orig = params.originalMessageId.trim();
+      const formattedOrig = orig.startsWith('<') && orig.endsWith('>') ? orig : `<${orig}>`;
+      headers.push(`In-Reply-To: ${formattedOrig}`);
+      headers.push(`References: ${formattedOrig}`);
+    }
+
+    headers.push('MIME-Version: 1.0');
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    headers.push('Content-Transfer-Encoding: 8bit');
+
+    const fullRfc822 = headers.join('\r\n') + '\r\n\r\n' + bodyText;
+
+    // 4. Base64url-encode raw RFC 822 message per Gmail API requirements
+    const rawBase64Url = Buffer.from(fullRfc822, 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    // 5. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
+    const labelIds: string[] = ['UNREAD'];
+    const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
+    if (quarantineLabelId && !labelIds.includes(quarantineLabelId)) {
+      labelIds.push(quarantineLabelId);
+    }
+
+    const insertPayload = {
+      raw: rawBase64Url,
+      threadId: params.threadId,
+      labelIds
+    };
+
+    let response;
+    try {
+      response = await axios.post(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert',
+        insertPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+    } catch (apiErr: any) {
+      if (apiErr?.response?.status === 401 && state.refreshToken) {
+        const refreshRes = await refreshGmailAccessToken();
+        if (refreshRes.success && state.accessToken) {
+          token = state.accessToken;
+          response = await axios.post(
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert',
+            insertPayload,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            }
+          );
+        } else {
+          throw apiErr;
+        }
+      } else {
+        throw apiErr;
+      }
+    }
+
+    console.log(`[GmailInsert] Successfully inserted quarantine report note into thread ${params.threadId} (messageId: ${response?.data?.id})`);
+    return true;
+  } catch (err: any) {
+    console.warn('[GmailInsert] Failed to insert quarantine report note into Gmail thread:', extractGoogleApiError(err));
+    return false;
+  }
+}
+
+/**
  * Lists message IDs from the user's real Gmail mailbox.
  */
 export async function listGmailMessages(
@@ -1265,7 +1412,7 @@ export async function handlePubSubPush(body: any): Promise<{
   try {
     state.watch.lastPushReceivedAt = new Date().toISOString();
 
-    let pushData: { emailAddress?: string; historyId?: string } = {};
+    let pushData: { emailAddress?: string; historyId?: string; threadId?: string } = {};
 
     if (body?.message?.data) {
       // Decode Base64 data from Cloud Pub/Sub
@@ -1288,6 +1435,7 @@ export async function handlePubSubPush(body: any): Promise<{
     // Queue immediately for automated forensic analysis pipeline
     queueEmailForAnalysis({
       messageId: body?.message?.messageId || `pubsub_${historyId}`,
+      threadId: body?.threadId || body?.message?.threadId || pushData?.threadId,
       source: 'pubsub_push',
       emailAddress,
       rawEml: body?.rawEmail,
@@ -1929,6 +2077,7 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
             // Queue immediately for automated forensic analysis
             queueEmailForAnalysis({
               messageId: msg.id,
+              threadId: msg.threadId,
               source: 'gmail_sync_loop',
               emailAddress: state.emailAddress || undefined,
               rawEml: raw,
