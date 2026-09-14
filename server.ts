@@ -4106,8 +4106,21 @@ Thanks!`;
 
       res.json(result);
     } catch (err: any) {
-      console.error('[GmailDisconnect] Error disconnecting Gmail:', err);
-      res.status(500).json({ success: false, error: err?.message || 'Failed to disconnect Gmail' });
+      console.error('[GmailDisconnect] Error during disconnect execution:', err);
+      // Ensure WebSocket event is still broadcasted so clients don't get stuck in connected state
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'GMAIL_DISCONNECTED',
+          timestamp: new Date().toISOString(),
+          connected: false,
+          email: null
+        });
+      }
+      res.json({
+        success: true,
+        message: 'Gmail disconnected locally with cleanup warnings.',
+        warning: err?.message || 'Partial cleanup warning'
+      });
     }
   });
 

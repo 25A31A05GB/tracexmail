@@ -579,6 +579,7 @@ export async function startGmailWatch(options?: {
 
 /**
  * Stops the Gmail users.watch() subscription via the Gmail users.stop API.
+ * Handles 404s and errors gracefully so that local watch state is always reset.
  */
 export async function stopGmailWatch(options?: {
   accessToken?: string;
@@ -609,17 +610,31 @@ export async function stopGmailWatch(options?: {
           timeout: 8000
         }
       );
+      console.log('[GmailWatch] Gmail API users.stop() completed successfully.');
     } catch (err: any) {
-      console.warn('[GmailWatch] Live Gmail users.stop() returned:', extractGoogleApiError(err));
+      const statusCode = err?.response?.status;
+      if (statusCode === 404) {
+        // 404 indicates the watch was already expired, removed, or never established on Google's side
+        console.log('[GmailWatch] Gmail users.stop() returned 404 (watch already expired or inactive on Google servers). Proceeding with local state reset.');
+      } else {
+        console.warn('[GmailWatch] Live Gmail users.stop() returned error:', extractGoogleApiError(err));
+      }
     }
   }
 
+  // Always reset local watch state
   state.watch.active = false;
   state.watch.enabled = false;
+  state.watch.expiration = null;
+  state.watch.subscription = null;
 
-  gmailEvents.emit('watch_stopped', {
-    timestamp: new Date().toISOString()
-  });
+  try {
+    gmailEvents.emit('watch_stopped', {
+      timestamp: new Date().toISOString()
+    });
+  } catch (emitErr: any) {
+    console.warn('[GmailWatch] Warning emitting watch_stopped event:', emitErr?.message);
+  }
 
   return {
     success: true,
@@ -1549,25 +1564,30 @@ export async function markMessageProcessed(params: {
 
 /**
  * Disconnects Gmail account and shuts down Google server-side watch and polling loops.
+ * Guarantees that local connection and authentication state is cleared even if remote API calls return errors.
  */
 export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; message: string }> {
   // 1. Immediately kill the background auto-sync loop & clear any active cycle lock
   stopAutoSyncLoop();
   isSyncCycleActive = false;
 
-  // 2. Teardown Gmail watch on Google server side
+  // 2. Teardown Gmail watch on Google server side (correctly awaited, handles 404s/network errors gracefully)
   try {
     await stopGmailWatch();
-  } catch (watchErr) {
-    console.warn('[GmailService] stopGmailWatch during disconnect warning:', watchErr);
+  } catch (watchErr: any) {
+    console.warn('[GmailService] stopGmailWatch during disconnect encountered error, continuing with local cleanup:', extractGoogleApiError(watchErr));
   }
 
-  // 3. Clear memory state and authentication credentials
+  // 3. Clear memory state, authentication credentials, and queues (guaranteed unconditional cleanup)
   state.isConnected = false;
+  state.authExpired = false;
+  state.authError = null;
   state.emailAddress = null;
   state.accessToken = null;
   state.refreshToken = null;
   state.tokenExpiresAt = null;
+  state.lastPolledAt = null;
+  state.activeScopes = [];
   state.watch.active = false;
   state.watch.enabled = false;
   state.watch.expiration = null;
@@ -1575,9 +1595,9 @@ export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{
   ingestionQueue.length = 0;
 
   // 4. Clear database tokens in Supabase so they are not resurrected
-  const supabase = getSupabaseAdminClient();
-  if (supabase) {
-    try {
+  try {
+    const supabase = getSupabaseAdminClient();
+    if (supabase) {
       await supabase.from('gmail_connections')
         .update({
           is_connected: false,
@@ -1589,15 +1609,19 @@ export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{
           updated_at: new Date().toISOString()
         })
         .eq('organization_id', orgId);
-    } catch (dbErr: any) {
-      console.warn('[GmailService] Error updating disconnected status in DB:', dbErr?.message);
     }
+  } catch (dbErr: any) {
+    console.warn('[GmailService] Error updating disconnected status in DB:', dbErr?.message);
   }
 
   // 5. Emit stopped and disconnected events to listeners
-  gmailEvents.emit('watch_stopped', { orgId, timestamp: new Date().toISOString() });
-  gmailEvents.emit('sync_cycle_stopped', { orgId, timestamp: new Date().toISOString() });
-  gmailEvents.emit('gmail_disconnected', { orgId, timestamp: new Date().toISOString() });
+  try {
+    gmailEvents.emit('watch_stopped', { orgId, timestamp: new Date().toISOString() });
+    gmailEvents.emit('sync_cycle_stopped', { orgId, timestamp: new Date().toISOString() });
+    gmailEvents.emit('gmail_disconnected', { orgId, timestamp: new Date().toISOString() });
+  } catch (emitErr: any) {
+    console.warn('[GmailService] Warning emitting disconnect events:', emitErr?.message);
+  }
 
   return { success: true, message: 'Gmail live connection disconnected and watch stopped successfully.' };
 }
