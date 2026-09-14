@@ -1,30 +1,6 @@
-import { sha256Sync, md5Sync } from './crypto';
-
-/**
- * Decodes Quoted-Printable bytes into a Uint8Array.
- */
-export function decodeQuotedPrintableToBuffer(input: string, isQHeader = false): Buffer {
-  if (!input) return Buffer.alloc(0);
-  let str = input.replace(/=\r?\n/g, '');
-  if (isQHeader) {
-    str = str.replace(/_/g, ' ');
-  }
-
-  const bytes: number[] = [];
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i];
-    if (ch === '=' && i + 2 < str.length) {
-      const hex = str.slice(i + 1, i + 3);
-      if (/^[0-9A-Fa-f]{2}$/.test(hex)) {
-        bytes.push(parseInt(hex, 16));
-        i += 2;
-        continue;
-      }
-    }
-    bytes.push(str.charCodeAt(i) & 0xff);
-  }
-  return Buffer.from(bytes);
-}
+import libmime from 'libmime';
+import libqp from 'libqp';
+import crypto from 'crypto';
 
 /**
  * Decodes RFC 2047 encoded-words in email headers (e.g. `=?UTF-8?Q?...?=` or `=?UTF-8?B?...?=`).
@@ -35,19 +11,34 @@ export function decodeHeaderWords(input?: string | null): string {
   const trimmed = input.trim();
   if (!trimmed.includes('=?')) return trimmed;
 
-  return trimmed.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/g, (_match, charset, encoding, data) => {
+  try {
+    // libmime.decodeWords handles complex character sets, folded lines, and B/Q encodings
+    const decoded = libmime.decodeWords(trimmed);
+    if (decoded && typeof decoded === 'string') {
+      return decoded;
+    }
+  } catch {
+    // Fallback manual regex decoder
+  }
+
+  return decodeRfc2047Fallback(trimmed);
+}
+
+/**
+ * Robust fallback RFC 2047 decoder if libmime encounters an unexpected malformed edge case.
+ */
+function decodeRfc2047Fallback(text: string): string {
+  return text.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/gi, (_match, charset, encoding, data) => {
     try {
       const enc = encoding.toUpperCase();
       if (enc === 'B') {
-        const cleaned = data.replace(/\s+/g, '');
-        const decodedStr = Buffer.from(cleaned, 'base64').toString('utf-8');
-        return decodedStr;
+        return Buffer.from(data, 'base64').toString('utf-8');
       } else if (enc === 'Q') {
-        const buf = decodeQuotedPrintableToBuffer(data, true);
-        return buf.toString('utf-8');
+        const qpFormatted = data.replace(/_/g, ' ');
+        return libqp.decode(qpFormatted).toString('utf-8');
       }
     } catch {
-      // return match as-is on failure
+      // return as-is on decode failure
     }
     return _match;
   });
@@ -59,9 +50,9 @@ export function decodeHeaderWords(input?: string | null): string {
 export function decodeQuotedPrintable(input: string): string {
   if (!input) return '';
   try {
-    const buf = decodeQuotedPrintableToBuffer(input, false);
-    return buf.toString('utf-8');
+    return libqp.decode(input).toString('utf-8');
   } catch {
+    // Fallback QP decode
     return input
       .replace(/=\r?\n/g, '')
       .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
@@ -199,15 +190,15 @@ export function parseMimeStructure(rawContent: string, globalContentType?: strin
           if (partEncoding === 'base64') {
             partBuf = Buffer.from(partBody.replace(/\s+/g, ''), 'base64');
           } else if (partEncoding === 'quoted-printable') {
-            partBuf = decodeQuotedPrintableToBuffer(partBody);
+            partBuf = libqp.decode(partBody);
           } else {
             partBuf = Buffer.from(partBody, 'utf-8');
           }
 
           const sizeBytes = partBuf.length;
           const sizeKb = (sizeBytes / 1024).toFixed(1);
-          const sha256 = sha256Sync(partBuf);
-          const md5 = md5Sync(partBuf);
+          const sha256 = crypto.createHash('sha256').update(partBuf).digest('hex');
+          const md5 = crypto.createHash('md5').update(partBuf).digest('hex');
           const isExe = /\.(exe|scr|bat|vbs|hta|js|jar|iso|vbe|wsf|dll|pif)$/i.test(filename);
           const isMacro = /\.(docm|xlsm|pptm|dotm|xltm)$/i.test(filename);
 

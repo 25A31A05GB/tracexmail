@@ -15,53 +15,42 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { SAMPLE_ANALYSES } from './data/samples';
 import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
-import { 
-  PrivacyConfig, 
-  loadPrivacyConfig, 
-  savePrivacyConfig, 
-  fetchOrgPrivacyConfigServer, 
-  saveOrgPrivacyConfigServer 
-} from './utils/privacyCompliance';
+import { PrivacyConfig, loadPrivacyConfig, savePrivacyConfig } from './utils/privacyCompliance';
 import { useSession } from './hooks/useSession';
-import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles, FolderOpen, Database, Menu, Activity } from 'lucide-react';
+import { Loader2, MailCheck, ShieldAlert, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
 import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
-import { UserOnboardingModal, UserPersona, OnboardingAnswers } from './components/UserOnboardingModal';
-import { lazyWithRetry } from './utils/lazyWithRetry';
-import { useInactivityTimer } from './hooks/useInactivityTimer';
-import { InactivityWarningModal } from './components/InactivityWarningModal';
-import { WorkspaceLockScreen } from './components/WorkspaceLockScreen';
 
-const DashboardView = lazyWithRetry(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })), 'DashboardView');
-const CasesView = lazyWithRetry(() => import('./components/CasesView').then(m => ({ default: m.CasesView })), 'CasesView');
-const CampaignsView = lazyWithRetry(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })), 'CampaignsView');
-const SearchView = lazyWithRetry(() => import('./components/SearchView').then(m => ({ default: m.SearchView })), 'SearchView');
-const RelationshipGraphView = lazyWithRetry(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })), 'RelationshipGraphView');
-const MapView = lazyWithRetry(() => import('./components/MapView').then(m => ({ default: m.MapView })), 'MapView');
-const AlertsView = lazyWithRetry(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })), 'AlertsView');
-const IngestionPipelineView = lazyWithRetry(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })), 'IngestionPipelineView');
-const GmailConnectionView = lazyWithRetry(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })), 'GmailConnectionView');
+const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
+const CasesView = lazy(() => import('./components/CasesView').then(m => ({ default: m.CasesView })));
+const CampaignsView = lazy(() => import('./components/CampaignsView').then(m => ({ default: m.CampaignsView })));
+const SearchView = lazy(() => import('./components/SearchView').then(m => ({ default: m.SearchView })));
+const RelationshipGraphView = lazy(() => import('./components/RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
+const MapView = lazy(() => import('./components/MapView').then(m => ({ default: m.MapView })));
+const AlertsView = lazy(() => import('./components/AlertsView').then(m => ({ default: m.AlertsView })));
+const IngestionPipelineView = lazy(() => import('./components/IngestionPipelineView').then(m => ({ default: m.IngestionPipelineView })));
+const GmailConnectionView = lazy(() => import('./components/GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
 
-// Code-split modals and non-critical dialogs with resilient lazy loading
-const ModeUpgradeModal = lazyWithRetry(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })), 'ModeUpgradeModal');
-const NewAnalysisModal = lazyWithRetry(() => import('./components/NewAnalysisModal').then(m => ({ default: m.NewAnalysisModal })), 'NewAnalysisModal');
-const ReportModal = lazyWithRetry(() => import('./components/ReportModal').then(m => ({ default: m.ReportModal })), 'ReportModal');
-const PrivacyComplianceModal = lazyWithRetry(() => import('./components/PrivacyComplianceModal').then(m => ({ default: m.PrivacyComplianceModal })), 'PrivacyComplianceModal');
-const ForensicWalkthroughModal = lazyWithRetry(() => import('./components/ForensicWalkthroughModal').then(m => ({ default: m.ForensicWalkthroughModal })), 'ForensicWalkthroughModal');
-const InvestigationObjectiveModal = lazyWithRetry(() => import('./components/InvestigationObjectiveModal').then(m => ({ default: m.InvestigationObjectiveModal })), 'InvestigationObjectiveModal');
-const CommandPaletteModal = lazyWithRetry(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })), 'CommandPaletteModal');
-const KeyboardShortcutsModal = lazyWithRetry(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })), 'KeyboardShortcutsModal');
+// Code-split modals and non-critical dialogs
+const ModeUpgradeModal = lazy(() => import('./components/ModeUpgradeModal').then(m => ({ default: m.ModeUpgradeModal })));
+const NewAnalysisModal = lazy(() => import('./components/NewAnalysisModal').then(m => ({ default: m.NewAnalysisModal })));
+const ReportModal = lazy(() => import('./components/ReportModal').then(m => ({ default: m.ReportModal })));
+const PrivacyComplianceModal = lazy(() => import('./components/PrivacyComplianceModal').then(m => ({ default: m.PrivacyComplianceModal })));
+const ForensicWalkthroughModal = lazy(() => import('./components/ForensicWalkthroughModal').then(m => ({ default: m.ForensicWalkthroughModal })));
+const InvestigationObjectiveModal = lazy(() => import('./components/InvestigationObjectiveModal').then(m => ({ default: m.InvestigationObjectiveModal })));
+const CommandPaletteModal = lazy(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
+const KeyboardShortcutsModal = lazy(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })));
 
 // Code-split authentication flows
-const LoginView = lazyWithRetry(() => import('./components/LoginView').then(m => ({ default: m.LoginView })), 'LoginView');
-const SignupView = lazyWithRetry(() => import('./components/SignupView').then(m => ({ default: m.SignupView })), 'SignupView');
-const ForgotPasswordView = lazyWithRetry(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })), 'ForgotPasswordView');
-const ResetPasswordView = lazyWithRetry(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })), 'ResetPasswordView');
-const AcceptInviteView = lazyWithRetry(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })), 'AcceptInviteView');
-const MagicLinkVerifyView = lazyWithRetry(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })), 'MagicLinkVerifyView');
-const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
+const LoginView = lazy(() => import('./components/LoginView').then(m => ({ default: m.LoginView })));
+const SignupView = lazy(() => import('./components/SignupView').then(m => ({ default: m.SignupView })));
+const ForgotPasswordView = lazy(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })));
+const ResetPasswordView = lazy(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })));
+const AcceptInviteView = lazy(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })));
+const MagicLinkVerifyView = lazy(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })));
+const OAuthConsentScreen = lazy(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })));
 
 function ViewSuspenseLoader() {
   return (
@@ -259,12 +248,6 @@ export default function App() {
     };
   }, [session]);
   const [privacyConfig, setPrivacyConfig] = useState<PrivacyConfig>(() => loadPrivacyConfig());
-
-  useEffect(() => {
-    fetchOrgPrivacyConfigServer().then(cfg => {
-      setPrivacyConfig(cfg);
-    });
-  }, [session]);
   const [casesRefreshSignal, setCasesRefreshSignal] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'simple' | 'analyst'>(() => {
     try {
@@ -274,44 +257,10 @@ export default function App() {
     }
   });
 
-  const [userPersona, setUserPersona] = useState<UserPersona>(() => {
-    try {
-      return (localStorage.getItem('tracexmail_user_persona') as UserPersona) || 'technical';
-    } catch {
-      return 'technical';
-    }
-  });
-
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
-
-  // Trigger onboarding questionnaire when user is logged in if not completed yet
-  useEffect(() => {
-    if (session && !authLoading) {
-      try {
-        const completed = localStorage.getItem('tracexmail_onboarding_completed') === 'true';
-        if (!completed) {
-          setIsOnboardingOpen(true);
-        }
-      } catch {}
-    }
-  }, [session, authLoading]);
-
   const handleToggleViewMode = (mode: 'simple' | 'analyst') => {
     setViewMode(mode);
     try {
       localStorage.setItem('tracexmail_view_mode', mode);
-    } catch {}
-  };
-
-  const handleSetPersona = (persona: UserPersona) => {
-    setUserPersona(persona);
-    try {
-      localStorage.setItem('tracexmail_user_persona', persona);
-      if (persona === 'non_technical') {
-        handleToggleViewMode('simple');
-      } else {
-        handleToggleViewMode('analyst');
-      }
     } catch {}
   };
 
@@ -341,22 +290,7 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
 
-  // Session Inactivity & Auto-Lock Compliance Engine (NIST SP 800-53 Rev 5 AC-11)
-  const {
-    config: inactivityConfig,
-    updateConfig: updateInactivityConfig,
-    lockState,
-    isLocked: isWorkspaceLocked,
-    isWarning: isWorkspaceInactivityWarning,
-    secondsRemaining: inactivitySecondsRemaining,
-    lockNow: lockWorkspaceNow,
-    extendSession: extendInactivitySession,
-    unlockWorkspace,
-    unlocking: workspaceUnlocking,
-    unlockError: workspaceUnlockError
-  } = useInactivityTimer(Boolean(session));
-
-  // Global Keyboard Shortcuts (Cmd+K for search, Cmd+N for new analysis, Cmd+E for report, Cmd+Shift+L for lock, 1-9 for tabs, ? for help)
+  // Global Keyboard Shortcuts (Cmd+K for search, Cmd+N for new analysis, Cmd+E for report, 1-9 for tabs, ? for help)
   useKeyboardShortcuts({
     onOpenCommandPalette: () => setIsCommandPaletteOpen(prev => !prev),
     onNewAnalysis: () => setIsNewModalOpen(true),
@@ -367,7 +301,6 @@ export default function App() {
     onToggleDemoCases: handleToggleDemoCases,
     onOpenShortcutsHelp: () => setIsShortcutsHelpOpen(prev => !prev),
     onSelectTab: (tab) => setActiveTab(tab),
-    onLockWorkspace: () => lockWorkspaceNow('manual'),
     onCloseModals: () => {
       setIsCommandPaletteOpen(false);
       setIsShortcutsHelpOpen(false);
@@ -392,13 +325,13 @@ export default function App() {
     if (selection.privacyMasking) {
       const updatedCfg = { ...privacyConfig, maskingEnabled: true };
       setPrivacyConfig(updatedCfg);
-      saveOrgPrivacyConfigServer(updatedCfg);
+      savePrivacyConfig(updatedCfg);
     }
   };
 
   const handleUpdatePrivacyConfig = (newCfg: PrivacyConfig) => {
     setPrivacyConfig(newCfg);
-    saveOrgPrivacyConfigServer(newCfg);
+    savePrivacyConfig(newCfg);
   };
 
   // Real-Time WebSockets Alerting Hook - only active if session is present
@@ -408,35 +341,11 @@ export default function App() {
     status: wsStatus,
     unreadCount,
     soundEnabled,
-    lastCreatedCaseId,
-    lastCaseUpdate,
     setSoundEnabled,
     dismissToast,
     broadcastTestAlert,
     reconnect: reconnectWs
   } = useWebSocketAlerts();
-
-  // Watch real-time case creations and updates from the primary WebSocket channel
-  useEffect(() => {
-    // Guard against firing on initial null values
-    if (!lastCreatedCaseId && !lastCaseUpdate) return;
-
-    // Trigger case list refresh signal across all views
-    setCasesRefreshSignal(prev => prev + 1);
-
-    // If new case was created and case details are attached, synchronize active analysis
-    if (lastCaseUpdate?.type === 'CASE_CREATED' && lastCaseUpdate.case) {
-      try {
-        const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
-        if (mapped) {
-          console.log('[App] Real-time WebSocket CASE_CREATED synchronized:', mapped.id);
-          setCurrentAnalysis(mapped);
-        }
-      } catch (err) {
-        console.warn('[App] Could not map real-time WebSocket case update:', err);
-      }
-    }
-  }, [lastCreatedCaseId, lastCaseUpdate]);
 
   const handleAnalysisCreated = (newAnalysis: EmailAnalysis) => {
     console.log('📥 [App.tsx] handleAnalysisCreated received new analysis:', {
@@ -752,7 +661,7 @@ export default function App() {
   const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers', 'settings'].includes(effectiveTab);
 
   return (
-    <div className="flex h-screen h-[100dvh] w-full max-w-[100vw] bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
+    <div className="flex h-screen w-screen bg-[#0b0d12] text-[#e7ebf1] overflow-hidden font-sans select-text">
       {/* Sidebar with role-differentiated navigation */}
       <Sidebar
         activeTab={effectiveTab}
@@ -763,7 +672,6 @@ export default function App() {
         accountType={accountType}
         onOpenUpgradeModal={handleOpenUpgradeModal}
         onOpenWalkthrough={() => setIsObjectiveModalOpen(true)}
-        onOpenReportModal={() => setIsReportModalOpen(true)}
         viewMode={viewMode}
         onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
@@ -771,7 +679,7 @@ export default function App() {
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 max-w-full w-full overflow-hidden">
+      <main className="flex-1 flex flex-col h-full bg-[#0b0d12] min-w-0 overflow-hidden">
         {/* Top Header with clearance badge, avatar, role switcher, and sign-out */}
         <Header
           currentAnalysis={currentAnalysis}
@@ -792,20 +700,15 @@ export default function App() {
           onSwitchRole={switchRole}
           viewMode={viewMode}
           onSetViewMode={handleToggleViewMode}
-          userPersona={userPersona}
-          onSetPersona={handleSetPersona}
-          onOpenOnboarding={() => setIsOnboardingOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onSyncCases={() => setCasesRefreshSignal(prev => prev + 1)}
-          inactivityRemainingSecs={inactivitySecondsRemaining}
-          onLockWorkspace={() => lockWorkspaceNow('manual')}
         />
 
         {/* View Switcher Container */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0 max-w-full w-full overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {isPersonalRestrictedTab ? (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#0b0d12]">
               <div className="max-w-lg p-6 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] space-y-4">
@@ -887,8 +790,6 @@ export default function App() {
                   onOpenNewModal={() => setIsNewModalOpen(true)}
                   onOpenReportModal={() => setIsReportModalOpen(true)}
                   viewMode={viewMode}
-                  userPersona={userPersona}
-                  onSwitchPersona={handleSetPersona}
                 />
               )}
 
@@ -974,76 +875,10 @@ export default function App() {
                   onSignOut={signOut}
                   revokeAllOtherSessions={revokeAllOtherSessions}
                   onNavigateTab={setActiveTab}
-                  userPersona={userPersona}
-                  onSetPersona={handleSetPersona}
-                  onOpenOnboarding={() => setIsOnboardingOpen(true)}
-                  inactivityConfig={inactivityConfig}
-                  onUpdateInactivityConfig={updateInactivityConfig}
-                  onLockWorkspaceNow={() => lockWorkspaceNow('manual')}
-                  lockState={lockState}
                 />
               )}
             </Suspense>
           )}
-        </div>
-        {/* Mobile Navigation Bottom Bar */}
-        <div className="md:hidden border-t border-[#3a352c] bg-[#14120f]/95 backdrop-blur px-2 py-1.5 flex items-center justify-around shrink-0 z-30 select-none">
-          <button
-            type="button"
-            id="mobile-nav-dashboard"
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
-              effectiveTab === 'dashboard' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <Activity className="w-4 h-4 mb-0.5" />
-            <span>Dashboard</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-nav-cases"
-            onClick={() => setActiveTab('cases')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
-              effectiveTab === 'cases' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <FolderOpen className="w-4 h-4 mb-0.5" />
-            <span>Cases</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-nav-overview"
-            onClick={() => setActiveTab('overview')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
-              effectiveTab === 'overview' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 mb-0.5" />
-            <span>Analysis</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-nav-ingest"
-            onClick={() => setActiveTab('ingest')}
-            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
-              effectiveTab === 'ingest' ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <Database className="w-4 h-4 mb-0.5" />
-            <span>Ingest</span>
-          </button>
-          <button
-            type="button"
-            id="mobile-nav-menu"
-            onClick={() => setIsMobileSidebarOpen(prev => !prev)}
-            className={`flex flex-col items-center justify-center p-1.5 rounded text-[10px] font-mono transition-colors cursor-pointer min-w-[56px] min-h-[44px] ${
-              isMobileSidebarOpen ? 'text-amber-400 font-bold' : 'text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-            aria-label="Toggle navigation drawer"
-          >
-            <Menu className="w-4 h-4 mb-0.5" />
-            <span>More</span>
-          </button>
         </div>
       </main>
 
@@ -1173,20 +1008,6 @@ export default function App() {
           isOpen={isShortcutsHelpOpen}
           onClose={() => setIsShortcutsHelpOpen(false)}
         />
-
-        {/* User Onboarding & Technical Profiling Questionnaire Modal */}
-        <UserOnboardingModal
-          isOpen={isOnboardingOpen}
-          onClose={() => setIsOnboardingOpen(false)}
-          onComplete={(answers) => {
-            handleSetPersona(answers.persona);
-            setIsOnboardingOpen(false);
-            setActiveTab('overview');
-          }}
-          initialPersona={userPersona}
-          initialReason={typeof localStorage !== 'undefined' ? localStorage.getItem('tracexmail_use_reason') || undefined : undefined}
-          canDismiss={true}
-        />
       </Suspense>
 
       {/* Real-time WebSocket Alert Toast */}
@@ -1195,37 +1016,6 @@ export default function App() {
         onDismiss={dismissToast}
         onInspect={handleToastInspect}
       />
-
-      {/* NIST SP 800-53 Rev 5 AC-11 Pre-Lock Session Inactivity Warning Modal */}
-      <InactivityWarningModal
-        isOpen={isWorkspaceInactivityWarning && !isWorkspaceLocked && Boolean(session)}
-        secondsRemaining={inactivitySecondsRemaining}
-        totalWarningSeconds={inactivityConfig.warningSeconds}
-        onExtendSession={extendInactivitySession}
-        onLockNow={() => lockWorkspaceNow('manual')}
-        complianceStandard={inactivityConfig.complianceStandard}
-      />
-
-      {/* NIST SP 800-53 Rev 5 AC-11 Restricted Workspace Lock Screen Overlay */}
-      {isWorkspaceLocked && Boolean(session) && (
-        <WorkspaceLockScreen
-          userEmail={user?.email || session?.user?.email}
-          userRole={role}
-          userLabel={userInitials}
-          organizationName={
-            accountType === 'personal' 
-              ? 'Personal Forensic Sandbox' 
-              : (profile?.organization_id || organizationId || 'Acme Cyber Defense SOC')
-          }
-          currentAnalysis={currentAnalysis}
-          lockedAt={lockState.lockedAt}
-          lockReason={lockState.lockReason}
-          onUnlock={unlockWorkspace}
-          onSignOut={signOut}
-          unlockError={workspaceUnlockError}
-          unlocking={workspaceUnlocking}
-        />
-      )}
     </div>
   );
 }

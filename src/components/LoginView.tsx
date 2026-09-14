@@ -29,7 +29,7 @@ export function LoginView({
   onSuccess,
   onSelectRoleLogin 
 }: LoginViewProps) {
-  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('password');
+  const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('magic-link');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -460,7 +460,7 @@ export function LoginView({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
+                  placeholder="analyst@enterprise.corp"
                   className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
                 />
               </div>
@@ -499,7 +499,7 @@ export function LoginView({
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder="analyst@enterprise.corp"
                 className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
               />
             </div>

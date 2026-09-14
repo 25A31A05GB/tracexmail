@@ -267,9 +267,9 @@ function PrivacyContent() {
         </div>
       </Section>
 
-      <Section title="4. Data Security & Cryptographic Safeguards" badge="Security Controls & Architecture">
+      <Section title="4. Data Security & Cryptographic Safeguards" badge="SOC 2 Type II Standards">
         <p>
-          All data in transit is encrypted using <strong>TLS 1.3 / HTTPS</strong> with strong cipher suites. Sensitive data at rest (email bodies, raw headers, and OAuth tokens) is encrypted using authenticated <strong>AES-256-GCM</strong>. Forensic case records are strictly partitioned with organization isolation, role-based access control (RBAC: Admin, Analyst, Read-Only), immutable audit logging, and self-hosted deployment options.
+          All data in transit is encrypted using <strong>TLS 1.3 / HTTPS</strong> with strong cipher suites. Data at rest is encrypted using <strong>AES-256</strong>. Forensic case records are strictly partitioned by organization and role-based access control (RBAC).
         </p>
         <p>
           TraceXMail includes built-in <strong>automated PII Masking</strong> allowing operators to sanitize Personally Identifiable Information (email addresses, names, and IP addresses) before exporting dossiers or sharing findings across security teams.

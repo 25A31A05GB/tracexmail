@@ -1,11 +1,11 @@
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 
-const clientEnvUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const clientEnvKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
-
-if (!clientEnvUrl || !clientEnvKey) {
-  console.info('[Supabase Client] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not provided at build time; initializing runtime discovery via /api/auth/status.');
-}
+const clientEnvUrl =
+  (import.meta as any).env?.VITE_SUPABASE_URL ||
+  'https://zinyrzlswkwwzxlgptmq.supabase.co';
+const clientEnvKey =
+  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
 
 const clientAppUrl =
   (import.meta as any).env?.VITE_APP_URL ||
@@ -114,12 +114,9 @@ export function validateSupabaseCredentials(url?: string | null, key?: string | 
   }
 }
 
-const initialUrl = clientEnvUrl || 'https://zinyrzlswkwwzxlgptmq.supabase.co';
-const initialKey = clientEnvKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
-
 export let isSupabaseConfigured = validateSupabaseCredentials(clientEnvUrl, clientEnvKey);
-let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : initialUrl;
-let configuredSupabaseAnonKey: string = isSupabaseConfigured ? clientEnvKey : initialKey;
+let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : '';
+let configuredSupabaseAnonKey: string = isSupabaseConfigured ? clientEnvKey : '';
 
 export function getSupabaseAnonKey(): string {
   return configuredSupabaseAnonKey || clientEnvKey;
@@ -134,24 +131,24 @@ export function getSupabaseUrl(): string {
  * Configured with session persistence, token auto-refresh, PKCE auth flow, and URL session detection.
  */
 export let supabase: SupabaseClient = createClient(
-  initialUrl,
-  initialKey,
+  isSupabaseConfigured ? clientEnvUrl : 'https://placeholder.supabase.co',
+  isSupabaseConfigured ? clientEnvKey : 'placeholder-anon-key',
   {
     global: {
       headers: {
-        apikey: initialKey,
+        apikey: isSupabaseConfigured ? clientEnvKey : 'placeholder-anon-key',
       },
     },
     auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
+      persistSession: isSupabaseConfigured,
+      autoRefreshToken: isSupabaseConfigured,
+      detectSessionInUrl: isSupabaseConfigured,
       flowType: 'pkce',
       storage: typeof window !== 'undefined' ? window.localStorage : undefined,
     },
     realtime: {
       params: {
-        eventsPerSecond: 10,
+        eventsPerSecond: isSupabaseConfigured ? 10 : 0,
       },
     },
   }

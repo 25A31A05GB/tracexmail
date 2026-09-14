@@ -4,11 +4,9 @@
 -- ==============================================================================
 -- Run this script in the Supabase SQL Editor (Dashboard > SQL Editor)
 -- 1. Creates the default organization if not present
--- 2. Breaks recursion on auth_user_org_id() and auth_user_role() with SET row_security = off
--- 3. Creates the `public.profiles` table linked to `auth.users`
--- 4. Configures non-recursive Row Level Security (RLS) for authenticated users and service_role
--- 5. Auto-creates profile on signup and backfills existing users
--- 6. Reloads the PostgREST schema cache so the table is immediately recognized
+-- 2. Creates the `public.profiles` table linked to `auth.users`
+-- 3. Configures Row Level Security (RLS) for authenticated users and service_role
+-- 4. Reloads the PostgREST schema cache so the table is immediately recognized
 -- ==============================================================================
 
 -- 1. Ensure organizations table exists and has default org
@@ -23,70 +21,7 @@ INSERT INTO public.organizations (id, name)
 VALUES ('org_acme_soc_01', 'Acme Cyber Defense SOC')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Helper functions with row_security = off to prevent infinite recursion
-CREATE OR REPLACE FUNCTION public.auth_user_org_id()
-RETURNS TEXT
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-SET row_security = off
-AS $$
-DECLARE
-    v_org_id TEXT;
-BEGIN
-    BEGIN
-        SELECT organization_id INTO v_org_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-        IF v_org_id IS NOT NULL THEN
-            RETURN v_org_id;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-    END;
-
-    BEGIN
-        SELECT organization_id INTO v_org_id FROM public.users WHERE id = auth.uid() LIMIT 1;
-        IF v_org_id IS NOT NULL THEN
-            RETURN v_org_id;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-    END;
-
-    RETURN 'org_acme_soc_01';
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.auth_user_role()
-RETURNS TEXT
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-SET row_security = off
-AS $$
-DECLARE
-    v_role TEXT;
-BEGIN
-    BEGIN
-        SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
-        IF v_role IS NOT NULL THEN
-            RETURN v_role;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-    END;
-
-    BEGIN
-        SELECT role INTO v_role FROM public.users WHERE id = auth.uid() LIMIT 1;
-        IF v_role IS NOT NULL THEN
-            RETURN v_role;
-        END IF;
-    EXCEPTION WHEN OTHERS THEN
-    END;
-
-    RETURN 'analyst';
-END;
-$$;
-
--- 3. Create public.profiles table
+-- 2. Create public.profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
@@ -100,54 +35,35 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Index for speedy lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_org ON public.profiles(organization_id);
 
--- Enable RLS
+-- 3. Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Allow users to read profiles without recursion
+-- Allow users to read all profiles in their organization
 DROP POLICY IF EXISTS "Users can view profiles in their organization" ON public.profiles;
-DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Profiles read policy" ON public.profiles;
-DROP POLICY IF EXISTS "Users can view profiles" ON public.profiles;
-
-CREATE POLICY "Users can view profiles"
+CREATE POLICY "Users can view profiles in their organization"
     ON public.profiles FOR SELECT
-    USING (
-        id = auth.uid()
-        OR auth.role() = 'service_role'
-        OR auth.uid() IS NOT NULL
-    );
+    USING (auth.uid() IS NOT NULL);
 
+-- Allow users to update their own profile
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
-    USING (auth.uid() = id OR auth.role() = 'service_role')
-    WITH CHECK (auth.uid() = id OR auth.role() = 'service_role');
+    USING (auth.uid() = id);
 
-DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
-CREATE POLICY "Users can insert their own profile"
-    ON public.profiles FOR INSERT
-    WITH CHECK (auth.uid() = id OR auth.role() = 'service_role');
-
+-- Allow service_role complete access to profiles
 DROP POLICY IF EXISTS "Service role full access to profiles" ON public.profiles;
 CREATE POLICY "Service role full access to profiles"
     ON public.profiles FOR ALL
     USING (auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'service_role');
 
--- Fix cases policy
-DROP POLICY IF EXISTS "Users can view cases in their organization or demo cases" ON public.cases;
-CREATE POLICY "Users can view cases in their organization or demo cases"
-    ON public.cases FOR SELECT
-    USING (
-        is_demo = true
-        OR auth.role() = 'service_role'
-        OR organization_id = auth_user_org_id()
-    );
-
 -- 4. Automatically provision profile when a new user signs up via auth.users
+-- SECURITY NOTE: New users default strictly to least privilege ('analyst' / 'read_only').
+-- NEVER trust client-writable raw_user_meta_data or email matching for admin privilege escalation.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -155,11 +71,9 @@ DECLARE
     user_name TEXT;
     org_id TEXT;
 BEGIN
-    IF NEW.email = 'arfathof@gmail.com' OR NEW.raw_user_meta_data->>'role' = 'admin' THEN
-        assigned_role := 'admin';
-    ELSE
-        assigned_role := COALESCE(NEW.raw_user_meta_data->>'role', 'analyst');
-    END IF;
+    -- Secure default: new signups are granted 'analyst' role.
+    -- Role elevation to 'admin' MUST be performed explicitly by an existing admin via server-side service_role.
+    assigned_role := 'analyst';
 
     user_name := COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1));
     org_id := COALESCE(NEW.raw_user_meta_data->>'organization_id', 'org_acme_soc_01');
@@ -169,13 +83,13 @@ BEGIN
     ON CONFLICT (id) DO UPDATE
     SET email = EXCLUDED.email,
         full_name = COALESCE(public.profiles.full_name, EXCLUDED.full_name),
-        role = CASE WHEN public.profiles.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END,
         updated_at = NOW();
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Trigger to execute upon new user signup
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
@@ -187,13 +101,11 @@ SELECT
     u.id,
     u.email,
     'org_acme_soc_01',
-    CASE WHEN u.email = 'arfathof@gmail.com' THEN 'admin' ELSE 'analyst' END,
+    'analyst',
     COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
     TRUE
 FROM auth.users u
-ON CONFLICT (id) DO UPDATE
-SET email = EXCLUDED.email,
-    role = CASE WHEN public.profiles.email = 'arfathof@gmail.com' THEN 'admin' ELSE public.profiles.role END;
+ON CONFLICT (id) DO NOTHING;
 
 -- 5. Notify PostgREST to immediately refresh its schema cache
 NOTIFY pgrst, 'reload schema';

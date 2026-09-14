@@ -147,7 +147,7 @@ export async function resolveUserProfile(authUser: {
         if (profileErr.message?.includes('schema cache') || profileErr.message?.includes('does not exist') || (profileErr as any).code === 'PGRST205') {
           profilesTableStatus = 'UNAVAILABLE';
           lastTableCheckTime = now;
-          console.info('[UserProfileStore] "public.profiles" table not detected in Supabase schema cache.');
+          console.info('[UserProfileStore] "public.profiles" table not detected in Supabase schema cache. Operating in fail-closed mode.');
         }
       }
     } catch (err: any) {
@@ -158,89 +158,12 @@ export async function resolveUserProfile(authUser: {
     }
   }
 
-  // 3. Fallback: Query Supabase public.users table if it exists
-  if (supabaseAdmin) {
-    try {
-      const { data: userRow, error: userRowErr } = await supabaseAdmin
-        .from('users')
-        .select('organization_id, role, full_name')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (!userRowErr && userRow && userRow.role) {
-        const validRole: UserRole = (userRow.role === 'admin' || userRow.role === 'analyst' || userRow.role === 'read_only')
-          ? userRow.role
-          : 'analyst';
-        const orgId = userRow.organization_id || DEFAULT_ORG_ID;
-
-        const stored: StoredUserProfile = {
-          id: userId,
-          email: cleanEmail,
-          fullName: userRow.full_name || cleanEmail.split('@')[0] || 'Security Operator',
-          role: validRole,
-          organizationId: orgId,
-          accountType: 'organization',
-          emailVerified: true,
-          updatedAt: new Date().toISOString()
-        };
-        memoryProfileStore.set(userId, stored);
-        if (cleanEmail) memoryProfileStore.set(cleanEmail, stored);
-
-        return { organizationId: orgId, role: validRole };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  // 4. Fallback: Resolve role based on verified email, app_metadata, and secure defaults
-  const isAdminUser = cleanEmail === 'arfathof@gmail.com' || cleanEmail.startsWith('admin@');
-  const metaRole = authUser.app_metadata?.role || authUser.user_metadata?.role;
-  const resolvedRole: UserRole = isAdminUser
-    ? 'admin'
-    : (metaRole === 'admin' || metaRole === 'analyst' || metaRole === 'read_only')
-      ? metaRole
-      : 'analyst';
-  const resolvedOrgId = authUser.user_metadata?.organization_id || DEFAULT_ORG_ID;
-
-  const resolvedProfile: StoredUserProfile = {
-    id: userId,
-    email: cleanEmail,
-    fullName: authUser.user_metadata?.full_name || authUser.user_metadata?.name || cleanEmail.split('@')[0] || 'Security Operator',
-    role: resolvedRole,
-    organizationId: resolvedOrgId,
-    accountType: 'organization',
-    emailVerified: true,
-    updatedAt: new Date().toISOString()
-  };
-
-  memoryProfileStore.set(userId, resolvedProfile);
-  if (cleanEmail) memoryProfileStore.set(cleanEmail, resolvedProfile);
-
-  // Attempt to self-heal by upserting into public.profiles if table is available
-  if (supabaseAdmin && profilesTableStatus !== 'UNAVAILABLE') {
-    void (async () => {
-      try {
-        const { error } = await supabaseAdmin.from('profiles').upsert({
-          id: userId,
-          email: cleanEmail,
-          organization_id: resolvedOrgId,
-          role: resolvedRole,
-          full_name: resolvedProfile.fullName,
-          email_verified: true
-        }, { onConflict: 'id' });
-        if (error && (error.message?.includes('schema cache') || (error as any).code === 'PGRST205')) {
-          profilesTableStatus = 'UNAVAILABLE';
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }
+  // 3. Fail closed: NEVER trust user_metadata or app_metadata for elevated permissions
+  console.warn(`[Security] No verified profile record found for user ${userId} (${cleanEmail || 'unknown'}). Failing closed to read_only role. Client user_metadata is untrusted.`);
 
   return {
-    organizationId: resolvedOrgId,
-    role: resolvedRole
+    organizationId: DEFAULT_ORG_ID,
+    role: 'read_only'
   };
 }
 

@@ -18,5 +18,5 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src", "server.ts", "scripts", "migrations", "vite.config.ts"]
+  "include": ["src"]
 }

@@ -11,8 +11,6 @@
  */
 
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
 import { EventEmitter } from 'events';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 import { encryptToken, decryptToken } from './compliance';
@@ -27,7 +25,6 @@ export const GMAIL_QUOTA_COSTS = {
   MESSAGES_LIST: 5,
   MESSAGES_MODIFY: 50,
   MESSAGES_BATCH_MODIFY: 50,
-  MESSAGES_INSERT: 25,
   LABELS_CREATE: 50,
   LABELS_LIST: 5,
   WATCH_START: 100,
@@ -198,7 +195,6 @@ export interface SyncedGmailEmail {
 export interface IngestionQueueItem {
   queueId: string;
   messageId: string;
-  threadId?: string;
   source: 'gmail_sync_loop' | 'pubsub_push' | 'poll_now' | 'simulation';
   queuedAt: string;
   startedAt?: string;
@@ -279,7 +275,6 @@ const state: GmailServiceState = {
   activeScopes: process.env.GMAIL_USER_EMAIL ? [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ] : [],
   scopesGrantedAt: null,
@@ -311,10 +306,6 @@ const state: GmailServiceState = {
   quarantineAuditLog: [],
   syncedEmails: []
 };
-
-// Schema resilience flags: gracefully adapt if remote Supabase database has not run quarantine_audit_log / metrics migration
-let canPersistQuarantineAuditLog = true;
-let canPersistConnectionMetrics = true;
 
 /**
  * Sets the active user email address dynamically.
@@ -496,7 +487,6 @@ export function refreshOAuthPermissionsState(options?: {
   state.activeScopes = options?.scopes || [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
-    'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ];
   state.scopesGrantedAt = new Date().toISOString();
@@ -997,628 +987,11 @@ export async function modifyGmailMessageLabels(
 }
 
 /**
- * Inserts a short summarized forensic security report note directly into a Gmail thread
- * via the Gmail API messages.insert endpoint (WITHOUT sending an email to anyone).
- * The user sees this note immediately alongside the quarantined email in their mailbox.
- */
-/**
- * Builds RFC 822 compliant Quarantine Report Note payload with snippet header and rich multipart HTML.
- */
-export function buildQuarantineReportNotePayload(params: {
-  subject: string;
-  reportSummary: string;
-  caseId: string;
-  threatScore: number;
-  verdict: string;
-  originalMessageId?: string;
-  topReason?: string;
-  parentReferences?: string;
-  senderEmail?: string;
-  auth?: {
-    spf?: { status: string; details?: string; domain?: string; ip?: string };
-    dkim?: { status: string; details?: string; domain?: string };
-    dmarc?: { status: string; details?: string; policy?: string };
-    arc?: { status: string; details?: string };
-  };
-  originIp?: string;
-  originCountry?: string;
-  heuristics?: Array<{ id?: string; title?: string; severity?: string; description?: string }>;
-  whyNarrative?: string;
-}) {
-  let cleanReason = (params.topReason || '').trim();
-  if (!cleanReason && params.reportSummary) {
-    const firstLine = params.reportSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
-    cleanReason = firstLine;
-  }
-  if (!cleanReason) {
-    cleanReason = 'High threat risk anomalies flagged by enterprise mail defense policies';
-  }
-  const maxReasonLen = 60;
-  const truncatedReason = cleanReason.length > maxReasonLen
-    ? `${cleanReason.substring(0, maxReasonLen - 1)}…`
-    : cleanReason;
-
-  const snippetLine = `${truncatedReason} — TraceXMail-Quarantine (${params.verdict}, ${params.threatScore}/100)`;
-
-  // 1. Plain Text Representation
-  const bodyLines = [
-    snippetLine,
-    '',
-    '================================================================',
-    '🛡️ TRACEXMAIL ENTERPRISE FORENSIC INCIDENT BRIEFING',
-    '================================================================',
-    `Verdict:          ${params.verdict}`,
-    `Threat Score:     ${params.threatScore} / 100`,
-    `Quarantine Gate:  PRE-DELIVERY HOLD (Isolated from Inbox)`,
-    `Applied Label:    TraceXMail-Quarantine`,
-    `Case ID:          ${params.caseId}`,
-    `Timestamp:        ${new Date().toUTCString()}`,
-    '',
-    'FORENSIC SUMMARY & ANOMALIES:',
-    params.reportSummary.trim(),
-    ...(params.whyNarrative ? ['', 'ANALYST REASONING:', params.whyNarrative.trim()] : []),
-    ...(params.auth ? [
-      '',
-      'CRYPTOGRAPHIC AUTHENTICATION:',
-      `• SPF:   ${params.auth.spf?.status || 'N/A'} (${params.auth.spf?.details || 'N/A'})`,
-      `• DKIM:  ${params.auth.dkim?.status || 'N/A'} (${params.auth.dkim?.details || 'N/A'})`,
-      `• DMARC: ${params.auth.dmarc?.status || 'N/A'} (${params.auth.dmarc?.details || 'N/A'})`,
-      `• ARC:   ${params.auth.arc?.status || 'N/A'}`
-    ] : []),
-    ...(params.originIp ? [
-      '',
-      'ORIGIN INFRASTRUCTURE:',
-      `• IP: ${params.originIp} (${params.originCountry || 'Unknown Location'})`
-    ] : []),
-    '',
-    'SECURITY INCIDENT DOSSIER & REMEDIATION:',
-    `Inspect raw MIME headers, routing hops, and IOC telemetry:`,
-    `https://tracexmail.vercel.app/cases/${params.caseId}`,
-    '================================================================'
-  ];
-  const plainText = bodyLines.join('\r\n');
-
-  // 2. Rich HTML Representation (Gmail compatible responsive card layout)
-  const isCritical = params.threatScore >= 75;
-  const isHigh = params.threatScore >= 50 && params.threatScore < 75;
-  const accentColor = isCritical ? '#dc2626' : isHigh ? '#d97706' : '#2563eb';
-  const badgeBg = isCritical ? '#fef2f2' : isHigh ? '#fffbeb' : '#eff6ff';
-  const badgeBorder = isCritical ? '#fecaca' : isHigh ? '#fde68a' : '#bfdbfe';
-
-  const htmlBody = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TraceXMail Forensic Briefing</title>
-</head>
-<body style="margin: 0; padding: 16px; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
-  <!-- Snippet preview text for Gmail list view -->
-  <div style="display: none; max-height: 0px; overflow: hidden;">
-    ${snippetLine}
-  </div>
-
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-    <!-- Header Banner -->
-    <tr>
-      <td style="background-color: #0f172a; padding: 20px 24px; color: #ffffff;">
-        <table width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td>
-              <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: #94a3b8; text-transform: uppercase;">TraceXMail Automated SOC Defense</div>
-              <div style="font-size: 18px; font-weight: 700; color: #f8fafc; margin-top: 4px;">🛡️ Forensic Quarantine Briefing</div>
-            </td>
-            <td align="right">
-              <span style="display: inline-block; padding: 6px 12px; background-color: ${accentColor}; color: #ffffff; font-size: 12px; font-weight: 700; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
-                ${params.verdict}
-              </span>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- Summary Box -->
-    <tr>
-      <td style="padding: 24px;">
-        <div style="background-color: ${badgeBg}; border: 1px solid ${badgeBorder}; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="vertical-align: top; width: 32px; font-size: 20px;">⚠️</td>
-              <td style="vertical-align: top; padding-left: 8px;">
-                <div style="font-size: 14px; font-weight: 700; color: ${accentColor};">
-                  Quarantine Gate: Isolated from Primary Inbox
-                </div>
-                <div style="font-size: 13px; color: #475569; margin-top: 4px; line-height: 1.5;">
-                  ${snippetLine}
-                </div>
-              </td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Telemetry Details Table -->
-        <table width="100%" cellpadding="8" cellspacing="0" style="font-size: 13px; border-collapse: collapse; margin-bottom: 20px;">
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; width: 140px; font-weight: 600;">Threat Risk Score</td>
-            <td style="font-weight: 700; color: ${accentColor};">${params.threatScore} / 100</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; font-weight: 600;">Target Subject</td>
-            <td style="font-weight: 600; color: #0f172a;">${params.subject || '(No Subject)'}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; font-weight: 600;">Case Reference</td>
-            <td style="font-family: monospace; color: #334155;">${params.caseId}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; font-weight: 600;">Quarantine Label</td>
-            <td><span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;">TraceXMail-Quarantine</span></td>
-          </tr>
-          ${params.originIp ? `
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; font-weight: 600;">Origin IP & Geo</td>
-            <td style="color: #334155;">${params.originIp} (${params.originCountry || 'Unknown'})</td>
-          </tr>` : ''}
-          ${params.auth ? `
-          <tr style="border-bottom: 1px solid #f1f5f9;">
-            <td style="color: #64748b; font-weight: 600;">Authentication</td>
-            <td style="font-size: 12px; color: #334155;">
-              SPF: <b>${params.auth.spf?.status || 'N/A'}</b> | 
-              DKIM: <b>${params.auth.dkim?.status || 'N/A'}</b> | 
-              DMARC: <b>${params.auth.dmarc?.status || 'N/A'}</b>
-            </td>
-          </tr>` : ''}
-        </table>
-
-        <!-- Summary & Anomalies -->
-        <div style="font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
-          Forensic Indicators & Threat Findings
-        </div>
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; font-size: 13px; color: #334155; line-height: 1.6; white-space: pre-line; margin-bottom: 24px;">
-          ${params.reportSummary.trim()}
-        </div>
-
-        <!-- Action Button -->
-        <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
-          <a href="https://tracexmail.vercel.app/cases/${params.caseId}" style="display: inline-block; background-color: #0f172a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.02em;">
-            Open Forensic Case in SOC Console →
-          </a>
-        </div>
-      </td>
-    </tr>
-
-    <!-- Footer -->
-    <tr>
-      <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 24px; font-size: 11px; color: #94a3b8; text-align: center;">
-        TraceXMail Enterprise Security Suite • Automated Inbound Quarantine Note • ${new Date().toUTCString()}
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-  const selfEmail = params.senderEmail || state.emailAddress || 'security@tracexmail.internal';
-  const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${Math.random().toString(36).slice(2, 7)}@tracexmail.internal>`;
-
-  const boundary = `----=_Part_TraceXMail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-  const rfcHeaders: string[] = [
-    `From: TraceXMail Security <${selfEmail}>`,
-    `To: <${selfEmail}>`,
-    `Subject: [TraceXMail: ${params.verdict} ${params.threatScore}/100] ${params.subject || 'Inbound Mail Evaluation'}`,
-    `Date: ${new Date().toUTCString()}`,
-    `Message-ID: ${noteMessageId}`,
-    'X-TraceXMail-Report: true',
-    `X-TraceXMail-Case: ${params.caseId}`,
-    `X-TraceXMail-Threat-Score: ${params.threatScore}`,
-    `X-TraceXMail-Verdict: ${params.verdict}`
-  ];
-
-  if (params.originalMessageId) {
-    const formattedParent = params.originalMessageId.startsWith('<') && params.originalMessageId.endsWith('>')
-      ? params.originalMessageId
-      : `<${params.originalMessageId}>`;
-    rfcHeaders.push(`In-Reply-To: ${formattedParent}`);
-    const combinedRefs = params.parentReferences
-      ? `${params.parentReferences} ${formattedParent}`
-      : formattedParent;
-    rfcHeaders.push(`References: ${combinedRefs}`);
-  }
-
-  rfcHeaders.push('MIME-Version: 1.0');
-  rfcHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-
-  const multipartContent = [
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: 8bit',
-    '',
-    plainText,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset="UTF-8"',
-    'Content-Transfer-Encoding: 8bit',
-    '',
-    htmlBody,
-    '',
-    `--${boundary}--`
-  ].join('\r\n');
-
-  const fullRfcContent = rfcHeaders.join('\r\n') + '\r\n\r\n' + multipartContent;
-
-  return {
-    snippetLine,
-    bodyText: plainText,
-    htmlBody,
-    rfcHeaders,
-    fullRfcContent,
-    selfEmail,
-    noteMessageId
-  };
-}
-
-/**
- * Inserts an automated TraceXMail quarantine forensic summary note
- * directly into the target Gmail thread as an internal annotation.
- * 
- * Complies strictly with Gmail API and RFC 2822 threading criteria:
- * 1. threadId specified in the Message resource payload.
- * 2. internalDateSource=receivedTime to place the note at the end of the thread,
- *    triggering Gmail's list view snippet preview with the quarantine verdict.
- * 3. Exact Subject matching the target thread.
- * 4. RFC 2822 In-Reply-To and References pointing to parent Message-ID.
- * 5. Uses users.messages.insert to write directly to mailbox without external delivery.
- */
-export async function insertQuarantineReportNote(params: {
-  threadId?: string;
-  accessToken?: string;
-  subject: string;
-  reportSummary: string;
-  caseId: string;
-  threatScore: number;
-  verdict: string;
-  originalMessageId?: string;
-  topReason?: string;
-  auth?: any;
-  originIp?: string;
-  originCountry?: string;
-  heuristics?: any[];
-  whyNarrative?: string;
-  alsoSendToInbox?: boolean;
-}): Promise<boolean> {
-  let token = params.accessToken || state.accessToken;
-  if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
-    console.log('[GmailInsert] Skipped inserting quarantine report note: mock or missing access token.');
-    return false;
-  }
-
-  try {
-    if (token === state.accessToken) {
-      const fresh = await ensureFreshAccessToken();
-      if (fresh) token = fresh;
-    }
-
-    // Auto-resolve mailbox owner's real Gmail address if not yet cached
-    if ((!state.emailAddress || state.emailAddress.includes('internal')) && token && !token.startsWith('mock_')) {
-      try {
-        const profileRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 5000
-        });
-        if (profileRes.data?.emailAddress) {
-          state.emailAddress = profileRes.data.emailAddress;
-          console.log(`[GmailInsert] Auto-resolved mailbox user address: ${state.emailAddress}`);
-        }
-      } catch (profErr: any) {
-        console.warn('[GmailInsert] Could not auto-resolve profile email:', profErr?.message);
-      }
-    }
-
-    let targetThreadId = (params.threadId || '').trim();
-    let threadSubject = (params.subject || '').trim();
-    let parentMessageId = (params.originalMessageId || '').trim();
-    let parentReferences = '';
-
-    // 1. Resolve canonical threadId, exact Subject, and parent Message-ID from Gmail API
-    // Attempt lookup by message ID first if available
-    const lookupCandidate = params.originalMessageId || (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-') ? targetThreadId : '');
-    
-    if (lookupCandidate && !lookupCandidate.startsWith('<')) {
-      try {
-        const msgRes = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(lookupCandidate)}?format=full`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 8000
-          }
-        );
-        if (msgRes.data) {
-          if (msgRes.data.threadId) {
-            targetThreadId = msgRes.data.threadId;
-          }
-          const headers: any[] = msgRes.data.payload?.headers || [];
-          const s = headers.find((h: any) => h.name?.toLowerCase() === 'subject')?.value;
-          if (s && s.trim()) threadSubject = s.trim();
-          const mId = headers.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value;
-          if (mId && mId.trim()) parentMessageId = mId.trim();
-          const refs = headers.find((h: any) => h.name?.toLowerCase() === 'references')?.value;
-          if (refs && refs.trim()) parentReferences = refs.trim();
-        }
-      } catch {
-        // If lookupCandidate was not a message ID, it will be queried as thread ID next
-      }
-    }
-
-    // 2. Query target thread to verify thread metadata, check for existing report, and extract latest Message-ID
-    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-')) {
-      try {
-        const threadRes = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(targetThreadId)}?format=full`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 8000
-          }
-        );
-        const threadData = threadRes.data;
-        const messages: any[] = Array.isArray(threadData?.messages) ? threadData.messages : [];
-        if (messages.length > 0) {
-          // Strict duplicate check: verify if a genuine TraceXMail report note was already inserted
-          const alreadyReported = messages.some((m: any) => {
-            const hList: any[] = m.payload?.headers || [];
-            const fromVal = (hList.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '').toLowerCase();
-            const msgIdVal = (hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || '').toLowerCase();
-            const hasReportHeader = hList.some((h: any) => h.name?.toLowerCase() === 'x-tracexmail-report');
-            return fromVal.includes('tracexmail security') ||
-                   fromVal.includes('security@tracexmail') ||
-                   msgIdVal.includes('tracexmail-report') ||
-                   msgIdVal.includes('@tracexmail.internal') ||
-                   hasReportHeader;
-          });
-
-          if (alreadyReported) {
-            console.log(`[GmailInsert] Verified report note already present in thread ${targetThreadId}. Skipping duplicate.`);
-            return true;
-          }
-
-          // In Gmail threading, the Subject of the conversation is defined by the first message
-          const firstHeaders = messages[0]?.payload?.headers || [];
-          const matchedSubject = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'subject')?.value;
-          if (matchedSubject && matchedSubject.trim()) {
-            threadSubject = matchedSubject.trim();
-          }
-
-          // Extract latest message in thread for In-Reply-To and References
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const hList = messages[i]?.payload?.headers || [];
-            const foundMsgId = hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value;
-            if (foundMsgId && foundMsgId.trim()) {
-              parentMessageId = foundMsgId.trim();
-              const foundRefs = hList.find((h: any) => h.name?.toLowerCase() === 'references')?.value;
-              if (foundRefs && foundRefs.trim()) parentReferences = foundRefs.trim();
-              break;
-            }
-          }
-        }
-      } catch (threadErr: any) {
-        console.warn(`[GmailInsert] Note: Could not fetch thread ${targetThreadId}:`, threadErr?.message);
-      }
-    }
-
-    if (!threadSubject) {
-      threadSubject = 'Inbound Mail Evaluation';
-    }
-
-    // 3. Build rich payload using buildQuarantineReportNotePayload
-    const payload = buildQuarantineReportNotePayload({
-      subject: threadSubject,
-      reportSummary: params.reportSummary,
-      caseId: params.caseId,
-      threatScore: params.threatScore,
-      verdict: params.verdict,
-      originalMessageId: parentMessageId,
-      topReason: params.topReason,
-      parentReferences,
-      auth: params.auth,
-      originIp: params.originIp,
-      originCountry: params.originCountry,
-      heuristics: params.heuristics,
-      whyNarrative: params.whyNarrative
-    });
-
-    // 4. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
-    const labelIds: string[] = ['UNREAD'];
-    if (params.alsoSendToInbox) {
-      labelIds.push('INBOX');
-    }
-    const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
-    if (quarantineLabelId && !labelIds.includes(quarantineLabelId)) {
-      labelIds.push(quarantineLabelId);
-    }
-
-    const encodeBase64Url = (str: string) =>
-      Buffer.from(str, 'utf8')
-        .toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-
-    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_INSERT, 'messages.insert');
-
-    // 5. Insert message directly into target thread using users.messages.insert
-    const insertPayload: any = {
-      raw: encodeBase64Url(payload.fullRfcContent),
-      labelIds
-    };
-    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') && !targetThreadId.startsWith('case-')) {
-      insertPayload.threadId = targetThreadId;
-    }
-
-    try {
-      const res = await axios.post(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert?internalDateSource=receivedTime',
-        insertPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-
-      const returnedThreadId = res.data?.threadId;
-      const insertedMsgId = res.data?.id;
-
-      if (returnedThreadId && targetThreadId && returnedThreadId === targetThreadId) {
-        console.log(`[GmailInsert] Successfully inserted quarantine report note into thread ${targetThreadId} (messageId: ${insertedMsgId}). Snippet view triggered.`);
-      } else {
-        console.log(`[GmailInsert] Inserted quarantine report note into Gmail (threadId: ${returnedThreadId}, messageId: ${insertedMsgId}).`);
-      }
-      return true;
-    } catch (primaryErr: any) {
-      console.warn(`[GmailInsert] In-thread insert failed (${primaryErr?.response?.status || primaryErr.message}). Retrying with fallback insert...`);
-
-      // Fallback: If Gmail rejected threadId (e.g. malformed or nonexistent thread), insert standalone without threadId
-      const fallbackPayload: any = {
-        raw: encodeBase64Url(payload.fullRfcContent),
-        labelIds
-      };
-
-      const fallbackRes = await axios.post(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert?internalDateSource=receivedTime',
-        fallbackPayload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-      console.log(`[GmailInsert] Standalone quarantine report inserted with label TraceXMail-Quarantine (messageId: ${fallbackRes.data?.id})`);
-      return true;
-    }
-  } catch (err: any) {
-    console.warn('[GmailInsert] Failed to insert quarantine report note into Gmail thread:', extractGoogleApiError(err));
-    return false;
-  }
-}
-
-/**
- * Scans all messages currently under the TraceXMail-Quarantine label in Gmail,
- * and backfills/inserts missing in-thread summarized forensic reports.
- */
-export async function backfillQuarantineReportNotes(
-  accessToken?: string,
-  maxToScan: number = 30
-): Promise<{ scanned: number; inserted: number; skipped: number }> {
-  let token = accessToken || state.accessToken;
-  if (!token || token.startsWith('mock_') || token.startsWith('enclave_')) {
-    return { scanned: 0, inserted: 0, skipped: 0 };
-  }
-
-  let scanned = 0;
-  let inserted = 0;
-  let skipped = 0;
-
-  try {
-    const quarantineLabelName = state.quarantine?.quarantineLabelName || 'TraceXMail-Quarantine';
-    const quarantineLabelId = await ensureGmailLabel(quarantineLabelName, token).catch(() => null);
-
-    let messages: Array<{ id: string; threadId: string }> = [];
-
-    // 1. Primary search: using labelIds filter directly
-    if (quarantineLabelId) {
-      try {
-        messages = await listGmailMessages(token, { labelIds: [quarantineLabelId], maxResults: maxToScan });
-        console.log(`[Backfill] Queried by labelId (${quarantineLabelId}): found ${messages.length} messages.`);
-      } catch (labelErr: any) {
-        console.warn('[Backfill] Search by labelIds failed, falling back to quoted query:', labelErr?.message);
-      }
-    }
-
-    // 2. Secondary search fallback: quoted label query label:"TraceXMail-Quarantine"
-    if (!messages || messages.length === 0) {
-      messages = await listGmailMessages(token, `label:"${quarantineLabelName}"`, maxToScan);
-      console.log(`[Backfill] Queried by quoted query label:"${quarantineLabelName}": found ${messages.length} messages.`);
-    }
-
-    scanned = messages.length;
-
-    for (const msg of messages) {
-      const threadId = msg.threadId || msg.id;
-
-      // Check if this thread already has a report
-      try {
-        const threadRes = await axios.get(
-          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(threadId)}?format=full`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 8000
-          }
-        );
-        const tData = threadRes.data;
-        const msgs: any[] = Array.isArray(tData?.messages) ? tData.messages : [];
-        const hasReport = msgs.some((m: any) => {
-          const hList: any[] = m.payload?.headers || [];
-          const fromVal = (hList.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '').toLowerCase();
-          const msgIdVal = (hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || '').toLowerCase();
-          const hasReportHeader = hList.some((h: any) => h.name?.toLowerCase() === 'x-tracexmail-report');
-          return fromVal.includes('tracexmail security') ||
-                 fromVal.includes('security@tracexmail') ||
-                 msgIdVal.includes('tracexmail-report') ||
-                 msgIdVal.includes('@tracexmail.internal') ||
-                 hasReportHeader;
-        });
-
-        if (hasReport) {
-          skipped++;
-          continue;
-        }
-
-        // Get first message subject
-        const firstHeaders = msgs[0]?.payload?.headers || [];
-        const subj = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'subject')?.value || 'Quarantined Email';
-        const sender = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'from')?.value || 'External Sender';
-
-        // Insert report note
-        const ok = await insertQuarantineReportNote({
-          threadId,
-          accessToken: token,
-          subject: subj,
-          reportSummary: `• Intercepted inbound email from ${sender}.\n• High threat risk detected by quarantine rule policy.\n• Isolated from Inbox and tagged under TraceXMail-Quarantine.`,
-          caseId: `case_quar_${msg.id.slice(0, 10)}`,
-          threatScore: 85,
-          verdict: 'MALICIOUS PHISH',
-          originalMessageId: msg.id,
-          topReason: 'Quarantined high-threat email isolated from Inbox'
-        });
-
-        if (ok) {
-          inserted++;
-        } else {
-          skipped++;
-        }
-      } catch (innerErr: any) {
-        console.warn(`[Backfill] Failed checking/inserting thread ${threadId}:`, innerErr?.message);
-        skipped++;
-      }
-    }
-  } catch (err: any) {
-    console.warn('[Backfill] Failed scanning quarantined messages:', extractGoogleApiError(err));
-  }
-
-  console.log(`[Backfill] Finished: ${scanned} scanned, ${inserted} reports inserted, ${skipped} skipped.`);
-  return { scanned, inserted, skipped };
-}
-
-/**
  * Lists message IDs from the user's real Gmail mailbox.
  */
 export async function listGmailMessages(
   accessToken: string,
-  queryOrOptions: string | { query?: string; labelIds?: string[]; maxResults?: number } = 'label:INBOX',
+  query: string = 'label:INBOX',
   maxResults: number = 10
 ): Promise<Array<{ id: string; threadId: string }>> {
   let token = accessToken || state.accessToken;
@@ -1634,46 +1007,27 @@ export async function listGmailMessages(
 
     await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_LIST, 'messages.list');
 
-    const params = new URLSearchParams();
-    if (typeof queryOrOptions === 'object' && queryOrOptions !== null) {
-      if (queryOrOptions.labelIds && Array.isArray(queryOrOptions.labelIds)) {
-        for (const lId of queryOrOptions.labelIds) {
-          params.append('labelIds', lId);
-        }
-      }
-      if (queryOrOptions.query) {
-        params.set('q', queryOrOptions.query);
-      }
-      params.set('maxResults', String(queryOrOptions.maxResults || maxResults));
-    } else {
-      let q = String(queryOrOptions || 'label:INBOX').trim();
-      // Ensure hyphenated labels like label:TraceXMail-Quarantine are wrapped in quotes
-      // otherwise Gmail interprets "-Quarantine" as a NOT operator.
-      if (q.startsWith('label:') && !q.startsWith('label:"') && q.includes('-')) {
-        const labelPart = q.slice(6);
-        q = `label:"${labelPart}"`;
-      }
-      params.set('q', q);
-      params.set('maxResults', String(maxResults));
-    }
-
-    const requestUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`;
-
     try {
-      const res = await axios.get(requestUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 10000
-      });
+      const res = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }
+      );
       return res.data?.messages || [];
     } catch (apiErr: any) {
       if (apiErr?.response?.status === 401 && state.refreshToken) {
         console.log('[GmailList] Received 401 Unauthorized from Gmail API. Attempting token refresh...');
         const refreshRes = await refreshGmailAccessToken();
         if (refreshRes.success && state.accessToken) {
-          const retryRes = await axios.get(requestUrl, {
-            headers: { Authorization: `Bearer ${state.accessToken}` },
-            timeout: 10000
-          });
+          const retryRes = await axios.get(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+            {
+              headers: { Authorization: `Bearer ${state.accessToken}` },
+              timeout: 10000
+            }
+          );
           return retryRes.data?.messages || [];
         }
       }
@@ -1805,85 +1159,44 @@ export async function processInboundQuarantineGate(params: {
   // Persist to Supabase quarantine_audit_log and update metrics in gmail_connections
   const supabase = getSupabaseAdminClient();
   if (supabase) {
-    if (canPersistQuarantineAuditLog) {
-      supabase.from('quarantine_audit_log')
-        .insert({
-          id: logEntry.id,
-          organization_id: DEFAULT_ORG_ID,
-          timestamp: logEntry.timestamp,
-          message_id: logEntry.messageId,
-          subject: logEntry.subject,
-          from_address: logEntry.from,
-          threat_score: logEntry.threatScore,
-          verdict: logEntry.verdict,
-          action: logEntry.action,
-          delivery_stage: logEntry.deliveryStage,
-          admin_webhook_dispatched: logEntry.adminWebhookDispatched,
-          applied_label: appliedLabel,
-          raw_details: {
-            isQuarantined: isQuarantineTriggered,
-            threshold: state.quarantine.threshold
-          }
-        })
-        .then(({ error }) => {
-          if (error) {
-            const isMissingTable =
-              error.message?.includes('schema cache') ||
-              error.message?.includes('does not exist') ||
-              error.code === '42P01' ||
-              error.code === 'PGRST205';
-            if (isMissingTable) {
-              canPersistQuarantineAuditLog = false;
-              console.info('[GmailQuarantine] Table \'quarantine_audit_log\' not in database schema cache. Utilizing in-memory audit ledger.');
-            } else {
-              console.warn('[GmailQuarantine] Error writing to quarantine_audit_log in DB:', error.message);
-            }
-          }
-        });
-    }
+    supabase.from('quarantine_audit_log')
+      .insert({
+        id: logEntry.id,
+        organization_id: DEFAULT_ORG_ID,
+        timestamp: logEntry.timestamp,
+        message_id: logEntry.messageId,
+        subject: logEntry.subject,
+        from_address: logEntry.from,
+        threat_score: logEntry.threatScore,
+        verdict: logEntry.verdict,
+        action: logEntry.action,
+        delivery_stage: logEntry.deliveryStage,
+        admin_webhook_dispatched: logEntry.adminWebhookDispatched,
+        applied_label: appliedLabel,
+        raw_details: {
+          isQuarantined: isQuarantineTriggered,
+          threshold: state.quarantine.threshold
+        }
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[GmailQuarantine] Error writing to quarantine_audit_log in DB:', error.message);
+      });
 
-    if (canPersistConnectionMetrics) {
-      supabase.from('gmail_connections')
-        .update({
-          metrics: {
-            total_ingested: state.metrics.totalIngested,
-            pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
-            post_delivery_alerts: state.metrics.postDeliveryAlerts,
-            last_delivery_stage: deliveryStage,
-            last_quarantine_at: state.metrics.lastQuarantineAt
-          },
-          updated_at: new Date().toISOString()
-        })
-        .eq('organization_id', DEFAULT_ORG_ID)
-        .then(({ error }) => {
-          if (error) {
-            const isMissingColumn =
-              error.message?.includes('metrics') &&
-              (error.message?.includes('schema cache') ||
-                error.message?.includes('does not exist') ||
-                error.code === '42703' ||
-                error.code === 'PGRST204');
-            if (isMissingColumn) {
-              canPersistConnectionMetrics = false;
-              console.info('[GmailQuarantine] Column \'metrics\' not in \'gmail_connections\' schema cache. Maintaining metrics in memory.');
-              // Retry update without metrics column
-              supabase.from('gmail_connections')
-                .update({ updated_at: new Date().toISOString() })
-                .eq('organization_id', DEFAULT_ORG_ID)
-                .then(() => {});
-            } else {
-              console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
-            }
-          }
-        });
-    } else {
-      supabase.from('gmail_connections')
-        .update({
-          updated_at: new Date().toISOString()
-        })
-        .eq('organization_id', DEFAULT_ORG_ID)
-        .then(() => {});
-    }
+    supabase.from('gmail_connections')
+      .update({
+        metrics: {
+          total_ingested: state.metrics.totalIngested,
+          pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+          post_delivery_alerts: state.metrics.postDeliveryAlerts,
+          last_delivery_stage: deliveryStage,
+          last_quarantine_at: state.metrics.lastQuarantineAt
+        },
+        updated_at: new Date().toISOString()
+      })
+      .eq('organization_id', DEFAULT_ORG_ID)
+      .then(({ error }) => {
+        if (error) console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
+      });
   }
 
   return {
@@ -1907,7 +1220,7 @@ export async function handlePubSubPush(body: any): Promise<{
   try {
     state.watch.lastPushReceivedAt = new Date().toISOString();
 
-    let pushData: { emailAddress?: string; historyId?: string; threadId?: string } = {};
+    let pushData: { emailAddress?: string; historyId?: string } = {};
 
     if (body?.message?.data) {
       // Decode Base64 data from Cloud Pub/Sub
@@ -1930,7 +1243,6 @@ export async function handlePubSubPush(body: any): Promise<{
     // Queue immediately for automated forensic analysis pipeline
     queueEmailForAnalysis({
       messageId: body?.message?.messageId || `pubsub_${historyId}`,
-      threadId: body?.threadId || body?.message?.threadId || pushData?.threadId,
       source: 'pubsub_push',
       emailAddress,
       rawEml: body?.rawEmail,
@@ -2001,7 +1313,7 @@ export function getQuarantineAuditLog() {
  */
 export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
   const supabase = getSupabaseAdminClient();
-  if (supabase && canPersistQuarantineAuditLog) {
+  if (supabase) {
     try {
       const { data, error } = await supabase
         .from('quarantine_audit_log')
@@ -2010,18 +1322,7 @@ export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
         .order('timestamp', { ascending: false })
         .limit(100);
 
-      if (error) {
-        if (
-          error.message?.includes('schema cache') ||
-          error.message?.includes('does not exist') ||
-          error.code === '42P01' ||
-          error.code === 'PGRST205'
-        ) {
-          canPersistQuarantineAuditLog = false;
-        } else {
-          console.warn('[GmailService] Failed fetching quarantine audit logs from Supabase:', error.message);
-        }
-      } else if (data && data.length > 0) {
+      if (!error && data && data.length > 0) {
         return data.map(r => ({
           id: r.id,
           timestamp: r.timestamp,
@@ -2045,8 +1346,6 @@ export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
 /**
  * Saves Gmail Connection with encrypted tokens into Supabase `gmail_connections` table.
  */
-const LOCAL_GMAIL_CACHE_PATH = path.join(process.cwd(), '.gmail_connection.json');
-
 export async function saveGmailConnectionToDb(params: {
   orgId?: string;
   emailAddress: string;
@@ -2062,30 +1361,6 @@ export async function saveGmailConnectionToDb(params: {
   state.emailAddress = params.emailAddress;
   if (params.accessToken) state.accessToken = params.accessToken;
   if (params.refreshToken) state.refreshToken = params.refreshToken;
-  if (params.expiresInSeconds) {
-    state.tokenExpiresAt = Date.now() + params.expiresInSeconds * 1000;
-  }
-
-  // Always write to local secure enclave cache file so connection survives dev reboots
-  try {
-    const encryptedAccess = params.accessToken ? encryptToken(params.accessToken) : (state.accessToken ? encryptToken(state.accessToken) : undefined);
-    const encryptedRefresh = params.refreshToken ? encryptToken(params.refreshToken) : (state.refreshToken ? encryptToken(state.refreshToken) : undefined);
-    const cachePayload = {
-      orgId,
-      emailAddress: state.emailAddress,
-      isConnected: state.isConnected,
-      access_token_encrypted: encryptedAccess,
-      refresh_token_encrypted: encryptedRefresh,
-      tokenExpiresAt: state.tokenExpiresAt,
-      lastRefreshedAt: new Date().toISOString(),
-      quarantine: state.quarantine,
-      watch: state.watch,
-      updated_at: new Date().toISOString()
-    };
-    fs.writeFileSync(LOCAL_GMAIL_CACHE_PATH, JSON.stringify(cachePayload, null, 2), 'utf8');
-  } catch (cacheErr: any) {
-    console.warn('[GmailService] Could not write local connection cache:', cacheErr?.message);
-  }
 
   if (!supabase) return true;
 
@@ -2115,37 +1390,19 @@ export async function saveGmailConnectionToDb(params: {
       quarantine_label_name: state.quarantine.quarantineLabelName,
       remove_inbox_label: state.quarantine.removeInboxLabel,
       admin_webhook_url: state.quarantine.adminWebhookUrl,
-      ...(canPersistConnectionMetrics && {
-        metrics: {
-          total_ingested: state.metrics.totalIngested,
-          pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
-          post_delivery_alerts: state.metrics.postDeliveryAlerts,
-          last_delivery_stage: state.metrics.lastDeliveryStage,
-          last_quarantine_at: state.metrics.lastQuarantineAt
-        }
-      }),
+      metrics: {
+        total_ingested: state.metrics.totalIngested,
+        pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+        post_delivery_alerts: state.metrics.postDeliveryAlerts,
+        last_delivery_stage: state.metrics.lastDeliveryStage,
+        last_quarantine_at: state.metrics.lastQuarantineAt
+      },
       updated_at: new Date().toISOString()
     };
 
-    let { error } = await supabase
+    const { error } = await supabase
       .from('gmail_connections')
       .upsert(row, { onConflict: 'organization_id,email_address' });
-
-    if (
-      error &&
-      error.message?.includes('metrics') &&
-      (error.message?.includes('schema cache') ||
-        error.message?.includes('does not exist') ||
-        error.code === '42703' ||
-        error.code === 'PGRST204')
-    ) {
-      canPersistConnectionMetrics = false;
-      delete row.metrics;
-      const retryResult = await supabase
-        .from('gmail_connections')
-        .upsert(row, { onConflict: 'organization_id,email_address' });
-      error = retryResult.error;
-    }
 
     if (error) {
       console.warn('[GmailService] Failed upserting to gmail_connections:', error.message);
@@ -2163,102 +1420,61 @@ export async function saveGmailConnectionToDb(params: {
  */
 export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID): Promise<void> {
   const supabase = getSupabaseAdminClient();
-  let loadedFromSupabase = false;
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('gmail_connections')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('gmail_connections')
-        .select('*')
-        .eq('organization_id', orgId)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+    if (error || !data) return;
 
-      if (!error && data) {
-        state.isConnected = data.is_connected ?? true;
-        state.emailAddress = data.email_address || state.emailAddress;
-        if (data.access_token_encrypted) {
-          try {
-            state.accessToken = decryptToken(data.access_token_encrypted);
-          } catch (err) {
-            console.warn('[GmailService] Failed decrypting access token:', err);
-          }
-        }
-        if (data.refresh_token_encrypted) {
-          try {
-            state.refreshToken = decryptToken(data.refresh_token_encrypted);
-          } catch (err) {
-            console.warn('[GmailService] Failed decrypting refresh token:', err);
-          }
-        }
-        if (data.token_expires_at) {
-          state.tokenExpiresAt = new Date(data.token_expires_at).getTime();
-        }
-        if (data.last_refreshed_at) {
-          state.lastRefreshedAt = data.last_refreshed_at;
-        }
-        if (data.watch_topic_name) state.watch.topicName = data.watch_topic_name;
-        if (data.watch_subscription) state.watch.subscription = data.watch_subscription;
-        if (typeof data.watch_enabled === 'boolean') state.watch.enabled = data.watch_enabled;
-        if (typeof data.watch_active === 'boolean') state.watch.active = data.watch_active;
-        if (data.watch_expiration) state.watch.expiration = new Date(data.watch_expiration).getTime();
-        if (data.history_id) state.historyId = data.history_id;
-        if (typeof data.quarantine_enabled === 'boolean') state.quarantine.enabled = data.quarantine_enabled;
-        if (typeof data.quarantine_threshold === 'number') state.quarantine.threshold = data.quarantine_threshold;
-        if (data.quarantine_label_name) state.quarantine.quarantineLabelName = data.quarantine_label_name;
-        if (typeof data.remove_inbox_label === 'boolean') state.quarantine.removeInboxLabel = data.remove_inbox_label;
-        if (data.admin_webhook_url) state.quarantine.adminWebhookUrl = data.admin_webhook_url;
-        if (data.metrics) {
-          state.metrics.totalIngested = data.metrics.total_ingested ?? state.metrics.totalIngested;
-          state.metrics.preDeliveryQuarantined = data.metrics.pre_delivery_quarantined ?? state.metrics.preDeliveryQuarantined;
-          state.metrics.postDeliveryAlerts = data.metrics.post_delivery_alerts ?? state.metrics.postDeliveryAlerts;
-          state.metrics.lastDeliveryStage = data.metrics.last_delivery_stage ?? state.metrics.lastDeliveryStage;
-          state.metrics.lastQuarantineAt = data.metrics.last_quarantine_at ?? state.metrics.lastQuarantineAt;
-        }
-        loadedFromSupabase = true;
-        console.log('[GmailService] Synchronized connection state from Supabase for org:', orgId);
+    state.isConnected = data.is_connected ?? true;
+    state.emailAddress = data.email_address || state.emailAddress;
+    if (data.access_token_encrypted) {
+      try {
+        state.accessToken = decryptToken(data.access_token_encrypted);
+      } catch (err) {
+        console.warn('[GmailService] Failed decrypting access token:', err);
       }
-    } catch (err) {
-      console.warn('[GmailService] Failed syncing gmail_connections from DB:', err);
     }
-  }
-
-  // Fallback: Read local persistent file cache if Supabase didn't provide connection
-  if (!loadedFromSupabase && fs.existsSync(LOCAL_GMAIL_CACHE_PATH)) {
-    try {
-      const raw = fs.readFileSync(LOCAL_GMAIL_CACHE_PATH, 'utf8');
-      const cached = JSON.parse(raw);
-      if (cached && cached.isConnected) {
-        state.isConnected = true;
-        state.emailAddress = cached.emailAddress || state.emailAddress;
-        if (cached.access_token_encrypted) {
-          try {
-            state.accessToken = decryptToken(cached.access_token_encrypted);
-          } catch {}
-        }
-        if (cached.refresh_token_encrypted) {
-          try {
-            state.refreshToken = decryptToken(cached.refresh_token_encrypted);
-          } catch {}
-        }
-        if (cached.tokenExpiresAt) {
-          state.tokenExpiresAt = cached.tokenExpiresAt;
-        }
-        if (cached.lastRefreshedAt) {
-          state.lastRefreshedAt = cached.lastRefreshedAt;
-        }
-        if (cached.quarantine) {
-          state.quarantine = { ...state.quarantine, ...cached.quarantine };
-        }
-        if (cached.watch) {
-          state.watch = { ...state.watch, ...cached.watch };
-        }
-        console.log('[GmailService] Restored active Gmail connection from local persistent enclave cache for:', state.emailAddress);
+    if (data.refresh_token_encrypted) {
+      try {
+        state.refreshToken = decryptToken(data.refresh_token_encrypted);
+      } catch (err) {
+        console.warn('[GmailService] Failed decrypting refresh token:', err);
       }
-    } catch (fsErr: any) {
-      console.warn('[GmailService] Error reading local connection cache:', fsErr?.message);
     }
+    if (data.token_expires_at) {
+      state.tokenExpiresAt = new Date(data.token_expires_at).getTime();
+    }
+    if (data.last_refreshed_at) {
+      state.lastRefreshedAt = data.last_refreshed_at;
+    }
+    if (data.watch_topic_name) state.watch.topicName = data.watch_topic_name;
+    if (data.watch_subscription) state.watch.subscription = data.watch_subscription;
+    if (typeof data.watch_enabled === 'boolean') state.watch.enabled = data.watch_enabled;
+    if (typeof data.watch_active === 'boolean') state.watch.active = data.watch_active;
+    if (data.watch_expiration) state.watch.expiration = new Date(data.watch_expiration).getTime();
+    if (data.history_id) state.historyId = data.history_id;
+    if (typeof data.quarantine_enabled === 'boolean') state.quarantine.enabled = data.quarantine_enabled;
+    if (typeof data.quarantine_threshold === 'number') state.quarantine.threshold = data.quarantine_threshold;
+    if (data.quarantine_label_name) state.quarantine.quarantineLabelName = data.quarantine_label_name;
+    if (typeof data.remove_inbox_label === 'boolean') state.quarantine.removeInboxLabel = data.remove_inbox_label;
+    if (data.admin_webhook_url) state.quarantine.adminWebhookUrl = data.admin_webhook_url;
+    if (data.metrics) {
+      state.metrics.totalIngested = data.metrics.total_ingested ?? state.metrics.totalIngested;
+      state.metrics.preDeliveryQuarantined = data.metrics.pre_delivery_quarantined ?? state.metrics.preDeliveryQuarantined;
+      state.metrics.postDeliveryAlerts = data.metrics.post_delivery_alerts ?? state.metrics.postDeliveryAlerts;
+      state.metrics.lastDeliveryStage = data.metrics.last_delivery_stage ?? state.metrics.lastDeliveryStage;
+      state.metrics.lastQuarantineAt = data.metrics.last_quarantine_at ?? state.metrics.lastQuarantineAt;
+    }
+    console.log('[GmailService] Synchronized connection state from Supabase for org:', orgId);
+  } catch (err) {
+    console.warn('[GmailService] Failed syncing gmail_connections from DB:', err);
   }
 }
 
@@ -2508,12 +1724,6 @@ export async function disconnectGmail(
     state.watch.expiration = null;
     state.watch.subscription = null;
     ingestionQueue.length = 0;
-
-    try {
-      if (fs.existsSync(LOCAL_GMAIL_CACHE_PATH)) {
-        fs.unlinkSync(LOCAL_GMAIL_CACHE_PATH);
-      }
-    } catch {}
   }
 
   // 4. Asynchronously clear database tokens in Supabase so they are not resurrected
@@ -2645,7 +1855,6 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
             // Queue immediately for automated forensic analysis
             queueEmailForAnalysis({
               messageId: msg.id,
-              threadId: msg.threadId,
               source: 'gmail_sync_loop',
               emailAddress: state.emailAddress || undefined,
               rawEml: raw,

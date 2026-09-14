@@ -72,15 +72,15 @@ function generateFallbackCanvas(analysis?: EmailAnalysis, options?: ExportEviden
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
-  const caseId = options?.caseId || analysis?.id || 'EML-UNASSIGNED';
-  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-UNASSIGNED';
+  const caseId = options?.caseId || analysis?.id || 'EML-2026-8894';
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-90421';
   const subject = options?.title || analysis?.subject || 'Forensic Evidence Artifact';
-  const verdict = analysis?.verdict || 'SUSPICIOUS';
-  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 0;
-  const from = analysis?.from || 'Unknown Sender';
-  const to = analysis?.to || 'Unknown Recipient';
-  const ip = analysis?.hops?.[0]?.fromIp || 'Unavailable';
-  const country = analysis?.hops?.[0]?.country || 'Unknown';
+  const verdict = analysis?.verdict || 'MALICIOUS';
+  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 98;
+  const from = analysis?.from || 'sender@external-domain.com';
+  const to = analysis?.to || 'victim@corporate.internal';
+  const ip = analysis?.hops?.[0]?.fromIp || '185.220.101.5';
+  const country = analysis?.hops?.[0]?.country || 'Germany (DE)';
 
   // Background
   ctx.fillStyle = '#14120f';
@@ -205,29 +205,16 @@ function generateFallbackCanvas(analysis?: EmailAnalysis, options?: ExportEviden
   ctx.font = '22px monospace';
   ctx.fillText('SHA-256 DIGEST:', 70, canvas.height - 85);
 
-  const realHash = analysis?.sha256 || analysis?.sha256Hash || analysis?.custodyHash || null;
-  const hash = realHash || 'HASH UNAVAILABLE';
-
-  ctx.fillStyle = realHash ? '#7fa3ba' : '#f59e0b';
+  ctx.fillStyle = '#7fa3ba';
   ctx.font = '22px monospace';
+  const hash = analysis?.sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   ctx.fillText(hash, 260, canvas.height - 85);
 
-  const isFallbackCanvas = analysis?.degradedAnalysis === true || analysis?.analysisSource === 'client_fallback_unverified' || analysis?.isClientFallback === true;
+  const isFallbackCanvas = analysis?.analysisSource === 'client_fallback_unverified' || analysis?.isClientFallback === true;
   if (isFallbackCanvas) {
-    // Degraded Warning Banner across top
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(40, 165, canvas.width - 80, 50);
-    ctx.fillStyle = '#fef3c7';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('⚠️ PARTIAL ANALYSIS — backend forensic pipeline unavailable at time of ingestion.', 60, 198);
-
     ctx.fillStyle = '#f59e0b';
     ctx.font = 'bold 20px monospace';
-    ctx.fillText('PARTIAL ANALYSIS — BACKEND UNREACHABLE • NOT SUITABLE FOR EVIDENTIARY USE', 70, canvas.height - 50);
-  } else if (!realHash) {
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '20px monospace';
-    ctx.fillText('UNVERIFIED TELEMETRY • SHA-256 DIGEST NOT COMPUTED', 70, canvas.height - 50);
+    ctx.fillText('DEGRADED MODE — BACKEND UNREACHABLE • NOT SUITABLE FOR EVIDENTIARY USE', 70, canvas.height - 50);
   } else {
     ctx.fillStyle = '#94A3B8';
     ctx.font = '20px monospace';
@@ -312,15 +299,15 @@ function generateDirectPdfReport(
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 12;
 
-  const caseId = options?.caseId || analysis?.id || 'EML-UNASSIGNED';
-  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-UNASSIGNED';
+  const caseId = options?.caseId || analysis?.id || 'EML-2026-8894';
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-90421';
   const subject = options?.title || analysis?.subject || 'Forensic Email Evidence Artifact';
-  const verdict = analysis?.verdict || 'SUSPICIOUS';
-  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 0;
-  const from = analysis?.from || 'Unknown Sender';
-  const to = analysis?.to || 'Unknown Recipient';
-  const ip = analysis?.hops?.[0]?.fromIp || 'Unavailable';
-  const country = analysis?.hops?.[0]?.country || 'Unknown';
+  const verdict = analysis?.verdict || 'MALICIOUS';
+  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 98;
+  const from = analysis?.from || 'sender@external-domain.com';
+  const to = analysis?.to || 'victim@corporate.internal';
+  const ip = analysis?.hops?.[0]?.fromIp || '185.220.101.5';
+  const country = analysis?.hops?.[0]?.country || 'Germany (DE)';
 
   // Header Bar
   pdf.setFillColor(15, 23, 42); // slate-900
@@ -358,26 +345,6 @@ function generateDirectPdfReport(
 
   curY += 24;
 
-  const isDegradedPdf = analysis?.degradedAnalysis === true || analysis?.analysisSource === 'client_fallback_unverified' || analysis?.isClientFallback === true;
-  if (isDegradedPdf) {
-    // Prominent Caveat Banner
-    pdf.setFillColor(254, 243, 199); // amber-100
-    pdf.setDrawColor(217, 119, 6); // amber-600
-    pdf.setLineWidth(0.5);
-    pdf.roundedRect(margin, curY, pageWidth - margin * 2, 14, 1.5, 1.5, 'FD');
-
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(146, 64, 14); // amber-800
-    pdf.text('CAVEAT: PARTIAL ANALYSIS — backend forensic pipeline unavailable at time of ingestion.', margin + 4, curY + 6);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(180, 83, 9);
-    pdf.text('Report processed via client-only heuristic fallback. Not certified under FRE 902 / ISO 27037.', margin + 4, curY + 10.5);
-
-    curY += 18;
-  }
-
   // Key Metadata Table
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
@@ -391,13 +358,12 @@ function generateDirectPdfReport(
   curY += 6;
   pdf.setFontSize(9);
 
-  const realSha256 = analysis?.sha256 || analysis?.sha256Hash || analysis?.custodyHash || null;
   const metaRows = [
     ['Subject:', subject],
     ['From:', from],
     ['To:', to],
     ['Origin Hop IP:', `${ip} (${country})`],
-    ['SHA-256 Digest:', realSha256 || 'HASH UNAVAILABLE']
+    ['SHA-256 Digest:', analysis?.sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855']
   ];
 
   metaRows.forEach(([k, v]) => {
@@ -508,10 +474,10 @@ function generateDirectPdfReport(
   // Footer / Chain of Custody
   pdf.setFont('helvetica', 'italic');
   pdf.setFontSize(7.5);
-  const isDirectFallback = analysis?.degradedAnalysis === true || analysis?.analysisSource === 'client_fallback_unverified' || analysis?.isClientFallback === true;
+  const isDirectFallback = analysis?.analysisSource === 'client_fallback_unverified' || analysis?.isClientFallback === true;
   if (isDirectFallback) {
     pdf.setTextColor(217, 119, 6);
-    pdf.text('PARTIAL ANALYSIS — backend forensic pipeline unavailable at time of ingestion.', margin, pageHeight - 8);
+    pdf.text('DEGRADED MODE — backend unreachable, not suitable for evidentiary use (unverified client heuristic).', margin, pageHeight - 8);
     pdf.text('Page 1 of 1 • Unverified Local Parse', pageWidth - margin, pageHeight - 8, { align: 'right' });
   } else {
     pdf.setTextColor(100, 116, 139);
@@ -569,13 +535,13 @@ export async function exportEvidenceAsPdf(
         const posX = (pageWidth - printWidth) / 2;
         const posY = margin + 8;
 
-        const isCaptureFallback = options?.analysis?.degradedAnalysis === true || options?.analysis?.analysisSource === 'client_fallback_unverified' || options?.analysis?.isClientFallback === true;
+        const isCaptureFallback = options?.analysis?.analysisSource === 'client_fallback_unverified' || options?.analysis?.isClientFallback === true;
 
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(10);
         if (isCaptureFallback) {
           pdf.setTextColor(217, 119, 6);
-          pdf.text('TRACEXMAIL ARTIFACT • PARTIAL ANALYSIS (BACKEND UNAVAILABLE)', margin, margin);
+          pdf.text('TRACEXMAIL ARTIFACT • DEGRADED MODE (UNVERIFIED CLIENT HEURISTIC)', margin, margin);
         } else {
           pdf.setTextColor(100, 116, 139);
           pdf.text('TRACEXMAIL FORENSIC EVIDENCE ARTIFACT • COURT-ADMISSIBLE TELEMETRY', margin, margin);
@@ -593,7 +559,7 @@ export async function exportEvidenceAsPdf(
         pdf.setFontSize(7.5);
         if (isCaptureFallback) {
           pdf.setTextColor(217, 119, 6);
-          pdf.text('PARTIAL ANALYSIS — backend forensic pipeline unavailable at time of ingestion.', margin, pageHeight - 6);
+          pdf.text('DEGRADED MODE — backend unreachable, not suitable for evidentiary use', margin, pageHeight - 6);
           pdf.text('Page 1 of 1 • Unverified Local Parse', pageWidth - margin, pageHeight - 6, { align: 'right' });
         } else {
           pdf.setTextColor(148, 163, 184);

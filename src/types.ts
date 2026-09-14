@@ -147,10 +147,10 @@ export interface ExtractedUrl {
 
 export interface AttachmentInfo {
   filename: string;
-  size: string | null;
+  size: string;
   mimeType: string;
-  sha256: string | null;
-  md5: string | null;
+  sha256: string;
+  md5: string;
   status: 'CLEAN' | 'MALICIOUS' | 'SUSPICIOUS';
   vtDetection?: string;
 }
@@ -260,7 +260,6 @@ export interface EmailAnalysis {
   evidenceId?: string;
   analysisSource?: 'server_verified' | 'client_fallback_unverified';
   isClientFallback?: boolean;
-  degradedAnalysis?: boolean;
   sha256Hash?: string;
   sha256?: string;
   custodyHash?: string;
@@ -336,8 +335,6 @@ export interface EmailAnalysis {
   mlConfidence: number; // e.g. 0.98
   rawEml: string;
   summary: string;
-  isDemo?: boolean;
-  is_demo?: boolean;
   domain_intelligence?: DomainIntelligence;
   domainIntelligence?: DomainIntelligence;
   maxmindIntelligence?: {
@@ -457,7 +454,7 @@ export interface EvidenceCardData {
   }>;
   score?: {
     label: string;
-    percent?: number | null;
+    percent: number;
     resultText: string;
     resultLabel: string;
     good?: boolean;
@@ -528,25 +525,6 @@ export interface CaseClosurePayload {
   analyst_notes?: string;
   close_reason?: string;
   resolution_type?: string;
-}
-
-export interface InactivityConfig {
-  enabled: boolean;
-  timeoutMinutes: number;
-  warningSeconds: number;
-  soundAlert: boolean;
-  autoLockOnBlur: boolean;
-  complianceStandard: 'NIST SP 800-53 AC-11' | 'ISO/IEC 27001' | 'SOC 2 Type II' | 'CJIS Security Policy';
-}
-
-export interface WorkspaceLockState {
-  isLocked: boolean;
-  isWarning: boolean;
-  secondsRemaining: number;
-  totalTimeoutSeconds: number;
-  idleSeconds: number;
-  lockedAt: string | null;
-  lockReason: 'inactivity' | 'manual' | 'policy';
 }
 
 

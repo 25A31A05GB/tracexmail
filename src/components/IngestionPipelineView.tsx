@@ -26,9 +26,7 @@ import {
   ShieldAlert,
   RotateCcw,
   Info,
-  Mail,
-  ChevronDown,
-  ChevronUp
+  Mail
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -85,36 +83,9 @@ export function IngestionPipelineView({
     `[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Pipeline initialized. Ready for RFC822 ingestion.`
   ]);
 
-  // Telemetry Console disclosure state (collapsed by default, persisted per user)
-  const [isTelemetryExpanded, setIsTelemetryExpanded] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('tracexmail_telemetry_expanded');
-      if (saved !== null) return saved === 'true';
-    } catch {}
-    return false;
-  });
-
-  const toggleTelemetry = () => {
-    setIsTelemetryExpanded(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('tracexmail_telemetry_expanded', String(next));
-      } catch {}
-      return next;
-    });
-  };
-
   const addLog = (msg: string) => {
     const ts = new Date().toISOString().split('T')[1].slice(0, 8);
     setDiagnosticLogs(prev => [...prev, `[${ts}] ${msg}`]);
-  };
-
-  const handleLoadSampleHeader = () => {
-    const sample = SAMPLE_ANALYSES[0];
-    const headerStr = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\nAuthentication-Results: spf=pass dkim=pass dmarc=pass\nReceived: from relay.network.net by gateway.corp.net with ESMTP id 9823419; ${sample.headers.date}\n\n${sample.name}`;
-    setRawText(headerStr);
-    setFileName(`${sample.id}.eml`);
-    addLog(`[ACTION] Loaded benchmark RFC822 sample '${sample.id}' into editor.`);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -350,26 +321,26 @@ export function IngestionPipelineView({
         />
       )}
 
-      <div className="flex-1 flex flex-col h-full bg-[var(--ink)] overflow-y-auto w-full max-w-full min-w-0 p-3.5 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex-1 flex flex-col h-full bg-[var(--ink)] overflow-y-auto p-4 sm:p-6 space-y-6">
         {/* Top Banner */}
-        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-4 sm:p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 rounded-full border-[1.5px] border-[var(--thread)] flex items-center justify-center bg-[rgba(178,58,46,0.1)] shrink-0">
+        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-5 sm:p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full border-[1.5px] border-[var(--thread)] flex items-center justify-center bg-[rgba(178,58,46,0.1)]">
               <Database className="w-5 h-5 text-[var(--thread)]" />
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-display font-bold text-[var(--paper)] flex items-center gap-2">
                 <span>Upload &amp; Inspect Email</span>
               </h2>
-              <p className="text-xs text-[var(--paper-dim)] mt-0.5 font-sans leading-relaxed">
-                Upload an email file (.eml, .msg, or raw text) to instantly verify sender, route, links, and security status.
+              <p className="text-xs text-[var(--paper-dim)] mt-0.5 font-sans">
+                Upload an email file (.eml, .msg, or raw text) to instantly verify the sender, route, links, and security status.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3">
             <button
               onClick={onNavigateToOverview}
-              className="w-full sm:w-auto justify-center px-3.5 py-2 bg-[var(--ink)] hover:bg-[#252019] text-[var(--paper)] text-xs font-semibold rounded-sm border border-[var(--line)] flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+              className="px-3.5 py-2 bg-[var(--ink)] hover:bg-[#252019] text-[var(--paper)] text-xs font-semibold rounded-sm border border-[var(--line)] flex items-center gap-2 transition-all cursor-pointer shadow-sm"
             >
               <span>View Case Overview</span>
               <ArrowRight className="w-3.5 h-3.5 text-[var(--slate)]" />
@@ -517,108 +488,74 @@ export function IngestionPipelineView({
         )}
 
         {/* Main Ingestion Box */}
-        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-4 sm:p-6 shadow-md space-y-4 max-w-full min-w-0">
-          {/* Ingestion Method Tabs with Visual Priority */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between border-b border-[var(--line)] gap-2 pb-0">
-            <div className="flex gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full">
-              {/* Primary Direct Ingestion Methods */}
-              <button
-                onClick={() => setActiveTab('paste')}
-                className={`pb-2.5 sm:pb-3 px-3 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                  activeTab === 'paste'
-                    ? 'border-[var(--thread)] text-[var(--paper)] font-bold bg-[rgba(178,58,46,0.08)] rounded-t-sm'
-                    : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
-                }`}
-              >
-                <FileText className="w-3.5 h-3.5 text-[var(--thread)] shrink-0" />
-                <span>Paste Headers / RFC822</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('upload')}
-                className={`pb-2.5 sm:pb-3 px-3 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                  activeTab === 'upload'
-                    ? 'border-[var(--thread)] text-[var(--paper)] font-bold bg-[rgba(178,58,46,0.08)] rounded-t-sm'
-                    : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
-                }`}
-              >
-                <Upload className="w-3.5 h-3.5 text-[var(--slate)] shrink-0" />
-                <span>Upload .EML</span>
-              </button>
-
-              {/* Secondary Power-User & Integration Methods */}
-              <button
-                onClick={() => setActiveTab('batch')}
-                className={`pb-2.5 sm:pb-3 px-2.5 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                  activeTab === 'batch'
-                    ? 'border-[var(--stamp)] text-[var(--paper)] font-bold bg-[rgba(201,162,39,0.08)] rounded-t-sm'
-                    : 'border-transparent text-[#8a8070] hover:text-[var(--paper-dim)]'
-                }`}
-                title="Forensic Benchmark Attack Dataset Presets"
-              >
-                <Cpu className="w-3 h-3 text-[var(--stamp)] shrink-0" />
-                <span>Preset Cases</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('gmail')}
-                className={`pb-2.5 sm:pb-3 px-2.5 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                  activeTab === 'gmail'
-                    ? 'border-amber-500 text-[var(--paper)] font-bold bg-amber-500/10 rounded-t-sm'
-                    : 'border-transparent text-[#8a8070] hover:text-[var(--paper-dim)]'
-                }`}
-                title="Direct Gmail Gateway Sync"
-              >
-                <Mail className="w-3 h-3 text-amber-500 shrink-0" />
-                <span className="flex items-center gap-1.5">
-                  <span>Gmail Live Sync</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                </span>
-              </button>
-            </div>
+        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-5 sm:p-6 shadow-md space-y-4">
+          <div className="flex border-b border-[var(--line)] gap-2 pb-0">
+            <button
+              onClick={() => setActiveTab('paste')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'paste'
+                  ? 'border-[var(--thread)] text-[var(--paper)]'
+                  : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-[var(--thread)]" />
+              <span>Paste Raw Headers / RFC822</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'upload'
+                  ? 'border-[var(--thread)] text-[var(--paper)]'
+                  : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
+              }`}
+            >
+              <Upload className="w-3.5 h-3.5 text-[var(--slate)]" />
+              <span>Upload .EML File</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('batch')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'batch'
+                  ? 'border-[var(--thread)] text-[var(--paper)]'
+                  : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
+              }`}
+            >
+              <Cpu className="w-3.5 h-3.5 text-[var(--stamp)]" />
+              <span>Forensic Preset Cases</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('gmail')}
+              className={`pb-3 px-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'gmail'
+                  ? 'border-[#d97706] text-[var(--paper)]'
+                  : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-[#d97706]" />
+              <span className="flex items-center gap-1.5">
+                <span>Gmail Live Auto-Sync</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              </span>
+            </button>
           </div>
 
           {activeTab === 'paste' && (
             <div className="space-y-3 pt-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
-                <span className="text-[var(--paper-dim)] font-sans">
-                  Paste full email headers or entire RFC822 payload below:
-                </span>
-                <button
-                  type="button"
-                  onClick={handleLoadSampleHeader}
-                  className="text-[11px] font-mono text-[var(--stamp)] hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
-                  title="Insert realistic benchmark RFC822 attack sample for immediate forensic testing"
-                >
-                  <Sparkles className="w-3 h-3 text-[var(--stamp)] shrink-0" />
-                  <span>Insert Sample Payload</span>
-                </button>
-              </div>
-
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
-                onKeyDown={(e) => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && rawText.trim()) {
-                    executePipelineWithAnimation(rawText, 'pasted_message.eml');
-                  }
-                }}
                 placeholder="Paste raw email headers (Received, From, To, Subject, Authentication-Results, etc.)..."
                 rows={11}
-                className="w-full p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors shadow-inner"
+                className="w-full p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors"
               />
-
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-                <span className="text-[11px] text-[var(--paper-muted)] font-mono self-start sm:self-auto">
-                  {rawText.length > 0 ? `${rawText.length.toLocaleString()} bytes ready • Press ⌘↵ to run` : 'Ready for input • Supports RFC822 / MIME text'}
-                </span>
+              <div className="flex justify-end">
                 <button
-                  disabled={!rawText.trim() || isScanning}
+                  disabled={!rawText.trim()}
                   onClick={() => executePipelineWithAnimation(rawText, 'pasted_message.eml')}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-[var(--thread)] to-[#c94132] hover:brightness-110 active:scale-[0.99] text-white text-xs font-bold rounded-sm border border-[rgba(255,255,255,0.15)] flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="btn-primary text-xs font-semibold flex items-center gap-2 cursor-pointer py-2 px-4.5 disabled:opacity-50"
                 >
                   <span>Execute Forensic Pipeline</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -631,24 +568,21 @@ export function IngestionPipelineView({
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`p-10 sm:p-12 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all ${
+                className={`p-10 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all ${
                   isDragging
-                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.15)] scale-[1.01]'
-                    : 'border-[var(--line)] hover:border-[var(--slate)] bg-[var(--ink)] hover:bg-[#1a1713]'
+                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.1)]'
+                    : 'border-[var(--line)] hover:border-[var(--slate)] bg-[var(--ink)]'
                 }`}
               >
-                <div className="w-14 h-14 mx-auto rounded-full bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] flex items-center justify-center text-[var(--slate)] mb-3 shadow-inner">
-                  <Upload className="w-7 h-7" />
+                <div className="w-12 h-12 mx-auto rounded-full bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] flex items-center justify-center text-[var(--slate)] mb-3">
+                  <Upload className="w-6 h-6" />
                 </div>
-                <p className="text-sm font-bold text-[var(--paper)]">
+                <p className="text-sm font-semibold text-[var(--paper)]">
                   Click to select or drag &amp; drop your .EML file here
                 </p>
-                <p className="text-xs text-[var(--paper-dim)] font-sans mt-1 max-w-sm mx-auto">
-                  Automatic MIME parsing, hop routing extraction, SPF/DKIM verification, and threat analysis.
+                <p className="text-xs text-[var(--paper-dim)] font-sans mt-1">
+                  Supports standard RFC822 (.eml, .msg, .txt) format
                 </p>
-                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded bg-[#201c16] border border-[#3a352c] text-[11px] font-mono text-[var(--paper-muted)]">
-                  <span>Accepts: .eml, .msg, .txt RFC822</span>
-                </div>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -673,7 +607,7 @@ export function IngestionPipelineView({
                       const rawContent = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\n\n${sample.name}`;
                       executePipelineWithAnimation(rawContent, `${sample.id}.eml`);
                     }}
-                    className="p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] hover:border-[var(--thread)] cursor-pointer transition-all space-y-1.5 group hover:bg-[#1f1b15]"
+                    className="p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] hover:border-[var(--thread)] cursor-pointer transition-all space-y-1.5 group"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-mono font-bold uppercase text-[var(--thread)] bg-[rgba(178,58,46,0.15)] border border-[rgba(178,58,46,0.3)] px-2 py-0.5 rounded-sm">
@@ -702,117 +636,67 @@ export function IngestionPipelineView({
           )}
         </div>
 
-        {/* Diagnostic Pipeline Terminal Log Panel (Progressive Disclosure) */}
-        {(() => {
-          const hasActiveJobOrError = isScanning || isPendingBackend || !!diagnosticError || !!error;
-          const isTerminalOpen = isTelemetryExpanded || hasActiveJobOrError;
-
-          if (!isTerminalOpen) {
-            return (
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={toggleTelemetry}
-                  className="px-3 py-1.5 rounded-sm bg-[#14110e] hover:bg-[#1a1612] border border-[#2e2820] hover:border-[#3a352c] text-[#8a8070] hover:text-[#ede6d8] flex items-center gap-2 font-mono text-[11px] transition-colors cursor-pointer"
-                  title="Open Diagnostic Telemetry Console"
-                >
-                  <Terminal className="w-3.5 h-3.5 text-[var(--slate)]" />
-                  <span className="font-medium">Diagnostic Telemetry</span>
-                  <span className="text-[10px] text-[#6b6255]">({diagnosticLogs.length} events • Idle)</span>
-                  <ChevronDown className="w-3 h-3 text-[#6b6255] ml-1" />
-                </button>
-              </div>
-            );
-          }
-
-          return (
-            <div className="bg-[#100e0b] border border-[#3a352c] rounded-sm font-mono shadow-md overflow-hidden transition-all duration-200 animate-in fade-in duration-150">
-              <div 
-                onClick={toggleTelemetry}
-                className="flex items-center justify-between p-3 cursor-pointer bg-[#14110e] hover:bg-[#1a1612] transition-colors select-none"
-                title="Click to collapse telemetry console"
-              >
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <Terminal className="w-4 h-4 text-[var(--slate)] shrink-0" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#ede6d8]">
-                    PIPELINE DIAGNOSTIC TELEMETRY
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e1b15] text-[#b9af9c] border border-[#3a352c]">
-                    {diagnosticLogs.length} EVENTS
-                  </span>
-                  {hasActiveJobOrError ? (
-                    <span className="text-[9.5px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-sans font-semibold flex items-center gap-1.5 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                      <span>{isPendingBackend ? 'Active Telemetry Streaming' : 'Diagnostic Notice Recorded'}</span>
-                    </span>
-                  ) : (
-                    <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[#17140f] text-[#8a8070] font-sans">
-                      Idle • Standby
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(diagnosticLogs.join('\n'));
-                      setCopiedLogs(true);
-                      setTimeout(() => setCopiedLogs(false), 2000);
-                    }}
-                    className="px-2 py-1 text-[10.5px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
-                    title="Copy diagnostic log output to clipboard"
-                  >
-                    {copiedLogs ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedLogs ? 'Copied' : 'Copy'}</span>
-                  </button>
-                  <button
-                    onClick={() => setDiagnosticLogs([`[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Terminal logs cleared.`])}
-                    className="px-2 py-1 text-[10.5px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
-                    title="Clear diagnostic log terminal"
-                  >
-                    <Trash2 className="w-3 h-3 text-[var(--thread)]" />
-                    <span>Clear</span>
-                  </button>
-                  <button
-                    onClick={toggleTelemetry}
-                    className="px-2.5 py-1 text-[11px] bg-[#221d17] hover:bg-[#2c261e] text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Collapse diagnostic console"
-                  >
-                    <span>Collapse</span>
-                    <ChevronUp className="w-3.5 h-3.5 text-[var(--slate)]" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#0a0907] border-t border-[#24201a]">
-                <div className="text-[11px] leading-relaxed max-h-52 overflow-y-auto space-y-1 text-[#b9af9c]">
-                  {diagnosticLogs.map((log, index) => {
-                    const isError = log.includes('[ERROR]') || log.includes('[FATAL]');
-                    const isSuccess = log.includes('[SUCCESS]') || log.includes('[COMPLETE]');
-                    const isIngest = log.includes('[INGEST]') || log.includes('[TRANSPORT]');
-                    return (
-                      <div 
-                        key={index} 
-                        className={`flex items-start gap-2 font-mono ${
-                          isError 
-                            ? 'text-rose-400 font-semibold bg-rose-950/20 px-1 py-0.5 rounded' 
-                            : isSuccess 
-                              ? 'text-emerald-400 font-semibold' 
-                              : isIngest 
-                                ? 'text-[var(--slate)]' 
-                                : 'text-[#b9af9c]'
-                        }`}
-                      >
-                        <span className="text-[#6b6255] select-none">&gt;</span>
-                        <span className="break-all">{log}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+        {/* Diagnostic Pipeline Terminal Log Panel */}
+        <div className="bg-[#100e0b] border border-[#3a352c] rounded-sm p-4 space-y-3 font-mono shadow-md">
+          <div className="flex items-center justify-between pb-2 border-b border-[#2a251e]">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-[var(--slate)]" />
+              <span className="text-xs font-bold uppercase tracking-wider text-[#ede6d8]">
+                PIPELINE DIAGNOSTIC TELEMETRY LOG
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e1b15] text-[#b9af9c] border border-[#3a352c]">
+                {diagnosticLogs.length} EVENTS
+              </span>
             </div>
-          );
-        })()}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(diagnosticLogs.join('\n'));
+                  setCopiedLogs(true);
+                  setTimeout(() => setCopiedLogs(false), 2000);
+                }}
+                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                title="Copy diagnostic log output to clipboard"
+              >
+                {copiedLogs ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedLogs ? 'Copied' : 'Copy Logs'}</span>
+              </button>
+              <button
+                onClick={() => setDiagnosticLogs([`[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Terminal logs cleared.`])}
+                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                title="Clear diagnostic log terminal"
+              >
+                <Trash2 className="w-3 h-3 text-[var(--thread)]" />
+                <span>Clear</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-[#0a0907] border border-[#24201a] rounded p-3 text-[11px] leading-relaxed max-h-52 overflow-y-auto space-y-1 text-[#b9af9c]">
+            {diagnosticLogs.map((log, index) => {
+              const isError = log.includes('[ERROR]') || log.includes('[FATAL]');
+              const isSuccess = log.includes('[SUCCESS]') || log.includes('[COMPLETE]');
+              const isIngest = log.includes('[INGEST]') || log.includes('[TRANSPORT]');
+              return (
+                <div 
+                  key={index} 
+                  className={`flex items-start gap-2 font-mono ${
+                    isError 
+                      ? 'text-rose-400 font-semibold bg-rose-950/20 px-1 py-0.5 rounded' 
+                      : isSuccess 
+                        ? 'text-emerald-400 font-semibold' 
+                        : isIngest 
+                          ? 'text-[var(--slate)]' 
+                          : 'text-[#b9af9c]'
+                  }`}
+                >
+                  <span className="text-[#6b6255] select-none">&gt;</span>
+                  <span className="break-all">{log}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Visible Forensic AlertToast Notification for Ingestion / Engine Errors */}

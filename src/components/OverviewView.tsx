@@ -47,7 +47,6 @@ import { classifyIp } from '../utils/parser';
 import { lookupMaxMindGeo } from '../utils/maxmindService';
 import { WhyAffordance } from './WhyAffordance';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
-import { NonTechnicalEvidenceCard } from './NonTechnicalEvidenceCard';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
@@ -249,8 +248,6 @@ interface OverviewViewProps {
   onOpenNewModal?: () => void;
   onOpenReportModal?: () => void;
   viewMode?: 'simple' | 'analyst';
-  userPersona?: 'technical' | 'non_technical';
-  onSwitchPersona?: (persona: 'technical' | 'non_technical') => void;
 }
 
 export function OverviewView({
@@ -262,9 +259,7 @@ export function OverviewView({
   onNavigateToGraph,
   onOpenNewModal,
   onOpenReportModal,
-  viewMode = 'simple',
-  userPersona = 'technical',
-  onSwitchPersona
+  viewMode = 'simple'
 }: OverviewViewProps) {
   const stdVerdict = getStandardizedVerdict(analysis);
 
@@ -295,27 +290,10 @@ export function OverviewView({
   const [reverifying, setReverifying] = useState<boolean>(false);
   const [originAssessmentOpen, setOriginAssessmentOpen] = useState<boolean>(false);
   const [isEvidenceTagOpen, setIsEvidenceTagOpen] = useState<boolean>(false);
-  const [overviewMode, setOverviewMode] = useState<'non_technical' | 'card' | 'workspace'>(() => {
-    if (userPersona === 'non_technical' || viewMode === 'simple') {
-      return 'non_technical';
-    }
-    return 'card';
-  });
-  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
+  const [overviewMode, setOverviewMode] = useState<'card' | 'workspace'>('card');
+  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
-
-  useEffect(() => {
-    if (userPersona === 'non_technical') {
-      setOverviewMode('non_technical');
-      setIsTechnicalExpanded(false);
-    } else if (userPersona === 'technical') {
-      setIsTechnicalExpanded(true);
-      if (overviewMode === 'non_technical') {
-        setOverviewMode('card');
-      }
-    }
-  }, [userPersona]);
 
   useEffect(() => {
     setIsTechnicalExpanded(viewMode === 'analyst');
@@ -622,64 +600,15 @@ export function OverviewView({
     );
   }
 
-  if (overviewMode === 'non_technical') {
-    return (
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0E0B09]">
-        {/* Quick Mode Bar to allow switching */}
-        <div className="bg-[#17130F] border-b border-[#2B241E] px-4 py-2 flex items-center justify-between text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span className="text-[#9C9186]">Active Mode:</span>
-            <span className="px-2 py-0.5 rounded bg-[#D3A039]/20 text-[#D3A039] font-semibold border border-[#D3A039]/30">
-              Non-Technical Safety Card
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (onSwitchPersona) onSwitchPersona('technical');
-                setOverviewMode('card');
-              }}
-              className="px-2.5 py-1 rounded bg-[#1D1712] hover:bg-[#2B241E] text-[#EDE6DC] border border-[#2B241E] text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Terminal className="w-3 h-3 text-blue-400" />
-              <span>Switch to Technical SOC View</span>
-            </button>
-          </div>
-        </div>
-
-        <NonTechnicalEvidenceCard
-          analysis={analysis}
-          onOpenNewModal={onOpenNewModal}
-          onOpenReportModal={onOpenReportModal}
-          onSwitchToTechnical={() => {
-            if (onSwitchPersona) onSwitchPersona('technical');
-            setOverviewMode('workspace');
-          }}
-        />
-      </div>
-    );
-  }
-
   const evidenceCardData = mapAnalysisToEvidenceCardData(analysis);
 
   return (
-    <div id="overview-dashboard" className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#0B0C0F] text-slate-100 font-mono w-full max-w-full min-w-0">
+    <div id="overview-dashboard" className="flex-1 p-4 md:p-6 overflow-y-auto bg-[#0B0C0F] text-slate-100 font-mono">
       {/* Top Bar Header & Action Controls */}
       <div className="flex flex-col gap-3 bg-[#16181D] border border-[#2A2D34] p-3.5 rounded-lg mb-6 shadow-sm">
         {/* Row 1: Mode Switcher + Case Status */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                setOverviewMode('non_technical');
-                if (onSwitchPersona) onSwitchPersona('non_technical');
-              }}
-              className="px-3 py-1.5 rounded text-xs font-mono font-semibold bg-[#1D2027] hover:bg-[#2A2D34] text-neutral-300 border border-[#2A2D34] transition-colors cursor-pointer flex items-center gap-1"
-              title="Switch to Non-Technical Human Safety Card View"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#D3A039]"></span>
-              <span>Human Safety Card</span>
-            </button>
             <button
               onClick={() => setOverviewMode('card')}
               className={`px-3 py-1.5 rounded text-xs font-mono font-semibold transition-colors cursor-pointer ${
@@ -787,42 +716,6 @@ export function OverviewView({
           </div>
         </div>
       </div>
-
-      {/* Degraded Analysis / Fallback Warning Banner */}
-      {(analysis.degradedAnalysis || analysis.isClientFallback || analysis.analysisSource === 'client_fallback_unverified') && (
-        <div 
-          id="degraded-analysis-warning-banner"
-          className="mb-6 p-4 rounded-lg bg-amber-950/40 border-2 border-amber-600/80 text-amber-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg backdrop-blur-sm"
-        >
-          <div className="flex items-start gap-3.5">
-            <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 shrink-0 mt-0.5">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider font-mono px-2 py-0.5 bg-amber-500/25 text-amber-300 border border-amber-500/50 rounded">
-                  PARTIAL ANALYSIS
-                </span>
-                <span className="text-sm font-bold text-amber-100 font-sans">
-                  Backend forensic pipeline unavailable at time of ingestion
-                </span>
-              </div>
-              <p className="text-xs text-amber-200/90 font-sans leading-relaxed">
-                This case was processed using local client-side heuristic fallback. Authoritative backend reputation lookups, server-side hash sealing, ML threat classification, and DNSSEC telemetry are degraded. Not certified under FRE 902 / ISO 27037 for court admissibility.
-              </p>
-            </div>
-          </div>
-          {onOpenNewModal && (
-            <button
-              onClick={onOpenNewModal}
-              className="shrink-0 px-3.5 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs font-mono transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm whitespace-nowrap self-end md:self-center"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Re-analyze via Pipeline</span>
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Top-of-view Plain-Language Summary for Non-Technical Reviewers */}
       <div className="mb-6">
@@ -1678,7 +1571,7 @@ export function OverviewView({
                     <div>
                       <div className="text-xs font-mono font-medium text-slate-200">{att.filename}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        Size: {att.size || 'size unavailable'} | SHA256: {att.sha256 ? `${att.sha256.slice(0, 16)}...` : 'hash unavailable'}
+                        Size: {att.size} | SHA256: {att.sha256.slice(0, 16)}...
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

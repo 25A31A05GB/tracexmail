@@ -178,12 +178,6 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
 
-  // In-Thread Quarantine Reports Sync State
-  const [syncingReports, setSyncingReports] = useState<boolean>(false);
-  const [syncReportsResult, setSyncReportsResult] = useState<string | null>(null);
-  const [dispatchingReportId, setDispatchingReportId] = useState<string | null>(null);
-  const [reportDispatchedMap, setReportDispatchedMap] = useState<Record<string, string>>({});
-
   // Synced & Analyzed Emails Stream State
   const [syncedEmails, setSyncedEmails] = useState<SyncedEmailItem[]>([]);
   const [loadingSyncedEmails, setLoadingSyncedEmails] = useState<boolean>(false);
@@ -612,72 +606,6 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     }
   };
 
-  const handleSyncQuarantineReports = async () => {
-    try {
-      setSyncingReports(true);
-      setSyncReportsResult(null);
-      const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
-      const res = await apiFetch('/api/gmail/sync-quarantine-reports', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-email': targetEmail
-        },
-        body: JSON.stringify({ user_email: targetEmail, limit: 50 })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSyncReportsResult(data.message || 'Quarantine reports successfully inserted into Gmail threads.');
-        fetchSyncedEmails();
-        fetchStatus();
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setSyncReportsResult(`Failed to sync reports: ${err.error || 'Server error'}`);
-      }
-    } catch (e: any) {
-      setSyncReportsResult(`Error syncing reports: ${e.message}`);
-    } finally {
-      setSyncingReports(false);
-      setTimeout(() => setSyncReportsResult(null), 10000);
-    }
-  };
-
-  const handleDispatchReport = async (email: SyncedEmailItem) => {
-    setDispatchingReportId(email.id);
-    try {
-      const res = await apiFetch('/api/gmail/dispatch-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          case_id: email.caseId || email.id,
-          threadId: email.messageId,
-          subject: email.subject,
-          threatScore: email.threatScore,
-          verdict: email.verdict,
-          whyNarrative: email.whyNarrative,
-          alsoSendToInbox: true
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setReportDispatchedMap(prev => ({ ...prev, [email.id]: 'Report Sent to Gmail!' }));
-        setTimeout(() => {
-          setReportDispatchedMap(prev => {
-            const next = { ...prev };
-            delete next[email.id];
-            return next;
-          });
-        }, 5000);
-      } else {
-        setErrorMsg(data.error || 'Failed to dispatch report note to Gmail.');
-      }
-    } catch (err: any) {
-      setErrorMsg('Error dispatching report to Gmail: ' + err.message);
-    } finally {
-      setDispatchingReportId(null);
-    }
-  };
-
   const handleSimulateInboundInterception = async (isMalicious: boolean = true) => {
     setSimulating(true);
     setSyncResult(null);
@@ -884,9 +812,9 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   }
 
   return (
-    <div className="bg-[#181613] border border-[#342e26] rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-6 shadow-sm w-full max-w-full min-w-0">
+    <div className="bg-[#181613] border border-[#342e26] rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
       {/* Top Header Card */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2820] pb-4 sm:pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#2d2820] pb-5">
         <div className="flex items-start gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
             <Mail className="w-5 h-5" />
@@ -1788,22 +1716,6 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                           <span>{isExpanded ? 'Hide Raw Details' : 'View Headers'}</span>
                           {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
-
-                        <button
-                          onClick={() => handleDispatchReport(email)}
-                          disabled={dispatchingReportId === email.id}
-                          className="px-2.5 py-1.5 bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-700/50 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                          title="Inject HTML forensic security report note directly into your real Gmail thread"
-                        >
-                          {dispatchingReportId === email.id ? (
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />
-                          ) : (
-                            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                          )}
-                          <span>
-                            {reportDispatchedMap[email.id] || (dispatchingReportId === email.id ? 'Sending Report...' : 'Send Report to Gmail')}
-                          </span>
-                        </button>
                       </div>
 
                       <div className="flex items-center gap-2 text-[11px] font-mono text-[#9d9282]">
@@ -1834,18 +1746,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       {/* Quarantine & Gate Settings Drawer */}
       {status?.is_connected && (
         <div className="space-y-3">
-          {syncReportsResult && (
-            <div className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-lg flex items-center justify-between text-xs text-amber-200">
-              <span className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
-                {syncReportsResult}
-              </span>
-              <button onClick={() => setSyncReportsResult(null)} className="text-amber-400 hover:text-amber-200 font-bold ml-2">×</button>
-            </div>
-          )}
-
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowWatchConfig(!showWatchConfig)}
                 className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-semibold transition-colors cursor-pointer"
@@ -1862,16 +1764,6 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                 <Sliders className="w-3.5 h-3.5 text-blue-400" />
                 <span>Pre-Delivery Quarantine Gate</span>
                 {showConfig ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-
-              <button
-                onClick={handleSyncQuarantineReports}
-                disabled={syncingReports}
-                className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded flex items-center gap-1.5 font-semibold transition-colors cursor-pointer disabled:opacity-50"
-                title="Ensure all emails in label:TraceXMail-Quarantine have summarized forensic reports inserted directly into their Gmail threads"
-              >
-                {syncingReports ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <FileText className="w-3.5 h-3.5 text-amber-400" />}
-                <span>{syncingReports ? 'Inserting Reports...' : 'Sync In-Thread Reports'}</span>
               </button>
             </div>
 

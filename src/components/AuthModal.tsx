@@ -12,7 +12,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = 'signin' }: AuthModalProps) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'analyst' | 'admin' | 'read_only'>('analyst');
@@ -23,53 +23,16 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  // MFA Challenge State
-  const [mfaChallenge, setMfaChallenge] = useState<{ factorId: string; challengeId: string } | null>(null);
-  const [mfaCode, setMfaCode] = useState('');
-
   React.useEffect(() => {
     if (isOpen) {
       if (initialMode) setMode(initialMode);
       setSubmitted(false);
-      setMfaChallenge(null);
-      setMfaCode('');
       setErrorMessage(null);
       setSuccessMessage(null);
     }
   }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
-
-  const handleMfaVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mfaChallenge || !mfaCode.trim() || !supabase) return;
-
-    setLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const { error } = await supabase.auth.mfa.verify({
-        factorId: mfaChallenge.factorId,
-        challengeId: mfaChallenge.challengeId,
-        code: mfaCode.trim()
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      setSuccessMessage('MFA verification successful (AAL2 authenticated).');
-      await initializeSession();
-      setTimeout(() => {
-        onClose();
-      }, 800);
-    } catch (err: any) {
-      console.error('[MFA Verify Error]', err);
-      setErrorMessage(err.message || 'Invalid TOTP verification code. Please check your authenticator app.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -151,27 +114,6 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
 
         if (signInError) {
           throw signInError;
-        }
-
-        // Real AAL Check for MFA
-        const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (!aalError && aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel === 'aal1') {
-          const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
-          if (!factorsError && factorsData?.totp && factorsData.totp.length > 0) {
-            const factor = factorsData.totp[0];
-            const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-              factorId: factor.id
-            });
-
-            if (!challengeError && challengeData) {
-              setMfaChallenge({
-                factorId: factor.id,
-                challengeId: challengeData.id
-              });
-              setLoading(false);
-              return;
-            }
-          }
         }
 
         setSuccessMessage('Signed in successfully.');
@@ -333,76 +275,6 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                 </button>
               </div>
             </div>
-          ) : mfaChallenge ? (
-            <form onSubmit={handleMfaVerify} className="space-y-4">
-              <div className="p-4 rounded-lg bg-cyan-950/40 border border-cyan-800/60 space-y-2">
-                <div className="flex items-center gap-2 text-cyan-400 font-semibold text-xs">
-                  <Shield className="w-4 h-4 shrink-0" />
-                  <span>Two-Factor Authentication Required (AAL2)</span>
-                </div>
-                <p className="text-xs text-slate-300">
-                  Please enter the 6-digit verification code from your authenticator app (Google Authenticator, 1Password, or Authy).
-                </p>
-              </div>
-
-              {errorMessage && (
-                <div className="p-3 text-xs bg-rose-950/50 border border-rose-600/60 rounded-lg text-rose-300 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="p-3 text-xs bg-emerald-950/50 border border-emerald-600/60 rounded-lg text-emerald-300 flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{successMessage}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  6-Digit Authenticator Code
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    required
-                    autoFocus
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-center tracking-widest font-mono text-cyan-300 placeholder-slate-600 focus:outline-hidden focus:border-cyan-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMfaChallenge(null);
-                    setMfaCode('');
-                    setErrorMessage(null);
-                  }}
-                  className="px-4 py-2 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
-                >
-                  Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || mfaCode.length < 6}
-                  className="flex-1 py-2 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-3.5 h-3.5" />}
-                  <span>Verify TOTP Code</span>
-                </button>
-              </div>
-            </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-3.5">
               {!isSupabaseConfigured && (

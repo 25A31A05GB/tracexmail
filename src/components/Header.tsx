@@ -59,16 +59,11 @@ interface HeaderProps {
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
   onSetViewMode?: (mode: 'simple' | 'analyst') => void;
-  userPersona?: 'technical' | 'non_technical';
-  onSetPersona?: (persona: 'technical' | 'non_technical') => void;
-  onOpenOnboarding?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
   onToggleMobileSidebar?: () => void;
   isMobileSidebarOpen?: boolean;
   onSyncCases?: () => void | Promise<void>;
-  inactivityRemainingSecs?: number;
-  onLockWorkspace?: () => void;
 }
 
 export function Header({
@@ -90,52 +85,19 @@ export function Header({
   onOpenWalkthrough,
   viewMode = 'simple',
   onSetViewMode,
-  userPersona = 'technical',
-  onSetPersona,
-  onOpenOnboarding,
   onOpenCommandPalette,
   onOpenShortcutsHelp,
   onToggleMobileSidebar,
   isMobileSidebarOpen = false,
-  onSyncCases,
-  inactivityRemainingSecs,
-  onLockWorkspace
+  onSyncCases
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.dropdown-container')) {
-        setDropdownOpen(false);
-        setUserDropdownOpen(false);
-        setToolsDropdownOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setDropdownOpen(false);
-        setUserDropdownOpen(false);
-        setToolsDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -246,72 +208,44 @@ export function Header({
           </button>
         )}
 
-        {/* Unified Case & Ingestion Sync Group (Progressive Disclosure) */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="relative dropdown-container">
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
-              title="Switch Case / Dataset Presets"
-            >
-              <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
-              <span className="max-w-[110px] sm:max-w-[160px] md:max-w-[180px] truncate font-mono text-xs text-[#ede6d8]">
-                {currentAnalysis.id || 'CASE-ACTIVE'}
-              </span>
-              <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
-            </button>
+        <div className="relative">
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
+          >
+            <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
+            <span className="max-w-[110px] sm:max-w-[180px] md:max-w-[200px] truncate font-mono text-xs text-[#ede6d8]">
+              {currentAnalysis.id || 'CASE-ACTIVE'}
+            </span>
+            <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
+          </button>
 
-            {dropdownOpen && (
-              <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="flex items-center justify-between pb-2 border-b border-[#2d2820] mb-2 px-1">
-                  <span className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] tracking-wider">
-                    Case &amp; Ingestion Hub
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Enclave
-                  </span>
-                </div>
-
-                <div className="p-2 rounded bg-[#12100d] border border-[#2d2820] mb-2.5 text-xs">
-                  <div className="text-[10px] font-mono text-[#8a8070]">Active Investigation:</div>
-                  <div className="font-semibold text-[#ede6d8] truncate mt-0.5">{currentAnalysis.subject}</div>
-                  <div className="text-[10.5px] font-mono text-[#b9af9c] truncate mt-0.5">{currentAnalysis.from}</div>
-                </div>
-
-                <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-1 py-1 tracking-wider">
-                  Benchmark Forensic Samples
-                </div>
-                <div className="space-y-1 mt-1 max-h-52 overflow-y-auto">
-                  {SAMPLE_ANALYSES.map((sample) => (
-                    <button
-                      key={sample.id}
-                      onClick={() => {
-                        onSelectAnalysis(sample);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-2.5 py-2 rounded text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
-                        sample.id === currentAnalysis.id
-                          ? 'bg-[#b23a2e]/20 border border-[#b23a2e]/40 text-[#ede6d8]'
-                          : 'hover:bg-[#221e17] text-[#b9af9c]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-display font-semibold truncate text-[#ede6d8]">{sample.subject}</span>
-                        <span className="text-[9.5px] font-mono uppercase px-1 py-0.2 rounded bg-black/40 text-amber-300 shrink-0">
-                          {sample.threatVerdict || sample.verdict}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#8a8070] font-mono truncate">{sample.from}</span>
-                    </button>
-                  ))}
-                </div>
+          {dropdownOpen && (
+            <div className="absolute left-0 mt-2 w-72 max-w-[85vw] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2 z-50">
+              <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-2 py-1 tracking-wider">
+                Preset Forensic Samples
               </div>
-            )}
-          </div>
-
-          {/* Integrated Auto-Sync / Auto-Refresh Control */}
-          <AutoRefreshControl onSyncCases={onSyncCases} />
+              <div className="space-y-1 mt-1 max-h-60 overflow-y-auto">
+                {SAMPLE_ANALYSES.map((sample) => (
+                  <button
+                    key={sample.id}
+                    onClick={() => {
+                      onSelectAnalysis(sample);
+                      setDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-2 rounded text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
+                      sample.id === currentAnalysis.id
+                        ? 'bg-[#b23a2e]/20 border border-[#b23a2e]/40 text-[#ede6d8]'
+                        : 'hover:bg-[#221e17] text-[#b9af9c]'
+                    }`}
+                  >
+                    <span className="font-display font-semibold truncate text-[#ede6d8]">{sample.subject}</span>
+                    <span className="text-[10px] text-[#8a8070] font-mono truncate">{sample.from}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="hidden lg:flex flex-col min-w-0">
@@ -331,180 +265,64 @@ export function Header({
         </div>
       </div>
 
-      {/* Right: Consolidated Actions with Progressive Disclosure */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      {/* Right: Actions */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
+        {/* Background Auto-Sync / Auto-Refresh Control */}
+        <AutoRefreshControl onSyncCases={onSyncCases} />
 
-        {/* Command Palette / Quick Search Trigger */}
-        {onOpenCommandPalette && (
-          <button
-            onClick={onOpenCommandPalette}
-            className="hidden xl:flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
-            title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
-          >
-            <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
-            <span className="font-sans">Command Deck</span>
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#26211a] border border-[#3a352c] rounded text-amber-400/90 group-hover:text-amber-300">
-              ⌘K
-            </kbd>
-          </button>
+        {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
+        {onSetViewMode && (
+          <div className="hidden sm:flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">
+            <button
+              onClick={() => onSetViewMode('simple')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
+                viewMode === 'simple'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'text-[#9d9282] hover:text-[#f4efe6]'
+              }`}
+              title="Clean view"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span>Standard</span>
+            </button>
+            <button
+              onClick={() => onSetViewMode('analyst')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
+                viewMode === 'analyst'
+                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  : 'text-[#9d9282] hover:text-[#f4efe6]'
+              }`}
+              title="Deep analysis view"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
+              <span>Analyst</span>
+            </button>
+          </div>
         )}
 
-        {/* Enclave Tools & Safety Overflow Menu (Progressive Disclosure) */}
-        <div className="relative dropdown-container">
-          <button
-            onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all cursor-pointer border text-xs ${
-              toolsDropdownOpen || privacyConfig?.maskingEnabled
-                ? 'bg-[#221e17] border-[var(--stamp)] text-[#ede6d8]'
-                : 'bg-[#1a1713] hover:bg-[#221e17] border-[#342e26] text-[#b9af9c]'
-            }`}
-            title="Enclave Tools, View Modes & Privacy Controls"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
-            <span className="hidden sm:inline font-medium">Tools</span>
-            {privacyConfig?.maskingEnabled && (
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" title="PII Masking Active" />
-            )}
-            <ChevronDown className="w-3 h-3 text-[#8a8070]" />
-          </button>
-
-          {toolsDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-24px)] bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl p-2.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 space-y-2.5">
-              <div className="text-[10px] font-mono uppercase text-[#8a8070] font-semibold tracking-wider pb-1 border-b border-[#2d2820]">
-                Workspace View &amp; Safety Controls
-              </div>
-
-              {/* View Mode Switcher */}
-              {onSetViewMode && (
-                <div className="space-y-1">
-                  <div className="text-[10px] font-mono text-[#8a8070]">Console Perspective:</div>
-                  <div className="grid grid-cols-2 gap-1.5 bg-[#100e0b] p-1 rounded border border-[#2d2820]">
-                    <button
-                      onClick={() => {
-                        onSetViewMode('simple');
-                        if (onSetPersona) onSetPersona('non_technical');
-                      }}
-                      className={`py-1 px-2 rounded text-[11px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                        viewMode === 'simple' || userPersona === 'non_technical'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold'
-                          : 'text-[#9d9282] hover:text-[#ede6d8]'
-                      }`}
-                    >
-                      <Eye className="w-3 h-3 text-amber-400" />
-                      <span>Human View</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        onSetViewMode('analyst');
-                        if (onSetPersona) onSetPersona('technical');
-                      }}
-                      className={`py-1 px-2 rounded text-[11px] font-medium flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                        viewMode === 'analyst' && userPersona === 'technical'
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold'
-                          : 'text-[#9d9282] hover:text-[#ede6d8]'
-                      }`}
-                    >
-                      <SlidersHorizontal className="w-3 h-3 text-blue-400" />
-                      <span>Analyst SOC</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Privacy Safeguards */}
-              {onOpenPrivacyModal && (
-                <button
-                  onClick={() => {
-                    setToolsDropdownOpen(false);
-                    onOpenPrivacyModal();
-                  }}
-                  className={`w-full text-left p-2 rounded flex items-center justify-between transition-colors border cursor-pointer ${
-                    privacyConfig?.maskingEnabled
-                      ? 'bg-purple-950/40 border-purple-800/80 text-purple-200'
-                      : 'bg-[#1a1712] hover:bg-[#221e17] border-[#2d2820] text-[#ede6d8]'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Scale className="w-3.5 h-3.5 text-purple-400" />
-                    <div>
-                      <div className="font-semibold text-[11.5px]">Privacy &amp; PII Masking</div>
-                      <div className="text-[9.5px] text-[#8a8070]">
-                        {privacyConfig?.maskingEnabled ? 'Active (Redacting PII/Tokens)' : 'Standard pass-through'}
-                      </div>
-                    </div>
-                  </div>
-                  <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-[#221e17] border border-[#3a352c] rounded text-[#8a8070]">
-                    ⌘⇧P
-                  </kbd>
-                </button>
-              )}
-
-              {/* Objective Setup */}
-              {onOpenWalkthrough && (
-                <button
-                  onClick={() => {
-                    setToolsDropdownOpen(false);
-                    onOpenWalkthrough();
-                  }}
-                  className="w-full text-left p-2 rounded bg-[#1a1712] hover:bg-[#221e17] border border-[#2d2820] flex items-center justify-between text-[#ede6d8] transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
-                    <div>
-                      <div className="font-semibold text-[11.5px]">Investigation Objective</div>
-                      <div className="text-[9.5px] text-[#8a8070]">Configure focus area &amp; goals</div>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--stamp)]">Setup &rarr;</span>
-                </button>
-              )}
-
-              {/* Keyboard Shortcuts */}
-              {onOpenShortcutsHelp && (
-                <button
-                  onClick={() => {
-                    setToolsDropdownOpen(false);
-                    onOpenShortcutsHelp();
-                  }}
-                  className="w-full text-left p-2 rounded bg-[#1a1712] hover:bg-[#221e17] border border-[#2d2820] flex items-center justify-between text-[#ede6d8] transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Keyboard className="w-3.5 h-3.5 text-amber-400" />
-                    <span className="font-medium text-[11.5px]">Keyboard Shortcuts Cheat Sheet</span>
-                  </div>
-                  <kbd className="px-1.5 py-0.5 text-[9px] font-mono bg-[#221e17] border border-[#3a352c] rounded text-amber-300">
-                    ?
-                  </kbd>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Unified Workspace Status & Operator Clearance (Progressive Disclosure) */}
-        <div className="relative dropdown-container">
+        {/* User Account / Clearance */}
+        <div className="relative">
           <button 
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
-            title={`Workspace Status & Operator Clearance | ${sessionUser?.email || userLabel}`}
+            className="flex items-center gap-1.5 sm:gap-2.5 px-2 sm:px-3 py-1.5 rounded-xl hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
+            title={`Role: ${role.toUpperCase()} | ${sessionUser?.email || userLabel}`}
           >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-            <span className="hidden sm:inline text-xs font-semibold text-[#f4efe6] capitalize">
-              {role === 'admin' ? 'Admin' : 'Analyst'}
-            </span>
-            <span className="hidden md:inline text-[10px] font-mono text-[#8a8070] bg-[#100e0b] px-1 py-0.2 rounded border border-[#2d2820]">
-              0/100
-            </span>
-            <div className="w-5 h-5 rounded bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-300">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+              <span className="hidden sm:inline text-xs font-semibold text-[#f4efe6] capitalize">
+                {role === 'admin' ? 'Admin' : 'Analyst'}
+              </span>
+            </div>
+            <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-300">
               {userLabel.slice(0, 2)}
             </div>
             <ChevronDown className="w-3 h-3 text-[#9d9282]" />
           </button>
 
           {userDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-68 max-w-[calc(100vw-24px)] bg-[#16130f] border border-[#3a352c] rounded-md shadow-2xl py-2 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
+            <div className="absolute right-0 mt-1 w-64 bg-[#16130f] border border-[#3a352c] rounded-[2px] shadow-[0_20px_40px_rgba(0,0,0,0.8)] py-1.5 z-50 text-xs text-[#ede6d8] animate-in fade-in zoom-in-95 duration-100 divide-y divide-[#3a352c]">
               <div className="px-3 py-2 text-[11px] text-[#8a8070]">
-                <div className="font-mono text-[10px] uppercase text-[#8a8070]">Workspace Operator</div>
+                <div className="font-mono text-[10px] uppercase text-[#8a8070]">Operator Identity</div>
                 <div className="truncate text-[#ede6d8] font-semibold mt-0.5">{sessionUser?.email || userLabel}</div>
                 <div className="font-mono text-[10.5px] mt-1 flex items-center justify-between">
                   <span className="text-[#8a8070]">Organization:</span>
@@ -521,10 +339,6 @@ export function Header({
                     {role === 'admin' ? 'GOLD (ADMIN)' : role === 'analyst' ? 'STEEL (ANALYST)' : 'SILVER (AUDITOR)'}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center justify-between text-[10px] font-mono">
-                  <span className="text-[#8a8070]">Usage Quota:</span>
-                  <span className="font-semibold text-emerald-400">0 / 100 cases (Active Tier)</span>
-                </div>
               </div>
 
               {/* Strict Access Verified Notice */}
@@ -539,18 +353,6 @@ export function Header({
               </div>
 
               <div className="py-1">
-                {onOpenOnboarding && (
-                  <button
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      onOpenOnboarding();
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-[#ede6d8] hover:bg-[rgba(201,162,39,0.15)] hover:text-[var(--stamp)] flex items-center gap-2 cursor-pointer transition-colors font-sans font-medium"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#D3A039]" />
-                    <span>Personalize Persona &amp; Goals</span>
-                  </button>
-                )}
                 {onOpenSettings && (
                   <button
                     onClick={() => {
@@ -561,23 +363,6 @@ export function Header({
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
                     <span>Account &amp; MFA Settings</span>
-                  </button>
-                )}
-                {onLockWorkspace && (
-                  <button
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      onLockWorkspace();
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-amber-300 hover:bg-[rgba(201,162,39,0.15)] flex items-center justify-between cursor-pointer transition-colors font-sans font-medium"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Lock Workspace Now</span>
-                    </div>
-                    <kbd className="px-1 py-0.2 text-[9px] font-mono bg-black/40 border border-[#3a352c] rounded text-[#8a8070]">
-                      ⌘⇧L
-                    </kbd>
                   </button>
                 )}
                 {onSignOut && (
@@ -597,20 +382,64 @@ export function Header({
           )}
         </div>
 
-        {/* Forensic Dossier & Executive Compliance Report Button */}
-        {onOpenReportModal && (
+        {/* Command Palette / Quick Search Trigger */}
+        {onOpenCommandPalette && (
           <button
-            onClick={onOpenReportModal}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-sm bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[var(--stamp)] text-xs font-mono font-semibold text-[#ede6d8] transition-all cursor-pointer shrink-0 group shadow-sm"
-            title="Open Forensic Dossier & Executive Incident Report"
+            onClick={onOpenCommandPalette}
+            className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
+            title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
           >
-            <FileText className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
-            <span className="hidden sm:inline">Forensic Report</span>
-            <span className="inline sm:hidden">Report</span>
+            <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
+            <span className="font-sans">Command Deck</span>
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#26211a] border border-[#3a352c] rounded text-amber-400/90 group-hover:text-amber-300">
+              ⌘K
+            </kbd>
           </button>
         )}
 
-        {/* Primary CTA: New Analysis Button with Shortcut Badge */}
+        {/* Keyboard Shortcuts Help Button */}
+        {onOpenShortcutsHelp && (
+          <button
+            onClick={onOpenShortcutsHelp}
+            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-[#9d9282] hover:text-amber-300 transition-colors cursor-pointer"
+            title="Keyboard Shortcuts Cheat Sheet (?)"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Investigation Objective Setup Prompt */}
+        {onOpenWalkthrough && (
+          <button
+            onClick={onOpenWalkthrough}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-[2px] bg-[rgba(201,162,39,0.15)] hover:bg-[rgba(201,162,39,0.25)] border border-[rgba(201,162,39,0.4)] hover:border-[var(--stamp)] text-xs font-mono text-[var(--stamp)] transition-all cursor-pointer shadow-[0_0_10px_rgba(201,162,39,0.15)]"
+            title="Setup Investigation Goal & Tailor Enclave Workspace"
+          >
+            <Compass className="w-3.5 h-3.5 text-[var(--stamp)]" />
+            <span className="font-bold tracking-wide">OBJECTIVE</span>
+          </button>
+        )}
+
+        {/* Privacy & Compliance Button */}
+        {onOpenPrivacyModal && (
+          <button
+            onClick={onOpenPrivacyModal}
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
+              privacyConfig?.maskingEnabled
+                ? 'bg-purple-950/70 border-purple-700 text-purple-200'
+                : 'bg-[#221e17] hover:bg-[#2c271f] border-[#3a352c] text-[#ede6d8]'
+            }`}
+            title="Configure Privacy Safeguards, Retention & PII Masking (⌘⇧P)"
+          >
+            <Scale className="w-3.5 h-3.5 text-purple-400" />
+            <span className="font-mono">Privacy</span>
+            {privacyConfig?.maskingEnabled && (
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            )}
+          </button>
+        )}
+
+        {/* New Analysis Button with Shortcut Badge */}
         <button
           onClick={onOpenNewModal}
           className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer shrink-0"

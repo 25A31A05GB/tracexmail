@@ -1,5 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, ShieldAlert, Terminal, Sparkles, DownloadCloud } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ShieldAlert, Terminal } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -9,7 +9,6 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
-  isChunkError: boolean;
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
@@ -19,32 +18,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
       hasError: false,
       error: null,
       errorInfo: null,
-      isChunkError: false
     };
   }
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
-    const msg = String(error?.message || '');
-    const isChunk =
-      error?.name === 'ChunkLoadError' ||
-      msg.includes('Failed to fetch dynamically imported module') ||
-      msg.includes('Importing a module script failed') ||
-      msg.includes('error loading dynamically imported module') ||
-      msg.includes('dynamically imported module');
-
-    return { hasError: true, error, isChunkError: isChunk };
+    return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const msg = String(error?.message || '');
-    const isChunk =
-      error?.name === 'ChunkLoadError' ||
-      msg.includes('Failed to fetch dynamically imported module') ||
-      msg.includes('Importing a module script failed') ||
-      msg.includes('error loading dynamically imported module') ||
-      msg.includes('dynamically imported module');
-
-    this.setState({ errorInfo, isChunkError: isChunk });
+    this.setState({ errorInfo });
     console.error(
       '[TraceXMail Fatal Render Error] Uncaught runtime exception in component tree:\n',
       error,
@@ -53,27 +35,9 @@ export class ErrorBoundary extends React.Component<Props, State> {
       '\n[Component Stack]:\n',
       errorInfo.componentStack
     );
-
-    // Auto-reload once for dynamic chunk updates
-    if (isChunk) {
-      try {
-        const lastAutoReload = sessionStorage.getItem('tracexmail_chunk_error_autoreload');
-        const now = Date.now();
-        if (!lastAutoReload || now - Number(lastAutoReload) > 20000) {
-          sessionStorage.setItem('tracexmail_chunk_error_autoreload', String(now));
-          console.info('[ErrorBoundary] Dynamic chunk load error detected. Performing automated refresh...');
-          setTimeout(() => {
-            window.location.reload();
-          }, 400);
-        }
-      } catch {}
-    }
   }
 
   private handleReload = () => {
-    try {
-      sessionStorage.removeItem('tracexmail_chunk_error_autoreload');
-    } catch {}
     window.location.reload();
   };
 
@@ -91,44 +55,32 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       const errorMessage = this.state.error?.message || 'An unexpected rendering error occurred';
       const componentStack = this.state.errorInfo?.componentStack;
-      const isChunkError = this.state.isChunkError;
 
       return (
         <div className="min-h-screen w-full bg-[#110f0c] text-[#ede6d8] flex items-center justify-center p-4 font-sans selection:bg-[#c9a227] selection:text-[#110f0c]">
           <div className="max-w-xl w-full bg-[#16130f] border border-[#3a352c] rounded-[4px] shadow-2xl p-6 relative overflow-hidden">
             {/* Header / Security Stamp */}
             <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#2e2a22]">
-              <div className={`w-10 h-10 rounded-[3px] ${isChunkError ? 'bg-amber-950/60 border border-amber-600/60 text-amber-400' : 'bg-rose-950/60 border border-rose-700/60 text-rose-400'} flex items-center justify-center shrink-0`}>
-                {isChunkError ? <DownloadCloud className="w-5 h-5" /> : <ShieldAlert className="w-5 h-5" />}
+              <div className="w-10 h-10 rounded-[3px] bg-rose-950/60 border border-rose-700/60 flex items-center justify-center text-rose-400 shrink-0">
+                <ShieldAlert className="w-5 h-5" />
               </div>
               <div>
                 <h1 className="text-base font-semibold font-display text-[#ede6d8]">
                   TraceXMail SOC Security Enclave
                 </h1>
-                <p className={`text-xs ${isChunkError ? 'text-amber-400/90' : 'text-rose-400/90'} font-mono tracking-wide uppercase`}>
-                  {isChunkError ? 'Application Update Available' : 'Application Runtime Interruption'}
+                <p className="text-xs text-rose-400/90 font-mono tracking-wide uppercase">
+                  Application Runtime Interruption
                 </p>
               </div>
             </div>
 
             {/* Error Body */}
-            {isChunkError ? (
-              <div className="mb-4 space-y-2 text-xs text-[#b9af9c] leading-relaxed">
-                <p>
-                  A new build of the TraceXMail forensic enclave was deployed, or a momentary network interruption delayed module delivery.
-                </p>
-                <p className="text-[#ede6d8] font-medium">
-                  Clicking <strong className="text-amber-300">Reload Application</strong> will instantly load the latest version with all forensic tools and active cases intact.
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-[#b9af9c] leading-relaxed mb-4">
-                A critical rendering or component lifecycle exception occurred. The error diagnostics have been captured in the browser console for investigation.
-              </p>
-            )}
+            <p className="text-xs text-[#b9af9c] leading-relaxed mb-4">
+              A critical rendering or component lifecycle exception occurred. The error diagnostics have been captured in the browser console for investigation.
+            </p>
 
             <div className="bg-[#0c0a08] border border-[#242019] rounded-[3px] p-3 mb-5 font-mono text-[11px] text-[#e0a82e] overflow-x-auto max-h-48 leading-normal">
-              <div className={`flex items-center gap-1.5 ${isChunkError ? 'text-amber-400' : 'text-rose-400'} font-semibold mb-1`}>
+              <div className="flex items-center gap-1.5 text-rose-400 font-semibold mb-1">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                 <span>{errorMessage}</span>
               </div>

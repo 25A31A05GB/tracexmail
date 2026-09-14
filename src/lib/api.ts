@@ -76,27 +76,7 @@ export async function getActiveAuthToken(): Promise<string | null> {
     return memorySessionToken;
   }
 
-  // 3. Check browser localStorage for Supabase Auth JWT
-  if (typeof window !== 'undefined') {
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            const tok = parsed?.access_token || parsed?.currentSession?.access_token;
-            if (tok) {
-              memorySessionToken = tok;
-              return tok;
-            }
-          }
-        }
-      }
-    } catch {}
-  }
-
-  // 4. Local Enclave session token fallback
+  // 3. Local Enclave session token fallback
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem('tracexmail_enclave_session');
@@ -184,38 +164,15 @@ export async function initializeSession(): Promise<{ token: string | null; user:
     let organizationId = DEFAULT_ORG_ID;
 
     try {
-      const { data: profile, error: profileErr } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('organization_id, role')
         .eq('id', userId)
         .maybeSingle();
 
-      if (!profileErr && profile) {
+      if (profile) {
         if (profile.role) role = profile.role;
         if (profile.organization_id) organizationId = profile.organization_id;
-      } else {
-        // Fallback: Check users table if profiles table is unavailable
-        try {
-          const { data: userRow } = await supabase
-            .from('users')
-            .select('organization_id, role')
-            .eq('id', userId)
-            .maybeSingle();
-          if (userRow) {
-            if (userRow.role) role = userRow.role;
-            if (userRow.organization_id) organizationId = userRow.organization_id;
-          }
-        } catch {}
-
-        // Fallback: Check user metadata & known admin
-        if (email === 'arfathof@gmail.com' || email.startsWith('admin@')) {
-          role = 'admin';
-        } else if (session.user.user_metadata?.role) {
-          role = session.user.user_metadata.role;
-        }
-        if (session.user.user_metadata?.organization_id) {
-          organizationId = session.user.user_metadata.organization_id;
-        }
       }
     } catch (profileErr) {
       console.warn('[Session] Could not fetch profile data:', profileErr);
@@ -349,13 +306,9 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   if (!headers.has('x-organization-id')) {
     headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
   }
-  if (!headers.has('x-user-email') && memorySessionUser?.email) {
-    headers.set('x-user-email', memorySessionUser.email);
-  }
 
   return fetch(targetUrl, {
     ...init,
-    credentials: init?.credentials || 'include',
     headers
   });
 }

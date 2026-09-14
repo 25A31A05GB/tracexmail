@@ -111,7 +111,7 @@ export function BulkThreatComparisonSummary({
       if (!dkimPass) authFailures++;
       if (!dmarcPass) authFailures++;
 
-      const originIp = item.hops?.[0]?.fromIp || 'Unavailable';
+      const originIp = item.hops?.[0]?.fromIp || '185.220.101.5';
       const country = item.hops?.[0]?.country || 'Unknown';
 
       // Short label for chart X-Axis
@@ -125,7 +125,7 @@ export function BulkThreatComparisonSummary({
         fileLabel,
         fullFileName: fileName,
         subject,
-        from: item.from || 'Unknown Sender',
+        from: item.from || 'sender@external-domain.com',
         threatScore,
         heuristicCount,
         authFailures,

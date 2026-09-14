@@ -17,36 +17,36 @@
     "benignCounterSignal"
   ],
   "weights": {
-    "urgencyIntensity": 2.4609,
-    "authorityPersona": 0.2908,
-    "paymentDiversion": 1.6563,
-    "payrollRedirection": 1.0578,
-    "giftCardPatterns": 1.2836,
-    "invoiceAlteration": 0,
-    "conversationalPretext": 1.1363,
+    "urgencyIntensity": 2.8157,
+    "authorityPersona": 0.9434,
+    "paymentDiversion": 2.6032,
+    "payrollRedirection": 2.7209,
+    "giftCardPatterns": 1.7213,
+    "invoiceAlteration": 0.434,
+    "conversationalPretext": 0.7979,
     "financialEntityCount": 0,
     "dollarAmountMagnitude": 0,
     "routingNumberPresent": 0,
     "ibanPresent": 0,
-    "replyToMismatch": 3.1309,
-    "freeMailProvider": -0.008,
+    "replyToMismatch": 0,
+    "freeMailProvider": 0,
     "brandDisplayMismatch": 0,
-    "benignCounterSignal": -0.9843
+    "benignCounterSignal": -0.6879
   },
-  "bias": -3.0307,
+  "bias": -0.9219,
   "decisionThreshold": 0.5,
   "metrics": {
-    "trainedAt": "2026-09-14T07:46:57.621Z",
-    "sampleCount": 7126,
-    "accuracy": 0.8315,
-    "precision": 0.5553,
-    "recall": 1,
-    "f1": 0.7141,
-    "rocAuc": null
+    "trainedAt": "2026-09-05T19:47:14.180Z",
+    "sampleCount": 433,
+    "accuracy": 0.8868,
+    "precision": 0.3623,
+    "recall": 0.8333,
+    "f1": 0.505,
+    "rocAuc": 0.992
   },
   "heuristicComparison": {
     "staticHeuristicF1": 0.768,
-    "learnedModelF1": 0.7141,
+    "learnedModelF1": 0.505,
     "note": "Static data/bec_weights.json was a hand-tuned keyword-multiplier heuristic. The learned model is trained on diverse deduplicated forensic records with L2 regularized logistic regression."
   }
 }
