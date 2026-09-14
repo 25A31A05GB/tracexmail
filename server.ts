@@ -1687,7 +1687,7 @@ async function startServer() {
     const includeDemo = req.query.include_demo === 'true';
 
     try {
-      let casesQuery = supabase.from('cases').select('id, title, headers, verdict, severity, threat_score, tags, hops, iocs, is_demo, created_at, organization_id');
+      let casesQuery = supabase.from('cases').select('id, title, classification, severity, threat_score, tags, is_demo, created_at, organization_id, raw_analysis');
       if (orgId) {
         if (includeDemo) {
           casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
@@ -1749,10 +1749,12 @@ async function startServer() {
       let legitimateRouteCount = 0;
 
       activeCasesForStats.forEach(c => {
-        const hops = Array.isArray(c.hops) ? c.hops : [];
+        const rawAnalysis = c.raw_analysis || {};
+        const hops = Array.isArray(rawAnalysis.hops) ? rawAnalysis.hops : (Array.isArray(c.hops) ? c.hops : []);
+        const classification = (c.classification || rawAnalysis.classification || rawAnalysis.verdict || '').toLowerCase();
         const hasTor = hops.some((h: any) => h.isTorExit || h.asnOrg?.toLowerCase().includes('tor') || h.asnOrg?.toLowerCase().includes('anonymizing'));
-        const hasSpoof = c.severity === 'CRITICAL' || c.verdict?.toLowerCase().includes('phish') || c.verdict?.toLowerCase().includes('spoof') || (c.tags && c.tags.includes('BEC'));
-        const hasCompromise = c.severity === 'HIGH' || c.verdict?.toLowerCase().includes('malware') || (c.tags && c.tags.includes('Account Takeover'));
+        const hasSpoof = c.severity === 'CRITICAL' || classification.includes('phish') || classification.includes('spoof') || (c.tags && c.tags.includes('BEC'));
+        const hasCompromise = c.severity === 'HIGH' || classification.includes('malware') || (c.tags && c.tags.includes('Account Takeover'));
         
         if (hasSpoof) spoofedCount++;
         if (hasTor) anonymizedRelayCount++;
@@ -2614,6 +2616,256 @@ async function startServer() {
 
   app.post('/api/cases/:caseId/emails', publicLimiter, (req, res) => {
     res.json({ status: 'success', message: 'Emails added to case' });
+  });
+
+  // ==========================================
+  // Case Analyst Notes Subsystem (RBAC + Audited)
+  // ==========================================
+
+  const ALLOWED_CASE_NOTE_LABELS = [
+    'Confirmed Phish',
+    'False Positive',
+    'Escalated',
+    'Needs Follow-up',
+    'Resolved',
+    'Informational'
+  ] as const;
+
+  type CaseNoteLabel = typeof ALLOWED_CASE_NOTE_LABELS[number];
+
+  interface CaseNoteRecord {
+    id: string;
+    case_id: string;
+    organization_id: string;
+    author_id?: string | null;
+    author_email: string;
+    label: CaseNoteLabel;
+    body: string;
+    created_at: string;
+  }
+
+  const IN_MEMORY_CASE_NOTES: CaseNoteRecord[] = [];
+
+  // POST /api/cases/:caseId/notes (requireAuth, requireRole(['admin','analyst']))
+  app.post('/api/cases/:caseId/notes', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res, next) => {
+    try {
+      const user = (req as AuthenticatedRequest).user!;
+      const { caseId } = req.params;
+      const { label, body } = req.body || {};
+
+      if (!label || !ALLOWED_CASE_NOTE_LABELS.includes(label)) {
+        return res.status(400).json({
+          error: `Invalid label '${label}'. Allowed labels: ${ALLOWED_CASE_NOTE_LABELS.join(', ')}`
+        });
+      }
+
+      if (!body || typeof body !== 'string' || body.trim().length === 0) {
+        return res.status(400).json({ error: 'Note body is required and cannot be empty.' });
+      }
+
+      if (body.length > 1000) {
+        return res.status(400).json({ error: `Note body exceeds the 1000 character limit (current: ${body.length}).` });
+      }
+
+      const noteId = `note-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+      const newNote: CaseNoteRecord = {
+        id: noteId,
+        case_id: caseId,
+        organization_id: user.organizationId,
+        author_id: user.userId || null,
+        author_email: user.email,
+        label: label as CaseNoteLabel,
+        body: body.trim(),
+        created_at: new Date().toISOString()
+      };
+
+      const supabase = getSupabaseClient();
+      let createdNote = newNote;
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('case_notes')
+            .insert([newNote])
+            .select()
+            .single();
+
+          if (!error && data) {
+            createdNote = data;
+          } else if (error) {
+            console.warn('[Supabase] case_notes insert fallback to memory:', error.message);
+          }
+        } catch (dbErr: any) {
+          console.warn('[Supabase] case_notes exception fallback to memory:', dbErr?.message);
+        }
+      }
+
+      // Maintain in-memory list for resilience and speed
+      IN_MEMORY_CASE_NOTES.unshift(createdNote);
+
+      try {
+        await logAuditAction({
+          organization_id: user.organizationId,
+          case_id: caseId,
+          user_id: user.userId,
+          user_email: user.email,
+          user_role: user.role,
+          action: 'CASE_NOTE_ADD',
+          resource_type: 'case_note',
+          resource_id: createdNote.id,
+          details: { label: createdNote.label, length: createdNote.body.length }
+        }, supabase);
+      } catch (auditErr) {
+        console.warn('[Audit] Could not log case note audit event:', auditErr);
+      }
+
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_NOTE_ADDED',
+          caseId,
+          note: createdNote,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return res.status(201).json(createdNote);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /api/cases/:caseId/notes (requireAuth)
+  app.get('/api/cases/:caseId/notes', authenticatedLimiter, requireAuth, async (req, res, next) => {
+    try {
+      const user = (req as AuthenticatedRequest).user!;
+      const { caseId } = req.params;
+      const supabase = getSupabaseClient();
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('case_notes')
+            .select('*')
+            .eq('case_id', caseId)
+            .eq('organization_id', user.organizationId)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            return res.json(data);
+          } else if (error) {
+            console.warn('[Supabase] Failed to fetch case_notes from DB, using in-memory store:', error.message);
+          }
+        } catch (dbErr: any) {
+          console.warn('[Supabase] case_notes query exception, using in-memory store:', dbErr?.message);
+        }
+      }
+
+      const notes = IN_MEMORY_CASE_NOTES.filter(
+        n => n.case_id === caseId && n.organization_id === user.organizationId
+      );
+      return res.json(notes);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // DELETE /api/cases/:caseId/notes/:noteId (requireAuth)
+  app.delete('/api/cases/:caseId/notes/:noteId', authenticatedLimiter, requireAuth, async (req, res, next) => {
+    try {
+      const user = (req as AuthenticatedRequest).user!;
+      const { caseId, noteId } = req.params;
+      const supabase = getSupabaseClient();
+
+      let targetNote: CaseNoteRecord | null = null;
+
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('case_notes')
+            .select('*')
+            .eq('id', noteId)
+            .eq('case_id', caseId)
+            .maybeSingle();
+
+          if (!error && data) {
+            targetNote = data;
+          }
+        } catch (dbErr: any) {
+          console.warn('[Supabase] note lookup exception:', dbErr?.message);
+        }
+      }
+
+      if (!targetNote) {
+        targetNote = IN_MEMORY_CASE_NOTES.find(n => n.id === noteId && n.case_id === caseId) || null;
+      }
+
+      if (!targetNote) {
+        return res.status(404).json({ error: 'Note not found' });
+      }
+
+      // Check organization isolation
+      if (targetNote.organization_id !== user.organizationId) {
+        return res.status(403).json({ error: 'Access denied to notes outside your organization' });
+      }
+
+      // Enforce author or admin check in code
+      const isAuthor = (targetNote.author_id && targetNote.author_id === user.userId) ||
+                       (targetNote.author_email && targetNote.author_email.toLowerCase() === user.email.toLowerCase());
+      const isAdmin = user.role === 'admin';
+
+      if (!isAuthor && !isAdmin) {
+        return res.status(403).json({ error: 'Permission denied: only the note author or an admin can delete this note.' });
+      }
+
+      if (supabase) {
+        try {
+          let deleteQuery = supabase.from('case_notes').delete().eq('id', noteId).eq('case_id', caseId).eq('organization_id', user.organizationId);
+          if (!isAdmin) {
+            deleteQuery = deleteQuery.eq('author_email', user.email);
+          }
+          const { error } = await deleteQuery;
+          if (error) {
+            console.warn('[Supabase] Failed to delete case note:', error.message);
+          }
+        } catch (delDbErr: any) {
+          console.warn('[Supabase] case_notes delete exception:', delDbErr?.message);
+        }
+      }
+
+      const memoryIndex = IN_MEMORY_CASE_NOTES.findIndex(n => n.id === noteId && n.case_id === caseId);
+      if (memoryIndex !== -1) {
+        IN_MEMORY_CASE_NOTES.splice(memoryIndex, 1);
+      }
+
+      try {
+        await logAuditAction({
+          organization_id: user.organizationId,
+          case_id: caseId,
+          user_id: user.userId,
+          user_email: user.email,
+          user_role: user.role,
+          action: 'CASE_NOTE_DELETE',
+          resource_type: 'case_note',
+          resource_id: noteId,
+          details: { label: targetNote.label }
+        }, supabase);
+      } catch (auditErr) {
+        console.warn('[Audit] Could not log case note deletion audit event:', auditErr);
+      }
+
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_NOTE_DELETED',
+          caseId,
+          noteId,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      return res.json({ success: true, message: 'Note deleted successfully', noteId });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Case Evidence Retrieval with Decryption and RBAC Masking

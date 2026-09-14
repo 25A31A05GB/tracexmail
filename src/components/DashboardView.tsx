@@ -412,13 +412,22 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       const dateStr = d.toISOString().slice(0, 10);
 
       const matchingCases = casesList.filter(c => {
-        const created = c.headers?.date || c.analyzedAt;
+        const created = c.headers?.date || c.analyzedAt || (c as any).created_at;
         return created && created.slice(0, 10) === dateStr;
       });
 
-      const cleanCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('clean')).length;
-      const suspCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('suspicious')).length;
-      const malCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('malicious') || c.verdict?.toLowerCase().includes('phish')).length;
+      const cleanCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('clean') || v.includes('legitimate') || (c.threatScore !== undefined && c.threatScore < 40);
+      }).length;
+      const suspCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('suspicious') || (c.threatScore !== undefined && c.threatScore >= 40 && c.threatScore < 70);
+      }).length;
+      const malCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('malicious') || v.includes('phish') || (c.threatScore !== undefined && c.threatScore >= 70);
+      }).length;
 
       data.push({
         date: dayName,
