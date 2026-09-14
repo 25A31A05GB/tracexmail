@@ -36,6 +36,7 @@ import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { UserRole } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
+import { EvidenceTagCard } from './EvidenceTagCard';
 
 interface CasesViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -78,6 +79,7 @@ export function CasesView({
 
   // Selected Case Detail Drawer/Modal
   const [selectedCaseDetail, setSelectedCaseDetail] = useState<any | null>(null);
+  const [previewEvidenceAnalysis, setPreviewEvidenceAnalysis] = useState<EmailAnalysis | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [editingNotes, setEditingNotes] = useState<boolean>(false);
   const [notesDraft, setNotesDraft] = useState<string>('');
@@ -295,6 +297,20 @@ export function CasesView({
       }
     } catch (e) {
       console.warn('Error deleting case from database:', e);
+    }
+  };
+
+  const handlePreviewEvidence = (caseItem: any) => {
+    if (caseItem.headers && caseItem.verdict && caseItem.auth) {
+      setPreviewEvidenceAnalysis(caseItem);
+    } else {
+      const match = SAMPLE_ANALYSES.find((s) => s.id === (caseItem.id || caseItem.email_id));
+      if (match) {
+        setPreviewEvidenceAnalysis(match);
+      } else {
+        const mapped = mapBackendCaseToAnalysis(caseItem);
+        setPreviewEvidenceAnalysis(mapped);
+      }
     }
   };
 
@@ -1005,6 +1021,14 @@ export function CasesView({
                             </button>
                           )}
                           <button
+                            onClick={() => handlePreviewEvidence(c)}
+                            title="Inspect Forensic Evidence Tag Card"
+                            className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-800/80 text-amber-300 border border-amber-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Tag className="w-3 h-3" />
+                            <span className="hidden sm:inline">Evidence</span>
+                          </button>
+                          <button
                             onClick={() => handleInspectCase(c)}
                             className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                           >
@@ -1294,6 +1318,14 @@ export function CasesView({
               
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => handlePreviewEvidence(selectedCaseDetail)}
+                  className="px-3 py-1.5 bg-amber-950 hover:bg-amber-800 text-amber-300 rounded border border-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="View Forensic Evidence Card"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>Evidence Card</span>
+                </button>
+                <button
                   onClick={(e) => handleSendCaseToSlack(e, selectedCaseDetail)}
                   disabled={sendingSlackCaseId === selectedCaseDetail.id}
                   className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-800 text-emerald-300 rounded border border-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
@@ -1323,7 +1355,11 @@ export function CasesView({
 
             <div className="p-6 overflow-y-auto space-y-6 text-xs">
               {/* Status & Severity Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 cursor-default"
+              >
                 <div>
                   <div className="text-[11px] text-slate-400 mb-1">Status (PATCH /api/cases/{selectedCaseDetail.id})</div>
                   <select
@@ -1358,10 +1394,14 @@ export function CasesView({
                     {selectedCaseDetail.members?.length || selectedCaseDetail.email_ids?.length || 1} emails linked
                   </span>
                 </div>
-              </div>
+              </motion.div>
 
               {/* C4 Analyst Feedback Loop: Ground-Truth Verdict Override & Discrepancy Calibration */}
-              <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-3">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-3 cursor-default"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                     <FlaskConical className="w-3.5 h-3.5 text-violet-400" />
@@ -1399,10 +1439,14 @@ export function CasesView({
                     </select>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Analyst Notes Section */}
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2 cursor-default"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -1450,7 +1494,7 @@ export function CasesView({
                       'No analyst notes recorded yet for this case.'}
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Linked Member Emails */}
               <div className="space-y-2">
@@ -1460,7 +1504,12 @@ export function CasesView({
                 </h4>
                 <div className="border border-slate-800 rounded-xl bg-slate-950/60 divide-y divide-slate-800 overflow-hidden">
                   {(selectedCaseDetail.members || []).map((m: any, idx: number) => (
-                    <div key={m.id || idx} className="p-3 flex items-center justify-between hover:bg-slate-900/50">
+                    <motion.div 
+                      key={m.id || idx} 
+                      whileHover={{ scale: 1.01 }}
+                      transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                      className="evidence-card p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors"
+                    >
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-200 truncate">{m.subject || 'No Subject'}</div>
                         <div className="text-[11px] text-slate-400 truncate">
@@ -1471,6 +1520,14 @@ export function CasesView({
                         <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-600 text-rose-300 text-[10px] rounded font-bold">
                           {m.threat_score || 85}/100
                         </span>
+                        <button
+                          onClick={() => handlePreviewEvidence(m)}
+                          title="Inspect Evidence Card"
+                          className="px-2 py-1 bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-700/60 rounded text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Tag className="w-2.5 h-2.5" />
+                          <span>Evidence</span>
+                        </button>
                         <button
                           onClick={() => {
                             const match = SAMPLE_ANALYSES.find((s) => s.id === (m.id || m.email_id));
@@ -1489,7 +1546,7 @@ export function CasesView({
                           <ArrowUpRight className="w-2.5 h-2.5" />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -1506,7 +1563,12 @@ export function CasesView({
                   </p>
                   <div className="border border-amber-900/50 bg-amber-950/20 rounded-xl divide-y divide-amber-900/30 overflow-hidden">
                     {selectedCaseDetail.suggested_members.map((sug: any, idx: number) => (
-                      <div key={sug.email_id || idx} className="p-3 flex items-center justify-between hover:bg-amber-950/30">
+                      <motion.div 
+                        key={sug.email_id || idx} 
+                        whileHover={{ scale: 1.01 }}
+                        transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                        className="evidence-card p-3 flex items-center justify-between hover:bg-amber-950/30 transition-colors"
+                      >
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-200 truncate">{sug.subject}</div>
                           <div className="text-[11px] text-amber-300/80 truncate">
@@ -1525,12 +1587,50 @@ export function CasesView({
                           )}
                           <span>Add to Case</span>
                         </button>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
               )}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Forensic Evidence Tag Card Preview Modal */}
+      {previewEvidenceAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="max-w-xl w-full my-8"
+          >
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setPreviewEvidenceAnalysis(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Evidence Card"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <EvidenceTagCard
+              analysis={previewEvidenceAnalysis}
+              onClose={() => setPreviewEvidenceAnalysis(null)}
+              isModal={true}
+              onNavigateToMap={() => {
+                setPreviewEvidenceAnalysis(null);
+                onSelectAnalysis(previewEvidenceAnalysis);
+                onNavigateToOverview();
+              }}
+              onNavigateToGraph={() => {
+                setPreviewEvidenceAnalysis(null);
+                onSelectAnalysis(previewEvidenceAnalysis);
+                onNavigateToOverview();
+              }}
+            />
           </motion.div>
         </div>
       )}

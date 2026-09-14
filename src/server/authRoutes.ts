@@ -1954,5 +1954,28 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     return res.json({ status: 'recorded' });
   });
 
+  /**
+   * GET /api/auth/status
+   * Exposes public client-side Supabase configuration (URL and public Anon key)
+   * so the browser frontend can initialize Supabase Auth at runtime.
+   */
+  router.get('/status', (_req: Request, res: Response) => {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+    const isConfigured = Boolean(
+      supabaseUrl &&
+      supabaseAnonKey &&
+      supabaseUrl.startsWith('http') &&
+      !supabaseUrl.includes('placeholder')
+    );
+
+    return res.json({
+      supabaseConfigured: isConfigured,
+      supabaseUrl: isConfigured ? supabaseUrl : '',
+      supabaseAnonKey: isConfigured ? supabaseAnonKey : '',
+      authMode: isConfigured ? 'supabase_jwt' : 'enclave_local'
+    });
+  });
+
   return router;
 }

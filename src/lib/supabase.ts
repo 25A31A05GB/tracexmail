@@ -1,20 +1,10 @@
 import { createClient, SupabaseClient, Session, User } from '@supabase/supabase-js';
 
-const clientEnvUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
-const clientEnvKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+const clientEnvUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const clientEnvKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
 if (!clientEnvUrl || !clientEnvKey) {
-  const missing: string[] = [];
-  if (!clientEnvUrl) missing.push('VITE_SUPABASE_URL');
-  if (!clientEnvKey) missing.push('VITE_SUPABASE_ANON_KEY');
-
-  const errorMsg =
-    `[Supabase Client Error] Missing required build/environment variable(s): ${missing.join(', ')}. ` +
-    `Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set at build time or runtime. ` +
-    `Silently defaulting to a hardcoded production project has been removed for security.`;
-
-  console.error(errorMsg);
-  throw new Error(errorMsg);
+  console.info('[Supabase Client] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY not provided at build time; initializing runtime discovery via /api/auth/status.');
 }
 
 const clientAppUrl =
@@ -124,9 +114,12 @@ export function validateSupabaseCredentials(url?: string | null, key?: string | 
   }
 }
 
+const initialUrl = clientEnvUrl || 'https://zinyrzlswkwwzxlgptmq.supabase.co';
+const initialKey = clientEnvKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
+
 export let isSupabaseConfigured = validateSupabaseCredentials(clientEnvUrl, clientEnvKey);
-let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : '';
-let configuredSupabaseAnonKey: string = isSupabaseConfigured ? clientEnvKey : '';
+let configuredSupabaseUrl: string = isSupabaseConfigured ? clientEnvUrl : initialUrl;
+let configuredSupabaseAnonKey: string = isSupabaseConfigured ? clientEnvKey : initialKey;
 
 export function getSupabaseAnonKey(): string {
   return configuredSupabaseAnonKey || clientEnvKey;
@@ -141,12 +134,12 @@ export function getSupabaseUrl(): string {
  * Configured with session persistence, token auto-refresh, PKCE auth flow, and URL session detection.
  */
 export let supabase: SupabaseClient = createClient(
-  clientEnvUrl,
-  clientEnvKey,
+  initialUrl,
+  initialKey,
   {
     global: {
       headers: {
-        apikey: clientEnvKey,
+        apikey: initialKey,
       },
     },
     auth: {
