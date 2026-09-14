@@ -1439,7 +1439,61 @@ async function verifyGooglePubSubPushToken(req: express.Request): Promise<boolea
   return false;
 }
 
+/**
+ * Validates critical environment variables and Supabase admin connectivity on startup.
+ * In production (NODE_ENV === 'production'), terminates immediately with exit code 1
+ * if any required secret or client connection is absent.
+ */
+function validateProductionEnvironment(): void {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const requiredVars = [
+    { key: 'SUPABASE_URL', value: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL },
+    { key: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY },
+    { key: 'JWT_SECRET', value: process.env.JWT_SECRET },
+    { key: 'TOKEN_ENCRYPTION_KEY', value: process.env.TOKEN_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY }
+  ];
+
+  const missing = requiredVars.filter(v => !v.value || v.value.trim().length === 0).map(v => v.key);
+
+  if (missing.length > 0) {
+    const errorMsg =
+      `\n================================================================================\n` +
+      `[FATAL STARTUP ERROR] Missing critical environment variables:\n` +
+      missing.map(m => `  - ${m}`).join('\n') +
+      `\n\nThe server cannot start safely without persistent keys and service role credentials.\n` +
+      (isProduction
+        ? `NODE_ENV is set to 'production'. Terminating process immediately.`
+        : `Running in development mode (NODE_ENV !== 'production'). Local fallbacks will be active.`) +
+      `\n================================================================================\n`;
+    console.error(errorMsg);
+    if (isProduction) {
+      process.exit(1);
+    }
+  }
+
+  // Verify that the Supabase Admin client can initialize with service-role privileges
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) {
+    const errorMsg =
+      `\n================================================================================\n` +
+      `[FATAL STARTUP ERROR] Failed to initialize Supabase Admin Client.\n` +
+      `getSupabaseAdminClient() returned null. The application and ingestion pipeline depend\n` +
+      `on service-role access to bypass RLS for administrative operations.\n` +
+      (isProduction
+        ? `NODE_ENV is set to 'production'. Terminating process immediately.`
+        : `Running in development mode (NODE_ENV !== 'production'). Supabase database operations will be offline/degraded.`) +
+      `\n================================================================================\n`;
+    console.error(errorMsg);
+    if (isProduction) {
+      process.exit(1);
+    }
+  } else {
+    console.log('[Supabase Admin] Supabase service-role client initialized successfully.');
+  }
+}
+
 async function startServer() {
+  validateProductionEnvironment();
   assertEncryptionKeyConfigured();
   const app = express();
   const PORT = 3000;
@@ -1517,8 +1571,41 @@ async function startServer() {
     });
   };
 
+  // Explicit CORS middleware guaranteeing Access-Control-* headers on EVERY response
+  // (Crucial for Vercel frontend https://tracexmail.vercel.app communicating with Render backend)
+  app.use((req, res, next) => {
+    const origin = req.header('Origin');
+    if (origin) {
+      const clean = origin.trim().replace(/\/+$/, '');
+      const isAllowed =
+        allowedOriginsList.includes(clean) ||
+        clean === 'https://tracexmail.vercel.app' ||
+        clean.endsWith('.vercel.app') ||
+        clean.endsWith('.onrender.com') ||
+        clean.endsWith('.run.app') ||
+        clean.endsWith('.pages.dev') ||
+        clean.includes('localhost') ||
+        clean.includes('127.0.0.1');
+
+      if (isAllowed) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, x-api-key, X-Requested-With, X-Goog-PubSub-Token, apikey, x-organization-id, X-Organization-Id, x-user-email, X-User-Email, Accept, Cache-Control, Pragma, Origin');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
+      }
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    next();
+  });
+
   app.use(cors(corsOptionsDelegate));
   app.options('*', cors(corsOptionsDelegate));
+  app.options('/api/gmail/*', cors(corsOptionsDelegate));
+  app.options('/api/*', cors(corsOptionsDelegate));
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -4093,8 +4180,8 @@ Thanks!`;
     res.json({ status: 'ok', watch: updated });
   });
 
-  // 13. Disconnect Gmail (Protected by token-bucket/sliding-window gmailDisconnectLimiter and admin role check against abuse/flapping)
-  app.post('/api/gmail/disconnect', gmailDisconnectLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+  // 13. Disconnect Gmail (Protected by token-bucket/sliding-window gmailDisconnectLimiter and admin/analyst role check)
+  app.post('/api/gmail/disconnect', gmailDisconnectLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     try {
       const user = (req as any).user;
       const orgId = user?.organizationId || DEFAULT_ORG_ID;
@@ -4336,20 +4423,39 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       try {
         const ai = new GoogleGenAI({ apiKey: geminiKey });
         let response;
-        let usedModel = 'gemini-2.5-flash';
-        try {
-          response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: promptText
-          });
-        } catch {
-          usedModel = 'gemini-3.8-flash';
-          response = await ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: promptText
-          });
+        let usedModel = 'gemini-3.8-flash';
+        const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+
+        for (let i = 0; i < candidateModels.length; i++) {
+          const model = candidateModels[i];
+          try {
+            response = await ai.models.generateContent({
+              model,
+              contents: promptText
+            });
+            usedModel = model;
+            break;
+          } catch (modelErr: any) {
+            const errMsg = modelErr?.message || String(modelErr);
+            const isTransient =
+              modelErr?.status === 503 ||
+              modelErr?.code === 503 ||
+              errMsg.includes('503') ||
+              errMsg.includes('high demand') ||
+              errMsg.includes('UNAVAILABLE') ||
+              errMsg.includes('429');
+
+            if (isTransient && i < candidateModels.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 350 * (i + 1)));
+              continue;
+            }
+            if (i === candidateModels.length - 1) {
+              throw modelErr;
+            }
+          }
         }
-        const narrativeText = response.text;
+
+        const narrativeText = response?.text;
         if (narrativeText) {
           return res.json({
             ai_narrative: {
@@ -5002,11 +5108,11 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
     const supabaseUrl =
       process.env.VITE_SUPABASE_URL ||
       process.env.SUPABASE_URL ||
-      'https://zinyrzlswkwwzxlgptmq.supabase.co';
+      '';
     const supabaseAnonKey =
       process.env.VITE_SUPABASE_ANON_KEY ||
       process.env.SUPABASE_ANON_KEY ||
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inppbnlyemxzd2t3d3p4bGdwdG1xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5MjQ1MDksImV4cCI6MjEwMzUwMDUwOX0.9NonejJ0MULA1yPkyqFSIA7al4vnPsahfORLyhYvZqc';
+      '';
 
     let supabaseConfigured = Boolean(
       supabaseUrl &&

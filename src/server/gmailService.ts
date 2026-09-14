@@ -307,6 +307,10 @@ const state: GmailServiceState = {
   syncedEmails: []
 };
 
+// Schema resilience flags: gracefully adapt if remote Supabase database has not run quarantine_audit_log / metrics migration
+let canPersistQuarantineAuditLog = true;
+let canPersistConnectionMetrics = true;
+
 /**
  * Sets the active user email address dynamically.
  */
@@ -1159,44 +1163,85 @@ export async function processInboundQuarantineGate(params: {
   // Persist to Supabase quarantine_audit_log and update metrics in gmail_connections
   const supabase = getSupabaseAdminClient();
   if (supabase) {
-    supabase.from('quarantine_audit_log')
-      .insert({
-        id: logEntry.id,
-        organization_id: DEFAULT_ORG_ID,
-        timestamp: logEntry.timestamp,
-        message_id: logEntry.messageId,
-        subject: logEntry.subject,
-        from_address: logEntry.from,
-        threat_score: logEntry.threatScore,
-        verdict: logEntry.verdict,
-        action: logEntry.action,
-        delivery_stage: logEntry.deliveryStage,
-        admin_webhook_dispatched: logEntry.adminWebhookDispatched,
-        applied_label: appliedLabel,
-        raw_details: {
-          isQuarantined: isQuarantineTriggered,
-          threshold: state.quarantine.threshold
-        }
-      })
-      .then(({ error }) => {
-        if (error) console.warn('[GmailQuarantine] Error writing to quarantine_audit_log in DB:', error.message);
-      });
+    if (canPersistQuarantineAuditLog) {
+      supabase.from('quarantine_audit_log')
+        .insert({
+          id: logEntry.id,
+          organization_id: DEFAULT_ORG_ID,
+          timestamp: logEntry.timestamp,
+          message_id: logEntry.messageId,
+          subject: logEntry.subject,
+          from_address: logEntry.from,
+          threat_score: logEntry.threatScore,
+          verdict: logEntry.verdict,
+          action: logEntry.action,
+          delivery_stage: logEntry.deliveryStage,
+          admin_webhook_dispatched: logEntry.adminWebhookDispatched,
+          applied_label: appliedLabel,
+          raw_details: {
+            isQuarantined: isQuarantineTriggered,
+            threshold: state.quarantine.threshold
+          }
+        })
+        .then(({ error }) => {
+          if (error) {
+            const isMissingTable =
+              error.message?.includes('schema cache') ||
+              error.message?.includes('does not exist') ||
+              error.code === '42P01' ||
+              error.code === 'PGRST205';
+            if (isMissingTable) {
+              canPersistQuarantineAuditLog = false;
+              console.info('[GmailQuarantine] Table \'quarantine_audit_log\' not in database schema cache. Utilizing in-memory audit ledger.');
+            } else {
+              console.warn('[GmailQuarantine] Error writing to quarantine_audit_log in DB:', error.message);
+            }
+          }
+        });
+    }
 
-    supabase.from('gmail_connections')
-      .update({
-        metrics: {
-          total_ingested: state.metrics.totalIngested,
-          pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
-          post_delivery_alerts: state.metrics.postDeliveryAlerts,
-          last_delivery_stage: deliveryStage,
-          last_quarantine_at: state.metrics.lastQuarantineAt
-        },
-        updated_at: new Date().toISOString()
-      })
-      .eq('organization_id', DEFAULT_ORG_ID)
-      .then(({ error }) => {
-        if (error) console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
-      });
+    if (canPersistConnectionMetrics) {
+      supabase.from('gmail_connections')
+        .update({
+          metrics: {
+            total_ingested: state.metrics.totalIngested,
+            pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+            post_delivery_alerts: state.metrics.postDeliveryAlerts,
+            last_delivery_stage: deliveryStage,
+            last_quarantine_at: state.metrics.lastQuarantineAt
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('organization_id', DEFAULT_ORG_ID)
+        .then(({ error }) => {
+          if (error) {
+            const isMissingColumn =
+              error.message?.includes('metrics') &&
+              (error.message?.includes('schema cache') ||
+                error.message?.includes('does not exist') ||
+                error.code === '42703' ||
+                error.code === 'PGRST204');
+            if (isMissingColumn) {
+              canPersistConnectionMetrics = false;
+              console.info('[GmailQuarantine] Column \'metrics\' not in \'gmail_connections\' schema cache. Maintaining metrics in memory.');
+              // Retry update without metrics column
+              supabase.from('gmail_connections')
+                .update({ updated_at: new Date().toISOString() })
+                .eq('organization_id', DEFAULT_ORG_ID)
+                .then(() => {});
+            } else {
+              console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
+            }
+          }
+        });
+    } else {
+      supabase.from('gmail_connections')
+        .update({
+          updated_at: new Date().toISOString()
+        })
+        .eq('organization_id', DEFAULT_ORG_ID)
+        .then(() => {});
+    }
   }
 
   return {
@@ -1313,7 +1358,7 @@ export function getQuarantineAuditLog() {
  */
 export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
   const supabase = getSupabaseAdminClient();
-  if (supabase) {
+  if (supabase && canPersistQuarantineAuditLog) {
     try {
       const { data, error } = await supabase
         .from('quarantine_audit_log')
@@ -1322,7 +1367,18 @@ export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
         .order('timestamp', { ascending: false })
         .limit(100);
 
-      if (!error && data && data.length > 0) {
+      if (error) {
+        if (
+          error.message?.includes('schema cache') ||
+          error.message?.includes('does not exist') ||
+          error.code === '42P01' ||
+          error.code === 'PGRST205'
+        ) {
+          canPersistQuarantineAuditLog = false;
+        } else {
+          console.warn('[GmailService] Failed fetching quarantine audit logs from Supabase:', error.message);
+        }
+      } else if (data && data.length > 0) {
         return data.map(r => ({
           id: r.id,
           timestamp: r.timestamp,
@@ -1390,19 +1446,37 @@ export async function saveGmailConnectionToDb(params: {
       quarantine_label_name: state.quarantine.quarantineLabelName,
       remove_inbox_label: state.quarantine.removeInboxLabel,
       admin_webhook_url: state.quarantine.adminWebhookUrl,
-      metrics: {
-        total_ingested: state.metrics.totalIngested,
-        pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
-        post_delivery_alerts: state.metrics.postDeliveryAlerts,
-        last_delivery_stage: state.metrics.lastDeliveryStage,
-        last_quarantine_at: state.metrics.lastQuarantineAt
-      },
+      ...(canPersistConnectionMetrics && {
+        metrics: {
+          total_ingested: state.metrics.totalIngested,
+          pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
+          post_delivery_alerts: state.metrics.postDeliveryAlerts,
+          last_delivery_stage: state.metrics.lastDeliveryStage,
+          last_quarantine_at: state.metrics.lastQuarantineAt
+        }
+      }),
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
+    let { error } = await supabase
       .from('gmail_connections')
       .upsert(row, { onConflict: 'organization_id,email_address' });
+
+    if (
+      error &&
+      error.message?.includes('metrics') &&
+      (error.message?.includes('schema cache') ||
+        error.message?.includes('does not exist') ||
+        error.code === '42703' ||
+        error.code === 'PGRST204')
+    ) {
+      canPersistConnectionMetrics = false;
+      delete row.metrics;
+      const retryResult = await supabase
+        .from('gmail_connections')
+        .upsert(row, { onConflict: 'organization_id,email_address' });
+      error = retryResult.error;
+    }
 
     if (error) {
       console.warn('[GmailService] Failed upserting to gmail_connections:', error.message);
