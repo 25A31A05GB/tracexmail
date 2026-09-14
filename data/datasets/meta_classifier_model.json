@@ -51,8 +51,8 @@
     "sampleCount": 7126,
     "testAccuracy": 0.7895,
     "brierScore": 0.0214,
-    "aucRoc": 0.996,
-    "rSquared": 0.948
+    "aucRoc": null,
+    "rSquared": null
   },
   "componentMappings": {
     "authentication": [

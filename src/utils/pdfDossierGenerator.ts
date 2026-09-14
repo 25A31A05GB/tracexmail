@@ -38,17 +38,17 @@ export function generateForensicPdfDossier({
   const stdVerdict = getStandardizedVerdict(analysis);
   const purgeInfo = getRetentionPurgeDate(privacyConfig.retentionPolicy, analysis.date);
 
-  const displayFrom = enforceMasking ? maskEmail(analysis.from, privacyConfig.maskingMode) : (analysis.from || 'sender@external.com');
-  const displayTo = enforceMasking ? maskEmail(analysis.to, privacyConfig.maskingMode) : (analysis.to || 'recipient@internal.corp');
+  const displayFrom = enforceMasking ? maskEmail(analysis.from, privacyConfig.maskingMode) : (analysis.from || 'Unknown Sender');
+  const displayTo = enforceMasking ? maskEmail(analysis.to, privacyConfig.maskingMode) : (analysis.to || 'Unknown Recipient');
   const displaySubject = enforceMasking ? maskText(analysis.subject, privacyConfig.maskingMode) : (analysis.subject || '(No Subject)');
 
   const originHop = analysis.hops?.find(h => h.isOrigin) || analysis.hops?.[0];
-  const rawOriginIp = originHop?.fromIp || '185.220.101.5';
+  const rawOriginIp = originHop?.fromIp || 'Unavailable';
   const originIp = enforceMasking ? maskIp(rawOriginIp, originHop?.isPrivate, privacyConfig.maskingMode) : rawOriginIp;
   const originCountry = originHop?.country || originHop?.countryCode || 'Unknown';
   const originCity = originHop?.city || 'Unknown';
-  const originAsn = originHop?.asn || 'AS44050';
-  const originOrg = originHop?.org || originHop?.isp || 'Bulletproof Hosting / Relay Network';
+  const originAsn = originHop?.asn || 'Unavailable';
+  const originOrg = originHop?.org || originHop?.isp || 'Unknown Provider';
 
   const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
   const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';

@@ -959,35 +959,33 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
       domain_age_days: undefined,
       is_newly_registered: false,
       is_typosquat: false,
-      typosquat_matched_brand: isPhish ? 'paypal.com' : undefined,
+      typosquat_matched_brand: undefined,
       typosquatting: {
-        is_typosquat: isPhish,
-        target_brand: isPhish ? 'paypal.com' : undefined,
-        distance: isPhish ? 1 : 0,
-        technique: isPhish ? 'Brand Impersonation' : 'None'
+        is_typosquat: false,
+        target_brand: undefined,
+        distance: 0,
+        technique: 'None'
       },
       dns: {
         domain: extractDomain(fromEmail) || fromEmail.split('@')[1] || 'domain.com',
-        ns: ['ns1.dns-parking.net', 'ns2.dns-parking.net'],
+        ns: [],
         a_records: hops.map(h => h.fromIp).filter(Boolean) as string[],
-        mx: ['10 mail.unauthorized-relay.net'],
-        mx_records: [
-          { priority: 10, host: 'mail.unauthorized-relay.net', status: isPhish ? 'UNAUTHENTICATED' : 'VERIFIED' }
-        ],
-        spf: 'v=spf1 include:_spf.unauthorized.net ~all',
-        spf_qualifier: spfStatus === 'PASS' ? '-all (HardFail - Enforced)' : '~all (SoftFail - Permissive)',
-        spf_mechanisms: ['include:_spf.unauthorized.net', '~all'],
-        dmarc: 'v=DMARC1; p=none; sp=none; pct=100; rua=mailto:reports@unauthorized.net',
+        mx: [],
+        mx_records: [],
+        spf: undefined,
+        spf_qualifier: undefined,
+        spf_mechanisms: [],
+        dmarc: undefined,
         dmarc_policy: dmarcStatus === 'PASS' ? 'reject' : 'none',
-        dmarc_sp: 'none',
-        dmarc_pct: 100,
-        dmarc_rua: 'reports@unauthorized.net',
-        dmarc_enforcement: dmarcStatus === 'PASS' ? 'REJECT (Strict Enforced)' : 'NONE (Monitoring Only)',
-        dnssec: 'VALIDATED'
+        dmarc_sp: undefined,
+        dmarc_pct: undefined,
+        dmarc_rua: undefined,
+        dmarc_enforcement: 'UNVERIFIED (Client Fallback)',
+        dnssec: 'UNVERIFIED'
       },
-      flags: isPhish ? ['Newly Registered Domain (<30 days)', 'Permissive SPF Qualifier (~all)'] : ['Corporate Authenticated Domain'],
-      risk_flags: isPhish ? ['Newly Registered Domain (<30 days)', 'Permissive SPF Qualifier (~all)'] : ['Corporate Authenticated Domain'],
-      lookup_method: 'CLIENT_ESTIMATION'
+      flags: isPhish ? ['Client Heuristic Detection (Unverified)'] : ['Unverified Client Fallback'],
+      risk_flags: isPhish ? ['Client Heuristic Detection (Unverified)'] : [],
+      lookup_method: 'CLIENT_OFFLINE_NO_DNS'
     },
     maxmindIntelligence: (hops[0] && hops[0].maxmindVerified ? {
       geonameId: hops[0].geonameId,

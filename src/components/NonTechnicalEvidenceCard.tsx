@@ -81,13 +81,15 @@ export function NonTechnicalEvidenceCard({
   // Anomalous routing check
   const safeHops = Array.isArray(analysis?.hops) ? analysis.hops : [];
   const originHop = safeHops.find((h) => h?.isOrigin) || safeHops[0];
-  const serverLocation = originHop ? `${originHop.city || 'Frankfurt'}, ${originHop.country || 'Germany'}` : 'Sofia, Bulgaria';
-  const serverIp = originHop?.fromIp || '185.220.101.5';
+  const serverLocation = originHop 
+    ? (originHop.city || originHop.country ? `${originHop.city || 'Unknown City'}, ${originHop.country || 'Unknown Country'}` : 'Unknown Location')
+    : 'Unavailable';
+  const serverIp = originHop?.fromIp || 'Unavailable';
 
   // Suspicious URLs check
   const suspiciousUrls = (analysis.urls || []).filter(u => u.status === 'MALICIOUS' || (u.virustotalScore && !u.virustotalScore.startsWith('0/')));
   const firstUrl = analysis.urls && analysis.urls.length > 0 ? analysis.urls[0] : null;
-  const linkDestination = firstUrl?.url || firstUrl?.domain || 'bit.ly/3gX992PaypalSec';
+  const linkDestination = firstUrl?.url || firstUrl?.domain || 'None identified';
 
   // Determine Call To Action Intent
   const emailSubject = analysis.subject || analysis.headers?.subject || 'Security notification update';

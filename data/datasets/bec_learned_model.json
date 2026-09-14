@@ -42,7 +42,7 @@
     "precision": 0.5553,
     "recall": 1,
     "f1": 0.7141,
-    "rocAuc": 0.992
+    "rocAuc": null
   },
   "heuristicComparison": {
     "staticHeuristicF1": 0.768,

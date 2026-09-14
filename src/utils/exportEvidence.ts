@@ -72,15 +72,15 @@ function generateFallbackCanvas(analysis?: EmailAnalysis, options?: ExportEviden
   const ctx = canvas.getContext('2d');
   if (!ctx) return canvas;
 
-  const caseId = options?.caseId || analysis?.id || 'EML-2026-8894';
-  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-90421';
+  const caseId = options?.caseId || analysis?.id || 'EML-UNASSIGNED';
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-UNASSIGNED';
   const subject = options?.title || analysis?.subject || 'Forensic Evidence Artifact';
-  const verdict = analysis?.verdict || 'MALICIOUS';
-  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 98;
-  const from = analysis?.from || 'sender@external-domain.com';
-  const to = analysis?.to || 'victim@corporate.internal';
-  const ip = analysis?.hops?.[0]?.fromIp || '185.220.101.5';
-  const country = analysis?.hops?.[0]?.country || 'Germany (DE)';
+  const verdict = analysis?.verdict || 'SUSPICIOUS';
+  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 0;
+  const from = analysis?.from || 'Unknown Sender';
+  const to = analysis?.to || 'Unknown Recipient';
+  const ip = analysis?.hops?.[0]?.fromIp || 'Unavailable';
+  const country = analysis?.hops?.[0]?.country || 'Unknown';
 
   // Background
   ctx.fillStyle = '#14120f';
@@ -312,15 +312,15 @@ function generateDirectPdfReport(
   const pageHeight = pdf.internal.pageSize.getHeight();
   const margin = 12;
 
-  const caseId = options?.caseId || analysis?.id || 'EML-2026-8894';
-  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-90421';
+  const caseId = options?.caseId || analysis?.id || 'EML-UNASSIGNED';
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-UNASSIGNED';
   const subject = options?.title || analysis?.subject || 'Forensic Email Evidence Artifact';
-  const verdict = analysis?.verdict || 'MALICIOUS';
-  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 98;
-  const from = analysis?.from || 'sender@external-domain.com';
-  const to = analysis?.to || 'victim@corporate.internal';
-  const ip = analysis?.hops?.[0]?.fromIp || '185.220.101.5';
-  const country = analysis?.hops?.[0]?.country || 'Germany (DE)';
+  const verdict = analysis?.verdict || 'SUSPICIOUS';
+  const score = analysis?.threatScore !== undefined ? analysis.threatScore : 0;
+  const from = analysis?.from || 'Unknown Sender';
+  const to = analysis?.to || 'Unknown Recipient';
+  const ip = analysis?.hops?.[0]?.fromIp || 'Unavailable';
+  const country = analysis?.hops?.[0]?.country || 'Unknown';
 
   // Header Bar
   pdf.setFillColor(15, 23, 42); // slate-900

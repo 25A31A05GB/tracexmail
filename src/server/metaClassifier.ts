@@ -44,17 +44,19 @@ export type MetaFeatureKey = keyof MetaFeatureVector;
 export interface MetaModelArtifact {
   modelName: string;
   version: string;
+  status?: 'TRAINED' | 'DEFAULT_UNTRAINED';
+  isDefaultUntrained?: boolean;
   featureKeys: MetaFeatureKey[];
   coefficients: Record<MetaFeatureKey, number>;
   intercept: number;
   metrics: {
-    trainedAt: string;
+    trainedAt: string | null;
     sampleCount: number;
-    testAccuracy: number;
-    brierScore: number;
-    aucRoc: number;
-    rSquared: number;
-  };
+    testAccuracy: number | null;
+    brierScore: number | null;
+    aucRoc: number | null;
+    rSquared: number | null;
+  } | null;
   componentMappings: {
     authentication: MetaFeatureKey[];
     domainRisk: MetaFeatureKey[];
@@ -67,6 +69,8 @@ export interface MetaModelArtifact {
 export interface MetaThreatPrediction {
   totalThreatScore: number;          // 0 to 100
   threatProbability: number;         // 0.0 to 1.0 calibrated probability
+  modelStatus?: 'TRAINED' | 'DEFAULT_UNTRAINED';
+  isDefaultUntrained?: boolean;
   breakdown: {
     total: number;
     maxScore: 100;
@@ -88,11 +92,13 @@ export interface MetaThreatPrediction {
 }
 
 // -----------------------------------------------------------------------------
-// DEFAULT LEARNED META-MODEL ARTIFACT
+// DEFAULT LEARNED META-MODEL ARTIFACT (Untrained default heuristic weights)
 // -----------------------------------------------------------------------------
 const DEFAULT_META_MODEL: MetaModelArtifact = {
-  modelName: 'TraceXMail Stacked Meta-Classifier v2.4',
+  modelName: 'TraceXMail Stacked Meta-Classifier v2.4 (Default Heuristic Weights)',
   version: '2.4.0',
+  status: 'DEFAULT_UNTRAINED',
+  isDefaultUntrained: true,
   featureKeys: [
     'mlProbLegitimate',
     'mlProbSuspicious',
@@ -138,14 +144,7 @@ const DEFAULT_META_MODEL: MetaModelArtifact = {
     heuristicRuleScore: 0.85
   },
   intercept: -1.85,
-  metrics: {
-    trainedAt: '2026-09-05T14:35:00Z',
-    sampleCount: 433,
-    testAccuracy: 0.988,
-    brierScore: 0.016,
-    aucRoc: 0.995,
-    rSquared: 0.942
-  },
+  metrics: null,
   componentMappings: {
     authentication: ['authSpfFail', 'authDkimFail', 'authDmarcFail'],
     domainRisk: ['domainAgeRisk', 'domainTyposquatRisk', 'identityLookalikeDomain', 'identityDisplayMismatch'],
@@ -328,6 +327,8 @@ export function predictMetaThreatScore(
   return {
     totalThreatScore,
     threatProbability: parseFloat(threatProbability.toFixed(4)),
+    modelStatus: model.isDefaultUntrained ? 'DEFAULT_UNTRAINED' : 'TRAINED',
+    isDefaultUntrained: Boolean(model.isDefaultUntrained),
     breakdown,
     featureAttributions: attributions
   };
@@ -418,9 +419,13 @@ export function trainMetaClassifier(
     coefficients[key] = parseFloat(weights[idx].toFixed(4));
   });
 
-  // Calculate Brier score and accuracy
+  // Calculate Brier score, accuracy, AUC-ROC, and R²
   let brierSum = 0;
   let correct = 0;
+  const predScores: number[] = [];
+  const targetScores: number[] = [];
+  let targetSum = 0;
+
   for (let i = 0; i < N; i++) {
     const feat = samples[i].features;
     let z = bias;
@@ -429,6 +434,10 @@ export function trainMetaClassifier(
     }
     const p = 1.0 / (1.0 + Math.exp(-z));
     const target = samples[i].isThreat;
+    predScores.push(p);
+    targetScores.push(target);
+    targetSum += target;
+
     brierSum += (p - target) * (p - target);
 
     const predBin = p >= 0.5 ? 1 : 0;
@@ -439,9 +448,37 @@ export function trainMetaClassifier(
   const brierScore = parseFloat((brierSum / N).toFixed(4));
   const testAccuracy = parseFloat((correct / N).toFixed(4));
 
+  // Exact Wilcoxon-Mann-Whitney ROC-AUC
+  const paired = predScores.map((score, i) => ({ score, target: targetScores[i] }));
+  paired.sort((a, b) => a.score - b.score);
+  let posCount = 0;
+  let rankSum = 0;
+  for (let i = 0; i < N; i++) {
+    if (paired[i].target >= 0.5) {
+      posCount++;
+      rankSum += (i + 1);
+    }
+  }
+  const negCount = N - posCount;
+  const calculatedAucRoc = posCount > 0 && negCount > 0
+    ? parseFloat(Math.max(0, Math.min(1, (rankSum - (posCount * (posCount + 1)) / 2) / (posCount * negCount))).toFixed(4))
+    : 0.5;
+
+  // Real R-Squared
+  const targetMean = targetSum / N;
+  let ssTot = 0;
+  let ssRes = 0;
+  for (let i = 0; i < N; i++) {
+    ssTot += (targetScores[i] - targetMean) * (targetScores[i] - targetMean);
+    ssRes += (targetScores[i] - predScores[i]) * (targetScores[i] - predScores[i]);
+  }
+  const calculatedRSquared = ssTot > 0 ? parseFloat(Math.max(0, 1 - (ssRes / ssTot)).toFixed(4)) : 1.0;
+
   const modelArtifact: MetaModelArtifact = {
     modelName: 'TraceXMail Stacked Meta-Classifier v2.4',
     version: '2.4.0',
+    status: 'TRAINED',
+    isDefaultUntrained: false,
     featureKeys,
     coefficients,
     intercept: parseFloat(bias.toFixed(4)),
@@ -450,8 +487,8 @@ export function trainMetaClassifier(
       sampleCount: N,
       testAccuracy,
       brierScore,
-      aucRoc: 0.996,
-      rSquared: 0.948
+      aucRoc: calculatedAucRoc,
+      rSquared: calculatedRSquared
     },
     componentMappings: DEFAULT_META_MODEL.componentMappings
   };

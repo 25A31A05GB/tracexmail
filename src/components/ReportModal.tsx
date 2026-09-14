@@ -83,10 +83,10 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
   const displaySubject = enforceMasking ? maskText(analysis.subject, privacyConfig.maskingMode) : analysis.subject;
 
   const originHop = analysis.hops?.find(h => h.isOrigin) || analysis.hops?.[0];
-  const originIp = originHop?.fromIp || '185.220.101.5';
+  const originIp = originHop?.fromIp || 'Unavailable';
   const originCountry = originHop?.country || originHop?.countryCode || 'Unknown';
   const originCity = originHop?.city || 'Unknown';
-  const originAsn = originHop?.asn || 'AS44050';
+  const originAsn = originHop?.asn || 'Unavailable';
 
   const fromEmail = analysis.headers?.fromEmail || analysis.from || '';
   const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1].replace(/[<>]/g, '').trim() : '';

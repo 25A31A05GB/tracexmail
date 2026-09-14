@@ -337,9 +337,8 @@ export function CasesView({
   };
 
   const handleOpenCreateModal = () => {
-    // Pre-select first sample email if available
-    const initialEmails = SAMPLE_ANALYSES.slice(0, 2).map(s => s.id);
-    setSelectedEmailIds(initialEmails);
+    // Start with clean unselected email list
+    setSelectedEmailIds([]);
     setNewCaseName('');
     setNewCaseStatus('open');
     setNewCaseSeverity('HIGH');
@@ -361,6 +360,10 @@ export function CasesView({
     setCreateError(null);
 
     const caseTitle = newCaseName.trim() || `Campaign Case (${selectedEmailIds.length} Linked Emails)`;
+    const selectedSampleList = SAMPLE_ANALYSES.filter(s => selectedEmailIds.includes(s.id));
+    const computedThreatScore = selectedSampleList.length > 0
+      ? Math.max(...selectedSampleList.map(s => getStandardizedVerdict(s).score))
+      : 0;
 
     try {
       const payload = {
@@ -370,6 +373,7 @@ export function CasesView({
         analyst_notes: newCaseNotes,
         status: newCaseStatus,
         severity: newCaseSeverity,
+        threat_score: computedThreatScore,
         organization_id: 'org_acme_soc_01'
       };
 
@@ -384,7 +388,7 @@ export function CasesView({
               description: payload.analyst_notes || 'Forensic investigation case initialized.',
               status: payload.status.toUpperCase(),
               severity: payload.severity,
-              threat_score: 85,
+              threat_score: computedThreatScore,
               created_at: new Date().toISOString(),
               tags: ['Forensic'],
               assigned_user: 'Lead Analyst',
@@ -420,72 +424,9 @@ export function CasesView({
         throw new Error('Invalid response structure from case creation API.');
       }
     } catch (err: any) {
-      console.warn('API error creating case, applying SAMPLE_ANALYSES fallback pattern:', err);
-      // Fallback pattern matching the existing error resilience
-      const chosenSamples = SAMPLE_ANALYSES.filter(s => selectedEmailIds.includes(s.id));
-      const fallbackMembers = (chosenSamples.length > 0 ? chosenSamples : SAMPLE_ANALYSES.slice(0, 2)).map(s => {
-        const std = getStandardizedVerdict(s);
-        return {
-          id: s.id,
-          email_id: s.id,
-          subject: s.headers?.subject || 'Sample Phishing Email',
-          sender: s.headers?.from || 'Unknown Sender',
-          from: s.headers?.from || 'Unknown Sender',
-          recipient: s.headers?.to || '',
-          to: s.headers?.to || '',
-          date: s.headers?.date || new Date().toISOString(),
-          threat_score: std.score,
-          threat_verdict: std.verdict,
-          filename: (s as any).filename || `${s.id}.eml`
-        };
-      });
-
-      const fallbackCase = {
-        id: `CASE-FB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        case_id: `CASE-FB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        organization_id: 'org_acme_soc_01',
-        title: caseTitle,
-        name: caseTitle,
-        subject: caseTitle,
-        status: newCaseStatus,
-        severity: newCaseSeverity,
-        threat_score: fallbackMembers.length > 0 ? Math.max(...fallbackMembers.map(m => m.threat_score)) : 80,
-        threat_verdict: 'MALICIOUS / PHISHING',
-        confidence: 0.92,
-        analyst_notes: newCaseNotes || 'Local forensic campaign group initialized.',
-        description: newCaseNotes || 'Local forensic campaign group initialized.',
-        notes: newCaseNotes || 'Local forensic campaign group initialized.',
-        email_ids: selectedEmailIds.length > 0 ? selectedEmailIds : fallbackMembers.map(m => m.id),
-        members: fallbackMembers,
-        member_emails: fallbackMembers,
-        suggested_members: [
-          {
-            email_id: 'eml_nazario_irs_tax_wire',
-            subject: 'Internal Revenue Service: Immediate Tax Levy Notice',
-            sender: 'notice@irs-tax-clearance.org',
-            threat_score: 94.0,
-            relationship_strength: 'MEDIUM',
-            similarity_score: 0.62,
-            reason: 'Correlated via shared high-risk exit infrastructure'
-          }
-        ],
-        total_emails: fallbackMembers.length,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        analyzed_at: new Date().toISOString(),
-        hops: [],
-        links: [],
-        iocs: [],
-        anomalies: [],
-        dns_auth: { spf: { status: 'neutral' }, dkim: { status: 'neutral' }, dmarc: { status: 'neutral' } }
-      };
-
-      setCases(prev => [fallbackCase, ...prev]);
-      setCreateSuccess(`Case ${fallbackCase.id} created (offline resilient mode).`);
-      setTimeout(() => {
-        setIsCreateModalOpen(false);
-        setCreateSuccess(null);
-      }, 1200);
+      console.error('API error creating case:', err);
+      const errMsg = err?.response?.data?.error || err?.message || 'Failed to create case. Database/backend is currently unavailable.';
+      setCreateError(errMsg);
     } finally {
       setCreatingCase(false);
     }
@@ -1230,8 +1171,9 @@ export function CasesView({
                             <div className="font-semibold text-slate-200 truncate">
                               {sample.headers?.subject || (sample as any).filename || sample.id}
                             </div>
-                            <div className="text-[11px] text-slate-400 truncate">
-                              From: {sample.headers?.from} | ID: {sample.id}
+                            <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5">
+                              <span className="text-[9px] px-1 py-0.2 bg-amber-950/60 border border-amber-600/40 text-amber-300 rounded font-mono">DEMO SAMPLE</span>
+                              <span>From: {sample.headers?.from} | ID: {sample.id}</span>
                             </div>
                           </div>
                         </div>

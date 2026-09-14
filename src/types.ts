@@ -336,6 +336,8 @@ export interface EmailAnalysis {
   mlConfidence: number; // e.g. 0.98
   rawEml: string;
   summary: string;
+  isDemo?: boolean;
+  is_demo?: boolean;
   domain_intelligence?: DomainIntelligence;
   domainIntelligence?: DomainIntelligence;
   maxmindIntelligence?: {

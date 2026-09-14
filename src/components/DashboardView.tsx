@@ -727,9 +727,16 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                   >
                     {/* Header: Case ID & Threat Score Priority */}
                     <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-cyan-300 font-mono text-[11px] font-bold shadow-inner">
-                        <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span>{sample.id}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-cyan-300 font-mono text-[11px] font-bold shadow-inner">
+                          <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>{sample.id}</span>
+                        </div>
+                        {(sample.isDemo || sample.id.startsWith('sample-') || sample.id.startsWith('eml_nazario')) && (
+                          <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono font-bold">
+                            DEMO
+                          </span>
+                        )}
                       </div>
                       <div className={`px-2 py-0.5 rounded-md border font-mono text-[11px] font-black flex items-center gap-1 shadow-sm ${verdictInfo.colors.badge}`}>
                         <Zap className="w-3 h-3 shrink-0" />
@@ -970,9 +977,16 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
               >
                 {/* Header: Case ID & Threat Score */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
-                    <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span>{sample.id}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
+                      <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>{sample.id}</span>
+                    </div>
+                    {(sample.isDemo || sample.id.startsWith('sample-') || sample.id.startsWith('eml_nazario')) && (
+                      <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono font-bold">
+                        DEMO
+                      </span>
+                    )}
                   </div>
                   <div className={`px-2.5 py-0.5 rounded-md border font-mono text-xs font-black flex items-center gap-1 shadow-sm ${verdictInfo.colors.badge}`}>
                     <Zap className="w-3 h-3 shrink-0" />
@@ -1049,14 +1063,14 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             {(() => {
               const focusVerdict = getStandardizedVerdict(activeFocusAnalysis);
               const focusOriginHop = activeFocusAnalysis.hops?.find(h => h.isOrigin) || activeFocusAnalysis.hops?.[0];
-              const originIp = focusOriginHop?.fromIp || '185.220.101.5';
+              const originIp = focusOriginHop?.fromIp || 'Unavailable';
               const isSpfPass = activeFocusAnalysis.auth?.spf?.status === 'PASS';
               const isDkimPass = activeFocusAnalysis.auth?.dkim?.status === 'PASS';
               const isDmarcPass = activeFocusAnalysis.auth?.dmarc?.status === 'PASS';
               const hasReplyDiverter = Boolean(activeFocusAnalysis.replyTo || activeFocusAnalysis.headers?.replyTo);
               const attributionConfidence = activeFocusAnalysis.mlConfidence 
-                ? (activeFocusAnalysis.mlConfidence * 100).toFixed(1) 
-                : '98.4';
+                ? `${(activeFocusAnalysis.mlConfidence * 100).toFixed(1)}%` 
+                : 'Unavailable';
 
               const handleFocusInspect = (targetTab: string) => {
                 if (onSelectAnalysis) onSelectAnalysis(activeFocusAnalysis);
