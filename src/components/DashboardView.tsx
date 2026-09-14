@@ -552,10 +552,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <ShieldAlert className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_cases || 6}
+                {stats?.summary?.total_cases ?? casesList.length}
               </div>
               <div className="text-[10px] text-rose-400/90 font-mono mt-0.5 flex items-center justify-between">
-                <span>2 Critical BEC</span>
+                <span>Active Forensic Queue</span>
                 <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
               </div>
             </div>
@@ -569,7 +569,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <Layers className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.active_campaigns || 3}
+                {stats?.summary?.active_campaigns ?? 0}
               </div>
               <div className="text-[10px] text-purple-400/90 font-mono mt-0.5 flex items-center justify-between">
                 <span>Threat Clusters</span>
@@ -586,7 +586,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <Database className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_emails_ingested || 14}
+                {stats?.summary?.total_emails_ingested ?? casesList.length}
               </div>
               <div className="text-[10px] text-blue-400 font-mono mt-0.5 flex items-center justify-between">
                 <span>Ingest Pipeline</span>
@@ -851,10 +851,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <ShieldAlert className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_cases || 6}
+            {stats?.summary?.total_cases ?? casesList.length}
           </div>
           <div className="text-[11px] text-rose-400/90 font-mono mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 inline" /> 2 Critical Wire BEC Lures
+            <TrendingUp className="w-3 h-3 inline" /> Active Forensic Queue
           </div>
         </motion.div>
 
@@ -869,10 +869,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Layers className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.active_campaigns || 3}
+            {stats?.summary?.active_campaigns ?? 0}
           </div>
           <div className="text-[11px] text-purple-400/90 font-mono mt-1">
-            Unattributed Threat Clusters
+            Active Campaign Clusters
           </div>
         </motion.div>
 
@@ -887,10 +887,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Database className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_emails_ingested || 14}
+            {stats?.summary?.total_emails_ingested ?? casesList.length}
           </div>
           <div className="text-[11px] text-blue-400/90 font-mono mt-1">
-            Nazario & Enron Corpus Verified
+            Total Ingested Artifacts
           </div>
         </motion.div>
 
@@ -905,7 +905,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Zap className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold text-amber-400 font-mono">
-            {stats?.summary?.average_threat_score || 72.4} / 100
+            {stats?.summary?.average_threat_score ?? (casesList.length > 0 ? Math.round(casesList.reduce((acc, c) => acc + (c.threatScore || 0), 0) / casesList.length) : 0)} / 100
           </div>
           <div className="text-[11px] text-slate-400 font-mono mt-1">
             Threat Intelligence &amp; Behavioral Analysis

@@ -179,14 +179,21 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     });
   }
 
-  // ML Score & Confidence
-  const mlPercentNum = analysis.mlConfidence ? analysis.mlConfidence * 100 : (threatScore >= 90 ? 98.4 : threatScore);
-  const mlPercentText = `${mlPercentNum.toFixed(1)}%`;
+  // ML Score & Confidence (Strictly authentic; never fabricate or substitute threat score)
+  const hasValidMlConfidence = typeof analysis.mlConfidence === 'number' && !isNaN(analysis.mlConfidence) && analysis.mlConfidence >= 0;
+  const mlPercentNum = hasValidMlConfidence 
+    ? (analysis.mlConfidence <= 1 ? analysis.mlConfidence * 100 : analysis.mlConfidence)
+    : null;
+  const mlPercentText = mlPercentNum !== null ? `${mlPercentNum.toFixed(1)}%` : 'ML confidence unavailable';
   const mlResultLabel = analysis.classification || (stampWord === 'PHISH' ? 'phish' : stampWord.toLowerCase());
 
-  // Hash & SOC Recommendation
-  const fullHash = analysis.sha256 || analysis.sha256Hash || analysis.custodyHash || (analysis.rawEml ? sha256Sync(analysis.rawEml) : sha256Sync(analysis.id || JSON.stringify(analysis)));
-  const shortHash = fullHash.length > 26 ? `${fullHash.slice(0, 19)}...${fullHash.slice(-4)}` : fullHash;
+  // Hash & SOC Recommendation (Compute hash strictly from real RFC 822 email payload bytes; no fabrication)
+  const rawBytes = analysis.rawEml || (analysis as any).rawEmail;
+  const rawHash = analysis.sha256 || analysis.sha256Hash || analysis.custodyHash || (rawBytes ? sha256Sync(rawBytes) : null);
+  const fullHash = rawHash || 'Hash unavailable — raw message not retained';
+  const shortHash = rawHash 
+    ? (rawHash.length > 26 ? `${rawHash.slice(0, 19)}...${rawHash.slice(-4)}` : rawHash)
+    : 'Hash unavailable — raw message not retained';
   
   const socAction = stdVerdict.recommendedAction;
 
@@ -359,14 +366,14 @@ export function EvidenceTagCard({
     ],
     score: {
       label: '5-Class Nearest Centroid Classifier',
-      percent: 0,
-      resultText: '0.0%',
+      percent: null,
+      resultText: 'ML confidence unavailable',
       resultLabel: 'pending',
       good: true
     },
     footer: {
       hashLabel: 'SHA-256',
-      hash: 'N/A',
+      hash: 'Hash unavailable — raw message not retained',
       actionLabel: 'SOC action:',
       action: 'AWAITING INGESTION',
       actionGood: true
@@ -384,12 +391,15 @@ export function EvidenceTagCard({
     analysis?.heuristics?.find(h => h.id === 'SENDER_BASELINE_ANOMALY' || h.title?.toLowerCase().includes('sender baseline'))?.description ||
     null;
 
-  // Calculate one-line teaser summary for collapsed state
-  const indicatorCount = (analysis?.heuristics || []).filter(h => h.triggered).length || (cardData.findings || []).filter(f => f.status === 'mal').length || (cardData.verdict.status !== 'good' ? 3 : 0);
+  // Calculate one-line teaser summary for collapsed state (Real counts only)
+  const indicatorCount = (analysis?.heuristics || []).filter(h => h.triggered).length || (cardData.findings || []).filter(f => f.status === 'mal').length || 0;
+  const indicatorText = indicatorCount === 0
+    ? '0 attack indicators on record'
+    : `${indicatorCount} attack indicator${indicatorCount === 1 ? '' : 's'}`;
   const complianceNames = complianceFlags.length > 0
     ? complianceFlags.map(f => f.regime.split('(')[0].replace(/§43A.*/, '§43A').trim()).slice(0, 2).join(', ')
     : 'None';
-  const teaserSummary = `${indicatorCount} attack indicator${indicatorCount === 1 ? '' : 's'} · ${counterfactuals.length > 0 ? (showAllCounterfactuals ? `${counterfactuals.length} counterfactuals` : '1 counterfactual') : 'counterfactuals'} · compliance: ${complianceNames}${senderAnomaly ? ' · ⚠️ baseline anomaly' : ''}`;
+  const teaserSummary = `${indicatorText} · ${counterfactuals.length > 0 ? (showAllCounterfactuals ? `${counterfactuals.length} counterfactuals` : '1 counterfactual') : 'counterfactuals'} · compliance: ${complianceNames}${senderAnomaly ? ' · ⚠️ baseline anomaly' : ''}`;
 
   // Procedural barcode line widths
   const barcodeWidths = [3, 1, 2, 1, 4, 1, 1, 3, 2, 1, 1, 4, 2, 1, 3, 1, 2, 4, 1, 1, 2, 3, 1, 1, 4, 2, 1, 3, 1, 2, 1, 4, 1, 2, 3, 1, 1, 2, 4, 1];
@@ -632,18 +642,32 @@ export function EvidenceTagCard({
               <div className="gauge-top">
                 <span>{cardData.score.label}</span>
                 <span>
-                  <b style={{ color: cardData.score.good ? 'var(--ec-green)' : 'var(--ec-red)' }}>
-                    {cardData.score.resultText}
-                  </b>{' '}
-                  {cardData.score.resultLabel}
+                  {cardData.score.percent != null ? (
+                    <>
+                      <b style={{ color: cardData.score.good ? 'var(--ec-green)' : 'var(--ec-red)' }}>
+                        {cardData.score.resultText}
+                      </b>{' '}
+                      {cardData.score.resultLabel}
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-mono text-xs">
+                      {cardData.score.resultText}
+                    </span>
+                  )}
                 </span>
               </div>
-              <div className="gauge">
-                <div 
-                  className={`gauge-fill ${cardData.score.good ? 'good' : ''}`}
-                  style={{ width: `${Math.max(4, Math.min(100, cardData.score.percent))}%` }}
-                />
-              </div>
+              {cardData.score.percent != null ? (
+                <div className="gauge">
+                  <div 
+                    className={`gauge-fill ${cardData.score.good ? 'good' : ''}`}
+                    style={{ width: `${Math.max(4, Math.min(100, cardData.score.percent))}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-500 font-mono italic mt-0.5">
+                  ML confidence unavailable
+                </div>
+              )}
             </div>
           </>
         )}
@@ -944,13 +968,18 @@ export function EvidenceTagCard({
       {cardData.footer && (
         <div className="footer">
           <div className="hashline">
-            {cardData.footer.hashLabel} <b>{cardData.footer.hash}</b>
+            {cardData.footer.hashLabel}{' '}
+            <b className={cardData.footer.hash.startsWith('Hash unavailable') ? 'font-normal text-slate-400 italic text-[11px]' : ''}>
+              {cardData.footer.hash}
+            </b>
           </div>
-          <div className="barcode" title={`Digest: ${cardData.footer.hash}`}>
-            {barcodeWidths.map((w, idx) => (
-              <div key={idx} style={{ width: `${w}px` }} />
-            ))}
-          </div>
+          {!cardData.footer.hash.startsWith('Hash unavailable') && (
+            <div className="barcode" title={`Digest: ${cardData.footer.hash}`}>
+              {barcodeWidths.map((w, idx) => (
+                <div key={idx} style={{ width: `${w}px` }} />
+              ))}
+            </div>
+          )}
           <div className="verdictline">
             <span>{cardData.footer.actionLabel}</span>
             <b className={cardData.footer.actionGood ? 'good' : ''}>{cardData.footer.action}</b>

@@ -105,10 +105,13 @@ export function AlertsView({
   const handleSyncFeeds = async () => {
     try {
       setSyncingFeeds(true);
-      const res = await forensicApi.syncRealWorldThreatFeeds();
+      const res: any = await forensicApi.syncRealWorldThreatFeeds();
+      const hasSimulated = res?.isSimulated || res?.simulated || res?.fallback || (res?.feeds && res.feeds.some((f: any) => f.isSimulated || f.is_demo));
       setSlackFeedback({
         type: 'success',
-        message: `Synced ${res.synced_count || 5} active real-world threat feeds. New alerts published to live stream.`
+        message: hasSimulated
+          ? 'Live feeds unreachable — showing offline simulated baseline.'
+          : `Synced ${res?.synced_count || 5} active real-world threat feeds. New alerts published to live stream.`
       });
       await loadRealWorldFeeds();
     } catch (err: any) {
@@ -422,6 +425,11 @@ export function AlertsView({
                 <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">
                   CURATED BENCHMARK LIBRARY
                 </span>
+                {realWorldFeeds.some(f => f.isSimulated || f.is_simulated || f.is_demo) && (
+                  <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider">
+                    Simulated / Offline Feed
+                  </span>
+                )}
                 <span className="text-xs text-slate-400">Vetted threat archetypes &amp; IOC campaign signatures (CISA, OpenPhish, PhishTank, VirusTotal)</span>
               </div>
               <p className="text-xs text-slate-300">
@@ -485,6 +493,12 @@ export function AlertsView({
                           <span className="px-2 py-0.5 rounded bg-slate-950 text-slate-400 border border-slate-800 text-[10px] font-mono">
                             Target: {threat.targeted_brand || threat.target_brand || 'Unknown'}
                           </span>
+
+                          {(threat.isSimulated || threat.is_simulated || threat.is_demo) && (
+                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider">
+                              Simulated / Offline Feed
+                            </span>
+                          )}
 
                           <span className="text-xs text-slate-500 font-mono flex items-center gap-1 ml-auto">
                             <Clock className="w-3 h-3" />
@@ -614,6 +628,11 @@ export function AlertsView({
                         {alert.category && (
                           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">
                             {alert.category}
+                          </span>
+                        )}
+                        {Boolean((alert as any).isSimulated || (alert as any).is_demo || (alert as any).is_simulated) && (
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider">
+                            Simulated / Offline Feed
                           </span>
                         )}
                         <span className="text-xs text-slate-500 flex items-center gap-1">

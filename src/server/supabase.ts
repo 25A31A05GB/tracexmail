@@ -43,17 +43,11 @@ export function getSupabaseAdminClient(): SupabaseClient | null {
   if (!serviceRoleKey) {
     if (!hasLoggedAdminNotice) {
       hasLoggedAdminNotice = true;
-      if (process.env.NODE_ENV === 'production') {
-        console.error(
-          '[Supabase Admin] CRITICAL CONFIGURATION ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is missing. ' +
-          'The admin client strictly requires the service role key to bypass RLS for administrative operations and pipeline writes.'
-        );
-      } else {
-        console.info(
-          '[Supabase Admin] Notice: SUPABASE_SERVICE_ROLE_KEY is not configured in this environment. ' +
-          'Operating in local in-memory fallback mode for database operations and audit logging.'
-        );
-      }
+      console.error(
+        '[Supabase Admin] CRITICAL CONFIGURATION ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is missing. ' +
+        'The admin client strictly requires the service role key to bypass RLS for administrative operations and pipeline writes. ' +
+        'Fallback to anon keys has been disabled to prevent silent permission failures.'
+      );
     }
     return null;
   }

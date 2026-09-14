@@ -130,7 +130,7 @@ export function AccountSettingsView({
             const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
             if (refreshErr || !refreshed.session) {
               console.warn('[Supabase MFA] Session refresh failed; skipping live factors fetch:', refreshErr?.message);
-              loadLocalFactors();
+              setFactors([]);
               return;
             }
           }
@@ -138,53 +138,24 @@ export function AccountSettingsView({
           console.log('[Supabase MFA] Requesting listFactors from Supabase for user:', session.user.email);
           const { data, error } = await supabase.auth.mfa.listFactors();
           if (error) {
-            console.warn('[Supabase MFA] /auth/v1/factors error (HTTP ' + (error.status || 'unknown') + '):', error.message, {
-              status: error.status,
-              name: error.name,
-              userId: session.user.id,
-              tokenPrefix: session.access_token.substring(0, 10) + '...'
-            });
-            loadLocalFactors();
+            console.error('[Supabase MFA] listFactors error (HTTP ' + (error.status || 'unknown') + '):', error.message);
+            setFactors([]);
           } else if (data) {
             const totpList = (data.totp || []) as TotpFactor[];
-            console.log('[Supabase MFA] Loaded verified factors count:', totpList.length);
             setFactors(totpList);
           }
         } else {
-          loadLocalFactors();
+          setFactors([]);
         }
-      } else {
-        loadLocalFactors();
-      }
-    } catch (err: any) {
-      console.warn('[Supabase MFA] Exception loading factors:', err);
-      loadLocalFactors();
-    } finally {
-      setLoadingFactors(false);
-    }
-  };
-
-  const loadLocalFactors = () => {
-    try {
-      const saved = localStorage.getItem(`tracexmail_mfa_factors_${user?.email || 'user'}`);
-      if (saved) {
-        setFactors(JSON.parse(saved));
       } else {
         setFactors([]);
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[Supabase MFA] Exception loading factors:', err);
       setFactors([]);
+    } finally {
+      setLoadingFactors(false);
     }
-  };
-
-  const saveLocalFactors = (newFactors: TotpFactor[]) => {
-    try {
-      localStorage.setItem(
-        `tracexmail_mfa_factors_${user?.email || 'user'}`,
-        JSON.stringify(newFactors)
-      );
-    } catch {}
-    setFactors(newFactors);
   };
 
   // Start Enrollment Workflow
@@ -196,91 +167,44 @@ export function AccountSettingsView({
     setVerifyCode('');
 
     try {
-      if (getIsSupabaseConfigured() && supabase) {
-        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr) {
-          console.warn('[Supabase MFA] getSession notice before enroll:', sessionErr);
-        }
-        if (session && session.user && session.access_token) {
-          const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
-          if (isExpired) {
-            console.warn('[Supabase MFA] Access token expired before enroll. Refreshing...');
-            await supabase.auth.refreshSession();
-          }
-
-          console.log('[Supabase MFA] Submitting POST /auth/v1/factors enroll request for:', session.user.email);
-          const { data, error } = await supabase.auth.mfa.enroll({
-            factorType: 'totp',
-            issuer: 'TraceXMail Forensics',
-            friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
-          });
-
-            if (error) {
-              const isTotpDisabled = error.status === 422 || error.message?.toLowerCase().includes('disabled');
-              const isUnauth = error.status === 401;
-
-              if (isTotpDisabled) {
-                console.info(
-                  '[Supabase MFA] Note: TOTP MFA is not enabled in your Supabase project settings (Supabase Dashboard -> Authentication -> Multi-Factor Authentication). ' +
-                  'Switching seamlessly to application-level RFC 6238 TOTP authenticator enrollment.'
-                );
-              } else if (isUnauth) {
-                console.warn(
-                  '[Supabase MFA] User session unauthenticated or expired on MFA endpoint. ' +
-                  'Switching seamlessly to application-level RFC 6238 TOTP authenticator enrollment.'
-                );
-                // Attempt refresh in background
-                supabase.auth.refreshSession().catch(() => {});
-              } else {
-                console.warn(
-                  `[Supabase MFA] Factor enrollment notice (HTTP ${error.status || 'unknown'}): ${error.message}. ` +
-                  'Falling back to application-level TOTP factor enrollment.'
-                );
-              }
-            } else if (data && data.totp) {
-              console.log('[Supabase MFA] TOTP enrollment factor initiated successfully:', data.id);
-              setEnrollData({
-                factorId: data.id,
-                qrCode: data.totp.qr_code,
-                secret: data.totp.secret,
-                uri: data.totp.uri
-              });
-              return;
-            }
-        }
+      if (!getIsSupabaseConfigured() || !supabase) {
+        throw new Error('Supabase is not configured. Real MFA enrollment requires active Supabase authentication.');
       }
 
-      // Application-level / Resilient RFC 6238 TOTP Factor Generation
-      const randomSecret = Array.from({ length: 32 }, () => 
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[Math.floor(Math.random() * 32)]
-      ).join('');
-      const factorId = `fac_totp_${Date.now()}`;
-      const email = user?.email || 'analyst@tracexmail.sec';
-      const uri = `otpauth://totp/TraceXMail:${encodeURIComponent(email)}?secret=${randomSecret}&issuer=TraceXMail`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(uri)}`;
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || !session || !session.user || !session.access_token) {
+        throw new Error('Active authenticated session required to enroll MFA factors.');
+      }
 
-      setEnrollData({
-        factorId,
-        qrCode: qrUrl,
-        secret: randomSecret,
-        uri
+      const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+      if (isExpired) {
+        await supabase.auth.refreshSession();
+      }
+
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        issuer: 'TraceXMail Forensics',
+        friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
       });
+
+      if (error) {
+        throw new Error(`Enrollment failed (${error.status || 'error'}): ${error.message}${error.status === 422 ? ' — Please ensure MFA is enabled in your Supabase Auth settings.' : ''}`);
+      }
+
+      if (data && data.totp) {
+        setEnrollData({
+          factorId: data.id,
+          qrCode: data.totp.qr_code,
+          secret: data.totp.secret,
+          uri: data.totp.uri
+        });
+      } else {
+        throw new Error('Supabase did not return TOTP factor payload.');
+      }
     } catch (err: any) {
-      console.warn('[AccountSettings] Enroll fallback notice:', err?.message || err);
-      const randomSecret = Array.from({ length: 32 }, () => 
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[Math.floor(Math.random() * 32)]
-      ).join('');
-      const factorId = `fac_totp_${Date.now()}`;
-      const email = user?.email || 'analyst@tracexmail.sec';
-      const uri = `otpauth://totp/TraceXMail:${encodeURIComponent(email)}?secret=${randomSecret}&issuer=TraceXMail`;
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(uri)}`;
-
-      setEnrollData({
-        factorId,
-        qrCode: qrUrl,
-        secret: randomSecret,
-        uri
-      });
+      console.error('[AccountSettings] Enroll error:', err);
+      setErrorMsg(err.message || 'Failed to start MFA enrollment.');
+      setIsEnrolling(false);
     }
   };
 
@@ -296,75 +220,56 @@ export function AccountSettingsView({
     setErrorMsg(null);
 
     try {
-      if (getIsSupabaseConfigured() && supabase && !enrollData.factorId.startsWith('fac_totp_')) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user && session.access_token) {
-          // Step 1: Create Challenge
-          const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
-            factorId: enrollData.factorId
-          });
-
-          if (challengeErr) {
-            setErrorMsg('Failed to challenge factor: ' + challengeErr.message);
-            setVerifying(false);
-            return;
-          }
-
-          // Step 2: Verify Code
-          const { error: verifyErr } = await supabase.auth.mfa.verify({
-            factorId: enrollData.factorId,
-            challengeId: challengeData.id,
-            code: verifyCode.trim()
-          });
-
-          if (verifyErr) {
-            setErrorMsg('Verification failed: ' + verifyErr.message + '. Please ensure your device clock is synchronized.');
-            // Audit failed challenge
-            fetch('/api/auth/mfa/enroll-log', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'FAILURE', factorType: 'totp', factorId: enrollData.factorId })
-            }).catch(() => {});
-            setVerifying(false);
-            return;
-          }
-
-          // Audit success
-          fetch('/api/auth/mfa/enroll-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'SUCCESS', factorType: 'totp', factorId: enrollData.factorId })
-          }).catch(() => {});
-
-          setSuccessMsg('TOTP Authenticator activated successfully! Your account is now fortified with Multi-Factor Authentication (AAL2).');
-          setIsEnrolling(false);
-          setEnrollData(null);
-          setVerifyCode('');
-          loadFactors();
-          return;
-        }
+      if (!getIsSupabaseConfigured() || !supabase) {
+        throw new Error('Supabase is not configured.');
       }
 
-      // Sandbox Fallback
-      const newFactor: TotpFactor = {
-        id: enrollData.factorId,
-        friendly_name: `Primary SOC Authenticator (${user?.email?.split('@')[0] || 'Operator'})`,
-        factor_type: 'totp',
-        status: 'verified',
-        created_at: new Date().toISOString()
-      };
-      saveLocalFactors([...factors, newFactor]);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user || !session.access_token) {
+        throw new Error('Active session required for MFA verification.');
+      }
 
+      // Step 1: Create Challenge
+      const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
+        factorId: enrollData.factorId
+      });
+
+      if (challengeErr) {
+        setErrorMsg('Failed to challenge factor: ' + challengeErr.message);
+        setVerifying(false);
+        return;
+      }
+
+      // Step 2: Verify Code
+      const { error: verifyErr } = await supabase.auth.mfa.verify({
+        factorId: enrollData.factorId,
+        challengeId: challengeData.id,
+        code: verifyCode.trim()
+      });
+
+      if (verifyErr) {
+        setErrorMsg('Verification failed: ' + verifyErr.message + '. Please ensure your device clock is synchronized.');
+        fetch('/api/auth/mfa/enroll-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'FAILURE', factorType: 'totp', factorId: enrollData.factorId })
+        }).catch(() => {});
+        setVerifying(false);
+        return;
+      }
+
+      // Audit success
       fetch('/api/auth/mfa/enroll-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'SUCCESS', factorType: 'totp', factorId: enrollData.factorId })
       }).catch(() => {});
 
-      setSuccessMsg('TOTP Authenticator activated successfully! Multi-Factor Authentication is now active on your account.');
+      setSuccessMsg('TOTP Authenticator activated successfully! Your account is now fortified with Multi-Factor Authentication (AAL2).');
       setIsEnrolling(false);
       setEnrollData(null);
       setVerifyCode('');
+      await loadFactors();
     } catch (err: any) {
       console.error('[AccountSettings] Verification error:', err);
       setErrorMsg(err.message || 'MFA verification failed.');
@@ -390,21 +295,16 @@ export function AccountSettingsView({
     setSuccessMsg(null);
 
     try {
-      if (getIsSupabaseConfigured() && supabase && !factorId.startsWith('fac_totp_')) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user && session.access_token) {
-          const { error } = await supabase.auth.mfa.unenroll({ factorId });
-          if (error) {
-            setErrorMsg('Failed to unenroll factor: ' + error.message);
-            setUnenrolling(false);
-            return;
-          }
+      if (getIsSupabaseConfigured() && supabase) {
+        const { error } = await supabase.auth.mfa.unenroll({ factorId });
+        if (error) {
+          setErrorMsg('Failed to unenroll factor: ' + error.message);
+          setUnenrolling(false);
+          return;
         }
       }
 
-      // Update state / local factors
-      const updated = factors.filter(f => f.id !== factorId);
-      saveLocalFactors(updated);
+      await loadFactors();
 
       // Audit unenroll action
       fetch('/api/auth/mfa/unenroll-log', {

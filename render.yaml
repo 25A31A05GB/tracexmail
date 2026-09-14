@@ -16,6 +16,10 @@ services:
         sync: false
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: GMAIL_CLIENT_ID

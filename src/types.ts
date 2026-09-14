@@ -454,7 +454,7 @@ export interface EvidenceCardData {
   }>;
   score?: {
     label: string;
-    percent: number;
+    percent?: number | null;
     resultText: string;
     resultLabel: string;
     good?: boolean;

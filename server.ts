@@ -1684,11 +1684,18 @@ async function startServer() {
     }
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId || (req.query.organization_id as string);
+    const includeDemo = req.query.include_demo === 'true';
 
     try {
       let casesQuery = supabase.from('cases').select('id, title, headers, verdict, severity, threat_score, tags, hops, iocs, is_demo, created_at, organization_id');
       if (orgId) {
-        casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        if (includeDemo) {
+          casesQuery = casesQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        } else {
+          casesQuery = casesQuery.eq('organization_id', orgId).eq('is_demo', false);
+        }
+      } else if (!includeDemo) {
+        casesQuery = casesQuery.eq('is_demo', false);
       }
       const { data: casesData, error: casesError } = await casesQuery;
       if (casesError) {
@@ -1697,29 +1704,42 @@ async function startServer() {
 
       let campQuery = supabase.from('campaigns').select('id, name, organization_id, is_demo, threat_actor, target_sector, status');
       if (orgId) {
-        campQuery = campQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        if (includeDemo) {
+          campQuery = campQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        } else {
+          campQuery = campQuery.eq('organization_id', orgId).eq('is_demo', false);
+        }
+      } else if (!includeDemo) {
+        campQuery = campQuery.eq('is_demo', false);
       }
       const { data: campData } = await campQuery;
 
       let alertQuery = supabase.from('alerts').select('*').order('timestamp', { ascending: false });
       if (orgId) {
-        alertQuery = alertQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        if (includeDemo) {
+          alertQuery = alertQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        } else {
+          alertQuery = alertQuery.eq('organization_id', orgId).eq('is_demo', false);
+        }
+      } else if (!includeDemo) {
+        alertQuery = alertQuery.eq('is_demo', false);
       }
       const { data: alertData } = await alertQuery;
 
       const allCases = casesData || [];
       const realCases = allCases.filter(c => !c.is_demo);
       const demoCases = allCases.filter(c => c.is_demo);
-      const totalCount = allCases.length;
+      const activeCasesForStats = includeDemo ? allCases : realCases;
+      const totalCount = activeCasesForStats.length;
 
-      const criticalCount = allCases.filter(c => c.severity === 'CRITICAL').length;
-      const highCount = allCases.filter(c => c.severity === 'HIGH').length;
-      const mediumCount = allCases.filter(c => c.severity === 'MEDIUM').length;
-      const lowCount = allCases.filter(c => c.severity === 'LOW').length;
-      const cleanCount = allCases.filter(c => c.severity === 'CLEAN').length;
+      const criticalCount = activeCasesForStats.filter(c => c.severity === 'CRITICAL').length;
+      const highCount = activeCasesForStats.filter(c => c.severity === 'HIGH').length;
+      const mediumCount = activeCasesForStats.filter(c => c.severity === 'MEDIUM').length;
+      const lowCount = activeCasesForStats.filter(c => c.severity === 'LOW').length;
+      const cleanCount = activeCasesForStats.filter(c => c.severity === 'CLEAN').length;
 
       const avgThreatScore = totalCount > 0
-        ? Math.round(allCases.reduce((acc, c) => acc + (c.threat_score || 0), 0) / totalCount)
+        ? Math.round(activeCasesForStats.reduce((acc, c) => acc + (c.threat_score || 0), 0) / totalCount)
         : 0;
 
       // Compute dynamic real infrastructure breakdown from actual cases
@@ -1728,7 +1748,7 @@ async function startServer() {
       let compromisedHostCount = 0;
       let legitimateRouteCount = 0;
 
-      allCases.forEach(c => {
+      activeCasesForStats.forEach(c => {
         const hops = Array.isArray(c.hops) ? c.hops : [];
         const hasTor = hops.some((h: any) => h.isTorExit || h.asnOrg?.toLowerCase().includes('tor') || h.asnOrg?.toLowerCase().includes('anonymizing'));
         const hasSpoof = c.severity === 'CRITICAL' || c.verdict?.toLowerCase().includes('phish') || c.verdict?.toLowerCase().includes('spoof') || (c.tags && c.tags.includes('BEC'));
@@ -1756,7 +1776,7 @@ async function startServer() {
       // Dynamic real threat clusters derived from campaigns and cases
       const realCampaigns = (campData || []).map(cp => ({
         name: cp.name || cp.threat_actor || 'Unattributed Incident Cluster',
-        campaign_count: allCases.filter(c => c.campaign_id === cp.id || c.title?.includes(cp.name)).length || 1,
+        campaign_count: activeCasesForStats.filter(c => c.campaign_id === cp.id || c.title?.includes(cp.name)).length || 1,
         target: cp.target_sector || 'Enterprise Communications',
         status: cp.status || 'ACTIVE'
       }));
@@ -1769,7 +1789,7 @@ async function startServer() {
         const dateStr = d.toISOString().slice(0, 10);
         const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         
-        const dayCases = allCases.filter(c => {
+        const dayCases = activeCasesForStats.filter(c => {
           if (!c.created_at) return false;
           return c.created_at.slice(0, 10) === dateStr;
         });
@@ -1811,8 +1831,8 @@ async function startServer() {
           infrastructure_breakdown: infrastructureBreakdown
         },
         threat_actors: realCampaigns.length > 0 ? realCampaigns : (
-          allCases.length > 0 ? [
-            { name: 'Active Correlated Ingestion Feed', campaign_count: allCases.length, target: 'Enterprise Targets', status: 'ANALYZED' }
+          activeCasesForStats.length > 0 ? [
+            { name: 'Active Correlated Ingestion Feed', campaign_count: activeCasesForStats.length, target: 'Enterprise Targets', status: 'ANALYZED' }
           ] : []
         ),
         daily_trends: dailyTrends,
@@ -5338,6 +5358,28 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       socket.destroy();
     }
   });
+
+  // Startup Validation for required secrets
+  const missingSecrets: string[] = [];
+  if (!process.env.SUPABASE_URL && !process.env.VITE_SUPABASE_URL) missingSecrets.push('SUPABASE_URL');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_KEY && !process.env.SUPABASE_SECRET_KEY) missingSecrets.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!process.env.JWT_SECRET) missingSecrets.push('JWT_SECRET');
+  if (!process.env.TOKEN_ENCRYPTION_KEY && !process.env.ENCRYPTION_KEY) missingSecrets.push('TOKEN_ENCRYPTION_KEY');
+
+  if (missingSecrets.length > 0) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        `[FATAL STARTUP CONFIGURATION ERROR] Missing required production environment variables: ${missingSecrets.join(', ')}. ` +
+        `Refusing to start in production without persistent credentials. Process terminating.`
+      );
+      process.exit(1);
+    } else {
+      console.warn(
+        `\x1b[33m[WARNING CONFIGURATION NOTICE] Missing environment variables: ${missingSecrets.join(', ')}. ` +
+        `Running in local development fallback mode with degraded in-memory storage.\x1b[0m`
+      );
+    }
+  }
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[TraceXMail] Express + WebSocket server running on http://0.0.0.0:${PORT}`);

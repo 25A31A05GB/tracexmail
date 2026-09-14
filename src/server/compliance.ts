@@ -510,11 +510,8 @@ export function resolveMasterSecret(): string {
 
   const isProduction = process.env.NODE_ENV === 'production';
   if (isProduction) {
-    const errorMsg =
-      '[Security Fatal] TOKEN_ENCRYPTION_KEY (or ENCRYPTION_KEY) is missing in production environment. ' +
-      'Refusing to generate an ephemeral key because process restarts will render previously encrypted data permanently undecryptable. ' +
-      'Please set TOKEN_ENCRYPTION_KEY in your environment.';
-    console.error(errorMsg);
+    const errorMsg = 'CRITICAL: TOKEN_ENCRYPTION_KEY must be set in production';
+    console.error(`[Security Fatal] ${errorMsg}`);
     throw new Error(errorMsg);
   }
 
