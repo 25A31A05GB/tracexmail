@@ -12,12 +12,33 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-pdf': ['jspdf', 'html2canvas'],
-          'vendor-leaflet': ['leaflet', 'react-leaflet'],
-          'vendor-flow': ['@xyflow/react'],
-          'vendor-charts': ['recharts'],
-          'vendor-supabase': ['@supabase/supabase-js']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('three') || id.includes('@react-three')) {
+              return 'vendor-3d';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('@xyflow/react')) {
+              return 'vendor-flow';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (id.includes('leaflet') || id.includes('react-leaflet')) {
+              return 'vendor-leaflet';
+            }
+            if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('pdfkit')) {
+              return 'vendor-pdf';
+            }
+            if (id.includes('@supabase/supabase-js')) {
+              return 'vendor-supabase';
+            }
+            if (id.includes('@xenova/transformers')) {
+              return 'vendor-ai-ml';
+            }
+          }
         }
       }
     }
