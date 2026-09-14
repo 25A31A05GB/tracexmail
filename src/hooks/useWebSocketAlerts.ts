@@ -146,22 +146,31 @@ export function useWebSocketAlerts() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data && data.type === 'CASE_CREATED' && data.case?.id) {
-            setLastCreatedCaseId(data.case.id);
+          if (data && data.type === 'CASE_CREATED' && (data.case?.id || data.caseId)) {
+            const caseId = data.case?.id || data.caseId;
+            setLastCreatedCaseId(caseId);
             setLastCaseUpdate({
               type: 'CASE_CREATED',
-              caseId: data.case.id,
+              caseId,
               case: data.case,
               timestamp: data.timestamp || new Date().toISOString()
             });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_CREATED', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+            }
           }
           if (data && (data.type === 'CASE_UPDATED' || data.type === 'CASE_CLOSED' || data.type === 'CASE_DELETED')) {
+            const caseId = data.caseId || data.case?.id;
             setLastCaseUpdate({
               type: data.type,
-              caseId: data.caseId || data.case?.id,
+              caseId,
               case: data.case,
               timestamp: data.timestamp || new Date().toISOString()
             });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+            }
           }
           if (data && data.type === 'GMAIL_SYNC_COMPLETE') {
             if (data.latest_case_id) {
@@ -169,6 +178,7 @@ export function useWebSocketAlerts() {
             }
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('GMAIL_SYNC_COMPLETE', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
             }
             const syncAlert: WebSocketAlert = {
               id: `sync_${Date.now()}`,
@@ -218,10 +228,10 @@ export function useWebSocketAlerts() {
 
       ws.onclose = () => {
         setStatus('disconnected');
-        // Retry connection after 5 seconds
+        // Retry connection after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 5000);
+        }, 3000);
       };
     } catch {
       setStatus('disconnected');
@@ -230,7 +240,18 @@ export function useWebSocketAlerts() {
 
   useEffect(() => {
     connect();
+
+    // Client ping heartbeat every 20 seconds
+    const pingInterval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(JSON.stringify({ type: 'PING' }));
+        } catch {}
+      }
+    }, 20000);
+
     return () => {
+      clearInterval(pingInterval);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
         wsRef.current.close();

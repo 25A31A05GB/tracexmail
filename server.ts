@@ -662,6 +662,76 @@ function buildEvidenceWhyNarrative(analysisOrCase: any) {
   };
 }
 
+// In-memory cases store for instant retrieval and resilience
+export const inMemoryCases = new Map<string, any>([
+  ['sample-paypal-phish', {
+    id: 'sample-paypal-phish',
+    organization_id: 'org_acme_soc_01',
+    title: 'Nazario Phish: PayPal Urgent Restriction',
+    description: 'Credential harvesting phishing email impersonating PayPal Security Center with urgent restriction threats.',
+    status: 'OPEN',
+    severity: 'HIGH',
+    threat_score: 88,
+    classification: 'PHISHING',
+    from_domain: 'paypal-account-security-update.com',
+    origin_ip: '185.220.101.5',
+    origin_country: 'DE',
+    origin_asn: 'AS208323',
+    origin_asn_org: 'Tor Exit Relay Node',
+    infra_type: 'TOR_EXIT_NODE',
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['Credential Harvesting', 'Brand Impersonation', 'Tor Network'],
+    is_demo: true,
+    source: 'sample'
+  }],
+  ['sample-bec-wire', {
+    id: 'sample-bec-wire',
+    organization_id: 'org_acme_soc_01',
+    title: 'BEC Wire Fraud: Urgent Invoice Payment Update',
+    description: 'Business Email Compromise targeting accounts payable with altered bank routing numbers.',
+    status: 'INVESTIGATING',
+    severity: 'CRITICAL',
+    threat_score: 94,
+    classification: 'FRAUD_BEC',
+    from_domain: 'executive-cfo-corp.com',
+    origin_ip: '104.244.76.13',
+    origin_country: 'US',
+    origin_asn: 'AS396982',
+    origin_asn_org: 'Google Cloud Platform Datacenter',
+    infra_type: 'DATACENTER',
+    created_at: new Date(Date.now() - 7200000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['BEC', 'Wire Fraud', 'Financial Diversion'],
+    is_demo: true,
+    source: 'sample'
+  }],
+  ['sample-legit-invoice', {
+    id: 'sample-legit-invoice',
+    organization_id: 'org_acme_soc_01',
+    title: 'Legitimate Vendor Invoice: Acme Cloud Services',
+    description: 'Authentic cryptographically verified invoice passing SPF, DKIM, and DMARC alignment.',
+    status: 'RESOLVED',
+    severity: 'CLEAN',
+    threat_score: 8,
+    classification: 'LEGITIMATE',
+    from_domain: 'billing.acme-cloud.com',
+    origin_ip: '52.95.4.12',
+    origin_country: 'US',
+    origin_asn: 'AS16509',
+    origin_asn_org: 'Amazon.com, Inc.',
+    infra_type: 'DATACENTER',
+    created_at: new Date(Date.now() - 14400000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['Clean', 'Verified SPF/DKIM', 'Corporate Billing'],
+    is_demo: true,
+    source: 'sample'
+  }]
+]);
+
 // Real Forensic Analysis Engine (Dynamic Geolocation, True IP Extraction, Authentic DNS/RDAP)
 async function parseRawEmailToAnalysis(
   rawContent: string,
@@ -1045,6 +1115,19 @@ async function parseRawEmailToAnalysis(
     } catch (dbErr) {
       console.warn('[Supabase] Failed to persist analyzed case to DB:', dbErr);
     }
+  }
+
+  // Always store in memory so newly analyzed cases are immediately visible in GET /api/cases
+  inMemoryCases.set(newCaseItem.id, newCaseItem);
+
+  // Broadcast real-time CASE_CREATED event over WebSockets
+  if (typeof broadcastWebSocketEvent === 'function') {
+    broadcastWebSocketEvent({
+      type: 'CASE_CREATED',
+      case: newCaseItem,
+      caseId: newCaseItem.id,
+      timestamp: new Date().toISOString()
+    });
   }
 
   try {
@@ -1847,76 +1930,6 @@ async function startServer() {
   app.get('/api/stats/dashboard', publicLimiter, handleStatsResponse);
   app.get('/api/v1/stats', publicLimiter, handleStatsResponse);
 
-  // In-memory cases fallback store for resilience if remote Supabase has RLS or connection errors
-  const inMemoryCases = new Map<string, any>([
-    ['sample-paypal-phish', {
-      id: 'sample-paypal-phish',
-      organization_id: 'org_acme_soc_01',
-      title: 'Nazario Phish: PayPal Urgent Restriction',
-      description: 'Credential harvesting phishing email impersonating PayPal Security Center with urgent restriction threats.',
-      status: 'OPEN',
-      severity: 'HIGH',
-      threat_score: 88,
-      classification: 'PHISHING',
-      from_domain: 'paypal-account-security-update.com',
-      origin_ip: '185.220.101.5',
-      origin_country: 'DE',
-      origin_asn: 'AS208323',
-      origin_asn_org: 'Tor Exit Relay Node',
-      infra_type: 'TOR_EXIT_NODE',
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-      updated_at: new Date().toISOString(),
-      assigned_user: 'analyst@acmedefense.sec',
-      tags: ['Credential Harvesting', 'Brand Impersonation', 'Tor Network'],
-      is_demo: true,
-      source: 'sample'
-    }],
-    ['sample-bec-wire', {
-      id: 'sample-bec-wire',
-      organization_id: 'org_acme_soc_01',
-      title: 'BEC Wire Fraud: Urgent Invoice Payment Update',
-      description: 'Business Email Compromise targeting accounts payable with altered bank routing numbers.',
-      status: 'INVESTIGATING',
-      severity: 'CRITICAL',
-      threat_score: 94,
-      classification: 'FRAUD_BEC',
-      from_domain: 'executive-cfo-corp.com',
-      origin_ip: '104.244.76.13',
-      origin_country: 'US',
-      origin_asn: 'AS396982',
-      origin_asn_org: 'Google Cloud Platform Datacenter',
-      infra_type: 'DATACENTER',
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-      updated_at: new Date().toISOString(),
-      assigned_user: 'analyst@acmedefense.sec',
-      tags: ['BEC', 'Wire Fraud', 'Financial Diversion'],
-      is_demo: true,
-      source: 'sample'
-    }],
-    ['sample-legit-invoice', {
-      id: 'sample-legit-invoice',
-      organization_id: 'org_acme_soc_01',
-      title: 'Legitimate Vendor Invoice: Acme Cloud Services',
-      description: 'Authentic cryptographically verified invoice passing SPF, DKIM, and DMARC alignment.',
-      status: 'RESOLVED',
-      severity: 'CLEAN',
-      threat_score: 8,
-      classification: 'LEGITIMATE',
-      from_domain: 'billing.acme-cloud.com',
-      origin_ip: '52.95.4.12',
-      origin_country: 'US',
-      origin_asn: 'AS16509',
-      origin_asn_org: 'Amazon.com, Inc.',
-      infra_type: 'DATACENTER',
-      created_at: new Date(Date.now() - 14400000).toISOString(),
-      updated_at: new Date().toISOString(),
-      assigned_user: 'analyst@acmedefense.sec',
-      tags: ['Clean', 'Verified SPF/DKIM', 'Corporate Billing'],
-      is_demo: true,
-      source: 'sample'
-    }]
-  ]);
-
   // Cases Management with RBAC & Supabase persistence with in-memory resilience
   app.get('/api/cases', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
@@ -1931,11 +1944,10 @@ async function startServer() {
 
     const getFallbackCases = () => {
       let cases = Array.from(inMemoryCases.values());
+      // Sort cases descending by created_at
+      cases.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       if (excludeDemo) {
         cases = cases.filter(c => !c.is_demo);
-        if (orgId) cases = cases.filter(c => c.organization_id === orgId);
-      } else if (orgId) {
-        cases = cases.filter(c => c.organization_id === orgId || c.is_demo);
       }
       return shouldMask ? cases.map((c: any) => maskCasePii(c, privacyConfig)) : cases;
     };
@@ -2021,9 +2033,6 @@ async function startServer() {
 
   app.post('/api/cases', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), validateRequest({ body: createCaseSchema }), async (req, res, next) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user!;
 
     if (req.body?.organization_id && req.body.organization_id !== user.organizationId) {
@@ -2046,12 +2055,36 @@ async function startServer() {
       source: 'manual'
     };
 
+    if (!supabase) {
+      inMemoryCases.set(newCase.id, newCase);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_CREATED',
+          case: newCase,
+          caseId: newCase.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.status(201).json(newCase);
+    }
+
     try {
       const { data, error } = await supabase.from('cases').insert([newCase]).select().single();
       if (error) {
-        console.error('[Supabase] Failed to insert case:', error);
-        return next(error);
+        console.error('[Supabase] Failed to insert case, using memory fallback:', error);
+        inMemoryCases.set(newCase.id, newCase);
+        if (typeof broadcastWebSocketEvent === 'function') {
+          broadcastWebSocketEvent({
+            type: 'CASE_CREATED',
+            case: newCase,
+            caseId: newCase.id,
+            timestamp: new Date().toISOString()
+          });
+        }
+        return res.status(201).json(newCase);
       }
+
+      inMemoryCases.set(data.id, data);
 
       await logAuditAction({
         organization_id: user.organizationId,
@@ -2069,30 +2102,69 @@ async function startServer() {
         broadcastWebSocketEvent({
           type: 'CASE_CREATED',
           case: data,
+          caseId: data.id,
           timestamp: new Date().toISOString()
         });
       }
 
       res.status(201).json(data);
     } catch (err) {
-      next(err);
+      inMemoryCases.set(newCase.id, newCase);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_CREATED',
+          case: newCase,
+          caseId: newCase.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+      res.status(201).json(newCase);
     }
   });
 
   // Case Deletion with RBAC: admin / analyst only
   app.delete('/api/cases/:caseId', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
+
+    if (!supabase) {
+      const existing = inMemoryCases.get(caseId);
+      if (!existing) {
+        return res.status(404).json({ error: 'Case not found' });
+      }
+      inMemoryCases.delete(caseId);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_DELETED',
+          caseId,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.json({
+        status: 'success',
+        message: `Case ${caseId} successfully deleted`,
+        deletedCase: existing
+      });
+    }
 
     const { data: existing, error: findError } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
     if (findError) {
       return res.status(500).json({ error: findError.message });
     }
     if (!existing) {
+      const memExisting = inMemoryCases.get(caseId);
+      if (memExisting) {
+        inMemoryCases.delete(caseId);
+        if (typeof broadcastWebSocketEvent === 'function') {
+          broadcastWebSocketEvent({
+            type: 'CASE_DELETED',
+            caseId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        return res.json({ status: 'success', message: `Case ${caseId} deleted from memory`, deletedCase: memExisting });
+      }
       return res.status(404).json({ error: 'Case not found' });
     }
 
@@ -2100,6 +2172,7 @@ async function startServer() {
     if (delError) {
       return res.status(500).json({ error: `Failed to delete case: ${delError.message}` });
     }
+    inMemoryCases.delete(caseId);
 
     try {
       await logAuditAction({
@@ -2138,27 +2211,55 @@ async function startServer() {
 
   app.patch('/api/cases/:caseId', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
-
-    // Fetch existing case for discrepancy comparison
-    const { data: existing } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
 
     const updates = { ...req.body };
     delete updates.organization_id;
     delete updates.id;
     updates.updated_at = new Date().toISOString();
 
+    if (!supabase) {
+      const existing = inMemoryCases.get(caseId);
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+      const updated = { ...existing, ...updates };
+      inMemoryCases.set(caseId, updated);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_UPDATED',
+          case: updated,
+          caseId,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.json(updated);
+    }
+
+    // Fetch existing case for discrepancy comparison
+    const { data: existing } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
+
     const { data, error } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
     if (error) {
+      const memExisting = inMemoryCases.get(caseId);
+      if (memExisting) {
+        const updated = { ...memExisting, ...updates };
+        inMemoryCases.set(caseId, updated);
+        if (typeof broadcastWebSocketEvent === 'function') {
+          broadcastWebSocketEvent({
+            type: 'CASE_UPDATED',
+            case: updated,
+            caseId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        return res.json(updated);
+      }
       return res.status(500).json({ error: `Failed to update case: ${error.message}` });
     }
     if (!data) {
       return res.status(404).json({ error: 'Case not found' });
     }
+    inMemoryCases.set(caseId, data);
 
     // Check for analyst verdict discrepancy (C4 Analyst Feedback Loop)
     if (existing && (req.body.analyst_verdict || req.body.status === 'CLOSED')) {
@@ -2210,9 +2311,6 @@ async function startServer() {
   // Dynamic Fast Triage Case Status Transition
   app.post('/api/cases/:caseId/triage', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
     const { status, severity, tags, assigned_user, analyst_notes, analyst_verdict } = req.body;
@@ -2227,13 +2325,46 @@ async function startServer() {
     if (analyst_notes) updates.analyst_notes = analyst_notes;
     if (analyst_verdict) updates.analyst_verdict = normalizeVerdictLabel(analyst_verdict);
 
+    if (!supabase) {
+      const existing = inMemoryCases.get(caseId);
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+      const updated = { ...existing, ...updates };
+      inMemoryCases.set(caseId, updated);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_UPDATED',
+          case: updated,
+          caseId,
+          triage_action: status || 'UPDATED',
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.json(updated);
+    }
+
     const { data: updatedCase, error } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
     if (error) {
+      const existing = inMemoryCases.get(caseId);
+      if (existing) {
+        const updated = { ...existing, ...updates };
+        inMemoryCases.set(caseId, updated);
+        if (typeof broadcastWebSocketEvent === 'function') {
+          broadcastWebSocketEvent({
+            type: 'CASE_UPDATED',
+            case: updated,
+            caseId,
+            triage_action: status || 'UPDATED',
+            timestamp: new Date().toISOString()
+          });
+        }
+        return res.json(updated);
+      }
       return res.status(500).json({ error: `Failed to triage case: ${error.message}` });
     }
     if (!updatedCase) {
       return res.status(404).json({ error: 'Case not found' });
     }
+    inMemoryCases.set(caseId, updatedCase);
 
     await logAuditAction({
       organization_id: user.organizationId,
@@ -2258,27 +2389,15 @@ async function startServer() {
       });
     }
 
-    res.json({
-      status: 'success',
-      message: `Case ${caseId} dynamic triage updated to ${updates.status || 'current state'}.`,
-      case: updatedCase
-    });
+    res.json(updatedCase);
   });
 
   // Explicit Case Closure with Analyst Verdict (C4)
   app.post('/api/cases/:caseId/close', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
     const { analyst_verdict, analyst_notes, close_reason, resolution_type = 'RESOLVED' } = req.body;
-
-    const { data: existing, error: findError } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
-    if (findError || !existing) {
-      return res.status(404).json({ error: 'Case not found' });
-    }
 
     const updates: any = {
       status: 'CLOSED',
@@ -2288,10 +2407,46 @@ async function startServer() {
     if (analyst_notes) updates.analyst_notes = analyst_notes;
     if (analyst_verdict) updates.analyst_verdict = normalizeVerdictLabel(analyst_verdict);
 
+    if (!supabase) {
+      const existing = inMemoryCases.get(caseId);
+      if (!existing) return res.status(404).json({ error: 'Case not found' });
+      const updated = { ...existing, ...updates };
+      inMemoryCases.set(caseId, updated);
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'CASE_CLOSED',
+          case: updated,
+          caseId,
+          timestamp: new Date().toISOString()
+        });
+      }
+      return res.json({ status: 'success', case: updated });
+    }
+
+    const { data: existing, error: findError } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
+    if (findError || !existing) {
+      const memExisting = inMemoryCases.get(caseId);
+      if (memExisting) {
+        const updated = { ...memExisting, ...updates };
+        inMemoryCases.set(caseId, updated);
+        if (typeof broadcastWebSocketEvent === 'function') {
+          broadcastWebSocketEvent({
+            type: 'CASE_CLOSED',
+            case: updated,
+            caseId,
+            timestamp: new Date().toISOString()
+          });
+        }
+        return res.json({ status: 'success', case: updated });
+      }
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
     const { data: updatedCase, error: updateError } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
     if (updateError) {
       return res.status(500).json({ error: `Failed to close case: ${updateError.message}` });
     }
+    inMemoryCases.set(caseId, updatedCase);
 
     // Record discrepancy in classifier feedback loop
     const correction = recordCorrectionIfDiscrepancy(existing, {
@@ -2480,6 +2635,9 @@ async function startServer() {
     try {
       const created = await createDynamicRealWorldCase(threatItem, user.organizationId, user.email || 'Lead SOC Analyst');
       
+      // Store in memory for instant retrieval
+      inMemoryCases.set(created.case.id, created.case);
+
       // Broadcast CASE_CREATED event
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
@@ -2517,6 +2675,7 @@ async function startServer() {
       try {
         const result = await createDynamicRealWorldCase(item, user.organizationId, user.email || 'Lead SOC Analyst');
         createdCases.push(result.case);
+        inMemoryCases.set(result.case.id, result.case);
 
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
@@ -5692,9 +5851,32 @@ If authentication (SPF/DKIM/DMARC) passed but the threat score is elevated, expl
       activeSockets.delete(ws);
     });
 
+    ws.on('message', (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'PING') {
+          ws.send(JSON.stringify({ type: 'PONG', timestamp: new Date().toISOString() }));
+        }
+      } catch {}
+    });
+
     // Send initial status ping
     ws.send(JSON.stringify({ type: 'CONNECTED', message: 'TraceXMail Live Alert Feed Active' }));
   });
+
+  // Keep-alive heartbeat interval to keep WebSocket open through reverse proxies
+  setInterval(() => {
+    const pingPayload = JSON.stringify({ type: 'HEARTBEAT_PING', timestamp: new Date().toISOString() });
+    activeSockets.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(pingPayload);
+        } catch {
+          activeSockets.delete(ws);
+        }
+      }
+    });
+  }, 25000);
 
   app.post('/api/alerts/broadcast', authenticatedLimiter, requireAuth, requireRole(['admin']), (req, res) => {
     const { title = 'New Threat Alert', description = 'Automated alert trigger', severity = 'HIGH', category = 'THREAT_DETECTION' } = req.body;

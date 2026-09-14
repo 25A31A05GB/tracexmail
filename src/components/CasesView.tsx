@@ -189,8 +189,10 @@ export function CasesView({
     }
   };
 
-  const fetchCases = async () => {
-    setLoading(true);
+  const fetchCases = async (isSilent: boolean = false) => {
+    if (!isSilent) {
+      setLoading(true);
+    }
     setFetchError(null);
     try {
       if (isSupabaseConfigured) {
@@ -205,8 +207,9 @@ export function CasesView({
 
         const { data, error } = await query;
         if (!error && data && data.length > 0) {
-          setCases(data);
-          setLoading(false);
+          const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+          setCases(sorted);
+          if (!isSilent) setLoading(false);
           return;
         }
       }
@@ -216,23 +219,83 @@ export function CasesView({
         mask_pii: maskPii ? true : undefined
       });
       if (Array.isArray(data)) {
-        setCases(data);
+        const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        setCases(sorted);
       } else {
         setCases([]);
       }
     } catch (err: any) {
       console.warn('Error fetching cases from backend/supabase:', err);
-      setFetchError(err?.message || 'Failed to connect to backend database');
-      setCases(showDemoCases ? SAMPLE_ANALYSES : []);
+      if (!isSilent) {
+        setFetchError(err?.message || 'Failed to connect to backend database');
+        setCases(showDemoCases ? SAMPLE_ANALYSES : []);
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
-  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert/case update activity
+  // Immediate optimistic update on real-time WebSocket case events
   useEffect(() => {
-    fetchCases();
-  }, [alerts, lastCreatedCaseId, lastCaseUpdate, refreshSignal, showDemoCases, maskPii]);
+    if (!lastCaseUpdate) return;
+    const { type, case: caseData, caseId } = lastCaseUpdate;
+
+    if (type === 'CASE_CREATED' && caseData && caseData.id) {
+      setCases(prev => {
+        if (prev.some(c => c.id === caseData.id)) {
+          return prev.map(c => (c.id === caseData.id ? { ...c, ...caseData } : c));
+        }
+        return [caseData, ...prev];
+      });
+    } else if ((type === 'CASE_UPDATED' || type === 'CASE_CLOSED') && caseData) {
+      const targetId = caseId || caseData.id;
+      setCases(prev => prev.map(c => (c.id === targetId ? { ...c, ...caseData } : c)));
+      if (selectedCaseDetail?.id === targetId) {
+        setSelectedCaseDetail((prev: any) => ({ ...prev, ...caseData }));
+      }
+    } else if (type === 'CASE_DELETED' && caseId) {
+      setCases(prev => prev.filter(c => c.id !== caseId));
+      if (selectedCaseDetail?.id === caseId) {
+        setSelectedCaseDetail(null);
+      }
+    }
+
+    // Follow-up background sync
+    fetchCases(true);
+  }, [lastCaseUpdate]);
+
+  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert
+  useEffect(() => {
+    fetchCases(false);
+  }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii]);
+
+  // Window event listener for cross-component real-time triggers (Gmail sync, direct ingest)
+  useEffect(() => {
+    const handleLiveEvent = (e: any) => {
+      const detail = e.detail;
+      if (detail?.case && detail.case.id) {
+        setCases(prev => {
+          if (prev.some(c => c.id === detail.case.id)) {
+            return prev.map(c => (c.id === detail.case.id ? { ...c, ...detail.case } : c));
+          }
+          return [detail.case, ...prev];
+        });
+      }
+      fetchCases(true);
+    };
+
+    window.addEventListener('CASE_CREATED', handleLiveEvent);
+    window.addEventListener('CASE_EVENT', handleLiveEvent);
+    window.addEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+
+    return () => {
+      window.removeEventListener('CASE_CREATED', handleLiveEvent);
+      window.removeEventListener('CASE_EVENT', handleLiveEvent);
+      window.removeEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+    };
+  }, []);
 
   // Real-time Supabase postgres changes channel for cases table
   useEffect(() => {
@@ -242,7 +305,7 @@ export function CasesView({
       const channel = supabase
         .channel('cases_table_live_stream')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
-          fetchCases();
+          fetchCases(true);
         })
         .subscribe((status) => {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -258,13 +321,13 @@ export function CasesView({
     }
   }, [showDemoCases, maskPii]);
 
-  // Periodic safety net polling interval (30s)
+  // Continuous background live polling (every 4 seconds) to guarantee real-time synchronization
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchCases();
-    }, 30000);
+      fetchCases(true);
+    }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showDemoCases, maskPii]);
 
   const handleQuickStatusChange = async (caseItem: any, newStatus: string) => {
     const caseId = caseItem.id;
@@ -580,18 +643,24 @@ export function CasesView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <ShieldAlert className="w-6 h-6 text-blue-400" />
-            Forensic Investigation Cases
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-blue-400" />
+              Forensic Investigation Cases
+            </h1>
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              LIVE SYNC
+            </div>
+          </div>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            Searchable case management view for grouping related fraudulent emails into campaigns.
+            Searchable case management view for grouping related fraudulent emails into campaigns with real-time updates.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchCases}
+            onClick={() => fetchCases(false)}
             disabled={loading}
             className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 flex items-center gap-2 cursor-pointer transition-colors"
           >
@@ -673,7 +742,7 @@ export function CasesView({
             <span>Backend Offline / Unreachable ({fetchError}). Displaying offline sample cases.</span>
           </div>
           <button
-            onClick={fetchCases}
+            onClick={() => fetchCases(false)}
             className="px-2.5 py-1 bg-amber-900/60 hover:bg-amber-800 text-amber-100 rounded text-[11px] font-semibold transition-colors cursor-pointer"
           >
             Retry Connection
