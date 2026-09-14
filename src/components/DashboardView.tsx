@@ -62,6 +62,7 @@ import { NetworkIntelligenceCard } from './NetworkIntelligenceCard';
 import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
+import { Interactive3DTiltCard, CyberMatrixBackground3D } from './3d';
 
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
@@ -525,9 +526,12 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       {/* When Minimized: Compact Executive Summary & Direct Action Hub */}
       {isMinimized ? (
         <div className="space-y-5 animate-in fade-in duration-200">
-          {/* Health & Status Bar */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          {/* Health & Status Bar with 3D Cyber Matrix Particle Layer */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 relative overflow-hidden shadow-lg">
+            <div className="absolute inset-0 pointer-events-none opacity-40">
+              <CyberMatrixBackground3D particleCount={35} className="w-full h-full" />
+            </div>
+            <div className="flex items-center gap-3 relative z-10">
               <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
               <div>
                 <div className="text-xs font-bold text-slate-200">
@@ -550,75 +554,83 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             )}
           </div>
 
-          {/* Compact KPI Row */}
+          {/* Compact KPI Row with 3D Interactive Tilt */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div 
-              onClick={() => onNavigateToTab?.('cases')}
-              className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group"
-            >
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Active Cases</span>
-                <ShieldAlert className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+            <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+              <div 
+                onClick={() => onNavigateToTab?.('cases')}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group h-full"
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Active Cases</span>
+                  <ShieldAlert className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-xl font-bold text-white font-mono">
+                  {stats?.summary?.total_cases ?? casesList.length}
+                </div>
+                <div className="text-[10px] text-rose-400/90 font-mono mt-0.5 flex items-center justify-between">
+                  <span>Active Forensic Queue</span>
+                  <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
+                </div>
               </div>
-              <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_cases ?? casesList.length}
-              </div>
-              <div className="text-[10px] text-rose-400/90 font-mono mt-0.5 flex items-center justify-between">
-                <span>Active Forensic Queue</span>
-                <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
-              </div>
-            </div>
+            </Interactive3DTiltCard>
 
-            <div 
-              onClick={() => onNavigateToTab?.('campaigns')}
-              className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group"
-            >
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Campaigns</span>
-                <Layers className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+            <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+              <div 
+                onClick={() => onNavigateToTab?.('campaigns')}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group h-full"
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Campaigns</span>
+                  <Layers className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-xl font-bold text-white font-mono">
+                  {stats?.summary?.active_campaigns ?? 0}
+                </div>
+                <div className="text-[10px] text-purple-400/90 font-mono mt-0.5 flex items-center justify-between">
+                  <span>Threat Clusters</span>
+                  <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
+                </div>
               </div>
-              <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.active_campaigns ?? 0}
-              </div>
-              <div className="text-[10px] text-purple-400/90 font-mono mt-0.5 flex items-center justify-between">
-                <span>Threat Clusters</span>
-                <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
-              </div>
-            </div>
+            </Interactive3DTiltCard>
 
-            <div 
-              onClick={() => onNavigateToTab?.('ingest')}
-              className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group"
-            >
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Ingested RFC 822</span>
-                <Database className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+            <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+              <div 
+                onClick={() => onNavigateToTab?.('ingest')}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group h-full"
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Ingested RFC 822</span>
+                  <Database className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-xl font-bold text-white font-mono">
+                  {stats?.summary?.total_emails_ingested ?? casesList.length}
+                </div>
+                <div className="text-[10px] text-blue-400 font-mono mt-0.5 flex items-center justify-between">
+                  <span>Ingest Pipeline</span>
+                  <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">Run →</span>
+                </div>
               </div>
-              <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_emails_ingested ?? casesList.length}
-              </div>
-              <div className="text-[10px] text-blue-400 font-mono mt-0.5 flex items-center justify-between">
-                <span>Ingest Pipeline</span>
-                <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">Run →</span>
-              </div>
-            </div>
+            </Interactive3DTiltCard>
 
-            <div 
-              onClick={() => onNavigateToTab?.('overview')}
-              className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group"
-            >
-              <div className="flex items-center justify-between text-slate-400 mb-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider">Avg Threat Score</span>
-                <ShieldCheck className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+              <div 
+                onClick={() => onNavigateToTab?.('overview')}
+                className="bg-slate-900/90 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 cursor-pointer transition-all group h-full"
+              >
+                <div className="flex items-center justify-between text-slate-400 mb-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider">Avg Threat Score</span>
+                  <ShieldCheck className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-xl font-bold text-white font-mono">
+                  76.4<span className="text-xs text-slate-500 font-normal"> / 100</span>
+                </div>
+                <div className="text-[10px] text-amber-400/90 font-mono mt-0.5 flex items-center justify-between">
+                  <span>High Malicious Ratio</span>
+                  <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">Overview →</span>
+                </div>
               </div>
-              <div className="text-xl font-bold text-white font-mono">
-                76.4<span className="text-xs text-slate-500 font-normal"> / 100</span>
-              </div>
-              <div className="text-[10px] text-amber-400/90 font-mono mt-0.5 flex items-center justify-between">
-                <span>High Malicious Ratio</span>
-                <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">Overview →</span>
-              </div>
-            </div>
+            </Interactive3DTiltCard>
           </div>
 
           {/* Quick Direct Navigation Hub */}
@@ -797,9 +809,12 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Health & Status Bar */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          {/* Health & Status Bar with 3D Cyber Matrix Particle Layer */}
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 relative overflow-hidden shadow-lg">
+            <div className="absolute inset-0 pointer-events-none opacity-40">
+              <CyberMatrixBackground3D particleCount={45} className="w-full h-full" />
+            </div>
+            <div className="flex items-center gap-3 relative z-10">
               <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
               <div>
                 <div className="text-xs font-bold text-slate-200">
@@ -854,78 +869,90 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             </div>
           )}
 
-      {/* KPI Cards */}
+      {/* KPI Cards with 3D Interactive Tilt */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
         >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Active Cases</span>
-            <ShieldAlert className="w-4 h-4 text-rose-400" />
-          </div>
-          <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_cases ?? casesList.length}
-          </div>
-          <div className="text-[11px] text-rose-400/90 font-mono mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 inline" /> Active Forensic Queue
-          </div>
+          <Interactive3DTiltCard maxTilt={6} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 h-full">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Active Cases</span>
+                <ShieldAlert className="w-4 h-4 text-rose-400" />
+              </div>
+              <div className="text-2xl font-bold text-white font-mono">
+                {stats?.summary?.total_cases ?? casesList.length}
+              </div>
+              <div className="text-[11px] text-rose-400/90 font-mono mt-1 flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 inline" /> Active Forensic Queue
+              </div>
+            </div>
+          </Interactive3DTiltCard>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
         >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Threat Campaigns</span>
-            <Layers className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.active_campaigns ?? 0}
-          </div>
-          <div className="text-[11px] text-purple-400/90 font-mono mt-1">
-            Active Campaign Clusters
-          </div>
+          <Interactive3DTiltCard maxTilt={6} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 h-full">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Threat Campaigns</span>
+                <Layers className="w-4 h-4 text-purple-400" />
+              </div>
+              <div className="text-2xl font-bold text-white font-mono">
+                {stats?.summary?.active_campaigns ?? 0}
+              </div>
+              <div className="text-[11px] text-purple-400/90 font-mono mt-1">
+                Active Campaign Clusters
+              </div>
+            </div>
+          </Interactive3DTiltCard>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
         >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Ingested RFC 822</span>
-            <Database className="w-4 h-4 text-blue-400" />
-          </div>
-          <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_emails_ingested ?? casesList.length}
-          </div>
-          <div className="text-[11px] text-blue-400/90 font-mono mt-1">
-            Total Ingested Artifacts
-          </div>
+          <Interactive3DTiltCard maxTilt={6} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 h-full">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Ingested RFC 822</span>
+                <Database className="w-4 h-4 text-blue-400" />
+              </div>
+              <div className="text-2xl font-bold text-white font-mono">
+                {stats?.summary?.total_emails_ingested ?? casesList.length}
+              </div>
+              <div className="text-[11px] text-blue-400/90 font-mono mt-1">
+                Total Ingested Artifacts
+              </div>
+            </div>
+          </Interactive3DTiltCard>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.25, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-slate-900/90 border border-slate-800 rounded-xl p-4"
         >
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Avg Threat Score</span>
-            <Zap className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold text-amber-400 font-mono">
-            {stats?.summary?.average_threat_score ?? (casesList.length > 0 ? Math.round(casesList.reduce((acc, c) => acc + (c.threatScore || 0), 0) / casesList.length) : 0)} / 100
-          </div>
-          <div className="text-[11px] text-slate-400 font-mono mt-1">
-            Threat Intelligence &amp; Behavioral Analysis
-          </div>
+          <Interactive3DTiltCard maxTilt={6} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 h-full">
+              <div className="flex items-center justify-between text-slate-400 mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider">Avg Threat Score</span>
+                <Zap className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="text-2xl font-bold text-amber-400 font-mono">
+                {stats?.summary?.average_threat_score ?? (casesList.length > 0 ? Math.round(casesList.reduce((acc, c) => acc + (c.threatScore || 0), 0) / casesList.length) : 0)} / 100
+              </div>
+              <div className="text-[11px] text-slate-400 font-mono mt-1">
+                Threat Intelligence &amp; Behavioral Analysis
+              </div>
+            </div>
+          </Interactive3DTiltCard>
         </motion.div>
       </div>
 

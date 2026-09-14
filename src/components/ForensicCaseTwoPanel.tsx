@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
 import { JargonTooltip } from './JargonTooltip';
+import { Interactive3DTiltCard, CyberThreatCore3D } from './3d';
 
 interface ForensicCaseTwoPanelProps {
   analysis: EmailAnalysis;
@@ -31,13 +32,17 @@ export function ForensicCaseTwoPanel({
     if (onToggleTechnicalExpanded) onToggleTechnicalExpanded(expanded);
   };
 
+  const threatScore = analysis?.threatScore ?? analysis?.riskScore ?? evidenceCardData.score?.percent ?? 65;
+  const verdictText = evidenceCardData.verdict?.text || (threatScore >= 70 ? 'MALICIOUS' : threatScore >= 40 ? 'SUSPICIOUS' : 'LEGITIMATE');
+
   return (
     <div className="space-y-5">
       {/* CORE FORENSIC DASHBOARD GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-5 items-start">
-        {/* LEFT COLUMN: The Evidence Card */}
-        <div className="rounded-xl border border-slate-700/80 bg-slate-900 p-5 select-text font-sans relative shadow-xl">
-          {/* Subject & Rubber-Stamp Verdict */}
+        {/* LEFT COLUMN: The Evidence Card with 3D Interactive Tilt & Specular Physics */}
+        <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.01} glareOpacity={0.18} className="rounded-xl">
+          <div className="rounded-xl border border-slate-700/80 bg-slate-900 p-5 select-text font-sans relative shadow-xl">
+            {/* Subject & Rubber-Stamp Verdict */}
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold text-[#E7E4DA] leading-snug break-words">
@@ -245,10 +250,43 @@ export function ForensicCaseTwoPanel({
               ))}
             </div>
           )}
-        </div>
+          </div>
+        </Interactive3DTiltCard>
 
         {/* RIGHT COLUMN: Separate bounded cards */}
         <div className="space-y-4">
+          {/* 3D HOLOGRAPHIC THREAT CORE VISUALIZATION */}
+          <div className="rounded-xl border border-slate-700/80 bg-slate-900/95 p-4 font-sans select-text shadow-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-2 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono">
+                  3D Holographic Threat Core
+                </span>
+              </div>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                threatScore >= 70 ? 'border-rose-500/40 text-rose-400 bg-rose-950/40' :
+                threatScore >= 40 ? 'border-amber-500/40 text-amber-400 bg-amber-950/40' :
+                'border-emerald-500/40 text-emerald-400 bg-emerald-950/40'
+              }`}>
+                {verdictText} • {threatScore}/100
+              </span>
+            </div>
+            
+            <div className="h-44 w-full relative flex items-center justify-center bg-slate-950/60 rounded-lg border border-slate-800/80 overflow-hidden">
+              <CyberThreatCore3D 
+                threatScore={threatScore}
+                verdict={verdictText}
+                size="full"
+                interactive={true}
+                className="w-full h-full"
+              />
+              <div className="absolute bottom-2 left-2 pointer-events-none text-[9px] font-mono text-slate-400 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-700/60">
+                Drag to rotate • Hover to pulse
+              </div>
+            </div>
+          </div>
+
           {/* 1. AI CASE SUMMARY */}
           {evidenceCardData.aiSummary && (
             <div className="rounded-xl border border-slate-700/80 bg-slate-900 p-4 font-sans select-text shadow-sm">
