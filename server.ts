@@ -4087,12 +4087,14 @@ Thanks!`;
     res.json({ status: 'ok', watch: updated });
   });
 
-  // 13. Disconnect Gmail (Protected by strictRateLimiter against abuse/flapping)
-  app.post('/api/gmail/disconnect', strictRateLimiter, requireAuth, async (req, res) => {
+  // 13. Disconnect Gmail (Protected by strictRateLimiter and admin role check against abuse/flapping)
+  app.post('/api/gmail/disconnect', strictRateLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     try {
       const user = (req as any).user;
       const orgId = user?.organizationId || DEFAULT_ORG_ID;
-      const result = await disconnectGmail(orgId);
+      const force = Boolean(req.body?.force);
+      
+      const result = await disconnectGmail(orgId, { force });
 
       // Broadcast WebSocket event across all connected tabs so UI resets instantly
       if (typeof broadcastWebSocketEvent === 'function') {
@@ -4100,6 +4102,7 @@ Thanks!`;
           type: 'GMAIL_DISCONNECTED',
           timestamp: new Date().toISOString(),
           connected: false,
+          force_cleared: result.force_cleared,
           email: null
         });
       }
@@ -4113,12 +4116,15 @@ Thanks!`;
           type: 'GMAIL_DISCONNECTED',
           timestamp: new Date().toISOString(),
           connected: false,
+          force_cleared: true,
           email: null
         });
       }
       res.json({
         success: true,
-        message: 'Gmail disconnected locally with cleanup warnings.',
+        disconnected: true,
+        force_cleared: true,
+        message: 'Gmail connection force-cleared locally with warnings.',
         warning: err?.message || 'Partial cleanup warning'
       });
     }

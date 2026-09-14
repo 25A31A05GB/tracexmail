@@ -152,24 +152,16 @@ export function useSession(): UseSessionReturn {
     const prof = await fetchProfile(currentUser);
     setProfile(prof);
 
-    const userEmail = (currentUser.email || '').toLowerCase();
-    const isKnownAdmin = userEmail === 'ramofyou@gmail.com' || userEmail === 'jayramsappa537@gmail.com';
-
-    const role: UserRole = (prof?.role as UserRole) || 
-      (currentUser.user_metadata?.role as UserRole) || 
-      (isKnownAdmin ? 'admin' : 'analyst');
+    const role: UserRole = (prof?.role as UserRole) || 'analyst';
     
-    const organizationId = prof?.organization_id || 
-      currentUser.user_metadata?.org_name || 
-      currentUser.user_metadata?.organization_id || 
-      'org_acme_soc_01';
+    const organizationId = prof?.organization_id || 'org_acme_soc_01';
 
     const sessionUser: SessionUser = {
       userId: currentUser.id,
       email: currentUser.email || '',
       organizationId,
       role,
-      label: prof?.full_name || currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || (currentUser.email ? currentUser.email.split('@')[0] : 'Security Analyst'),
+      label: prof?.full_name || (currentUser.email ? currentUser.email.split('@')[0] : 'Security Analyst'),
       authMethod: 'supabase_jwt'
     };
 
@@ -486,17 +478,11 @@ export function useSession(): UseSessionReturn {
     }
   }, [user, fetchProfile]);
 
-  const role: UserRole = (profile?.role as UserRole) || 
-    (user?.user_metadata?.role as UserRole) || 
-    'analyst';
+  const role: UserRole = (profile?.role as UserRole) || 'analyst';
 
-  const organizationId = profile?.organization_id || 
-    user?.user_metadata?.org_name || 
-    (user?.user_metadata as any)?.organization_id || 
-    'org_acme_soc_01';
+  const organizationId = profile?.organization_id || 'org_acme_soc_01';
 
   const accountType: AccountType = (profile?.account_type as AccountType) ||
-    (user?.user_metadata?.account_type as AccountType) ||
     (role === 'admin' ? 'organization' : 'organization');
 
   // Strict email verification check: checks genuine email confirmation from auth session and user metadata

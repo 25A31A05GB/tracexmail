@@ -62,6 +62,8 @@ CREATE POLICY "Service role full access to profiles"
     WITH CHECK (auth.role() = 'service_role');
 
 -- 4. Automatically provision profile when a new user signs up via auth.users
+-- SECURITY NOTE: New users default strictly to least privilege ('analyst' / 'read_only').
+-- NEVER trust client-writable raw_user_meta_data or email matching for admin privilege escalation.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -69,14 +71,9 @@ DECLARE
     user_name TEXT;
     org_id TEXT;
 BEGIN
-    -- Determine role (default admin for recognized owner, otherwise analyst)
-    IF NEW.email IN ('ramofyou@gmail.com', 'jayramsappa537@gmail.com') THEN
-        assigned_role := 'admin';
-    ELSIF NEW.raw_user_meta_data->>'role' IN ('admin', 'analyst', 'read_only') THEN
-        assigned_role := NEW.raw_user_meta_data->>'role';
-    ELSE
-        assigned_role := 'analyst';
-    END IF;
+    -- Secure default: new signups are granted 'analyst' role.
+    -- Role elevation to 'admin' MUST be performed explicitly by an existing admin via server-side service_role.
+    assigned_role := 'analyst';
 
     user_name := COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1));
     org_id := COALESCE(NEW.raw_user_meta_data->>'organization_id', 'org_acme_soc_01');
@@ -104,11 +101,7 @@ SELECT
     u.id,
     u.email,
     'org_acme_soc_01',
-    CASE
-        WHEN u.email IN ('ramofyou@gmail.com', 'jayramsappa537@gmail.com') THEN 'admin'
-        WHEN u.raw_user_meta_data->>'role' IN ('admin', 'analyst', 'read_only') THEN u.raw_user_meta_data->>'role'
-        ELSE 'analyst'
-    END,
+    'analyst',
     COALESCE(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', split_part(u.email, '@', 1)),
     TRUE
 FROM auth.users u

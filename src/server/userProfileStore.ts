@@ -20,45 +20,6 @@ let profilesTableStatus: 'UNKNOWN' | 'AVAILABLE' | 'UNAVAILABLE' = 'UNKNOWN';
 let lastTableCheckTime = 0;
 const TABLE_CHECK_COOLDOWN_MS = 60 * 1000; // recheck every 60 seconds if unknown or unavailable
 
-// Pre-seed primary app maintainers and administrators
-const seedProfiles: StoredUserProfile[] = [
-  {
-    id: 'd9f3b70c-58d8-44fa-9bec-ba1ebc4bbf20',
-    email: 'ramofyou@gmail.com',
-    fullName: 'SOC Administrator (Ram)',
-    role: 'admin',
-    organizationId: DEFAULT_ORG_ID,
-    accountType: 'organization',
-    emailVerified: true,
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'usr_jayram_sappa',
-    email: 'jayramsappa537@gmail.com',
-    fullName: 'Jayram Sappa',
-    role: 'admin',
-    organizationId: DEFAULT_ORG_ID,
-    accountType: 'organization',
-    emailVerified: true,
-    updatedAt: new Date().toISOString()
-  }
-];
-
-// Initialize in-memory store with seeds
-for (const profile of seedProfiles) {
-  memoryProfileStore.set(profile.id, profile);
-  memoryProfileStore.set(profile.email.toLowerCase(), profile);
-}
-
-/**
- * Check if the email belongs to a recognized system administrator
- */
-export function isKnownAdminEmail(email?: string): boolean {
-  if (!email) return false;
-  const clean = email.trim().toLowerCase();
-  return clean === 'ramofyou@gmail.com' || clean === 'jayramsappa537@gmail.com';
-}
-
 /**
  * Retrieve a user profile from memory store by ID or email
  */
@@ -112,7 +73,15 @@ export async function saveStoredProfile(profile: StoredUserProfile): Promise<Sto
 
 /**
  * Resolve an authenticated Supabase user into an authoritative UserRole and organizationId.
- * Guarantees a resilient, non-null context even if 'public.profiles' table does not exist in Supabase.
+ *
+ * CRITICAL SECURITY MANDATE:
+ * NEVER trust client-writable user_metadata or app_metadata for authorization, role, or organization_id.
+ * Any authenticated user can mutate user_metadata from their client via supabase.auth.updateUser().
+ * Role and organization MUST be resolved exclusively from verified server-side stores:
+ * 1. The authoritative 'public.profiles' table in Supabase
+ * 2. Or a verified in-memory profile created by server-side admin actions/invitations
+ *
+ * If no verified profile row exists, FAIL CLOSED to lowest privilege ('read_only').
  */
 export async function resolveUserProfile(authUser: {
   id: string;
@@ -123,7 +92,7 @@ export async function resolveUserProfile(authUser: {
   const userId = authUser.id;
   const cleanEmail = (authUser.email || '').trim().toLowerCase();
 
-  // 1. Check in-memory profile cache first
+  // 1. Check in-memory profile cache for a verified server-side profile
   const cached = (cleanEmail ? memoryProfileStore.get(cleanEmail) : null) || memoryProfileStore.get(userId);
   if (cached && cached.role && cached.organizationId) {
     return {
@@ -140,7 +109,7 @@ export async function resolveUserProfile(authUser: {
     profilesTableStatus = 'UNKNOWN';
   }
 
-  // 2. Query Supabase profiles if table is available
+  // 2. Query Supabase profiles table using service-role client
   if (supabaseAdmin && profilesTableStatus !== 'UNAVAILABLE') {
     try {
       const { data: profile, error: profileErr } = await supabaseAdmin
@@ -151,9 +120,9 @@ export async function resolveUserProfile(authUser: {
 
       if (!profileErr && profile && profile.organization_id && profile.role) {
         profilesTableStatus = 'AVAILABLE';
-        const validRole: UserRole = profile.role === 'admin' || profile.role === 'analyst' || profile.role === 'read_only'
+        const validRole: UserRole = (profile.role === 'admin' || profile.role === 'analyst' || profile.role === 'read_only')
           ? profile.role
-          : 'analyst';
+          : 'read_only';
 
         const stored: StoredUserProfile = {
           id: userId,
@@ -178,7 +147,7 @@ export async function resolveUserProfile(authUser: {
         if (profileErr.message?.includes('schema cache') || profileErr.message?.includes('does not exist') || (profileErr as any).code === 'PGRST205') {
           profilesTableStatus = 'UNAVAILABLE';
           lastTableCheckTime = now;
-          console.info('[UserProfileStore] "public.profiles" table not detected in Supabase schema cache. Resilient in-memory profiles active.');
+          console.info('[UserProfileStore] "public.profiles" table not detected in Supabase schema cache. Operating in fail-closed mode.');
         }
       }
     } catch (err: any) {
@@ -189,66 +158,12 @@ export async function resolveUserProfile(authUser: {
     }
   }
 
-  // 3. Fallback resolution: determine role and organization with security-conscious defaults
-  let determinedRole: UserRole = 'analyst';
-  if (isKnownAdminEmail(cleanEmail)) {
-    determinedRole = 'admin';
-  } else if (authUser.app_metadata?.role && ['admin', 'analyst', 'read_only'].includes(authUser.app_metadata.role)) {
-    determinedRole = authUser.app_metadata.role as UserRole;
-  } else if (authUser.user_metadata?.role && ['admin', 'analyst', 'read_only'].includes(authUser.user_metadata.role)) {
-    determinedRole = authUser.user_metadata.role as UserRole;
-  }
-
-  const determinedOrg = authUser.user_metadata?.organization_id || authUser.user_metadata?.org_name || DEFAULT_ORG_ID;
-  const fullName = authUser.user_metadata?.full_name || authUser.user_metadata?.name || cleanEmail.split('@')[0] || 'Security Analyst';
-
-  const newStoredProfile: StoredUserProfile = {
-    id: userId,
-    email: cleanEmail,
-    fullName,
-    role: determinedRole,
-    organizationId: determinedOrg,
-    accountType: (authUser.user_metadata?.account_type as any) || 'organization',
-    emailVerified: Boolean(cleanEmail),
-    updatedAt: new Date().toISOString()
-  };
-
-  memoryProfileStore.set(userId, newStoredProfile);
-  if (cleanEmail) memoryProfileStore.set(cleanEmail, newStoredProfile);
-
-  // 4. Try background auto-provision to Supabase profiles IF table is available
-  if (supabaseAdmin && profilesTableStatus !== 'UNAVAILABLE') {
-    try {
-      const { error: upsertErr } = await supabaseAdmin
-        .from('profiles')
-        .upsert({
-          id: userId,
-          email: cleanEmail,
-          role: determinedRole,
-          organization_id: determinedOrg,
-          full_name: fullName,
-          updated_at: new Date().toISOString()
-        });
-
-      if (upsertErr) {
-        if (upsertErr.message?.includes('schema cache') || upsertErr.message?.includes('does not exist') || (upsertErr as any).code === 'PGRST205') {
-          profilesTableStatus = 'UNAVAILABLE';
-          lastTableCheckTime = now;
-        }
-      } else {
-        profilesTableStatus = 'AVAILABLE';
-      }
-    } catch (upsertCatch: any) {
-      if (upsertCatch?.message?.includes('schema cache') || upsertCatch?.message?.includes('does not exist')) {
-        profilesTableStatus = 'UNAVAILABLE';
-        lastTableCheckTime = now;
-      }
-    }
-  }
+  // 3. Fail closed: NEVER trust user_metadata or app_metadata for elevated permissions
+  console.warn(`[Security] No verified profile record found for user ${userId} (${cleanEmail || 'unknown'}). Failing closed to read_only role. Client user_metadata is untrusted.`);
 
   return {
-    organizationId: determinedOrg,
-    role: determinedRole
+    organizationId: DEFAULT_ORG_ID,
+    role: 'read_only'
   };
 }
 
