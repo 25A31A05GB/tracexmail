@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { UserRole, AccountType } from '../hooks/useSession';
+import { Sparkles, Terminal } from 'lucide-react';
 
 interface AccountSettingsViewProps {
   role: UserRole;
@@ -36,6 +37,9 @@ interface AccountSettingsViewProps {
   onSignOut?: () => void;
   revokeAllOtherSessions?: () => Promise<void>;
   onNavigateTab?: (tab: any) => void;
+  userPersona?: 'technical' | 'non_technical';
+  onSetPersona?: (persona: 'technical' | 'non_technical') => void;
+  onOpenOnboarding?: () => void;
 }
 
 interface TotpFactor {
@@ -57,7 +61,10 @@ export function AccountSettingsView({
   isEmailVerified,
   onSignOut,
   revokeAllOtherSessions,
-  onNavigateTab
+  onNavigateTab,
+  userPersona = 'technical',
+  onSetPersona,
+  onOpenOnboarding
 }: AccountSettingsViewProps) {
   // Factors state
   const [factors, setFactors] = useState<TotpFactor[]>([]);
@@ -509,6 +516,34 @@ export function AccountSettingsView({
               <span className="font-mono text-[11px] text-[var(--stamp)] font-bold">
                 {role === 'admin' ? 'LEVEL 3: SOC COMMANDER (FULL WRITE/PURGE)' : role === 'analyst' ? 'LEVEL 2: FORENSIC ANALYST' : 'LEVEL 1: AUDITOR (READ ONLY)'}
               </span>
+            </div>
+
+            <div className="pt-3 border-t border-[var(--line)]">
+              <span className="text-[var(--paper-muted)] block text-[11px] mb-1">Active Experience Mode:</span>
+              <div className="flex items-center justify-between">
+                <span className="font-sans font-bold text-xs text-[#ede6d8] flex items-center gap-1.5">
+                  {userPersona === 'technical' ? (
+                    <>
+                      <Terminal className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                      <span>Technical (SOC Forensics)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-[#4ADE80]" />
+                      <span>Non-Technical (Human Safety)</span>
+                    </>
+                  )}
+                </span>
+                {onOpenOnboarding && (
+                  <button
+                    type="button"
+                    onClick={onOpenOnboarding}
+                    className="text-[11px] text-[var(--stamp)] hover:underline cursor-pointer font-sans"
+                  >
+                    Change Persona
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

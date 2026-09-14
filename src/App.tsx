@@ -28,6 +28,7 @@ import { forensicApi } from './lib/api';
 import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
+import { UserOnboardingModal, UserPersona, OnboardingAnswers } from './components/UserOnboardingModal';
 
 const DashboardView = lazy(() => import('./components/DashboardView').then(m => ({ default: m.DashboardView })));
 const CasesView = lazy(() => import('./components/CasesView').then(m => ({ default: m.CasesView })));
@@ -269,10 +270,44 @@ export default function App() {
     }
   });
 
+  const [userPersona, setUserPersona] = useState<UserPersona>(() => {
+    try {
+      return (localStorage.getItem('tracexmail_user_persona') as UserPersona) || 'technical';
+    } catch {
+      return 'technical';
+    }
+  });
+
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
+
+  // Trigger onboarding questionnaire when user is logged in if not completed yet
+  useEffect(() => {
+    if (session && !authLoading) {
+      try {
+        const completed = localStorage.getItem('tracexmail_onboarding_completed') === 'true';
+        if (!completed) {
+          setIsOnboardingOpen(true);
+        }
+      } catch {}
+    }
+  }, [session, authLoading]);
+
   const handleToggleViewMode = (mode: 'simple' | 'analyst') => {
     setViewMode(mode);
     try {
       localStorage.setItem('tracexmail_view_mode', mode);
+    } catch {}
+  };
+
+  const handleSetPersona = (persona: UserPersona) => {
+    setUserPersona(persona);
+    try {
+      localStorage.setItem('tracexmail_user_persona', persona);
+      if (persona === 'non_technical') {
+        handleToggleViewMode('simple');
+      } else {
+        handleToggleViewMode('analyst');
+      }
     } catch {}
   };
 
@@ -712,6 +747,9 @@ export default function App() {
           onSwitchRole={switchRole}
           viewMode={viewMode}
           onSetViewMode={handleToggleViewMode}
+          userPersona={userPersona}
+          onSetPersona={handleSetPersona}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
@@ -802,6 +840,8 @@ export default function App() {
                   onOpenNewModal={() => setIsNewModalOpen(true)}
                   onOpenReportModal={() => setIsReportModalOpen(true)}
                   viewMode={viewMode}
+                  userPersona={userPersona}
+                  onSwitchPersona={handleSetPersona}
                 />
               )}
 
@@ -887,6 +927,9 @@ export default function App() {
                   onSignOut={signOut}
                   revokeAllOtherSessions={revokeAllOtherSessions}
                   onNavigateTab={setActiveTab}
+                  userPersona={userPersona}
+                  onSetPersona={handleSetPersona}
+                  onOpenOnboarding={() => setIsOnboardingOpen(true)}
                 />
               )}
             </Suspense>
@@ -1019,6 +1062,20 @@ export default function App() {
         <KeyboardShortcutsModal
           isOpen={isShortcutsHelpOpen}
           onClose={() => setIsShortcutsHelpOpen(false)}
+        />
+
+        {/* User Onboarding & Technical Profiling Questionnaire Modal */}
+        <UserOnboardingModal
+          isOpen={isOnboardingOpen}
+          onClose={() => setIsOnboardingOpen(false)}
+          onComplete={(answers) => {
+            handleSetPersona(answers.persona);
+            setIsOnboardingOpen(false);
+            setActiveTab('overview');
+          }}
+          initialPersona={userPersona}
+          initialReason={typeof localStorage !== 'undefined' ? localStorage.getItem('tracexmail_use_reason') || undefined : undefined}
+          canDismiss={true}
         />
       </Suspense>
 

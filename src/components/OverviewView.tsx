@@ -47,6 +47,7 @@ import { classifyIp } from '../utils/parser';
 import { lookupMaxMindGeo } from '../utils/maxmindService';
 import { WhyAffordance } from './WhyAffordance';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
+import { NonTechnicalEvidenceCard } from './NonTechnicalEvidenceCard';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
@@ -248,6 +249,8 @@ interface OverviewViewProps {
   onOpenNewModal?: () => void;
   onOpenReportModal?: () => void;
   viewMode?: 'simple' | 'analyst';
+  userPersona?: 'technical' | 'non_technical';
+  onSwitchPersona?: (persona: 'technical' | 'non_technical') => void;
 }
 
 export function OverviewView({
@@ -259,7 +262,9 @@ export function OverviewView({
   onNavigateToGraph,
   onOpenNewModal,
   onOpenReportModal,
-  viewMode = 'simple'
+  viewMode = 'simple',
+  userPersona = 'technical',
+  onSwitchPersona
 }: OverviewViewProps) {
   const stdVerdict = getStandardizedVerdict(analysis);
 
@@ -290,10 +295,27 @@ export function OverviewView({
   const [reverifying, setReverifying] = useState<boolean>(false);
   const [originAssessmentOpen, setOriginAssessmentOpen] = useState<boolean>(false);
   const [isEvidenceTagOpen, setIsEvidenceTagOpen] = useState<boolean>(false);
-  const [overviewMode, setOverviewMode] = useState<'card' | 'workspace'>('card');
-  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst');
+  const [overviewMode, setOverviewMode] = useState<'non_technical' | 'card' | 'workspace'>(() => {
+    if (userPersona === 'non_technical' || viewMode === 'simple') {
+      return 'non_technical';
+    }
+    return 'card';
+  });
+  const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
+
+  useEffect(() => {
+    if (userPersona === 'non_technical') {
+      setOverviewMode('non_technical');
+      setIsTechnicalExpanded(false);
+    } else if (userPersona === 'technical') {
+      setIsTechnicalExpanded(true);
+      if (overviewMode === 'non_technical') {
+        setOverviewMode('card');
+      }
+    }
+  }, [userPersona]);
 
   useEffect(() => {
     setIsTechnicalExpanded(viewMode === 'analyst');
@@ -600,6 +622,44 @@ export function OverviewView({
     );
   }
 
+  if (overviewMode === 'non_technical') {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0E0B09]">
+        {/* Quick Mode Bar to allow switching */}
+        <div className="bg-[#17130F] border-b border-[#2B241E] px-4 py-2 flex items-center justify-between text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-[#9C9186]">Active Mode:</span>
+            <span className="px-2 py-0.5 rounded bg-[#D3A039]/20 text-[#D3A039] font-semibold border border-[#D3A039]/30">
+              Non-Technical Safety Card
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (onSwitchPersona) onSwitchPersona('technical');
+                setOverviewMode('card');
+              }}
+              className="px-2.5 py-1 rounded bg-[#1D1712] hover:bg-[#2B241E] text-[#EDE6DC] border border-[#2B241E] text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Terminal className="w-3 h-3 text-blue-400" />
+              <span>Switch to Technical SOC View</span>
+            </button>
+          </div>
+        </div>
+
+        <NonTechnicalEvidenceCard
+          analysis={analysis}
+          onOpenNewModal={onOpenNewModal}
+          onOpenReportModal={onOpenReportModal}
+          onSwitchToTechnical={() => {
+            if (onSwitchPersona) onSwitchPersona('technical');
+            setOverviewMode('workspace');
+          }}
+        />
+      </div>
+    );
+  }
+
   const evidenceCardData = mapAnalysisToEvidenceCardData(analysis);
 
   return (
@@ -609,6 +669,17 @@ export function OverviewView({
         {/* Row 1: Mode Switcher + Case Status */}
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setOverviewMode('non_technical');
+                if (onSwitchPersona) onSwitchPersona('non_technical');
+              }}
+              className="px-3 py-1.5 rounded text-xs font-mono font-semibold bg-[#1D2027] hover:bg-[#2A2D34] text-neutral-300 border border-[#2A2D34] transition-colors cursor-pointer flex items-center gap-1"
+              title="Switch to Non-Technical Human Safety Card View"
+            >
+              <span className="w-2 h-2 rounded-full bg-[#D3A039]"></span>
+              <span>Human Safety Card</span>
+            </button>
             <button
               onClick={() => setOverviewMode('card')}
               className={`px-3 py-1.5 rounded text-xs font-mono font-semibold transition-colors cursor-pointer ${

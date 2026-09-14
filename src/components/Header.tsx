@@ -59,6 +59,9 @@ interface HeaderProps {
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
   onSetViewMode?: (mode: 'simple' | 'analyst') => void;
+  userPersona?: 'technical' | 'non_technical';
+  onSetPersona?: (persona: 'technical' | 'non_technical') => void;
+  onOpenOnboarding?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
   onToggleMobileSidebar?: () => void;
@@ -85,6 +88,9 @@ export function Header({
   onOpenWalkthrough,
   viewMode = 'simple',
   onSetViewMode,
+  userPersona = 'technical',
+  onSetPersona,
+  onOpenOnboarding,
   onOpenCommandPalette,
   onOpenShortcutsHelp,
   onToggleMobileSidebar,
@@ -274,28 +280,34 @@ export function Header({
         {onSetViewMode && (
           <div className="hidden sm:flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">
             <button
-              onClick={() => onSetViewMode('simple')}
-              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
-                viewMode === 'simple'
+              onClick={() => {
+                onSetViewMode('simple');
+                if (onSetPersona) onSetPersona('non_technical');
+              }}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+                viewMode === 'simple' || userPersona === 'non_technical'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-[#9d9282] hover:text-[#f4efe6]'
               }`}
-              title="Clean view"
+              title="Clean human-readable safety view (Non-Technical)"
             >
               <Eye className="w-3.5 h-3.5 text-amber-400" />
-              <span>Standard</span>
+              <span>Human View</span>
             </button>
             <button
-              onClick={() => onSetViewMode('analyst')}
-              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1 ${
-                viewMode === 'analyst'
+              onClick={() => {
+                onSetViewMode('analyst');
+                if (onSetPersona) onSetPersona('technical');
+              }}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+                viewMode === 'analyst' && userPersona === 'technical'
                   ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                   : 'text-[#9d9282] hover:text-[#f4efe6]'
               }`}
-              title="Deep analysis view"
+              title="Deep analysis SOC console (Technical)"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400" />
-              <span>Analyst</span>
+              <span>Analyst SOC</span>
             </button>
           </div>
         )}
@@ -353,6 +365,18 @@ export function Header({
               </div>
 
               <div className="py-1">
+                {onOpenOnboarding && (
+                  <button
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      onOpenOnboarding();
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[#ede6d8] hover:bg-[rgba(201,162,39,0.15)] hover:text-[var(--stamp)] flex items-center gap-2 cursor-pointer transition-colors font-sans font-medium"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#D3A039]" />
+                    <span>Personalize Persona &amp; Goals</span>
+                  </button>
+                )}
                 {onOpenSettings && (
                   <button
                     onClick={() => {
