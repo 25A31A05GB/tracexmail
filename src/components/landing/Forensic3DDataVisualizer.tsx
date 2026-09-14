@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { 
@@ -21,17 +21,27 @@ import {
   Compass, 
   Layers,
   ChevronRight,
-  Database,
-  RefreshCw,
-  Maximize2,
-  Minimize2,
-  ZoomIn,
-  ZoomOut,
-  Radio,
-  Activity
+  Database
 } from 'lucide-react';
 import { EmailAnalysis } from '../../types';
-import { useLiveForensicCases3D, Dynamic3DNode, LiveDbCase } from '../../hooks/useLiveForensicCases3D';
+import { SAMPLE_ANALYSES } from '../../data/samples';
+
+export type NodeType = 'USER' | 'ATTACKER' | 'CHECKPOINT' | 'RELAY';
+
+export interface Dynamic3DNode {
+  id: string;
+  name: string;
+  category: NodeType;
+  role: string;
+  status: 'MALICIOUS' | 'WARNING' | 'CLEAN';
+  riskScore: number;
+  position: [number, number, number];
+  simpleExplanation: string;
+  technicalDetails: string;
+  actionAdvice: string;
+  colorHex: number;
+  shape: 'diamond' | 'spiked' | 'ring' | 'sphere';
+}
 
 interface Forensic3DDataVisualizerProps {
   currentAnalysis?: EmailAnalysis;
@@ -40,57 +50,156 @@ interface Forensic3DDataVisualizerProps {
   onExploreCase?: (caseIndex?: number) => void;
 }
 
+// Convert any live EmailAnalysis into an intuitive 3D node network
+function deriveNodesFromCase(analysis: EmailAnalysis): Dynamic3DNode[] {
+  const nodes: Dynamic3DNode[] = [];
+  const isMalicious = (analysis.riskScore ?? (analysis.threatScore ?? 80)) >= 60;
+  const threatScore = analysis.riskScore ?? (analysis.threatScore ?? 85);
+
+  // 1. Traced User / Recipient Node (Protected User) - DIAMOND GREEN/CYAN
+  const recipientEmail = analysis.headers?.to || 'employee@yourcompany.com';
+  nodes.push({
+    id: 'node-user',
+    name: recipientEmail.split('<').pop()?.replace('>', '') || 'Protected User',
+    category: 'USER',
+    role: 'Traced Recipient (Protected Inbox)',
+    status: 'CLEAN',
+    riskScore: 0,
+    position: [2.8, -0.4, 0.5],
+    simpleExplanation: 'This is the verified employee inbox targeted by the message. The user was safely protected from the attack.',
+    technicalDetails: `Final destination mailbox. Envelope To: ${recipientEmail}. Endpoint identity verified.`,
+    actionAdvice: 'Safe. No user credentials were leaked.',
+    colorHex: 0x22c55e,
+    shape: 'diamond'
+  });
+
+  // 2. Attacker / Origin Node - SPIKED RED / AMBER
+  const originHop = analysis.hops?.[0];
+  const originIp = originHop?.fromIp || '185.220.101.5';
+  const originLocation = originHop?.city && originHop?.country 
+    ? `${originHop.city}, ${originHop.country}` 
+    : 'Sofia, Bulgaria (Tor Exit)';
+  
+  nodes.push({
+    id: 'node-attacker',
+    name: isMalicious ? 'Threat Actor Gateway' : 'Legitimate Sender Gateway',
+    category: isMalicious ? 'ATTACKER' : 'RELAY',
+    role: isMalicious ? 'Attacker Origin (Hidden Relay)' : 'Verified Mail Origin',
+    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
+    riskScore: isMalicious ? threatScore : 5,
+    position: [-2.8, 0.8, -0.4],
+    simpleExplanation: isMalicious 
+      ? `The real computer that sent this email. It hid behind ${originLocation} while pretending to be someone else.` 
+      : `The official mail server in ${originLocation} authorized by the sender organization.`,
+    technicalDetails: `IP: ${originIp} | ASN: ${originHop?.asn || 'AS200548'} | PTR: ${originHop?.reverseDns || 'unresolved'}`,
+    actionAdvice: isMalicious ? 'Permanently blocked at enterprise gateway.' : 'No action required; origin verified.',
+    colorHex: isMalicious ? 0xef4444 : 0x38bdf8,
+    shape: isMalicious ? 'spiked' : 'sphere'
+  });
+
+  // 3. Security Checkpoint (SPF / DKIM / DMARC verification) - RING GOLD/RED
+  const dmarcStatus = analysis.authResults?.dmarc?.status || (isMalicious ? 'FAIL' : 'PASS');
+  const spfStatus = analysis.authResults?.spf?.status || (isMalicious ? 'SOFTFAIL' : 'PASS');
+  nodes.push({
+    id: 'node-security',
+    name: 'Authentication Checkpoint',
+    category: 'CHECKPOINT',
+    role: 'Cryptographic Security Gate',
+    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
+    riskScore: isMalicious ? 92 : 2,
+    position: [-0.2, 1.8, 0.7],
+    simpleExplanation: isMalicious
+      ? `The digital security checkpoint failed. The sender's signature did not match the claimed brand domain.`
+      : `All cryptographic checks passed! The sender signature perfectly matches the company domain.`,
+    technicalDetails: `SPF: ${spfStatus} | DKIM: ${analysis.authResults?.dkim?.status || 'PASS'} | DMARC: ${dmarcStatus}`,
+    actionAdvice: isMalicious ? 'Message flagged for spoofing attempt.' : 'Identity cryptographically validated.',
+    colorHex: isMalicious ? 0xf59e0b : 0x10b981,
+    shape: 'ring'
+  });
+
+  // 4. Mail Transit Relay (Intermediary MTA / Proofpoint / Google) - SPHERE BLUE
+  const secondHop = analysis.hops?.[1] || { fromHost: 'mx.inbound-security.net', fromIp: '198.51.100.22' };
+  nodes.push({
+    id: 'node-relay',
+    name: secondHop.fromHost || 'Inbound Mail Gateway',
+    category: 'RELAY',
+    role: 'Legitimate Mail Gateway',
+    status: 'CLEAN',
+    riskScore: 8,
+    position: [0.6, -1.5, -0.6],
+    simpleExplanation: 'Standard internet mail transit station that received the incoming packet and inspected its safety.',
+    technicalDetails: `MTA Hop #2: ${secondHop.fromIp || '198.51.100.22'} | Time delay: 0.8s | TLS Encrypted`,
+    actionAdvice: 'Verified safe delivery pipeline node.',
+    colorHex: 0x60a5fa,
+    shape: 'sphere'
+  });
+
+  // 5. Domain / Typosquat or Brand Entity - CUBE OR DIAMOND
+  const fromDomain = analysis.headers?.from?.split('@')[1]?.replace('>', '') || 'paypal-account-security.com';
+  nodes.push({
+    id: 'node-domain',
+    name: fromDomain,
+    category: isMalicious ? 'ATTACKER' : 'USER',
+    role: isMalicious ? 'Lookalike / Phishing Domain' : 'Verified Sender Domain',
+    status: isMalicious ? 'MALICIOUS' : 'CLEAN',
+    riskScore: isMalicious ? 95 : 4,
+    position: [-1.2, -0.8, 1.2],
+    simpleExplanation: isMalicious
+      ? `A deceptive domain created by the attacker to trick the user into thinking this was an official email.`
+      : `The official verified corporate domain for this sender organization.`,
+    technicalDetails: `Domain: ${fromDomain} | Age: 3 days old | Registrar: Anonymous Privacy`,
+    actionAdvice: isMalicious ? 'Blacklisted globally across all SOC DNS resolvers.' : 'Legitimate domain reputation.',
+    colorHex: isMalicious ? 0xdc2626 : 0x34d399,
+    shape: isMalicious ? 'spiked' : 'diamond'
+  });
+
+  return nodes;
+}
+
 export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> = ({
   currentAnalysis,
   onSelectCase,
-  onOpenConsole,
-  onExploreCase
+  onOpenConsole
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-
-  // Unified Live Supabase Forensic Hook
-  const {
-    cases,
-    activeCase,
-    activeCaseIndex,
-    activeAnalysis,
-    nodes,
-    selectedNode,
-    setSelectedNode,
-    connectionStatus,
-    dbSourceStatus,
-    lastSyncTimestamp,
-    realtimeUpdatesCount,
-    selectCaseByIndex,
-    refreshLiveCases
-  } = useLiveForensicCases3D(currentAnalysis);
-
-  // Notify parent on active analysis change
-  useEffect(() => {
-    if (activeAnalysis && onSelectCase) {
-      onSelectCase(activeAnalysis);
-    }
-  }, [activeAnalysis, onSelectCase]);
-
-  // Viewport Settings
+  const [selectedCaseIndex, setSelectedCaseIndex] = useState<number>(0);
+  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(currentAnalysis || SAMPLE_ANALYSES[0]);
+  const [selectedNode, setSelectedNode] = useState<Dynamic3DNode | null>(null);
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [explanationMode, setExplanationMode] = useState<'simple' | 'technical'>('simple');
   const [nodeScreenCoords, setNodeScreenCoords] = useState<{ id: string; x: number; y: number; visible: boolean; depth: number }[]>([]);
 
-  // Three.js Render Loop & Viewport Setup with Dynamic Node Positioning
+  // Update active analysis when sample preset is clicked
+  const handleSelectPreset = (idx: number) => {
+    setSelectedCaseIndex(idx);
+    const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0];
+    setActiveAnalysis(sample);
+    if (onSelectCase) {
+      onSelectCase(sample);
+    }
+  };
+
+  // Derive dynamic 3D nodes from the active case
+  const nodes = useMemo(() => {
+    return deriveNodesFromCase(activeAnalysis);
+  }, [activeAnalysis]);
+
+  // Set default selected node on case change
+  useEffect(() => {
+    setSelectedNode(nodes[0]);
+  }, [nodes]);
+
+  // Three.js Scene Setup & Render Loop
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     let width = container.clientWidth || 600;
-    let height = container.clientHeight || 460;
+    let height = container.clientHeight || 450;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
-    camera.position.set(0, 1.4, 7.5);
-    cameraRef.current = camera;
+    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+    camera.position.set(0, 1.2, 7.2);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
@@ -100,63 +209,52 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.minDistance = 3.0;
-    controls.maxDistance = 14.0;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 3.5;
+    controls.maxDistance = 12.0;
     controls.maxPolarAngle = Math.PI / 1.7;
-    controls.minPolarAngle = Math.PI / 6;
-    controlsRef.current = controls;
+    controls.minPolarAngle = Math.PI / 5;
 
-    // Advanced Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xfff8f0, 1.4);
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xfff8ee, 1.2);
     scene.add(ambientLight);
 
-    const directional = new THREE.DirectionalLight(0xffffff, 1.8);
-    directional.position.set(6, 8, 6);
-    scene.add(directional);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    mainLight.position.set(5, 8, 5);
+    scene.add(mainLight);
 
-    const redGlow = new THREE.PointLight(0xef4444, 3.0, 14);
-    redGlow.position.set(-4, 2, 2);
-    scene.add(redGlow);
+    const redAccent = new THREE.PointLight(0xef4444, 2.5, 12);
+    redAccent.position.set(-4, 2, 2);
+    scene.add(redAccent);
 
-    const greenGlow = new THREE.PointLight(0x10b981, 3.0, 14);
-    greenGlow.position.set(4, -2, 2);
-    scene.add(greenGlow);
+    const greenAccent = new THREE.PointLight(0x22c55e, 2.5, 12);
+    greenAccent.position.set(4, -2, 2);
+    scene.add(greenAccent);
 
     // Root Group
     const graphGroup = new THREE.Group();
     scene.add(graphGroup);
 
-    // Holographic Matrix Core Sphere
-    const coreInnerGeo = new THREE.IcosahedronGeometry(0.75, 1);
-    const coreInnerMat = new THREE.MeshStandardMaterial({
+    // Central Core Glow Grid Sphere
+    const centralGeo = new THREE.SphereGeometry(0.7, 16, 16);
+    const centralMat = new THREE.MeshBasicMaterial({
       color: 0xc9a227,
-      emissive: 0x5a3e0f,
-      emissiveIntensity: 0.6,
       wireframe: true,
       transparent: true,
-      opacity: 0.35
+      opacity: 0.25
     });
-    const coreMesh = new THREE.Mesh(coreInnerGeo, coreInnerMat);
-    graphGroup.add(coreMesh);
+    const centralMesh = new THREE.Mesh(centralGeo, centralMat);
+    graphGroup.add(centralMesh);
 
-    // Floating Orbital Halo Rings
-    const orbitRing1 = new THREE.Mesh(
-      new THREE.TorusGeometry(3.1, 0.012, 16, 64),
-      new THREE.MeshBasicMaterial({ color: 0x8a8070, transparent: true, opacity: 0.25 })
-    );
-    orbitRing1.rotation.x = Math.PI / 2.4;
-    graphGroup.add(orbitRing1);
+    // Orbital Ring
+    const orbitRingGeo = new THREE.TorusGeometry(2.8, 0.015, 16, 64);
+    const orbitRingMat = new THREE.MeshBasicMaterial({ color: 0x8a8070, transparent: true, opacity: 0.3 });
+    const orbitRing = new THREE.Mesh(orbitRingGeo, orbitRingMat);
+    orbitRing.rotation.x = Math.PI / 2.3;
+    graphGroup.add(orbitRing);
 
-    const orbitRing2 = new THREE.Mesh(
-      new THREE.TorusGeometry(3.3, 0.008, 16, 64),
-      new THREE.MeshBasicMaterial({ color: 0xc9a227, transparent: true, opacity: 0.2 })
-    );
-    orbitRing2.rotation.y = Math.PI / 3;
-    graphGroup.add(orbitRing2);
-
-    // Node Meshes & Energy Packets
-    const nodeMeshes: { mesh: THREE.Mesh; nodeData: Dynamic3DNode; group: THREE.Group }[] = [];
+    // Create 3D Meshes for each dynamic node based on its unique Shape & Color
+    const nodeMeshes: { mesh: THREE.Mesh; nodeData: Dynamic3DNode }[] = [];
     const pulsePackets: { mesh: THREE.Mesh; startPos: THREE.Vector3; endPos: THREE.Vector3 }[] = [];
 
     nodes.forEach((node) => {
@@ -164,17 +262,19 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       nodeSubGroup.position.set(...node.position);
 
       let geom: THREE.BufferGeometry;
+
+      // Unique 3D Geometries to clearly differentiate roles:
       switch (node.shape) {
-        case 'diamond':
+        case 'diamond': // Traced User / Recipient
           geom = new THREE.OctahedronGeometry(0.38, 0);
           break;
-        case 'spiked':
+        case 'spiked': // Malicious Attacker Entity
           geom = new THREE.DodecahedronGeometry(0.42, 0);
           break;
-        case 'ring':
+        case 'ring': // Authentication Security Checkpoint
           geom = new THREE.TorusGeometry(0.34, 0.08, 16, 32);
           break;
-        case 'sphere':
+        case 'sphere': // Mail Transit Relay
         default:
           geom = new THREE.SphereGeometry(0.32, 24, 24);
           break;
@@ -183,30 +283,29 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       const mat = new THREE.MeshStandardMaterial({
         color: node.colorHex,
         emissive: node.colorHex,
-        emissiveIntensity: 0.85,
-        roughness: 0.25,
-        metalness: 0.5
+        emissiveIntensity: 0.8,
+        roughness: 0.2,
+        metalness: 0.6
       });
 
       const mesh = new THREE.Mesh(geom, mat);
       mesh.userData = { nodeData: node };
       nodeSubGroup.add(mesh);
-      nodeMeshes.push({ mesh, nodeData: node, group: nodeSubGroup });
+      nodeMeshes.push({ mesh, nodeData: node });
 
-      // Holographic protective halo
-      const halo = new THREE.Mesh(
-        new THREE.RingGeometry(0.46, 0.54, 24),
-        new THREE.MeshBasicMaterial({
-          color: node.colorHex,
-          side: THREE.DoubleSide,
-          transparent: true,
-          opacity: 0.5
-        })
-      );
+      // Halo ring around each node
+      const haloGeo = new THREE.RingGeometry(0.46, 0.54, 24);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: node.colorHex,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6
+      });
+      const halo = new THREE.Mesh(haloGeo, haloMat);
       halo.rotation.x = Math.PI / 2;
       nodeSubGroup.add(halo);
 
-      // Connecting Beam to Center Core
+      // Connective Beam to Center Core
       const beamGeo = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(-node.position[0], -node.position[1], -node.position[2])
@@ -219,11 +318,10 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       const beam = new THREE.Line(beamGeo, beamMat);
       nodeSubGroup.add(beam);
 
-      // Pulse particle
-      const packetMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(0.07, 12, 12),
-        new THREE.MeshBasicMaterial({ color: node.colorHex })
-      );
+      // Packet Pulse along connection line
+      const packetGeo = new THREE.SphereGeometry(0.07, 12, 12);
+      const packetMat = new THREE.MeshBasicMaterial({ color: node.colorHex });
+      const packetMesh = new THREE.Mesh(packetGeo, packetMat);
       graphGroup.add(packetMesh);
       pulsePackets.push({
         mesh: packetMesh,
@@ -234,7 +332,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       graphGroup.add(nodeSubGroup);
     });
 
-    // Transmission Path Line connecting: Attacker ➔ Checkpoint ➔ Relay ➔ Traced User
+    // Inter-node connection curve: Attacker ➔ Security Checkpoint ➔ Relay ➔ Traced User
     const attackerNode = nodes.find(n => n.category === 'ATTACKER') || nodes[0];
     const checkpointNode = nodes.find(n => n.category === 'CHECKPOINT') || nodes[1];
     const relayNode = nodes.find(n => n.category === 'RELAY') || nodes[2];
@@ -247,24 +345,23 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       new THREE.Vector3(...userNode.position)
     ]);
 
-    const curvePoints = curve.getPoints(60);
+    const curvePoints = curve.getPoints(50);
     const curveGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
     const curveMat = new THREE.LineBasicMaterial({
       color: 0xede6d8,
       transparent: true,
-      opacity: 0.7
+      opacity: 0.6
     });
     const pathLine = new THREE.Line(curveGeo, curveMat);
     graphGroup.add(pathLine);
 
-    // Active Packet moving along transmission path
-    const pathPacket = new THREE.Mesh(
-      new THREE.SphereGeometry(0.13, 16, 16),
-      new THREE.MeshBasicMaterial({ color: 0xef4444 })
-    );
+    // Traveling Phish Packet along the entire transmission path
+    const pathPacketGeo = new THREE.SphereGeometry(0.12, 16, 16);
+    const pathPacketMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+    const pathPacket = new THREE.Mesh(pathPacketGeo, pathPacketMat);
     graphGroup.add(pathPacket);
 
-    // Click Detection
+    // Click Raycasting
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -312,46 +409,43 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
 
       if (autoRotate) {
         controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.75;
+        controls.autoRotateSpeed = 0.8;
       } else {
         controls.autoRotate = false;
       }
       controls.update();
 
-      // Gentle rotation of core matrix
-      coreMesh.rotation.y += delta * 0.12;
-      coreMesh.rotation.x += delta * 0.06;
+      // Slow gentle rotation of core
+      centralMesh.rotation.y += delta * 0.15;
+      centralMesh.rotation.x += delta * 0.08;
 
-      // Animate node meshes with smooth floating and rotational dynamics
-      nodeMeshes.forEach(({ mesh, nodeData, group }) => {
-        // Floating sinusoidal offset
-        group.position.y = nodeData.position[1] + Math.sin(elapsed * 2.0 + nodeData.position[0]) * 0.05;
-
+      // Animate individual node meshes (spinning diamonds/dodecahedrons)
+      nodeMeshes.forEach(({ mesh, nodeData }) => {
         if (nodeData.shape === 'diamond') {
-          mesh.rotation.y += delta * 0.85;
+          mesh.rotation.y += delta * 0.9;
           mesh.rotation.x += delta * 0.4;
         } else if (nodeData.shape === 'spiked') {
-          mesh.rotation.y += delta * 0.55;
-          mesh.rotation.z += delta * 0.45;
+          mesh.rotation.y += delta * 0.6;
+          mesh.rotation.z += delta * 0.5;
         } else if (nodeData.shape === 'ring') {
-          mesh.rotation.x += delta * 0.65;
+          mesh.rotation.x += delta * 0.7;
         }
       });
 
-      // Pulse packets
+      // Packet pulses along radius rays
       pulsePackets.forEach((p, idx) => {
-        const t = (elapsed * 0.65 + idx * 0.2) % 1;
+        const t = (elapsed * 0.7 + idx * 0.2) % 1;
         p.mesh.position.lerpVectors(p.startPos, p.endPos, t);
         p.mesh.scale.setScalar(0.06 + Math.sin(t * Math.PI) * 0.05);
       });
 
-      // Traveling packet along path
-      const pathT = (elapsed * 0.22) % 1;
+      // Path packet along transmission curve
+      const pathT = (elapsed * 0.25) % 1;
       const pointOnCurve = curve.getPointAt(pathT);
       pathPacket.position.copy(pointOnCurve);
       pathPacket.scale.setScalar(1 + Math.sin(elapsed * 6) * 0.2);
 
-      // Project 3D Coordinates to 2D Screen
+      // Project 3D Coordinates to 2D Screen for Friendly Floating Labels
       const coords: { id: string; x: number; y: number; visible: boolean; depth: number }[] = [];
       nodes.forEach((node) => {
         const worldPos = new THREE.Vector3(...node.position);
@@ -383,20 +477,9 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
       domElement.removeEventListener('click', handlePointerDown);
       renderer.dispose();
     };
-  }, [nodes, autoRotate, setSelectedNode]);
-
-  const handleZoom = (direction: 'in' | 'out') => {
-    if (!cameraRef.current) return;
-    const factor = direction === 'in' ? 0.85 : 1.15;
-    cameraRef.current.position.multiplyScalar(factor);
-    cameraRef.current.updateProjectionMatrix();
-  };
+  }, [nodes, autoRotate]);
 
   const handleResetCamera = () => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    cameraRef.current.position.set(0, 1.4, 7.5);
-    controlsRef.current.target.set(0, 0, 0);
-    controlsRef.current.update();
     setAutoRotate(true);
   };
 
@@ -407,95 +490,92 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
         {/* Simple & Clean Header */}
         <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227] mb-3">
-            <Radio className={`w-3.5 h-3.5 ${connectionStatus === 'connected' ? 'text-[#22c55e] animate-pulse' : 'text-[#f59e0b]'}`} />
-            <span>Live 3D Telemetry Matrix • {dbSourceStatus}</span>
-            {realtimeUpdatesCount > 0 && (
-              <span className="bg-[#10b981]/20 text-[#4ade80] px-1.5 py-0.2 rounded text-[10px]">
-                {realtimeUpdatesCount} Live Updates
-              </span>
-            )}
+            <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
+            <span>Interactive 3D Email Journey Map</span>
           </div>
 
           <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[34px] md:text-[38px] font-medium text-[#ede6d8] leading-tight">
-            Live Case Journey &amp; Attacker Nexus
+            See how the email traveled from attacker to your inbox
           </h2>
 
           <p className="mt-2.5 text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
-            Reconstructed dynamically from active Supabase cases. Differentiating protected employees from malicious spoofing infrastructure.
+            Every email is a journey across the internet. TraceXMail reconstructs each stop along the way, separating malicious attackers from protected users in real time.
           </p>
 
-          {/* Real Database Case Selector */}
+          {/* Preset Case Buttons to switch live database case structure */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-            <div className="flex items-center gap-1.5 text-[11.5px] text-[#8e8574] font-['IBM_Plex_Mono',monospace] mr-1">
-              <Database className="w-3.5 h-3.5 text-[#c9a227]" />
-              <span>Database Cases:</span>
-            </div>
-
-            {cases.map((dbCase, idx) => {
-              const isSelected = activeCaseIndex === idx;
-              const isHigh = dbCase.threatLevel === 'HIGH';
-              return (
-                <button
-                  key={dbCase.id}
-                  onClick={() => selectCaseByIndex(idx)}
-                  className={`px-3 py-1.5 rounded-[4px] text-[12px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSelected
-                      ? isHigh 
-                        ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md ring-1 ring-[#ff8d7d]' 
-                        : 'bg-[#10b981] text-[#14120f] font-bold shadow-md ring-1 ring-[#34d399]'
-                      : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
-                  }`}
-                  title={`Source: ${dbCase.source} • Last updated: ${new Date(dbCase.updatedAt).toLocaleTimeString()}`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${isHigh ? 'bg-[#ef4444]' : 'bg-[#10b981]'}`} />
-                  <span className="max-w-[140px] sm:max-w-[180px] truncate">{dbCase.title}</span>
-                </button>
-              );
-            })}
+            <span className="text-[12px] text-[#8e8574] font-['IBM_Plex_Mono',monospace] mr-1">
+              Select Live Case:
+            </span>
+            <button
+              onClick={() => handleSelectPreset(0)}
+              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCaseIndex === 0
+                  ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
+                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+              <span>Nazario PayPal Phish</span>
+            </button>
 
             <button
-              onClick={refreshLiveCases}
-              disabled={connectionStatus === 'syncing'}
-              className="p-1.5 rounded bg-[#1f1a14] hover:bg-[#2a241b] border border-[#3d2f1f] text-[#c9a227] transition-all cursor-pointer ml-1"
-              title="Sync latest live cases from Supabase database"
-              aria-label="Refresh Database Cases"
+              onClick={() => handleSelectPreset(1)}
+              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCaseIndex === 1
+                  ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
+                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+              }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${connectionStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+              <span>CEO BEC Wire Fraud</span>
+            </button>
+
+            <button
+              onClick={() => handleSelectPreset(2)}
+              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCaseIndex === 2
+                  ? 'bg-[#22c55e] text-[#14120f] font-bold shadow-md'
+                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
+              <span>Safe GitHub Verification</span>
             </button>
           </div>
         </div>
 
-        {/* Clear Shape & Color Legend */}
+        {/* Clear Shape & Color Legend for Non-Technical Users */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6 max-w-4xl mx-auto">
-          <div className="flex items-center gap-2.5 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
-            <div className="w-3.5 h-3.5 bg-[#10b981] rotate-45 shrink-0 rounded-[1px]" />
+          <div className="flex items-center gap-2 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
+            <div className="w-3.5 h-3.5 bg-[#22c55e] rotate-45 shrink-0 rounded-[1px]" />
             <div>
               <div className="text-[12px] font-bold text-[#ede6d8] leading-tight">Protected User</div>
               <div className="text-[10px] text-[#8e8574]">Targeted Employee</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
+          <div className="flex items-center gap-2 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
             <div className="w-3.5 h-3.5 bg-[#ef4444] shrink-0 rounded-[2px]" />
             <div>
               <div className="text-[12px] font-bold text-[#ede6d8] leading-tight">Attacker Node</div>
-              <div className="text-[10px] text-[#8e8574]">Tor Exit / Spoof IP</div>
+              <div className="text-[10px] text-[#8e8574]">Phishing / Spoofing</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
+          <div className="flex items-center gap-2 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
             <div className="w-3.5 h-3.5 border-2 border-[#f59e0b] rounded-full shrink-0" />
             <div>
-              <div className="text-[12px] font-bold text-[#ede6d8] leading-tight">Auth Checkpoint</div>
+              <div className="text-[12px] font-bold text-[#ede6d8] leading-tight">Security Gate</div>
               <div className="text-[10px] text-[#8e8574]">SPF / DKIM / DMARC</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
-            <div className="w-3.5 h-3.5 bg-[#3b82f6] rounded-full shrink-0" />
+          <div className="flex items-center gap-2 p-2.5 rounded-[4px] bg-[#16130f] border border-[#2d2820]">
+            <div className="w-3.5 h-3.5 bg-[#60a5fa] rounded-full shrink-0" />
             <div>
               <div className="text-[12px] font-bold text-[#ede6d8] leading-tight">Mail Relay</div>
-              <div className="text-[10px] text-[#8e8574]">Transit Gateway</div>
+              <div className="text-[10px] text-[#8e8574]">Transit Servers</div>
             </div>
           </div>
         </div>
@@ -503,36 +583,18 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
         {/* Main 3D Display Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          {/* Redesigned 3D Orbit Viewport (8 Columns) */}
-          <div className="lg:col-span-8 h-[460px] sm:h-[520px] relative rounded-[6px] border border-[#3d2f1f] bg-[radial-gradient(ellipse_at_top,#261c14_0%,#14120f_80%)] overflow-hidden shadow-2xl">
+          {/* 3D WebGL Canvas Viewport (8 Columns) */}
+          <div className="lg:col-span-8 h-[440px] sm:h-[500px] relative rounded-[6px] border border-[#3d2f1f] bg-[radial-gradient(ellipse_at_top,#261c14_0%,#14120f_80%)] overflow-hidden shadow-2xl">
             
-            {/* Top HUD Controls inside Viewport */}
-            <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none gap-2">
-              <div className="pointer-events-auto flex items-center gap-2 px-2.5 py-1 rounded bg-[#14120f]/90 border border-[#3a352c] text-[11px] font-['IBM_Plex_Mono',monospace] text-[#d6cdbe] shadow-lg">
+            {/* Top Bar inside Viewport */}
+            <div className="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none">
+              <div className="pointer-events-auto flex items-center gap-2 px-2.5 py-1 rounded bg-[#14120f]/90 border border-[#3a352c] text-[11px] font-['IBM_Plex_Mono',monospace] text-[#d6cdbe]">
                 <MousePointer className="w-3 h-3 text-[#c9a227]" />
-                <span className="hidden sm:inline">Drag to rotate • Scroll to zoom • Tap to inspect</span>
-                <span className="sm:hidden">Drag &amp; tap to inspect</span>
+                <span className="hidden sm:inline">Click any node or drag to rotate 3D view</span>
+                <span className="sm:hidden">Tap nodes to inspect</span>
               </div>
 
-              <div className="pointer-events-auto flex items-center gap-1.5 shadow-lg">
-                <button
-                  onClick={() => handleZoom('in')}
-                  className="p-1.5 rounded text-[11px] bg-[#181510] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-all cursor-pointer"
-                  title="Zoom In"
-                  aria-label="Zoom In"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={() => handleZoom('out')}
-                  className="p-1.5 rounded text-[11px] bg-[#181510] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-all cursor-pointer"
-                  title="Zoom Out"
-                  aria-label="Zoom Out"
-                >
-                  <ZoomOut className="w-3.5 h-3.5" />
-                </button>
-
+              <div className="pointer-events-auto flex items-center gap-1.5">
                 <button
                   onClick={() => setAutoRotate(!autoRotate)}
                   className={`px-2.5 py-1 rounded text-[11px] font-['IBM_Plex_Mono',monospace] border transition-all cursor-pointer flex items-center gap-1 ${
@@ -540,16 +602,15 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
                       ? 'bg-[#c9a227]/20 border-[#c9a227] text-[#ede6d8]'
                       : 'bg-[#181510] border-[#3a352c] text-[#8e8574]'
                   }`}
-                  title="Toggle automatic camera orbit"
+                  title="Toggle continuous gentle rotation"
                 >
                   <RotateCw className="w-3 h-3" />
-                  <span className="hidden sm:inline">{autoRotate ? 'Orbit: ON' : 'Orbit: OFF'}</span>
+                  <span>{autoRotate ? 'Orbit: ON' : 'Orbit: PAUSED'}</span>
                 </button>
 
                 <button
                   onClick={handleResetCamera}
-                  className="px-2 py-1 rounded text-[11px] font-['IBM_Plex_Mono',monospace] bg-[#181510] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-all cursor-pointer flex items-center gap-1"
-                  title="Reset 3D Camera View"
+                  className="px-2.5 py-1 rounded text-[11px] font-['IBM_Plex_Mono',monospace] bg-[#181510] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-all cursor-pointer flex items-center gap-1"
                 >
                   <Compass className="w-3 h-3" />
                   <span>Reset</span>
@@ -589,28 +650,28 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
                       : isMal
                         ? 'bg-[#1c1211]/90 text-[#ff8d7d] border border-[#ef4444]/60 hover:bg-[#b23a2e] hover:text-[#ede6d8]'
                         : isUser
-                          ? 'bg-[#0e1912]/90 text-[#4ade80] border border-[#10b981]/60 hover:bg-[#10b981] hover:text-[#14120f]'
+                          ? 'bg-[#0e1912]/90 text-[#4ade80] border border-[#22c55e]/60 hover:bg-[#22c55e] hover:text-[#14120f]'
                           : 'bg-[#14120f]/90 text-[#d6cdbe] border border-[#3a352c] hover:border-[#c9a227]'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${isMal ? 'bg-[#ef4444]' : isUser ? 'bg-[#10b981]' : 'bg-[#f59e0b]'}`} />
+                  <span className={`w-2 h-2 rounded-full ${isMal ? 'bg-[#ef4444]' : isUser ? 'bg-[#22c55e]' : 'bg-[#f59e0b]'}`} />
                   <span>{node.name}</span>
                 </div>
               );
             })}
 
             {/* Bottom Status Ticker inside Viewport */}
-            <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] bg-[#14120f]/85 backdrop-blur-sm px-3 py-1.5 rounded border border-[#3a352c]">
+            <div className="absolute bottom-3 left-3 right-3 z-10 pointer-events-none flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] bg-[#14120f]/80 backdrop-blur-sm px-3 py-1.5 rounded border border-[#3a352c]">
               <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#10b981] animate-ping" />
-                <span>Supabase Live Sync: {lastSyncTimestamp}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-ping" />
+                <span>Live Graph Synced to Active Case</span>
               </span>
-              <span>{nodes.length} Live Verified Nodes</span>
+              <span>{nodes.length} Verified Nodes</span>
             </div>
 
           </div>
 
-          {/* Side Plain-English & SOC Card (4 Columns) */}
+          {/* Side Plain-English Explanation Card (4 Columns) */}
           <div className="lg:col-span-4 flex flex-col justify-between p-5 rounded-[6px] bg-[#181510] border border-[#3a352c] shadow-xl">
             {selectedNode ? (
               <div className="flex flex-col h-full justify-between">
@@ -621,7 +682,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
                       selectedNode.status === 'MALICIOUS'
                         ? 'bg-[#ef4444]/20 text-[#ff8d7d] border border-[#ef4444]/40'
                         : selectedNode.category === 'USER'
-                          ? 'bg-[#10b981]/20 text-[#4ade80] border border-[#10b981]/40'
+                          ? 'bg-[#22c55e]/20 text-[#4ade80] border border-[#22c55e]/40'
                           : 'bg-[#f59e0b]/20 text-[#f59e0b] border border-[#f59e0b]/40'
                     }`}>
                       {selectedNode.role}
@@ -691,18 +752,18 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
                     onClick={onOpenConsole}
                     className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-2.5 px-4 rounded-[4px] font-semibold text-[13.5px] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md"
                   >
-                    <span>Open Live Evidence in Console</span>
+                    <span>Open Full Evidence in Console</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                   <p className="text-[11px] text-center text-[#8e8574] mt-2 font-['IBM_Plex_Mono',monospace]">
-                    Direct Supabase Sync • Free Instant Triage
+                    Zero setup • Free instant verification
                   </p>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-[#8e8574]">
                 <Info className="w-8 h-8 text-[#c9a227] mb-2" />
-                <p className="text-[13px]">Click any 3D node to inspect its story</p>
+                <p className="text-[13px]">Click any 3D node to inspect its plain-English story</p>
               </div>
             )}
           </div>

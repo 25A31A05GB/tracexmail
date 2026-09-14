@@ -119,7 +119,7 @@ export default function App() {
       const code = searchParams.get('code') || hashParams.get('code');
       const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
       const type = searchParams.get('type') || hashParams.get('type');
-      const token = searchParams.get('magic_token') || hashParams.get('magic_token') || hashParams.get('token');
+      const token = searchParams.get('token') || hashParams.get('token') || searchParams.get('magic_token') || hashParams.get('magic_token');
 
       const isRecovery = type === 'recovery' || 
                          hash.includes('type=recovery') || 
@@ -136,10 +136,13 @@ export default function App() {
       } else if (isRecovery) {
         setAuthView('reset-password');
       } else if (
+        code || 
+        accessToken || 
         hash.startsWith('#magic-link') || 
         hash.includes('magic_token') || 
         search.includes('magic_token') || 
-        (token && token.startsWith('mlk_'))
+        (token && token.startsWith('mlk_')) ||
+        (search.includes('token=') && !hash.startsWith('#reset-password'))
       ) {
         setAuthView('magic-link');
       } else if (hash.startsWith('#forgot-password')) {
@@ -627,45 +630,15 @@ export default function App() {
         )}
         {authView === 'intro' && (
           <LandingView
-            onSignIn={() => {
-              setAuthView('login');
-              window.location.hash = 'login';
-            }}
-            onRequestAccess={() => {
-              setAuthView('signup');
-              window.location.hash = 'signup';
-            }}
-            onOpenConsole={() => {
-              if (!session) {
-                setAuthView('login');
-                window.location.hash = 'login';
-              } else {
-                setActiveTab('ingest');
-                setAuthView('intro');
-                window.location.hash = '';
-              }
-            }}
+            onOpenConsole={() => setAuthView('login')}
             onOpenTrace={() => {
               setCurrentAnalysis(SAMPLE_ANALYSES[0]);
-              if (!session) {
-                setAuthView('login');
-                window.location.hash = 'login';
-              } else {
-                setActiveTab('overview');
-                setAuthView('intro');
-                window.location.hash = '';
-              }
+              setAuthView('login');
             }}
+            onRequestAccess={() => setAuthView('signup')}
             onSelectCase={(sample) => {
               setCurrentAnalysis(sample);
-              if (!session) {
-                setAuthView('login');
-                window.location.hash = 'login';
-              } else {
-                setActiveTab('overview');
-                setAuthView('intro');
-                window.location.hash = '';
-              }
+              setAuthView('login');
             }}
           />
         )}

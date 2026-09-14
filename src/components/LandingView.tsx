@@ -10,7 +10,6 @@ import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon
 
 interface LandingViewProps {
   onOpenConsole: () => void;
-  onSignIn?: () => void;
   onOpenTrace: () => void;
   onRequestAccess?: () => void;
   onSelectCase?: (analysis: EmailAnalysis) => void;
@@ -18,7 +17,6 @@ interface LandingViewProps {
 
 export function LandingView({
   onOpenConsole,
-  onSignIn,
   onOpenTrace,
   onRequestAccess,
   onSelectCase
@@ -139,7 +137,7 @@ export function LandingView({
 
           <div className="flex items-center gap-2 sm:gap-4">
             <button
-              onClick={onSignIn || onOpenConsole}
+              onClick={onOpenConsole}
               className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] sm:text-[14.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
             >
               Sign in
@@ -209,15 +207,9 @@ export function LandingView({
             <div className="pt-3 border-t border-[#3a352c] flex flex-col gap-2">
               <button
                 onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
-                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer transition-colors shadow-md"
+                className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
               >
                 Launch Free Analyst Console
-              </button>
-              <button
-                onClick={() => { if (onSignIn) { onSignIn(); } else { onOpenConsole(); } setMobileMenuOpen(false); }}
-                className="w-full bg-[#1e1b15] hover:bg-[#28231b] border border-[#3a352c] text-[#ede6d8] py-2 rounded text-[13.5px] font-medium text-center cursor-pointer transition-colors"
-              >
-                Sign In to Account
               </button>
             </div>
           </div>
@@ -228,6 +220,11 @@ export function LandingView({
       <section className="py-12 sm:py-16 lg:py-24 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center relative z-10">
           <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227] mb-4">
+              <TraceXLogo3D size="sm" interactive={false} />
+              <span>TraceXMail Forensic Core v2.4</span>
+            </div>
+
             <h1 className="font-['Fraunces',serif] text-[28px] xs:text-[34px] sm:text-[44px] lg:text-[50px] font-medium leading-[1.12] text-[#ede6d8] tracking-tight max-w-xl">
               Every phishing email leaves a trail. We follow it to the source.
             </h1>

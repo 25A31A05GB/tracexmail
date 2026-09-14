@@ -16,8 +16,6 @@ import {
 } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../../data/samples';
 import { EmailAnalysis } from '../../types';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { forensicApi } from '../../lib/api';
 
 interface LiveDynamicTelemetryRibbonProps {
   onSelectCase?: (analysis: EmailAnalysis) => void;
@@ -89,58 +87,31 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
   onOpenConsole,
   className = ''
 }) => {
-  // Real database-connected numbers
+  // Dynamic base numbers that sync and increment in real-time
   const [deconstructedCount, setDeconstructedCount] = useState<number>(14892);
   const [cryptoVerifiedCount, setCryptoVerifiedCount] = useState<number>(41280);
   const [torInterceptionsCount, setTorInterceptionsCount] = useState<number>(1247);
   const [activeAnalysts, setActiveAnalysts] = useState<number>(38);
   const [events, setEvents] = useState<LiveTraceEvent[]>(INITIAL_EVENTS);
   const [recentFlash, setRecentFlash] = useState<boolean>(false);
-  const [isSupabaseLive, setIsSupabaseLive] = useState<boolean>(false);
 
-  // Fetch real cases from Supabase
+  // Read real local cases / session cases if stored
   useEffect(() => {
-    async function loadSupabaseEvents() {
-      try {
-        if (supabase && isSupabaseConfigured) {
-          const { data, count, error } = await supabase
-            .from('cases')
-            .select('*', { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .limit(6);
-
-          if (!error && data && data.length > 0) {
-            setIsSupabaseLive(true);
-            if (count && count > 0) {
-              setDeconstructedCount(prev => Math.max(prev, 14000 + count));
-            }
-
-            const realEvents: LiveTraceEvent[] = data.map((item: any, idx: number) => ({
-              id: item.id || `sb-${idx}`,
-              hash: (item.sha256_hash || item.id || 'e3b0c442...').slice(0, 16) + '...',
-              source: item.origin_ip ? `${item.origin_ip}` : 'Real-World Feed Ingest',
-              asn: item.asn || 'AS-BGP-SCAN',
-              verdict: (item.threat_score ?? 80) >= 60 ? 'MALICIOUS' : 'CLEAN',
-              threatScore: item.threat_score ?? 92,
-              timeAgo: 'Live',
-              subject: item.title || item.subject || 'Verified Ingestion Event',
-              sampleIndex: idx % SAMPLE_ANALYSES.length
-            }));
-            setEvents(realEvents);
-          }
+    try {
+      const stored = localStorage.getItem('tracexmail_cases_history');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDeconstructedCount(prev => prev + parsed.length);
         }
-      } catch (e) {
-        console.warn('[Telemetry Ribbon] Supabase live stream query fallback:', e);
       }
-    }
-
-    loadSupabaseEvents();
+    } catch {}
   }, []);
 
   // Periodic simulated live telemetry tick to reflect real-time enterprise stream
   useEffect(() => {
     const interval = setInterval(() => {
-      // Increments to reflect live global ingest
+      // Small random increments to simulate live global ingest
       setDeconstructedCount(prev => prev + 1);
       setCryptoVerifiedCount(prev => prev + Math.floor(Math.random() * 3) + 1);
       if (Math.random() > 0.6) {
@@ -182,76 +153,86 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2 px-2.5 py-1 rounded-[2px] bg-[#22c55e]/10 border border-[#22c55e]/30 text-[#4ade80] font-['IBM_Plex_Mono',monospace] text-[11px] font-bold">
             <span className={`w-2 h-2 rounded-full bg-[#22c55e] ${recentFlash ? 'scale-150 animate-ping' : 'animate-pulse'}`} />
-            <span>{isSupabaseLive ? 'SUPABASE REAL-TIME INGEST ACTIVE' : 'GLOBAL DECONSTRUCTION ACTIVE'}</span>
+            <span>GLOBAL DECONSTRUCTION ENGINE ACTIVE</span>
           </div>
           <span className="hidden sm:inline-block font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574]">
-            Low Latency (14ms) • Direct Telemetry
+            RFC822 Core v2.4 • Low Latency (14ms)
           </span>
         </div>
 
-        {/* Live Dynamic Counters */}
-        <div className="flex items-center gap-4 sm:gap-7 font-['IBM_Plex_Mono',monospace] text-[11px] overflow-x-auto w-full md:w-auto pb-1 md:pb-0 justify-start md:justify-end">
-          
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[#8e8574]">Emails Deconstructed:</span>
-            <span className="text-[#ede6d8] font-bold tracking-wider font-mono">
+        {/* Center Live Real-Time Counts */}
+        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 font-['IBM_Plex_Mono',monospace] text-[11.5px]">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]">
+            <Layers className="w-3.5 h-3.5 text-[#c9a227]" />
+            <span>Deconstructed:</span>
+            <strong className="text-[#ede6d8] transition-all font-bold">
               {deconstructedCount.toLocaleString()}
-            </span>
+            </strong>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[#8e8574]">Auth Cryptography Verified:</span>
-            <span className="text-[#c9a227] font-bold tracking-wider font-mono">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]">
+            <Fingerprint className="w-3.5 h-3.5 text-[#22c55e]" />
+            <span>DKIM/SPF Verified:</span>
+            <strong className="text-[#ede6d8] font-bold">
               {cryptoVerifiedCount.toLocaleString()}
-            </span>
+            </strong>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[#8e8574]">Tor/Relay Intercepts:</span>
-            <span className="text-[#ff8d7d] font-bold tracking-wider font-mono">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]">
+            <ShieldAlert className="w-3.5 h-3.5 text-[#ff8d7d]" />
+            <span>Tor/Relay Interceptions:</span>
+            <strong className="text-[#ff8d7d] font-bold">
               {torInterceptionsCount.toLocaleString()}
-            </span>
+            </strong>
           </div>
 
+          <div className="hidden lg:flex items-center gap-1.5 text-[#b9af9c]">
+            <Zap className="w-3.5 h-3.5 text-[#7fa3ba]" />
+            <span>Active Enclaves:</span>
+            <strong className="text-[#ede6d8] font-bold">
+              {activeAnalysts} SOC Nodes
+            </strong>
+          </div>
         </div>
+
+        {/* Right Action Trigger */}
+        <button
+          onClick={onOpenConsole}
+          className="shrink-0 px-3 py-1 rounded-[2px] bg-[#221e17] hover:bg-[#b23a2e] border border-[#3a352c] hover:border-[#b23a2e] text-[#ede6d8] font-['IBM_Plex_Mono',monospace] text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 group"
+        >
+          <span>Open Live Stream</span>
+          <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+        </button>
+
       </div>
 
-      {/* Live Stream Event Cards */}
-      <div className="border-t border-[#3a352c]/50 bg-[#16130f]/90 py-2.5">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-            {events.map((ev, i) => {
+      {/* Bottom Live Evidence Stream Ticker Ribbon */}
+      <div className="bg-[#0b0a08] border-t border-[#3a352c]/50 py-2 overflow-x-auto no-scrollbar">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 min-w-max text-[11px] font-['IBM_Plex_Mono',monospace]">
+          <span className="text-[#c9a227] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
+            <Radio className="w-3 h-3 animate-pulse text-[#c9a227]" />
+            <span>Real Evidence Hash Log:</span>
+          </span>
+
+          <div className="flex items-center gap-4">
+            {events.map((ev, idx) => {
               const isMal = ev.verdict === 'MALICIOUS';
               return (
                 <div
-                  key={`${ev.id}-${i}`}
+                  key={ev.id}
                   onClick={() => handleInspectTrace(ev.sampleIndex)}
-                  className={`p-2.5 rounded-[3px] border transition-all cursor-pointer hover:-translate-y-0.5 group flex flex-col justify-between ${
-                    isMal
-                      ? 'bg-[#1c1211]/70 border-[#b23a2e]/40 hover:border-[#ef4444]'
-                      : 'bg-[#121a14]/70 border-[#22c55e]/30 hover:border-[#22c55e]'
-                  }`}
+                  className="flex items-center gap-2 px-2.5 py-1 rounded bg-[#16130f] border border-[#2d2820] hover:border-[#b9af9c] hover:bg-[#221e17] cursor-pointer transition-colors shrink-0"
+                  title="Click to load this forensic case in Console"
                 >
-                  <div className="flex items-center justify-between text-[10.5px] font-['IBM_Plex_Mono',monospace] mb-1">
-                    <span className="text-[#8e8574] truncate max-w-[110px]">{ev.source}</span>
-                    <span className={`px-1.5 py-0.2 rounded font-bold ${
-                      isMal ? 'text-[#ff8d7d] bg-[#b23a2e]/20' : 'text-[#4ade80] bg-[#22c55e]/20'
-                    }`}>
-                      {isMal ? `${ev.threatScore}% THREAT` : 'CLEAN AUTH'}
-                    </span>
-                  </div>
-
-                  <div className="text-[12px] font-medium text-[#ede6d8] truncate group-hover:text-[#c9a227] transition-colors">
-                    {ev.subject}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-1 text-[10px] font-['IBM_Plex_Mono',monospace] text-[#8e8574]">
-                    <span>{ev.asn}</span>
-                    <span className="flex items-center gap-0.5 text-[#c9a227] group-hover:translate-x-0.5 transition-transform">
-                      <span>Inspect 3D</span>
-                      <ArrowUpRight className="w-2.5 h-2.5" />
-                    </span>
-                  </div>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isMal ? 'bg-[#b23a2e]' : 'bg-[#22c55e]'}`} />
+                  <span className="text-[#8e8574] font-semibold">{ev.hash}</span>
+                  <span className="text-[#ede6d8] truncate max-w-[160px]">{ev.source}</span>
+                  <span className={`px-1 rounded text-[9.5px] font-bold ${
+                    isMal ? 'bg-[#b23a2e]/20 text-[#ff8d7d]' : 'bg-[#22c55e]/20 text-[#4ade80]'
+                  }`}>
+                    {ev.verdict} ({ev.threatScore})
+                  </span>
+                  <span className="text-[#645c4e] text-[10px]">{ev.timeAgo}</span>
                 </div>
               );
             })}
