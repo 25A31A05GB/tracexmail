@@ -36,6 +36,7 @@ import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { UserRole } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
+import { EvidenceTagCard } from './EvidenceTagCard';
 
 interface CasesViewProps {
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
@@ -78,6 +79,7 @@ export function CasesView({
 
   // Selected Case Detail Drawer/Modal
   const [selectedCaseDetail, setSelectedCaseDetail] = useState<any | null>(null);
+  const [previewEvidenceAnalysis, setPreviewEvidenceAnalysis] = useState<EmailAnalysis | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [editingNotes, setEditingNotes] = useState<boolean>(false);
   const [notesDraft, setNotesDraft] = useState<string>('');
@@ -187,8 +189,10 @@ export function CasesView({
     }
   };
 
-  const fetchCases = async () => {
-    setLoading(true);
+  const fetchCases = async (isSilent: boolean = false) => {
+    if (!isSilent) {
+      setLoading(true);
+    }
     setFetchError(null);
     try {
       if (isSupabaseConfigured) {
@@ -203,8 +207,9 @@ export function CasesView({
 
         const { data, error } = await query;
         if (!error && data && data.length > 0) {
-          setCases(data);
-          setLoading(false);
+          const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+          setCases(sorted);
+          if (!isSilent) setLoading(false);
           return;
         }
       }
@@ -214,23 +219,83 @@ export function CasesView({
         mask_pii: maskPii ? true : undefined
       });
       if (Array.isArray(data)) {
-        setCases(data);
+        const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        setCases(sorted);
       } else {
         setCases([]);
       }
     } catch (err: any) {
       console.warn('Error fetching cases from backend/supabase:', err);
-      setFetchError(err?.message || 'Failed to connect to backend database');
-      setCases(showDemoCases ? SAMPLE_ANALYSES : []);
+      if (!isSilent) {
+        setFetchError(err?.message || 'Failed to connect to backend database');
+        setCases(showDemoCases ? SAMPLE_ANALYSES : []);
+      }
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   };
 
-  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert/case update activity
+  // Immediate optimistic update on real-time WebSocket case events
   useEffect(() => {
-    fetchCases();
-  }, [alerts, lastCreatedCaseId, lastCaseUpdate, refreshSignal, showDemoCases, maskPii]);
+    if (!lastCaseUpdate) return;
+    const { type, case: caseData, caseId } = lastCaseUpdate;
+
+    if (type === 'CASE_CREATED' && caseData && caseData.id) {
+      setCases(prev => {
+        if (prev.some(c => c.id === caseData.id)) {
+          return prev.map(c => (c.id === caseData.id ? { ...c, ...caseData } : c));
+        }
+        return [caseData, ...prev];
+      });
+    } else if ((type === 'CASE_UPDATED' || type === 'CASE_CLOSED') && caseData) {
+      const targetId = caseId || caseData.id;
+      setCases(prev => prev.map(c => (c.id === targetId ? { ...c, ...caseData } : c)));
+      if (selectedCaseDetail?.id === targetId) {
+        setSelectedCaseDetail((prev: any) => ({ ...prev, ...caseData }));
+      }
+    } else if (type === 'CASE_DELETED' && caseId) {
+      setCases(prev => prev.filter(c => c.id !== caseId));
+      if (selectedCaseDetail?.id === caseId) {
+        setSelectedCaseDetail(null);
+      }
+    }
+
+    // Follow-up background sync
+    fetchCases(true);
+  }, [lastCaseUpdate]);
+
+  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert
+  useEffect(() => {
+    fetchCases(false);
+  }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii]);
+
+  // Window event listener for cross-component real-time triggers (Gmail sync, direct ingest)
+  useEffect(() => {
+    const handleLiveEvent = (e: any) => {
+      const detail = e.detail;
+      if (detail?.case && detail.case.id) {
+        setCases(prev => {
+          if (prev.some(c => c.id === detail.case.id)) {
+            return prev.map(c => (c.id === detail.case.id ? { ...c, ...detail.case } : c));
+          }
+          return [detail.case, ...prev];
+        });
+      }
+      fetchCases(true);
+    };
+
+    window.addEventListener('CASE_CREATED', handleLiveEvent);
+    window.addEventListener('CASE_EVENT', handleLiveEvent);
+    window.addEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+
+    return () => {
+      window.removeEventListener('CASE_CREATED', handleLiveEvent);
+      window.removeEventListener('CASE_EVENT', handleLiveEvent);
+      window.removeEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+    };
+  }, []);
 
   // Real-time Supabase postgres changes channel for cases table
   useEffect(() => {
@@ -240,7 +305,7 @@ export function CasesView({
       const channel = supabase
         .channel('cases_table_live_stream')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, () => {
-          fetchCases();
+          fetchCases(true);
         })
         .subscribe((status) => {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -256,13 +321,13 @@ export function CasesView({
     }
   }, [showDemoCases, maskPii]);
 
-  // Periodic safety net polling interval (30s)
+  // Continuous background live polling (every 4 seconds) to guarantee real-time synchronization
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchCases();
-    }, 30000);
+      fetchCases(true);
+    }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [showDemoCases, maskPii]);
 
   const handleQuickStatusChange = async (caseItem: any, newStatus: string) => {
     const caseId = caseItem.id;
@@ -298,6 +363,20 @@ export function CasesView({
     }
   };
 
+  const handlePreviewEvidence = (caseItem: any) => {
+    if (caseItem.headers && caseItem.verdict && caseItem.auth) {
+      setPreviewEvidenceAnalysis(caseItem);
+    } else {
+      const match = SAMPLE_ANALYSES.find((s) => s.id === (caseItem.id || caseItem.email_id));
+      if (match) {
+        setPreviewEvidenceAnalysis(match);
+      } else {
+        const mapped = mapBackendCaseToAnalysis(caseItem);
+        setPreviewEvidenceAnalysis(mapped);
+      }
+    }
+  };
+
   const handleInspectCase = (caseItem: any) => {
     // If it's a full EmailAnalysis object
     if (caseItem.headers && caseItem.verdict && caseItem.auth) {
@@ -321,9 +400,8 @@ export function CasesView({
   };
 
   const handleOpenCreateModal = () => {
-    // Pre-select first sample email if available
-    const initialEmails = SAMPLE_ANALYSES.slice(0, 2).map(s => s.id);
-    setSelectedEmailIds(initialEmails);
+    // Start with clean unselected email list
+    setSelectedEmailIds([]);
     setNewCaseName('');
     setNewCaseStatus('open');
     setNewCaseSeverity('HIGH');
@@ -345,6 +423,10 @@ export function CasesView({
     setCreateError(null);
 
     const caseTitle = newCaseName.trim() || `Campaign Case (${selectedEmailIds.length} Linked Emails)`;
+    const selectedSampleList = SAMPLE_ANALYSES.filter(s => selectedEmailIds.includes(s.id));
+    const computedThreatScore = selectedSampleList.length > 0
+      ? Math.max(...selectedSampleList.map(s => getStandardizedVerdict(s).score))
+      : 0;
 
     try {
       const payload = {
@@ -354,6 +436,7 @@ export function CasesView({
         analyst_notes: newCaseNotes,
         status: newCaseStatus,
         severity: newCaseSeverity,
+        threat_score: computedThreatScore,
         organization_id: 'org_acme_soc_01'
       };
 
@@ -368,7 +451,7 @@ export function CasesView({
               description: payload.analyst_notes || 'Forensic investigation case initialized.',
               status: payload.status.toUpperCase(),
               severity: payload.severity,
-              threat_score: 85,
+              threat_score: computedThreatScore,
               created_at: new Date().toISOString(),
               tags: ['Forensic'],
               assigned_user: 'Lead Analyst',
@@ -404,72 +487,9 @@ export function CasesView({
         throw new Error('Invalid response structure from case creation API.');
       }
     } catch (err: any) {
-      console.warn('API error creating case, applying SAMPLE_ANALYSES fallback pattern:', err);
-      // Fallback pattern matching the existing error resilience
-      const chosenSamples = SAMPLE_ANALYSES.filter(s => selectedEmailIds.includes(s.id));
-      const fallbackMembers = (chosenSamples.length > 0 ? chosenSamples : SAMPLE_ANALYSES.slice(0, 2)).map(s => {
-        const std = getStandardizedVerdict(s);
-        return {
-          id: s.id,
-          email_id: s.id,
-          subject: s.headers?.subject || 'Sample Phishing Email',
-          sender: s.headers?.from || 'Unknown Sender',
-          from: s.headers?.from || 'Unknown Sender',
-          recipient: s.headers?.to || '',
-          to: s.headers?.to || '',
-          date: s.headers?.date || new Date().toISOString(),
-          threat_score: std.score,
-          threat_verdict: std.verdict,
-          filename: (s as any).filename || `${s.id}.eml`
-        };
-      });
-
-      const fallbackCase = {
-        id: `CASE-FB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        case_id: `CASE-FB-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
-        organization_id: 'org_acme_soc_01',
-        title: caseTitle,
-        name: caseTitle,
-        subject: caseTitle,
-        status: newCaseStatus,
-        severity: newCaseSeverity,
-        threat_score: fallbackMembers.length > 0 ? Math.max(...fallbackMembers.map(m => m.threat_score)) : 80,
-        threat_verdict: 'MALICIOUS / PHISHING',
-        confidence: 0.92,
-        analyst_notes: newCaseNotes || 'Local forensic campaign group initialized.',
-        description: newCaseNotes || 'Local forensic campaign group initialized.',
-        notes: newCaseNotes || 'Local forensic campaign group initialized.',
-        email_ids: selectedEmailIds.length > 0 ? selectedEmailIds : fallbackMembers.map(m => m.id),
-        members: fallbackMembers,
-        member_emails: fallbackMembers,
-        suggested_members: [
-          {
-            email_id: 'eml_nazario_irs_tax_wire',
-            subject: 'Internal Revenue Service: Immediate Tax Levy Notice',
-            sender: 'notice@irs-tax-clearance.org',
-            threat_score: 94.0,
-            relationship_strength: 'MEDIUM',
-            similarity_score: 0.62,
-            reason: 'Correlated via shared high-risk exit infrastructure'
-          }
-        ],
-        total_emails: fallbackMembers.length,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        analyzed_at: new Date().toISOString(),
-        hops: [],
-        links: [],
-        iocs: [],
-        anomalies: [],
-        dns_auth: { spf: { status: 'neutral' }, dkim: { status: 'neutral' }, dmarc: { status: 'neutral' } }
-      };
-
-      setCases(prev => [fallbackCase, ...prev]);
-      setCreateSuccess(`Case ${fallbackCase.id} created (offline resilient mode).`);
-      setTimeout(() => {
-        setIsCreateModalOpen(false);
-        setCreateSuccess(null);
-      }, 1200);
+      console.error('API error creating case:', err);
+      const errMsg = err?.response?.data?.error || err?.message || 'Failed to create case. Database/backend is currently unavailable.';
+      setCreateError(errMsg);
     } finally {
       setCreatingCase(false);
     }
@@ -623,18 +643,24 @@ export function CasesView({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
-            <ShieldAlert className="w-6 h-6 text-blue-400" />
-            Forensic Investigation Cases
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2.5">
+              <ShieldAlert className="w-6 h-6 text-blue-400" />
+              Forensic Investigation Cases
+            </h1>
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              LIVE SYNC
+            </div>
+          </div>
           <p className="text-xs text-slate-400 font-mono mt-1">
-            Searchable case management view for grouping related fraudulent emails into campaigns.
+            Searchable case management view for grouping related fraudulent emails into campaigns with real-time updates.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchCases}
+            onClick={() => fetchCases(false)}
             disabled={loading}
             className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 flex items-center gap-2 cursor-pointer transition-colors"
           >
@@ -716,7 +742,7 @@ export function CasesView({
             <span>Backend Offline / Unreachable ({fetchError}). Displaying offline sample cases.</span>
           </div>
           <button
-            onClick={fetchCases}
+            onClick={() => fetchCases(false)}
             className="px-2.5 py-1 bg-amber-900/60 hover:bg-amber-800 text-amber-100 rounded text-[11px] font-semibold transition-colors cursor-pointer"
           >
             Retry Connection
@@ -1005,6 +1031,14 @@ export function CasesView({
                             </button>
                           )}
                           <button
+                            onClick={() => handlePreviewEvidence(c)}
+                            title="Inspect Forensic Evidence Tag Card"
+                            className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-800/80 text-amber-300 border border-amber-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <Tag className="w-3 h-3" />
+                            <span className="hidden sm:inline">Evidence</span>
+                          </button>
+                          <button
                             onClick={() => handleInspectCase(c)}
                             className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                           >
@@ -1206,8 +1240,9 @@ export function CasesView({
                             <div className="font-semibold text-slate-200 truncate">
                               {sample.headers?.subject || (sample as any).filename || sample.id}
                             </div>
-                            <div className="text-[11px] text-slate-400 truncate">
-                              From: {sample.headers?.from} | ID: {sample.id}
+                            <div className="text-[11px] text-slate-400 truncate flex items-center gap-1.5">
+                              <span className="text-[9px] px-1 py-0.2 bg-amber-950/60 border border-amber-600/40 text-amber-300 rounded font-mono">DEMO SAMPLE</span>
+                              <span>From: {sample.headers?.from} | ID: {sample.id}</span>
                             </div>
                           </div>
                         </div>
@@ -1294,6 +1329,14 @@ export function CasesView({
               
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => handlePreviewEvidence(selectedCaseDetail)}
+                  className="px-3 py-1.5 bg-amber-950 hover:bg-amber-800 text-amber-300 rounded border border-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="View Forensic Evidence Card"
+                >
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>Evidence Card</span>
+                </button>
+                <button
                   onClick={(e) => handleSendCaseToSlack(e, selectedCaseDetail)}
                   disabled={sendingSlackCaseId === selectedCaseDetail.id}
                   className="px-3 py-1.5 bg-emerald-950 hover:bg-emerald-800 text-emerald-300 rounded border border-emerald-700 text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
@@ -1323,7 +1366,11 @@ export function CasesView({
 
             <div className="p-6 overflow-y-auto space-y-6 text-xs">
               {/* Status & Severity Bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800 cursor-default"
+              >
                 <div>
                   <div className="text-[11px] text-slate-400 mb-1">Status (PATCH /api/cases/{selectedCaseDetail.id})</div>
                   <select
@@ -1358,10 +1405,14 @@ export function CasesView({
                     {selectedCaseDetail.members?.length || selectedCaseDetail.email_ids?.length || 1} emails linked
                   </span>
                 </div>
-              </div>
+              </motion.div>
 
               {/* C4 Analyst Feedback Loop: Ground-Truth Verdict Override & Discrepancy Calibration */}
-              <div className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-3">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-3 cursor-default"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                     <FlaskConical className="w-3.5 h-3.5 text-violet-400" />
@@ -1399,10 +1450,14 @@ export function CasesView({
                     </select>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Analyst Notes Section */}
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2">
+              <motion.div 
+                whileHover={{ scale: 1.012 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.8, 0.25, 1] }}
+                className="evidence-card bg-slate-950/60 border border-slate-800 rounded-xl p-4 space-y-2 cursor-default"
+              >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-200 flex items-center gap-1.5">
                     <FileText className="w-3.5 h-3.5 text-blue-400" />
@@ -1450,7 +1505,7 @@ export function CasesView({
                       'No analyst notes recorded yet for this case.'}
                   </p>
                 )}
-              </div>
+              </motion.div>
 
               {/* Linked Member Emails */}
               <div className="space-y-2">
@@ -1460,7 +1515,12 @@ export function CasesView({
                 </h4>
                 <div className="border border-slate-800 rounded-xl bg-slate-950/60 divide-y divide-slate-800 overflow-hidden">
                   {(selectedCaseDetail.members || []).map((m: any, idx: number) => (
-                    <div key={m.id || idx} className="p-3 flex items-center justify-between hover:bg-slate-900/50">
+                    <motion.div 
+                      key={m.id || idx} 
+                      whileHover={{ scale: 1.01 }}
+                      transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                      className="evidence-card p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors"
+                    >
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-200 truncate">{m.subject || 'No Subject'}</div>
                         <div className="text-[11px] text-slate-400 truncate">
@@ -1471,6 +1531,14 @@ export function CasesView({
                         <span className="px-2 py-0.5 bg-rose-950/80 border border-rose-600 text-rose-300 text-[10px] rounded font-bold">
                           {m.threat_score || 85}/100
                         </span>
+                        <button
+                          onClick={() => handlePreviewEvidence(m)}
+                          title="Inspect Evidence Card"
+                          className="px-2 py-1 bg-amber-950/80 hover:bg-amber-800 text-amber-300 border border-amber-700/60 rounded text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          <Tag className="w-2.5 h-2.5" />
+                          <span>Evidence</span>
+                        </button>
                         <button
                           onClick={() => {
                             const match = SAMPLE_ANALYSES.find((s) => s.id === (m.id || m.email_id));
@@ -1489,7 +1557,7 @@ export function CasesView({
                           <ArrowUpRight className="w-2.5 h-2.5" />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </div>
@@ -1506,7 +1574,12 @@ export function CasesView({
                   </p>
                   <div className="border border-amber-900/50 bg-amber-950/20 rounded-xl divide-y divide-amber-900/30 overflow-hidden">
                     {selectedCaseDetail.suggested_members.map((sug: any, idx: number) => (
-                      <div key={sug.email_id || idx} className="p-3 flex items-center justify-between hover:bg-amber-950/30">
+                      <motion.div 
+                        key={sug.email_id || idx} 
+                        whileHover={{ scale: 1.01 }}
+                        transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                        className="evidence-card p-3 flex items-center justify-between hover:bg-amber-950/30 transition-colors"
+                      >
                         <div className="min-w-0">
                           <div className="font-semibold text-slate-200 truncate">{sug.subject}</div>
                           <div className="text-[11px] text-amber-300/80 truncate">
@@ -1525,12 +1598,50 @@ export function CasesView({
                           )}
                           <span>Add to Case</span>
                         </button>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
               )}
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Forensic Evidence Tag Card Preview Modal */}
+      {previewEvidenceAnalysis && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="max-w-xl w-full my-8"
+          >
+            <div className="flex justify-end mb-2">
+              <button
+                onClick={() => setPreviewEvidenceAnalysis(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg bg-slate-900 border border-slate-700 hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Evidence Card"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <EvidenceTagCard
+              analysis={previewEvidenceAnalysis}
+              onClose={() => setPreviewEvidenceAnalysis(null)}
+              isModal={true}
+              onNavigateToMap={() => {
+                setPreviewEvidenceAnalysis(null);
+                onSelectAnalysis(previewEvidenceAnalysis);
+                onNavigateToOverview();
+              }}
+              onNavigateToGraph={() => {
+                setPreviewEvidenceAnalysis(null);
+                onSelectAnalysis(previewEvidenceAnalysis);
+                onNavigateToOverview();
+              }}
+            />
           </motion.div>
         </div>
       )}

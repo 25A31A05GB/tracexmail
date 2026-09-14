@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
-import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2 } from 'lucide-react';
 import { sha256Sync, generateEvidenceId } from '../utils/crypto';
 import { resolveOrigin, formatOriginLocation, formatOriginIp } from '../utils/originResolution';
 import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
@@ -9,6 +10,56 @@ import { generateAttackNarrative } from '../utils/attackNarrative';
 import { computeCounterfactuals, CounterfactualFactor } from '../utils/counterfactual';
 import { mapComplianceFlags, ComplianceFlag } from '../utils/complianceMapping';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
+import { apiFetch } from '../lib/api';
+import { useSession } from '../hooks/useSession';
+
+export interface CaseNoteItem {
+  id: string;
+  case_id: string;
+  organization_id?: string;
+  author_id?: string | null;
+  author_email: string;
+  label: 'Confirmed Phish' | 'False Positive' | 'Escalated' | 'Needs Follow-up' | 'Resolved' | 'Informational';
+  body: string;
+  created_at: string;
+}
+
+function getNoteBadgeStyle(label: string): string {
+  switch (label) {
+    case 'Confirmed Phish':
+      return 'bg-rose-950/80 text-rose-300 border-rose-700/70';
+    case 'False Positive':
+      return 'bg-emerald-950/80 text-emerald-300 border-emerald-700/70';
+    case 'Escalated':
+      return 'bg-amber-950/80 text-amber-300 border-amber-700/70';
+    case 'Needs Follow-up':
+      return 'bg-sky-950/80 text-sky-300 border-sky-700/70';
+    case 'Resolved':
+      return 'bg-teal-950/80 text-teal-300 border-teal-700/70';
+    case 'Informational':
+    default:
+      return 'bg-slate-800 text-slate-300 border-slate-600/70';
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - d.getTime()) / 1000);
+    if (isNaN(diffSec) || diffSec < 0) return 'just now';
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 30) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+  } catch {
+    return 'recently';
+  }
+}
 
 /**
  * Pure mapping helper that converts an EmailAnalysis object to the EvidenceCardData schema.
@@ -179,14 +230,21 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     });
   }
 
-  // ML Score & Confidence
-  const mlPercentNum = analysis.mlConfidence ? analysis.mlConfidence * 100 : (threatScore >= 90 ? 98.4 : threatScore);
-  const mlPercentText = `${mlPercentNum.toFixed(1)}%`;
+  // ML Score & Confidence (Strictly authentic; never fabricate or substitute threat score)
+  const hasValidMlConfidence = typeof analysis.mlConfidence === 'number' && !isNaN(analysis.mlConfidence) && analysis.mlConfidence >= 0;
+  const mlPercentNum = hasValidMlConfidence 
+    ? (analysis.mlConfidence <= 1 ? analysis.mlConfidence * 100 : analysis.mlConfidence)
+    : null;
+  const mlPercentText = mlPercentNum !== null ? `${mlPercentNum.toFixed(1)}%` : 'ML confidence unavailable';
   const mlResultLabel = analysis.classification || (stampWord === 'PHISH' ? 'phish' : stampWord.toLowerCase());
 
-  // Hash & SOC Recommendation
-  const fullHash = analysis.sha256 || analysis.sha256Hash || analysis.custodyHash || (analysis.rawEml ? sha256Sync(analysis.rawEml) : sha256Sync(analysis.id || JSON.stringify(analysis)));
-  const shortHash = fullHash.length > 26 ? `${fullHash.slice(0, 19)}...${fullHash.slice(-4)}` : fullHash;
+  // Hash & SOC Recommendation (Compute hash strictly from real RFC 822 email payload bytes; no fabrication)
+  const rawBytes = analysis.rawEml || (analysis as any).rawEmail;
+  const rawHash = analysis.sha256 || analysis.sha256Hash || analysis.custodyHash || (rawBytes ? sha256Sync(rawBytes) : null);
+  const fullHash = rawHash || 'Hash unavailable — raw message not retained';
+  const shortHash = rawHash 
+    ? (rawHash.length > 26 ? `${rawHash.slice(0, 19)}...${rawHash.slice(-4)}` : rawHash)
+    : 'Hash unavailable — raw message not retained';
   
   const socAction = stdVerdict.recommendedAction;
 
@@ -305,9 +363,22 @@ export function EvidenceTagCard({
   const [attackStoryOpen, setAttackStoryOpen] = useState(true);
   const [counterfactualsOpen, setCounterfactualsOpen] = useState(true);
   const [complianceOpen, setComplianceOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
   const [senderAnomalyOpen, setSenderAnomalyOpen] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
+
+  // User session context for RBAC & ownership checks
+  const { user, role } = useSession();
+
+  // Analyst Notes State
+  const [notesList, setNotesList] = useState<CaseNoteItem[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<CaseNoteItem['label']>('Informational');
+  const [noteBody, setNoteBody] = useState('');
+  const [submittingNote, setSubmittingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
 
   // Compute final case card data from analysis or direct data prop
   const cardData: EvidenceCardData = directData || (analysis ? mapAnalysisToEvidenceCardData(analysis) : {
@@ -359,19 +430,124 @@ export function EvidenceTagCard({
     ],
     score: {
       label: '5-Class Nearest Centroid Classifier',
-      percent: 0,
-      resultText: '0.0%',
+      percent: null,
+      resultText: 'ML confidence unavailable',
       resultLabel: 'pending',
       good: true
     },
     footer: {
       hashLabel: 'SHA-256',
-      hash: 'N/A',
+      hash: 'Hash unavailable — raw message not retained',
       actionLabel: 'SOC action:',
       action: 'AWAITING INGESTION',
       actionGood: true
     }
   });
+
+  const caseIdForNotes = cardData.caseId || analysis?.id;
+
+  // Fetch analyst notes on mount or when caseId changes
+  useEffect(() => {
+    let isMounted = true;
+    if (!caseIdForNotes || caseIdForNotes === 'NO-CASE-SELECTED') {
+      setNotesList([]);
+      setNotesLoading(false);
+      return;
+    }
+
+    const fetchNotes = async () => {
+      setNotesLoading(true);
+      setNotesError(null);
+      try {
+        const res = await apiFetch(`/api/cases/${encodeURIComponent(caseIdForNotes)}/notes`);
+        if (!res.ok) {
+          throw new Error(`Failed to load notes (${res.status})`);
+        }
+        const data = await res.json();
+        if (isMounted) {
+          setNotesList(Array.isArray(data) ? data : []);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.warn('[EvidenceCard] Notes fetch error:', err);
+          setNotesError(err?.message || 'Could not load analyst notes');
+          setNotesList([]);
+        }
+      } finally {
+        if (isMounted) {
+          setNotesLoading(false);
+        }
+      }
+    };
+
+    fetchNotes();
+    return () => {
+      isMounted = false;
+    };
+  }, [caseIdForNotes]);
+
+  // Submit new analyst note
+  const handleAddNote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!caseIdForNotes || caseIdForNotes === 'NO-CASE-SELECTED') return;
+    if (!noteBody.trim() || submittingNote) return;
+
+    setSubmittingNote(true);
+    setNotesError(null);
+    try {
+      const res = await apiFetch(`/api/cases/${encodeURIComponent(caseIdForNotes)}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: selectedLabel,
+          body: noteBody.trim()
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to add note (${res.status})`);
+      }
+
+      const createdNote: CaseNoteItem = await res.json();
+      setNotesList(prev => [createdNote, ...prev.filter(n => n.id !== createdNote.id)]);
+      setNoteBody('');
+    } catch (err: any) {
+      console.error('[EvidenceCard] Add note error:', err);
+      setNotesError(err?.message || 'Failed to submit note');
+    } finally {
+      setSubmittingNote(false);
+    }
+  };
+
+  // Delete analyst note
+  const handleDeleteNote = async (noteId: string) => {
+    if (!caseIdForNotes || deletingNoteId) return;
+    setDeletingNoteId(noteId);
+    setNotesError(null);
+    try {
+      const res = await apiFetch(`/api/cases/${encodeURIComponent(caseIdForNotes)}/notes/${encodeURIComponent(noteId)}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to delete note (${res.status})`);
+      }
+      setNotesList(prev => prev.filter(n => n.id !== noteId));
+    } catch (err: any) {
+      console.error('[EvidenceCard] Delete note error:', err);
+      setNotesError(err?.message || 'Failed to delete note');
+    } finally {
+      setDeletingNoteId(null);
+    }
+  };
+
+  const canDeleteNote = (note: CaseNoteItem) => {
+    if (role === 'admin') return true;
+    if (user?.id && note.author_id && note.author_id === user.id) return true;
+    if (user?.email && note.author_email && note.author_email.toLowerCase() === user.email.toLowerCase()) return true;
+    return false;
+  };
 
   // Deep analysis data derivation
   const attackNarrative = cardData.deepAnalysis?.attackNarrative || (analysis ? generateAttackNarrative(analysis) : undefined);
@@ -384,12 +560,15 @@ export function EvidenceTagCard({
     analysis?.heuristics?.find(h => h.id === 'SENDER_BASELINE_ANOMALY' || h.title?.toLowerCase().includes('sender baseline'))?.description ||
     null;
 
-  // Calculate one-line teaser summary for collapsed state
-  const indicatorCount = (analysis?.heuristics || []).filter(h => h.triggered).length || (cardData.findings || []).filter(f => f.status === 'mal').length || (cardData.verdict.status !== 'good' ? 3 : 0);
+  // Calculate one-line teaser summary for collapsed state (Real counts only)
+  const indicatorCount = (analysis?.heuristics || []).filter(h => h.triggered).length || (cardData.findings || []).filter(f => f.status === 'mal').length || 0;
+  const indicatorText = indicatorCount === 0
+    ? '0 attack indicators on record'
+    : `${indicatorCount} attack indicator${indicatorCount === 1 ? '' : 's'}`;
   const complianceNames = complianceFlags.length > 0
     ? complianceFlags.map(f => f.regime.split('(')[0].replace(/§43A.*/, '§43A').trim()).slice(0, 2).join(', ')
     : 'None';
-  const teaserSummary = `${indicatorCount} attack indicator${indicatorCount === 1 ? '' : 's'} · ${counterfactuals.length > 0 ? (showAllCounterfactuals ? `${counterfactuals.length} counterfactuals` : '1 counterfactual') : 'counterfactuals'} · compliance: ${complianceNames}${senderAnomaly ? ' · ⚠️ baseline anomaly' : ''}`;
+  const teaserSummary = `${indicatorText} · ${counterfactuals.length > 0 ? (showAllCounterfactuals ? `${counterfactuals.length} counterfactuals` : '1 counterfactual') : 'counterfactuals'} · compliance: ${complianceNames}${senderAnomaly ? ' · ⚠️ baseline anomaly' : ''}`;
 
   // Procedural barcode line widths
   const barcodeWidths = [3, 1, 2, 1, 4, 1, 1, 3, 2, 1, 1, 4, 2, 1, 3, 1, 2, 4, 1, 1, 2, 3, 1, 1, 4, 2, 1, 3, 1, 2, 1, 4, 1, 2, 3, 1, 1, 2, 4, 1];
@@ -464,46 +643,83 @@ export function EvidenceTagCard({
 
   const stampClass = cardData.verdict.status === 'good' ? 'good' : cardData.verdict.status === 'warn' ? 'warn' : '';
 
+  const cardContainerVariants: Variants = {
+    hidden: { 
+      opacity: 0, 
+      y: 28,
+      scale: 0.985
+    },
+    visible: {
+      opacity: 1, 
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.45,
+        ease: 'easeOut',
+        staggerChildren: 0.045,
+        delayChildren: 0.05
+      }
+    }
+  };
+
+  const cardItemVariants: Variants = {
+    hidden: { 
+      opacity: 0, 
+      y: 12
+    },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: 'easeOut'
+      }
+    }
+  };
+
   const cardHtml = (
-    <div 
+    <motion.div 
       ref={cardRef}
       id="card"
       className="evidence-card relative select-text"
+      variants={cardContainerVariants}
+      initial="hidden"
+      animate="visible"
     >
       {/* Folder Tab Header */}
-      <div className="tab">
+      <motion.div variants={cardItemVariants} className="tab">
         <div className="caseid">
           CASE <b>{cardData.caseId}</b>
         </div>
         <div className="meta">
           {cardData.evidenceId} · {cardData.timestamp}
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Body */}
       <div className="body">
         {/* Rubber-Stamp Verdict Badge */}
-        <div className={`stamp ${stampClass}`}>
+        <motion.div variants={cardItemVariants} className={`stamp ${stampClass}`}>
           {cardData.verdict.text}
           <small>{cardData.verdict.scoreLabel}</small>
-        </div>
+        </motion.div>
 
         {/* Subject */}
-        <div className="subject">
+        <motion.div variants={cardItemVariants} className="subject">
           <h1>{cardData.subject}</h1>
-        </div>
+        </motion.div>
 
         {/* Identity Rows */}
         {cardData.identityRows.map((r, idx) => (
-          <div key={idx} className="row">
+          <motion.div variants={cardItemVariants} key={idx} className="row">
             <div className="k">{r.k}</div>
             <div className={`v ${r.status || ''}`}>{r.v}</div>
-          </div>
+          </motion.div>
         ))}
 
         {/* Authentication Checks */}
         {cardData.checks && cardData.checks.length > 0 && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">AUTHENTICATION</div>
             <div className="chips">
               {cardData.checks.map((c, idx) => (
@@ -513,12 +729,12 @@ export function EvidenceTagCard({
                 </div>
               ))}
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Origin & Relay */}
         {cardData.origin && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.origin.sectionTitle || 'ORIGIN & RELAY'}</div>
             <div className="row">
               <div className="k">FIRST-HOP IP</div>
@@ -547,11 +763,11 @@ export function EvidenceTagCard({
                 <div className={`v ${r.status || ''}`}>{r.v}</div>
               </div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {cardData.relay && (
-          <div className="relay mt-1.5">
+          <motion.div variants={cardItemVariants} className="relay mt-1.5">
             <span 
               className="chain leading-relaxed" 
               dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} 
@@ -563,12 +779,12 @@ export function EvidenceTagCard({
             >
               Full graph ↗
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* Domain Intelligence */}
         {cardData.entity && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.entity.sectionTitle || 'DOMAIN INTELLIGENCE'}</div>
             {cardData.entity.rows.map((r, idx) => (
               <div key={idx} className="row">
@@ -588,12 +804,12 @@ export function EvidenceTagCard({
                 ))}
               </div>
             )}
-          </>
+          </motion.div>
         )}
 
         {/* AI Case Summary */}
         {cardData.aiSummary && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">AI CASE SUMMARY</div>
             <div className="ai-box">
               <p>{cardData.aiSummary.text}</p>
@@ -608,12 +824,12 @@ export function EvidenceTagCard({
                 </button>
               </div>
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Links & Attachments */}
         {cardData.findings && cardData.findings.length > 0 && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">LINKS &amp; ATTACHMENTS</div>
             {cardData.findings.map((f, idx) => (
               <div key={idx} className="link-item">
@@ -621,31 +837,45 @@ export function EvidenceTagCard({
                 <span className={`badge ${f.status}`}>{f.badge}</span>
               </div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {/* ML Verdict */}
         {cardData.score && (
-          <>
+          <motion.div variants={cardItemVariants}>
             <div className="section-label">ML VERDICT</div>
             <div className="gauge-wrap">
               <div className="gauge-top">
                 <span>{cardData.score.label}</span>
                 <span>
-                  <b style={{ color: cardData.score.good ? 'var(--ec-green)' : 'var(--ec-red)' }}>
-                    {cardData.score.resultText}
-                  </b>{' '}
-                  {cardData.score.resultLabel}
+                  {cardData.score.percent != null ? (
+                    <>
+                      <b style={{ color: cardData.score.good ? 'var(--ec-green)' : 'var(--ec-red)' }}>
+                        {cardData.score.resultText}
+                      </b>{' '}
+                      {cardData.score.resultLabel}
+                    </>
+                  ) : (
+                    <span className="text-slate-400 font-mono text-xs">
+                      {cardData.score.resultText}
+                    </span>
+                  )}
                 </span>
               </div>
-              <div className="gauge">
-                <div 
-                  className={`gauge-fill ${cardData.score.good ? 'good' : ''}`}
-                  style={{ width: `${Math.max(4, Math.min(100, cardData.score.percent))}%` }}
-                />
-              </div>
+              {cardData.score.percent != null ? (
+                <div className="gauge">
+                  <div 
+                    className={`gauge-fill ${cardData.score.good ? 'good' : ''}`}
+                    style={{ width: `${Math.max(4, Math.min(100, cardData.score.percent))}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="text-[10px] text-slate-500 font-mono italic mt-0.5">
+                  ML confidence unavailable
+                </div>
+              )}
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Threat Score Breakdown */}
@@ -653,7 +883,7 @@ export function EvidenceTagCard({
           const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
           if (!bd || !bd.components) return null;
           return (
-            <>
+            <motion.div variants={cardItemVariants}>
               <div className="section-label flex items-center justify-between">
                 <span>THREAT SCORE BREAKDOWN</span>
                 <button
@@ -706,12 +936,12 @@ export function EvidenceTagCard({
                   </div>
                 )}
               </div>
-            </>
+            </motion.div>
           );
         })()}
 
         {/* Expandable Deep Analysis Section */}
-        <div className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
+        <motion.div variants={cardItemVariants} className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
           {/* Main Deep Analysis Toggle Header */}
           <button
             type="button"
@@ -909,7 +1139,146 @@ export function EvidenceTagCard({
                 </div>
               )}
 
-              {/* 4. Sender Baseline Anomaly Panel (rendered ONLY if present) */}
+              {/* 4. Analyst Notes Panel (Collapsible, placed after Compliance section) */}
+              <div className="rounded border border-slate-700/60 bg-slate-950/40 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setNotesOpen(!notesOpen)}
+                  className="w-full px-2.5 py-1.5 flex items-center justify-between bg-slate-800/40 hover:bg-slate-800/60 transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquareText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="font-semibold text-[11px] text-slate-200">Analyst Notes</span>
+                    <span className="px-1 py-0.2 rounded bg-amber-950/60 border border-amber-800/60 text-[9px] text-amber-300 font-mono">
+                      {notesList.length}
+                    </span>
+                  </div>
+                  {notesOpen ? <ChevronUp className="w-3 h-3 text-slate-400" /> : <ChevronDown className="w-3 h-3 text-slate-400" />}
+                </button>
+
+                {notesOpen && (
+                  <div className="p-2.5 border-t border-slate-800/60 space-y-3">
+                    {/* Add Note Form */}
+                    <form onSubmit={handleAddNote} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] uppercase font-mono text-slate-400 shrink-0">Label:</label>
+                        <select
+                          value={selectedLabel}
+                          onChange={(e) => setSelectedLabel(e.target.value as CaseNoteItem['label'])}
+                          className="px-2 py-1 text-[11px] font-mono bg-slate-900 border border-slate-700 rounded text-slate-200 focus:outline-none focus:border-amber-500 transition-colors"
+                        >
+                          <option value="Confirmed Phish">Confirmed Phish</option>
+                          <option value="False Positive">False Positive</option>
+                          <option value="Escalated">Escalated</option>
+                          <option value="Needs Follow-up">Needs Follow-up</option>
+                          <option value="Resolved">Resolved</option>
+                          <option value="Informational">Informational</option>
+                        </select>
+                      </div>
+
+                      <div className="relative">
+                        <textarea
+                          value={noteBody}
+                          onChange={(e) => setNoteBody(e.target.value.slice(0, 1000))}
+                          placeholder="Attach analyst findings, containment notes, or triage context..."
+                          rows={2}
+                          maxLength={1000}
+                          className="w-full px-2.5 py-1.5 text-xs font-sans bg-slate-900/90 border border-slate-700/80 rounded text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500/80 resize-y min-h-[50px] leading-relaxed"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] font-mono">
+                        <span className={noteBody.length >= 950 ? 'text-amber-400 font-semibold' : 'text-slate-500'}>
+                          {noteBody.length}/1000 chars
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={!noteBody.trim() || submittingNote || !caseIdForNotes || caseIdForNotes === 'NO-CASE-SELECTED'}
+                          className="px-2.5 py-1 rounded bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/50 text-amber-300 hover:text-amber-200 text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {submittingNote ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="w-3 h-3 text-amber-400" />
+                              <span>Add Note</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+
+                    {notesError && (
+                      <div className="px-2 py-1 rounded bg-rose-950/40 border border-rose-800/60 text-[10px] text-rose-300 font-mono flex items-center justify-between">
+                        <span>{notesError}</span>
+                        <button type="button" onClick={() => setNotesError(null)} className="text-rose-400 hover:text-rose-200 cursor-pointer">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Notes List */}
+                    <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                      {notesLoading && notesList.length === 0 ? (
+                        <div className="py-3 flex items-center justify-center gap-2 text-slate-400 text-xs font-mono">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          <span>Loading analyst notes...</span>
+                        </div>
+                      ) : notesList.length === 0 ? (
+                        <div className="py-2.5 text-center text-xs text-slate-500 font-mono italic">
+                          No analyst notes yet
+                        </div>
+                      ) : (
+                        notesList.map((note) => (
+                          <div
+                            key={note.id}
+                            className="p-2 rounded bg-slate-900/60 border border-slate-800 hover:border-slate-700/80 transition-colors text-xs space-y-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`px-1.5 py-0.5 rounded border text-[9px] font-mono font-bold tracking-wide uppercase ${getNoteBadgeStyle(note.label)}`}>
+                                  {note.label}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono truncate max-w-[160px]" title={note.author_email}>
+                                  {note.author_email}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {formatRelativeTime(note.created_at)}
+                                </span>
+                                {canDeleteNote(note) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    disabled={deletingNoteId === note.id}
+                                    title="Delete this note"
+                                    className="p-0.5 rounded text-slate-500 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-40"
+                                  >
+                                    {deletingNoteId === note.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin text-rose-400" />
+                                    ) : (
+                                      <Trash2 className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-slate-200 text-xs leading-relaxed font-sans whitespace-pre-wrap break-words">
+                              {note.body}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. Sender Baseline Anomaly Panel (rendered ONLY if present) */}
               {senderAnomaly && (
                 <div className="rounded border border-rose-800/70 bg-rose-950/30 overflow-hidden">
                   <button
@@ -936,36 +1305,52 @@ export function EvidenceTagCard({
               )}
             </div>
           )}
-        </div>
+        </motion.div>
 
       </div>
 
       {/* Footer */}
       {cardData.footer && (
-        <div className="footer">
+        <motion.div variants={cardItemVariants} className="footer">
           <div className="hashline">
-            {cardData.footer.hashLabel} <b>{cardData.footer.hash}</b>
+            {cardData.footer.hashLabel}{' '}
+            <b className={cardData.footer.hash.startsWith('Hash unavailable') ? 'font-normal text-slate-400 italic text-[11px]' : ''}>
+              {cardData.footer.hash}
+            </b>
           </div>
-          <div className="barcode" title={`Digest: ${cardData.footer.hash}`}>
-            {barcodeWidths.map((w, idx) => (
-              <div key={idx} style={{ width: `${w}px` }} />
-            ))}
-          </div>
+          {!cardData.footer.hash.startsWith('Hash unavailable') && (
+            <div className="barcode" title={`Digest: ${cardData.footer.hash}`}>
+              {barcodeWidths.map((w, idx) => (
+                <div key={idx} style={{ width: `${w}px` }} />
+              ))}
+            </div>
+          )}
           <div className="verdictline">
             <span>{cardData.footer.actionLabel}</span>
             <b className={cardData.footer.actionGood ? 'good' : ''}>{cardData.footer.action}</b>
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md overflow-y-auto"
+      >
         <div className="flex flex-col items-center max-w-full my-auto">
           {/* Action Bar */}
-          <div className="w-full max-w-[520px] flex items-center justify-between mb-3 px-1 text-xs">
+          <motion.div 
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
+            className="w-full max-w-[520px] flex items-center justify-between mb-3 px-1 text-xs"
+          >
             <div className="flex items-center gap-2 text-[#F2EFE7] font-mono font-medium">
               <span className="w-2 h-2 rounded-full bg-[#CC9A4A] animate-pulse" />
               <span>FORENSIC EVIDENCE CARD</span>
@@ -1020,12 +1405,12 @@ export function EvidenceTagCard({
                 </button>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* Render Card */}
           {cardHtml}
         </div>
-      </div>
+      </motion.div>
     );
   }
 

@@ -121,11 +121,7 @@ export function OAuthConsentScreen({ onConsentHandled }: OAuthConsentProps) {
         if (params.state) url.searchParams.set('state', params.state);
         window.location.href = url.toString();
       } else {
-        // Fallback standard redirection with generated auth token
-        const target = new URL(params.redirectUri);
-        target.searchParams.set('code', `auth_code_${Math.random().toString(36).substring(2, 12)}`);
-        if (params.state) target.searchParams.set('state', params.state);
-        window.location.href = target.toString();
+        throw new Error('OAuth server returned an invalid response without an authorization code.');
       }
     } catch (err: any) {
       console.error('OAuth grant error:', err);

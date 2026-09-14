@@ -3,6 +3,7 @@ import { sha256Sync, generateEvidenceId } from './crypto';
 import { lookupMaxMindGeo } from './maxmindService';
 import { parseAuthenticationHeaders } from './authParser';
 import { extractRealSenderIp } from './realSenderIp';
+import { parseMimeStructure } from './mimeDecoder';
 
 export function defangUrl(url: string): string {
   return url
@@ -386,10 +387,10 @@ export function mapBackendCaseToAnalysis(
   const rawAtts = Array.isArray(data.attachments) ? data.attachments : [];
   const attachments: AttachmentInfo[] = rawAtts.map((a: any) => ({
     filename: a.filename || 'attachment',
-    size: a.size || (a.size_bytes ? `${a.size_bytes} bytes` : '0 KB'),
+    size: a.size || (a.size_bytes ? `${a.size_bytes} bytes` : null),
     mimeType: a.mime_type || a.mimeType || 'application/octet-stream',
-    sha256: a.sha256 || '',
-    md5: a.md5 || '',
+    sha256: a.sha256 || null,
+    md5: a.md5 || null,
     status: a.status || (a.is_dangerous ? 'MALICIOUS' : 'CLEAN'),
     vtDetection: a.vt_detection || a.vtDetection
   }));
@@ -777,18 +778,33 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
   const dkimStatus = parsedAuth.dkim.status;
   const dmarcStatus = parsedAuth.dmarc.status;
 
-  // Check attachments
+  // Check attachments via real MIME structure decoder
+  const mimeStruct = parseMimeStructure(raw);
   const attachments: AttachmentInfo[] = [];
-  if (raw.includes('Content-Disposition: attachment') || raw.includes('filename=')) {
+
+  if (mimeStruct.attachments && mimeStruct.attachments.length > 0) {
+    mimeStruct.attachments.forEach((att) => {
+      attachments.push({
+        filename: att.filename,
+        size: att.size,
+        mimeType: att.mimeType,
+        sha256: att.sha256,
+        md5: att.md5,
+        status: att.isDangerous ? 'MALICIOUS' : 'SUSPICIOUS',
+        vtDetection: undefined,
+      });
+    });
+  } else if (raw.includes('Content-Disposition: attachment') || /filename=["']?([^"'\r\n]+)["']?/i.test(raw)) {
+    // Fallback if MIME structure parsing found no decoded attachment bytes
     const filenameMatch = raw.match(/filename=["']?([^"'\r\n]+)["']?/i);
     const fname = filenameMatch ? filenameMatch[1] : 'attachment_payload.bin';
     const isExe = /\.(exe|scr|bat|vbs|hta|js|jar|iso)$/i.test(fname);
     attachments.push({
       filename: fname,
-      size: '245.8 KB',
+      size: null,
       mimeType: isExe ? 'application/x-msdownload' : 'application/octet-stream',
-      sha256: '7b9c1f5e8d2a4c6b8a0e9f1d3c5b7a9e2f4a6c8b0d1e3f5a7b9c1d3e5f7a9b1c',
-      md5: '4f2d7c9a1b3e5f7a9b1c3d5e7f9a1b3c',
+      sha256: null,
+      md5: null,
       status: isExe ? 'MALICIOUS' : 'SUSPICIOUS',
       vtDetection: undefined,
     });
@@ -876,6 +892,7 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     evidenceId,
     analysisSource: 'client_fallback_unverified',
     isClientFallback: true,
+    degradedAnalysis: true,
     sha256Hash: sha256,
     custodyHash: sha256,
     evidenceSource: 'client_offline_fallback',
@@ -942,35 +959,33 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
       domain_age_days: undefined,
       is_newly_registered: false,
       is_typosquat: false,
-      typosquat_matched_brand: isPhish ? 'paypal.com' : undefined,
+      typosquat_matched_brand: undefined,
       typosquatting: {
-        is_typosquat: isPhish,
-        target_brand: isPhish ? 'paypal.com' : undefined,
-        distance: isPhish ? 1 : 0,
-        technique: isPhish ? 'Brand Impersonation' : 'None'
+        is_typosquat: false,
+        target_brand: undefined,
+        distance: 0,
+        technique: 'None'
       },
       dns: {
         domain: extractDomain(fromEmail) || fromEmail.split('@')[1] || 'domain.com',
-        ns: ['ns1.dns-parking.net', 'ns2.dns-parking.net'],
+        ns: [],
         a_records: hops.map(h => h.fromIp).filter(Boolean) as string[],
-        mx: ['10 mail.unauthorized-relay.net'],
-        mx_records: [
-          { priority: 10, host: 'mail.unauthorized-relay.net', status: isPhish ? 'UNAUTHENTICATED' : 'VERIFIED' }
-        ],
-        spf: 'v=spf1 include:_spf.unauthorized.net ~all',
-        spf_qualifier: spfStatus === 'PASS' ? '-all (HardFail - Enforced)' : '~all (SoftFail - Permissive)',
-        spf_mechanisms: ['include:_spf.unauthorized.net', '~all'],
-        dmarc: 'v=DMARC1; p=none; sp=none; pct=100; rua=mailto:reports@unauthorized.net',
+        mx: [],
+        mx_records: [],
+        spf: undefined,
+        spf_qualifier: undefined,
+        spf_mechanisms: [],
+        dmarc: undefined,
         dmarc_policy: dmarcStatus === 'PASS' ? 'reject' : 'none',
-        dmarc_sp: 'none',
-        dmarc_pct: 100,
-        dmarc_rua: 'reports@unauthorized.net',
-        dmarc_enforcement: dmarcStatus === 'PASS' ? 'REJECT (Strict Enforced)' : 'NONE (Monitoring Only)',
-        dnssec: 'VALIDATED'
+        dmarc_sp: undefined,
+        dmarc_pct: undefined,
+        dmarc_rua: undefined,
+        dmarc_enforcement: 'UNVERIFIED (Client Fallback)',
+        dnssec: 'UNVERIFIED'
       },
-      flags: isPhish ? ['Newly Registered Domain (<30 days)', 'Permissive SPF Qualifier (~all)'] : ['Corporate Authenticated Domain'],
-      risk_flags: isPhish ? ['Newly Registered Domain (<30 days)', 'Permissive SPF Qualifier (~all)'] : ['Corporate Authenticated Domain'],
-      lookup_method: 'CLIENT_ESTIMATION'
+      flags: isPhish ? ['Client Heuristic Detection (Unverified)'] : ['Unverified Client Fallback'],
+      risk_flags: isPhish ? ['Client Heuristic Detection (Unverified)'] : [],
+      lookup_method: 'CLIENT_OFFLINE_NO_DNS'
     },
     maxmindIntelligence: (hops[0] && hops[0].maxmindVerified ? {
       geonameId: hops[0].geonameId,

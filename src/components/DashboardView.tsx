@@ -412,13 +412,22 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       const dateStr = d.toISOString().slice(0, 10);
 
       const matchingCases = casesList.filter(c => {
-        const created = c.headers?.date || c.analyzedAt;
+        const created = c.headers?.date || c.analyzedAt || (c as any).created_at;
         return created && created.slice(0, 10) === dateStr;
       });
 
-      const cleanCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('clean')).length;
-      const suspCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('suspicious')).length;
-      const malCount = matchingCases.filter(c => c.verdict?.toLowerCase().includes('malicious') || c.verdict?.toLowerCase().includes('phish')).length;
+      const cleanCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('clean') || v.includes('legitimate') || (c.threatScore !== undefined && c.threatScore < 40);
+      }).length;
+      const suspCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('suspicious') || (c.threatScore !== undefined && c.threatScore >= 40 && c.threatScore < 70);
+      }).length;
+      const malCount = matchingCases.filter(c => {
+        const v = ((c.classification || c.verdict || (c as any).raw_analysis?.classification || '') as string).toLowerCase();
+        return v.includes('malicious') || v.includes('phish') || (c.threatScore !== undefined && c.threatScore >= 70);
+      }).length;
 
       data.push({
         date: dayName,
@@ -460,7 +469,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   }, [totals30Day]);
 
   return (
-    <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
+    <div className="flex-1 overflow-y-auto w-full max-w-full min-w-0 p-3.5 sm:p-5 md:p-6 space-y-4 sm:space-y-6">
       {/* Top Banner / Breadcrumb */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -552,10 +561,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <ShieldAlert className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_cases || 6}
+                {stats?.summary?.total_cases ?? casesList.length}
               </div>
               <div className="text-[10px] text-rose-400/90 font-mono mt-0.5 flex items-center justify-between">
-                <span>2 Critical BEC</span>
+                <span>Active Forensic Queue</span>
                 <span className="text-blue-400 group-hover:translate-x-0.5 transition-transform">View →</span>
               </div>
             </div>
@@ -569,7 +578,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <Layers className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.active_campaigns || 3}
+                {stats?.summary?.active_campaigns ?? 0}
               </div>
               <div className="text-[10px] text-purple-400/90 font-mono mt-0.5 flex items-center justify-between">
                 <span>Threat Clusters</span>
@@ -586,7 +595,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <Database className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
               </div>
               <div className="text-xl font-bold text-white font-mono">
-                {stats?.summary?.total_emails_ingested || 14}
+                {stats?.summary?.total_emails_ingested ?? casesList.length}
               </div>
               <div className="text-[10px] text-blue-400 font-mono mt-0.5 flex items-center justify-between">
                 <span>Ingest Pipeline</span>
@@ -718,9 +727,16 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                   >
                     {/* Header: Case ID & Threat Score Priority */}
                     <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-cyan-300 font-mono text-[11px] font-bold shadow-inner">
-                        <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        <span>{sample.id}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-cyan-300 font-mono text-[11px] font-bold shadow-inner">
+                          <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>{sample.id}</span>
+                        </div>
+                        {(sample.isDemo || sample.id.startsWith('sample-') || sample.id.startsWith('eml_nazario')) && (
+                          <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono font-bold">
+                            DEMO
+                          </span>
+                        )}
                       </div>
                       <div className={`px-2 py-0.5 rounded-md border font-mono text-[11px] font-black flex items-center gap-1 shadow-sm ${verdictInfo.colors.badge}`}>
                         <Zap className="w-3 h-3 shrink-0" />
@@ -851,10 +867,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <ShieldAlert className="w-4 h-4 text-rose-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_cases || 6}
+            {stats?.summary?.total_cases ?? casesList.length}
           </div>
           <div className="text-[11px] text-rose-400/90 font-mono mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3 inline" /> 2 Critical Wire BEC Lures
+            <TrendingUp className="w-3 h-3 inline" /> Active Forensic Queue
           </div>
         </motion.div>
 
@@ -869,10 +885,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Layers className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.active_campaigns || 3}
+            {stats?.summary?.active_campaigns ?? 0}
           </div>
           <div className="text-[11px] text-purple-400/90 font-mono mt-1">
-            Unattributed Threat Clusters
+            Active Campaign Clusters
           </div>
         </motion.div>
 
@@ -887,10 +903,10 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Database className="w-4 h-4 text-blue-400" />
           </div>
           <div className="text-2xl font-bold text-white font-mono">
-            {stats?.summary?.total_emails_ingested || 14}
+            {stats?.summary?.total_emails_ingested ?? casesList.length}
           </div>
           <div className="text-[11px] text-blue-400/90 font-mono mt-1">
-            Nazario & Enron Corpus Verified
+            Total Ingested Artifacts
           </div>
         </motion.div>
 
@@ -905,7 +921,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             <Zap className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-2xl font-bold text-amber-400 font-mono">
-            {stats?.summary?.average_threat_score || 72.4} / 100
+            {stats?.summary?.average_threat_score ?? (casesList.length > 0 ? Math.round(casesList.reduce((acc, c) => acc + (c.threatScore || 0), 0) / casesList.length) : 0)} / 100
           </div>
           <div className="text-[11px] text-slate-400 font-mono mt-1">
             Threat Intelligence &amp; Behavioral Analysis
@@ -961,9 +977,16 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
               >
                 {/* Header: Case ID & Threat Score */}
                 <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
-                    <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <span>{sample.id}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-cyan-300 font-mono text-xs font-bold">
+                      <ShieldAlert className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                      <span>{sample.id}</span>
+                    </div>
+                    {(sample.isDemo || sample.id.startsWith('sample-') || sample.id.startsWith('eml_nazario')) && (
+                      <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono font-bold">
+                        DEMO
+                      </span>
+                    )}
                   </div>
                   <div className={`px-2.5 py-0.5 rounded-md border font-mono text-xs font-black flex items-center gap-1 shadow-sm ${verdictInfo.colors.badge}`}>
                     <Zap className="w-3 h-3 shrink-0" />
@@ -1040,14 +1063,14 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             {(() => {
               const focusVerdict = getStandardizedVerdict(activeFocusAnalysis);
               const focusOriginHop = activeFocusAnalysis.hops?.find(h => h.isOrigin) || activeFocusAnalysis.hops?.[0];
-              const originIp = focusOriginHop?.fromIp || '185.220.101.5';
+              const originIp = focusOriginHop?.fromIp || 'Unavailable';
               const isSpfPass = activeFocusAnalysis.auth?.spf?.status === 'PASS';
               const isDkimPass = activeFocusAnalysis.auth?.dkim?.status === 'PASS';
               const isDmarcPass = activeFocusAnalysis.auth?.dmarc?.status === 'PASS';
               const hasReplyDiverter = Boolean(activeFocusAnalysis.replyTo || activeFocusAnalysis.headers?.replyTo);
               const attributionConfidence = activeFocusAnalysis.mlConfidence 
-                ? (activeFocusAnalysis.mlConfidence * 100).toFixed(1) 
-                : '98.4';
+                ? `${(activeFocusAnalysis.mlConfidence * 100).toFixed(1)}%` 
+                : 'Unavailable';
 
               const handleFocusInspect = (targetTab: string) => {
                 if (onSelectAnalysis) onSelectAnalysis(activeFocusAnalysis);

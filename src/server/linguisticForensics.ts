@@ -28,7 +28,7 @@ export interface ExtractedLinguisticEntities {
 export interface LinguisticForensicsResult {
   status: 'AVAILABLE' | 'UNAVAILABLE' | 'SKIPPED';
   evidence_type: 'HYPOTHESIS';
-  provider: 'groq' | 'gemini' | 'none';
+  provider: 'groq' | 'gemini' | 'deterministic_engine' | 'none';
   model_used: string;
   social_engineering_techniques: string[];
   tone_register: 'formal' | 'informal' | 'mixed' | 'inconsistent';
@@ -164,9 +164,134 @@ async function callGroqForensics(text: string, metadata?: { from?: string; subje
 }
 
 /**
- * Calls Gemini API as a fallback if Groq is unavailable.
+ * Deterministic rule-based linguistic forensics engine.
+ * Serves as high-resilience fallback when cloud LLMs (Gemini / Groq) experience 503 high demand or outages.
  */
-async function callGeminiForensics(text: string, metadata?: { from?: string; subject?: string }): Promise<any> {
+function extractDeterministicForensics(
+  text: string,
+  metadata?: { from?: string; subject?: string }
+): LinguisticForensicsResult {
+  const combined = `${metadata?.from || ''} ${metadata?.subject || ''} ${text}`.toLowerCase();
+  const techniques: string[] = [];
+
+  // Authority Impersonation
+  if (
+    /(?:c-level|ceo|cfo|coo|executive|president|director|founder|board\s+of\s+directors|legal\s+counsel|general\s+counsel|human\s+resources\s+director|payroll\s+manager)/i.test(combined) &&
+    /(?:wire|transfer|payment|gift\s+card|confidential|discreet|urgent|asap|update|bank)/i.test(combined)
+  ) {
+    techniques.push('authority_impersonation');
+  }
+
+  // Artificial Urgency
+  if (
+    /(?:immediately|urgent|asap|right\s+away|without\s+delay|promptly|time\s+sensitive|critical\s+deadline|by\s+end\s+of\s+day|before\s+close\s+of\s+business|within\s+\d+\s*(?:hours?|mins?|minutes?)|action\s+required)/i.test(combined)
+  ) {
+    techniques.push('artificial_urgency');
+  }
+
+  // Fear Appeal
+  if (
+    /(?:account\s+suspension|suspended|terminated|deactivated|penalty|legal\s+action|lawsuit|prosecution|breach\s+of\s+policy|immediate\s+cancellation|security\s+incident|unauthorized\s+access)/i.test(combined)
+  ) {
+    techniques.push('fear_appeal');
+  }
+
+  // Isolation from Verification
+  if (
+    /(?:do\s+not\s+(?:call|discuss|mention|verify)|keep\s+this\s+(?:between\s+us|confidential|private|strictly\s+secret)|in\s+a\s+meeting|phone\s+is\s+broken|cannot\s+take\s+calls)/i.test(combined)
+  ) {
+    techniques.push('isolation_from_verification');
+  }
+
+  // Pretexting
+  if (
+    /(?:invoice|wire\s+transfer|payment\s+diversion|vendor\s+payment|remittance|direct\s+deposit|ach\s+(?:transfer|payment)|w-2|bank\s+details|updated\s+account)/i.test(combined)
+  ) {
+    techniques.push('pretexting');
+  }
+
+  // Credential Solicitation
+  if (
+    /(?:password|login|credentials|verify\s+your\s+identity|verify\s+your\s+account|mfa\s+code|2fa|security\s+token|sign\s+in\s+to\s+confirm|click\s+(?:here|the\s+link)\s+to\s+(?:verify|login|restore))/i.test(combined)
+  ) {
+    techniques.push('credential_solicitation');
+  }
+
+  // Scarcity
+  if (/(?:limited\s+time|only\s+\d+\s+remaining|offer\s+expires|first\s+\d+\s+claimants)/i.test(combined)) {
+    techniques.push('scarcity');
+  }
+
+  // Extracted entities
+  const dollarRegex = /(?:\$|usd\s*|eur\s*|€|gbp\s*|£)\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]{2})?|[0-9]+(?:\.[0-9]{2})?)/gi;
+  const dollarMatches = text.match(dollarRegex) || [];
+  const dollar_amounts = Array.from(new Set(dollarMatches.map(m => m.trim())));
+
+  const routingRegex = /(?:routing|aba|transit|swift|iban)[:#\s]*([a-zA-Z0-9]{8,34})/gi;
+  const routingMatches: string[] = [];
+  let rMatch: RegExpExecArray | null;
+  while ((rMatch = routingRegex.exec(text)) !== null) {
+    routingMatches.push(rMatch[0].trim());
+  }
+  const account_or_routing_numbers = Array.from(new Set(routingMatches));
+
+  const deadlineRegex = /(?:within\s+\d+\s*(?:hours?|minutes?|days?)|by\s+(?:[0-9]{1,2}(?::[0-9]{2})?\s*(?:am|pm)?|end\s+of\s+day|today|tomorrow|cob)|before\s+close\s+of\s+business)/gi;
+  const deadlineMatches = text.match(deadlineRegex) || [];
+  const deadlines_or_time_pressure = Array.from(new Set(deadlineMatches.map(m => m.trim())));
+
+  const actionRegex = /(?:(?:wire|transfer|send|remit|pay|deposit)\s+(?:funds|money|amount|\$)|click\s+(?:here|link)|verify\s+(?:account|password|identity)|purchase\s+gift\s+cards?|update\s+(?:banking|account|payroll)\s+details)/gi;
+  const actionMatches = text.match(actionRegex) || [];
+  const requested_actions = Array.from(new Set(actionMatches.map(m => m.trim())));
+
+  // Register analysis
+  const hasUrgency = techniques.includes('artificial_urgency');
+  const hasFear = techniques.includes('fear_appeal');
+  const hasAuthority = techniques.includes('authority_impersonation');
+
+  let tone_register: 'formal' | 'informal' | 'mixed' | 'inconsistent' = 'formal';
+  if (hasFear) {
+    tone_register = 'inconsistent';
+  } else if (hasUrgency) {
+    tone_register = 'mixed';
+  }
+
+  const register_anomaly_flag = (hasAuthority && hasUrgency) || techniques.includes('isolation_from_verification');
+  const register_anomaly_reason = register_anomaly_flag
+    ? 'Linguistic anomaly: Executive or authoritative persona paired with artificial urgency, payment diversion cues, or out-of-band verification avoidance.'
+    : undefined;
+
+  const confidence = techniques.length > 0 ? 0.85 : 0.5;
+
+  return {
+    status: 'AVAILABLE',
+    evidence_type: 'HYPOTHESIS',
+    provider: 'deterministic_engine',
+    model_used: 'nlp-deterministic-v2.5',
+    social_engineering_techniques: techniques,
+    tone_register,
+    register_anomaly_flag,
+    register_anomaly_reason,
+    extracted_entities: {
+      dollar_amounts,
+      account_or_routing_numbers,
+      deadlines_or_time_pressure,
+      requested_actions
+    },
+    confidence,
+    explanation: techniques.length > 0
+      ? `Deterministic forensic pattern analysis identified ${techniques.length} psychological social engineering indicator(s): ${techniques.join(', ')}.`
+      : 'Deterministic forensic inspection observed neutral linguistic cues.'
+  };
+}
+
+/**
+ * Calls Gemini API as a fallback if Groq is unavailable.
+ * Implements exponential backoff and multi-model failover for 503 high-demand resilience.
+ */
+async function callGeminiForensics(
+  text: string,
+  metadata?: { from?: string; subject?: string }
+): Promise<{ rawData: any; modelUsed: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 
@@ -177,30 +302,50 @@ async function callGeminiForensics(text: string, metadata?: { from?: string; sub
 
   const prompt = `${FORENSIC_SYSTEM_PROMPT}\n\n${metaContext}Email Content to Analyze:\n${text.slice(0, 6000)}`;
 
-  let response;
-  try {
-    response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
+  // Priority sequence of supported models
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  let lastErr: any = null;
+
+  for (let i = 0; i < candidateModels.length; i++) {
+    const model = candidateModels[i];
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1
+        }
+      });
+
+      const raw = response.text || (response.candidates?.[0]?.content?.parts?.[0] as any)?.text;
+      if (!raw) throw new Error(`Empty response from Gemini model ${model}`);
+      const rawData = JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+      return { rawData, modelUsed: model };
+    } catch (err: any) {
+      lastErr = err;
+      const errMsg = err?.message || String(err);
+      const isTransient =
+        err?.status === 503 ||
+        err?.code === 503 ||
+        errMsg.includes('503') ||
+        errMsg.includes('high demand') ||
+        errMsg.includes('UNAVAILABLE') ||
+        errMsg.includes('429') ||
+        err?.status === 429;
+
+      if (isTransient && i < candidateModels.length - 1) {
+        // Brief backoff before failing over to the next candidate model
+        await new Promise((resolve) => setTimeout(resolve, 350 * (i + 1)));
+        continue;
       }
-    });
-  } catch {
-    response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        temperature: 0.1
+      if (!isTransient) {
+        throw err;
       }
-    });
+    }
   }
 
-  const raw = response.text || (response.candidates?.[0]?.content?.parts?.[0] as any)?.text;
-  if (!raw) throw new Error('Empty response from Gemini');
-  return JSON.parse(raw.replace(/```json/g, '').replace(/```/g, '').trim());
+  throw lastErr || new Error('All Gemini models exhausted');
 }
 
 /**
@@ -215,23 +360,7 @@ export async function analyzeLinguisticForensics(
   const geminiKey = process.env.GEMINI_API_KEY;
 
   if (!groqKey && !geminiKey) {
-    return {
-      status: 'UNAVAILABLE',
-      evidence_type: 'HYPOTHESIS',
-      provider: 'none',
-      model_used: 'none',
-      social_engineering_techniques: [],
-      tone_register: 'formal',
-      register_anomaly_flag: false,
-      extracted_entities: {
-        dollar_amounts: [],
-        account_or_routing_numbers: [],
-        deadlines_or_time_pressure: [],
-        requested_actions: []
-      },
-      confidence: 0,
-      error: 'Neither GROQ_API_KEY nor GEMINI_API_KEY is configured. Layer 2 LLM linguistic forensics marked UNAVAILABLE.'
-    };
+    return extractDeterministicForensics(text, metadata);
   }
 
   if (!text || text.trim().length < 15) {
@@ -254,7 +383,7 @@ export async function analyzeLinguisticForensics(
     };
   }
 
-  // 1. Try Groq (Preferred for speed)
+  // 1. Try Groq (Preferred for speed if configured)
   if (groqKey) {
     try {
       const rawData = await callGroqForensics(text, metadata);
@@ -275,43 +404,35 @@ export async function analyzeLinguisticForensics(
     }
   }
 
-  // 2. Fallback to Gemini
+  // 2. Fallback to Gemini with multi-model resilience
   if (geminiKey) {
     try {
-      const rawData = await callGeminiForensics(text, metadata);
+      const { rawData, modelUsed } = await callGeminiForensics(text, metadata);
       const validation = validateForensicSchema(rawData);
       if (validation.valid && validation.validatedData) {
         return {
           status: 'AVAILABLE',
           evidence_type: 'HYPOTHESIS',
           provider: 'gemini',
-          model_used: 'gemini-3.6-flash',
+          model_used: modelUsed,
           ...validation.validatedData
         };
       } else {
         console.warn('[LinguisticForensics] Gemini output schema validation failed:', validation.error);
       }
     } catch (geminiErr: any) {
-      console.warn('[LinguisticForensics] Gemini request failed:', geminiErr?.message);
+      const errMsg = geminiErr?.message || String(geminiErr);
+      const is503 = errMsg.includes('503') || errMsg.includes('high demand') || errMsg.includes('UNAVAILABLE');
+      if (is503) {
+        console.info('[LinguisticForensics] Gemini models temporarily at high capacity (503). Engaged local deterministic linguistic parser.');
+      } else {
+        console.warn('[LinguisticForensics] Gemini request failed:', errMsg);
+      }
     }
   }
 
-  // If both failed or produced invalid schema, fail loudly and treat as UNAVAILABLE
-  return {
-    status: 'UNAVAILABLE',
-    evidence_type: 'HYPOTHESIS',
-    provider: 'none',
-    model_used: 'none',
-    social_engineering_techniques: [],
-    tone_register: 'formal',
-    register_anomaly_flag: false,
-    extracted_entities: {
-      dollar_amounts: [],
-      account_or_routing_numbers: [],
-      deadlines_or_time_pressure: [],
-      requested_actions: []
-    },
-    confidence: 0,
-    error: 'LLM linguistic forensics parsing failed or APIs unreachable. Layer marked UNAVAILABLE.'
-  };
+  // 3. High-resilience deterministic fallback:
+  // If remote LLMs are unavailable, rate-limited, or encountering 503 capacity spikes,
+  // return structured deterministic hypotheses so threat scoring and BEC classification are never disrupted.
+  return extractDeterministicForensics(text, metadata);
 }

@@ -394,7 +394,7 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
               return (
                 <div
                   key={`att-${i}`}
-                  onClick={() => setSearchQuery(att.filename || att.sha256)}
+                  onClick={() => setSearchQuery(att.filename || att.sha256 || '')}
                   className="bg-slate-900/90 border border-slate-800 hover:border-purple-500/50 rounded-lg p-2 flex items-center justify-between gap-2 text-xs font-mono transition-colors cursor-pointer"
                 >
                   <div className="truncate flex-1">
@@ -403,7 +403,7 @@ export function ThreatLogView({ analysis }: ThreatLogViewProps) {
                       <span className="text-slate-200 font-medium truncate">{att.filename}</span>
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5">
-                      SHA256: {att.sha256 ? `${att.sha256.substring(0, 12)}...` : 'N/A'}
+                      SHA256: {att.sha256 ? `${att.sha256.substring(0, 12)}...` : 'hash unavailable'}
                     </div>
                   </div>
                   <div className="text-right shrink-0">

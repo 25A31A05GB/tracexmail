@@ -20,10 +20,16 @@ import {
   Radio, 
   FileText,
   SlidersHorizontal,
-  ExternalLink
+  ExternalLink,
+  Clock,
+  Volume2,
+  VolumeX,
+  EyeOff
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { UserRole, AccountType } from '../hooks/useSession';
+import { InactivityConfig, WorkspaceLockState } from '../types';
+import { Sparkles, Terminal } from 'lucide-react';
 
 interface AccountSettingsViewProps {
   role: UserRole;
@@ -36,6 +42,13 @@ interface AccountSettingsViewProps {
   onSignOut?: () => void;
   revokeAllOtherSessions?: () => Promise<void>;
   onNavigateTab?: (tab: any) => void;
+  userPersona?: 'technical' | 'non_technical';
+  onSetPersona?: (persona: 'technical' | 'non_technical') => void;
+  onOpenOnboarding?: () => void;
+  inactivityConfig?: InactivityConfig;
+  onUpdateInactivityConfig?: (config: Partial<InactivityConfig>) => void;
+  onLockWorkspaceNow?: () => void;
+  lockState?: WorkspaceLockState;
 }
 
 interface TotpFactor {
@@ -57,7 +70,14 @@ export function AccountSettingsView({
   isEmailVerified,
   onSignOut,
   revokeAllOtherSessions,
-  onNavigateTab
+  onNavigateTab,
+  userPersona = 'technical',
+  onSetPersona,
+  onOpenOnboarding,
+  inactivityConfig,
+  onUpdateInactivityConfig,
+  onLockWorkspaceNow,
+  lockState
 }: AccountSettingsViewProps) {
   // Factors state
   const [factors, setFactors] = useState<TotpFactor[]>([]);
@@ -130,7 +150,7 @@ export function AccountSettingsView({
             const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
             if (refreshErr || !refreshed.session) {
               console.warn('[Supabase MFA] Session refresh failed; skipping live factors fetch:', refreshErr?.message);
-              loadLocalFactors();
+              setFactors([]);
               return;
             }
           }
@@ -138,53 +158,24 @@ export function AccountSettingsView({
           console.log('[Supabase MFA] Requesting listFactors from Supabase for user:', session.user.email);
           const { data, error } = await supabase.auth.mfa.listFactors();
           if (error) {
-            console.warn('[Supabase MFA] /auth/v1/factors error (HTTP ' + (error.status || 'unknown') + '):', error.message, {
-              status: error.status,
-              name: error.name,
-              userId: session.user.id,
-              tokenPrefix: session.access_token.substring(0, 10) + '...'
-            });
-            loadLocalFactors();
+            console.error('[Supabase MFA] listFactors error (HTTP ' + (error.status || 'unknown') + '):', error.message);
+            setFactors([]);
           } else if (data) {
             const totpList = (data.totp || []) as TotpFactor[];
-            console.log('[Supabase MFA] Loaded verified factors count:', totpList.length);
             setFactors(totpList);
           }
         } else {
-          loadLocalFactors();
+          setFactors([]);
         }
-      } else {
-        loadLocalFactors();
-      }
-    } catch (err: any) {
-      console.warn('[Supabase MFA] Exception loading factors:', err);
-      loadLocalFactors();
-    } finally {
-      setLoadingFactors(false);
-    }
-  };
-
-  const loadLocalFactors = () => {
-    try {
-      const saved = localStorage.getItem(`tracexmail_mfa_factors_${user?.email || 'user'}`);
-      if (saved) {
-        setFactors(JSON.parse(saved));
       } else {
         setFactors([]);
       }
-    } catch {
+    } catch (err: any) {
+      console.error('[Supabase MFA] Exception loading factors:', err);
       setFactors([]);
+    } finally {
+      setLoadingFactors(false);
     }
-  };
-
-  const saveLocalFactors = (newFactors: TotpFactor[]) => {
-    try {
-      localStorage.setItem(
-        `tracexmail_mfa_factors_${user?.email || 'user'}`,
-        JSON.stringify(newFactors)
-      );
-    } catch {}
-    setFactors(newFactors);
   };
 
   // Start Enrollment Workflow
@@ -196,108 +187,43 @@ export function AccountSettingsView({
     setVerifyCode('');
 
     try {
-      if (getIsSupabaseConfigured() && supabase) {
-        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
-        if (sessionErr) {
-          console.warn('[Supabase MFA] getSession notice before enroll:', sessionErr);
-        }
-        if (session && session.user && session.access_token) {
-          const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
-          if (isExpired) {
-            console.warn('[Supabase MFA] Access token expired before enroll. Refreshing...');
-            await supabase.auth.refreshSession();
-          }
-
-          console.log('[Supabase MFA] Submitting POST /auth/v1/factors enroll request for:', session.user.email);
-          const { data, error } = await supabase.auth.mfa.enroll({
-            factorType: 'totp',
-            issuer: 'TraceXMail Forensics',
-            friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
-          });
-
-          if (error) {
-            console.error('[Supabase MFA] POST /auth/v1/factors enroll error (HTTP ' + (error.status || 'unknown') + '):', error.message, {
-              status: error.status,
-              name: error.name,
-              hint: error.status === 401 ? '401 Unauthorized indicates the user session JWT is expired, invalidated, or unauthenticated on the Supabase GoTrue endpoint. Falling back to local secure sandbox MFA.' : undefined
-            });
-
-            if (error.status === 401) {
-              // Try refreshing session once
-              console.warn('[Supabase MFA] Attempting session refresh after 401 on /auth/v1/factors...');
-              const { data: refData } = await supabase.auth.refreshSession();
-              if (refData?.session) {
-                const retryRes = await supabase.auth.mfa.enroll({
-                  factorType: 'totp',
-                  issuer: 'TraceXMail Forensics',
-                  friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
-                });
-                if (!retryRes.error && retryRes.data?.totp) {
-                  setEnrollData({
-                    factorId: retryRes.data.id,
-                    qrCode: retryRes.data.totp.qr_code,
-                    secret: retryRes.data.totp.secret,
-                    uri: retryRes.data.totp.uri
-                  });
-                  return;
-                }
-              }
-            }
-
-            // Fallback to local sandbox registration if Supabase endpoint is unauthenticated
-            console.info('[Supabase MFA] Using resilient local sandbox TOTP registration.');
-          } else if (data && data.totp) {
-            console.log('[Supabase MFA] TOTP enrollment factor initiated successfully:', data.id);
-            setEnrollData({
-              factorId: data.id,
-              qrCode: data.totp.qr_code,
-              secret: data.totp.secret,
-              uri: data.totp.uri
-            });
-            return;
-          }
-        }
+      if (!getIsSupabaseConfigured() || !supabase) {
+        throw new Error('Supabase is not configured. Real MFA enrollment requires active Supabase authentication.');
       }
 
-      // Fallback / Sandbox Enrollment (Simulated RFC 6238 Secret)
-      const randomSecret = Array.from({ length: 32 }, () => 
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'[Math.floor(Math.random() * 32)]
-      ).join('');
-      const factorId = `fac_totp_${Date.now()}`;
-      const email = user?.email || 'analyst@tracexmail.sec';
-      const uri = `otpauth://totp/TraceXMail:${encodeURIComponent(email)}?secret=${randomSecret}&issuer=TraceXMail`;
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      if (sessionErr || !session || !session.user || !session.access_token) {
+        throw new Error('Active authenticated session required to enroll MFA factors.');
+      }
 
-      // Inline SVG QR placeholder representation
-      const qrSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="160" height="160">
-        <rect width="100" height="100" fill="#ffffff" />
-        <rect x="10" y="10" width="24" height="24" fill="#14120f" />
-        <rect x="14" y="14" width="16" height="16" fill="#ffffff" />
-        <rect x="18" y="18" width="8" height="8" fill="#14120f" />
-        <rect x="66" y="10" width="24" height="24" fill="#14120f" />
-        <rect x="70" y="14" width="16" height="16" fill="#ffffff" />
-        <rect x="74" y="18" width="8" height="8" fill="#14120f" />
-        <rect x="10" y="66" width="24" height="24" fill="#14120f" />
-        <rect x="14" y="70" width="16" height="16" fill="#ffffff" />
-        <rect x="18" y="74" width="8" height="8" fill="#14120f" />
-        <rect x="42" y="15" width="16" height="6" fill="#14120f" />
-        <rect x="45" y="25" width="10" height="8" fill="#14120f" />
-        <rect x="40" y="40" width="20" height="20" fill="#14120f" />
-        <rect x="45" y="45" width="10" height="10" fill="#ffffff" />
-        <rect x="15" y="42" width="18" height="16" fill="#14120f" />
-        <rect x="68" y="42" width="18" height="16" fill="#14120f" />
-        <rect x="42" y="70" width="16" height="16" fill="#14120f" />
-        <rect x="68" y="70" width="18" height="18" fill="#14120f" />
-      </svg>`;
+      const isExpired = session.expires_at ? (session.expires_at * 1000) <= Date.now() : false;
+      if (isExpired) {
+        await supabase.auth.refreshSession();
+      }
 
-      setEnrollData({
-        factorId,
-        qrCode: qrSvg,
-        secret: randomSecret,
-        uri
+      const { data, error } = await supabase.auth.mfa.enroll({
+        factorType: 'totp',
+        issuer: 'TraceXMail Forensics',
+        friendlyName: `SOC TOTP (${user?.email?.split('@')[0] || 'Operator'})`
       });
+
+      if (error) {
+        throw new Error(`Enrollment failed (${error.status || 'error'}): ${error.message}${error.status === 422 ? ' — Please ensure MFA is enabled in your Supabase Auth settings.' : ''}`);
+      }
+
+      if (data && data.totp) {
+        setEnrollData({
+          factorId: data.id,
+          qrCode: data.totp.qr_code,
+          secret: data.totp.secret,
+          uri: data.totp.uri
+        });
+      } else {
+        throw new Error('Supabase did not return TOTP factor payload.');
+      }
     } catch (err: any) {
-      console.error('[AccountSettings] Enroll exception:', err);
-      setErrorMsg(err.message || 'An unexpected error occurred while starting MFA enrollment.');
+      console.error('[AccountSettings] Enroll error:', err);
+      setErrorMsg(err.message || 'Failed to start MFA enrollment.');
       setIsEnrolling(false);
     }
   };
@@ -314,75 +240,56 @@ export function AccountSettingsView({
     setErrorMsg(null);
 
     try {
-      if (getIsSupabaseConfigured() && supabase && !enrollData.factorId.startsWith('fac_totp_')) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user && session.access_token) {
-          // Step 1: Create Challenge
-          const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
-            factorId: enrollData.factorId
-          });
-
-          if (challengeErr) {
-            setErrorMsg('Failed to challenge factor: ' + challengeErr.message);
-            setVerifying(false);
-            return;
-          }
-
-          // Step 2: Verify Code
-          const { error: verifyErr } = await supabase.auth.mfa.verify({
-            factorId: enrollData.factorId,
-            challengeId: challengeData.id,
-            code: verifyCode.trim()
-          });
-
-          if (verifyErr) {
-            setErrorMsg('Verification failed: ' + verifyErr.message + '. Please ensure your device clock is synchronized.');
-            // Audit failed challenge
-            fetch('/api/auth/mfa/enroll-log', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ status: 'FAILURE', factorType: 'totp', factorId: enrollData.factorId })
-            }).catch(() => {});
-            setVerifying(false);
-            return;
-          }
-
-          // Audit success
-          fetch('/api/auth/mfa/enroll-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'SUCCESS', factorType: 'totp', factorId: enrollData.factorId })
-          }).catch(() => {});
-
-          setSuccessMsg('TOTP Authenticator activated successfully! Your account is now fortified with Multi-Factor Authentication (AAL2).');
-          setIsEnrolling(false);
-          setEnrollData(null);
-          setVerifyCode('');
-          loadFactors();
-          return;
-        }
+      if (!getIsSupabaseConfigured() || !supabase) {
+        throw new Error('Supabase is not configured.');
       }
 
-      // Sandbox Fallback
-      const newFactor: TotpFactor = {
-        id: enrollData.factorId,
-        friendly_name: `Primary SOC Authenticator (${user?.email?.split('@')[0] || 'Operator'})`,
-        factor_type: 'totp',
-        status: 'verified',
-        created_at: new Date().toISOString()
-      };
-      saveLocalFactors([...factors, newFactor]);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !session.user || !session.access_token) {
+        throw new Error('Active session required for MFA verification.');
+      }
 
+      // Step 1: Create Challenge
+      const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({
+        factorId: enrollData.factorId
+      });
+
+      if (challengeErr) {
+        setErrorMsg('Failed to challenge factor: ' + challengeErr.message);
+        setVerifying(false);
+        return;
+      }
+
+      // Step 2: Verify Code
+      const { error: verifyErr } = await supabase.auth.mfa.verify({
+        factorId: enrollData.factorId,
+        challengeId: challengeData.id,
+        code: verifyCode.trim()
+      });
+
+      if (verifyErr) {
+        setErrorMsg('Verification failed: ' + verifyErr.message + '. Please ensure your device clock is synchronized.');
+        fetch('/api/auth/mfa/enroll-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'FAILURE', factorType: 'totp', factorId: enrollData.factorId })
+        }).catch(() => {});
+        setVerifying(false);
+        return;
+      }
+
+      // Audit success
       fetch('/api/auth/mfa/enroll-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'SUCCESS', factorType: 'totp', factorId: enrollData.factorId })
       }).catch(() => {});
 
-      setSuccessMsg('TOTP Authenticator activated successfully! Multi-Factor Authentication is now active on your account.');
+      setSuccessMsg('TOTP Authenticator activated successfully! Your account is now fortified with Multi-Factor Authentication (AAL2).');
       setIsEnrolling(false);
       setEnrollData(null);
       setVerifyCode('');
+      await loadFactors();
     } catch (err: any) {
       console.error('[AccountSettings] Verification error:', err);
       setErrorMsg(err.message || 'MFA verification failed.');
@@ -408,21 +315,16 @@ export function AccountSettingsView({
     setSuccessMsg(null);
 
     try {
-      if (getIsSupabaseConfigured() && supabase && !factorId.startsWith('fac_totp_')) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user && session.access_token) {
-          const { error } = await supabase.auth.mfa.unenroll({ factorId });
-          if (error) {
-            setErrorMsg('Failed to unenroll factor: ' + error.message);
-            setUnenrolling(false);
-            return;
-          }
+      if (getIsSupabaseConfigured() && supabase) {
+        const { error } = await supabase.auth.mfa.unenroll({ factorId });
+        if (error) {
+          setErrorMsg('Failed to unenroll factor: ' + error.message);
+          setUnenrolling(false);
+          return;
         }
       }
 
-      // Update state / local factors
-      const updated = factors.filter(f => f.id !== factorId);
-      saveLocalFactors(updated);
+      await loadFactors();
 
       // Audit unenroll action
       fetch('/api/auth/mfa/unenroll-log', {
@@ -628,6 +530,34 @@ export function AccountSettingsView({
                 {role === 'admin' ? 'LEVEL 3: SOC COMMANDER (FULL WRITE/PURGE)' : role === 'analyst' ? 'LEVEL 2: FORENSIC ANALYST' : 'LEVEL 1: AUDITOR (READ ONLY)'}
               </span>
             </div>
+
+            <div className="pt-3 border-t border-[var(--line)]">
+              <span className="text-[var(--paper-muted)] block text-[11px] mb-1">Active Experience Mode:</span>
+              <div className="flex items-center justify-between">
+                <span className="font-sans font-bold text-xs text-[#ede6d8] flex items-center gap-1.5">
+                  {userPersona === 'technical' ? (
+                    <>
+                      <Terminal className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                      <span>Technical (SOC Forensics)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-[#4ADE80]" />
+                      <span>Non-Technical (Human Safety)</span>
+                    </>
+                  )}
+                </span>
+                {onOpenOnboarding && (
+                  <button
+                    type="button"
+                    onClick={onOpenOnboarding}
+                    className="text-[11px] text-[var(--stamp)] hover:underline cursor-pointer font-sans"
+                  >
+                    Change Persona
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -749,10 +679,19 @@ export function AccountSettingsView({
 
                     {/* QR Code Container */}
                     <div className="bg-white p-3 rounded-sm inline-block shadow-md">
-                      <div 
-                        dangerouslySetInnerHTML={{ __html: enrollData.qrCode }}
-                        className="w-[160px] h-[160px] flex items-center justify-center [&_svg]:w-full [&_svg]:h-full"
-                      />
+                      {enrollData.qrCode.startsWith('http') || enrollData.qrCode.startsWith('data:') ? (
+                        <img 
+                          src={enrollData.qrCode} 
+                          alt="Authenticator TOTP QR Code" 
+                          className="w-[160px] h-[160px] object-contain"
+                          crossOrigin="anonymous"
+                        />
+                      ) : (
+                        <div 
+                          dangerouslySetInnerHTML={{ __html: enrollData.qrCode }}
+                          className="w-[160px] h-[160px] flex items-center justify-center [&_svg]:w-full [&_svg]:h-full"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-1 pt-1">
@@ -901,7 +840,128 @@ export function AccountSettingsView({
             </div>
           )}
 
-          {/* Section 3: Session Management & Revocation */}
+          {/* Section 3: Session Inactivity & Auto-Lock Compliance (NIST SP 800-53 AC-11) */}
+          <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-5">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+              <div>
+                <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-400" />
+                  <span>SESSION INACTIVITY &amp; AUTO-LOCK COMPLIANCE (NIST SP 800-53 AC-11)</span>
+                </div>
+                <div className="text-[11.5px] text-[var(--paper-dim)] mt-0.5">
+                  Automatically safeguards evidence confidentiality by locking the workspace after unattended idle periods.
+                </div>
+              </div>
+
+              {onLockWorkspaceNow && (
+                <button
+                  type="button"
+                  onClick={onLockWorkspaceNow}
+                  className="px-3 py-1.5 rounded-[2px] border border-[#3a352c] hover:border-amber-500/80 bg-[#16130f] hover:bg-[#221e17] text-amber-300 transition-all text-xs font-mono flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Lock Workspace Now (Cmd+Shift+L / Ctrl+Shift+L)"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Lock Workspace Now</span>
+                  <kbd className="px-1 py-0.2 text-[9px] bg-black/40 border border-[#3a352c] rounded text-[#8a8070]">
+                    ⌘⇧L
+                  </kbd>
+                </button>
+              )}
+            </div>
+
+            {/* Inactivity Status Pill */}
+            <div className="p-3 bg-[var(--ink)] border border-[var(--line)] rounded-[2px] flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${inactivityConfig?.enabled ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span className="font-semibold text-[var(--paper)]">
+                  Compliance Status: {inactivityConfig?.enabled ? 'Active Enforcement (Compliant)' : 'Disabled / Suspended'}
+                </span>
+              </div>
+
+              {lockState && (
+                <div className="font-mono text-[11px] text-[#8a8070] flex items-center gap-2">
+                  <span>Idle: <strong className="text-amber-300">{lockState.idleSeconds}s</strong></span>
+                  <span>•</span>
+                  <span>Next Auto-Lock in: <strong className="text-emerald-400">{Math.floor(lockState.secondsRemaining / 60)}m {lockState.secondsRemaining % 60}s</strong></span>
+                </div>
+              )}
+            </div>
+
+            {/* Inactivity Configuration Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              {/* Timeout Duration Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--paper)] block">
+                  Inactivity Timeout Threshold:
+                </label>
+                <select
+                  value={inactivityConfig?.timeoutMinutes ?? 15}
+                  onChange={(e) => onUpdateInactivityConfig?.({ timeoutMinutes: Number(e.target.value) })}
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-amber-500/80 rounded-[2px] px-3 py-2 text-xs font-mono text-[var(--paper)] cursor-pointer"
+                >
+                  <option value={1}>1 Minute (Demo / Rapid Test)</option>
+                  <option value={5}>5 Minutes (Strict Security Zone)</option>
+                  <option value={10}>10 Minutes (High Risk Area)</option>
+                  <option value={15}>15 Minutes (NIST SP 800-53 Default Standard)</option>
+                  <option value={30}>30 Minutes (Standard SOC)</option>
+                  <option value={60}>60 Minutes (Extended Lab)</option>
+                </select>
+                <span className="text-[10px] text-[var(--paper-muted)] block">
+                  Recommended: 15 minutes per NIST SP 800-53 Rev 5 control AC-11.
+                </span>
+              </div>
+
+              {/* Warning Window Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-[var(--paper)] block">
+                  Pre-Lock Warning Duration:
+                </label>
+                <select
+                  value={inactivityConfig?.warningSeconds ?? 60}
+                  onChange={(e) => onUpdateInactivityConfig?.({ warningSeconds: Number(e.target.value) })}
+                  className="w-full bg-[var(--ink)] border border-[var(--line)] focus:border-amber-500/80 rounded-[2px] px-3 py-2 text-xs font-mono text-[var(--paper)] cursor-pointer"
+                >
+                  <option value={30}>30 Seconds Before Lock</option>
+                  <option value={60}>60 Seconds Before Lock (Recommended)</option>
+                  <option value={120}>120 Seconds (2 Minutes)</option>
+                </select>
+                <span className="text-[10px] text-[var(--paper-muted)] block">
+                  Displays interactive countdown modal before locking.
+                </span>
+              </div>
+            </div>
+
+            {/* Checkbox Options */}
+            <div className="space-y-2 pt-1 border-t border-[var(--line)] text-xs">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={inactivityConfig?.soundAlert ?? true}
+                  onChange={(e) => onUpdateInactivityConfig?.({ soundAlert: e.target.checked })}
+                  className="rounded border-[var(--line)] bg-[var(--ink)] text-amber-500 focus:ring-0 w-3.5 h-3.5"
+                />
+                <span className="text-[var(--paper)] font-medium flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Audible Alert Chime on Countdown Warning</span>
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={inactivityConfig?.autoLockOnBlur ?? false}
+                  onChange={(e) => onUpdateInactivityConfig?.({ autoLockOnBlur: e.target.checked })}
+                  className="rounded border-[var(--line)] bg-[var(--ink)] text-amber-500 focus:ring-0 w-3.5 h-3.5"
+                />
+                <span className="text-[var(--paper)] font-medium flex items-center gap-1.5">
+                  <EyeOff className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Zero-Trust Strict Mode: Lock immediately when switching browser tabs or minimizing window</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* Section 4: Session Management & Revocation */}
           <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
             <div className="border-b border-[var(--line)] pb-3">
               <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">

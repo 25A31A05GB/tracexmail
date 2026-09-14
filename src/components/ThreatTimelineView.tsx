@@ -101,7 +101,7 @@ export function ThreatTimelineView({
   const currentOriginIp = useMemo(() => {
     const hops = Array.isArray(analysis?.hops) ? analysis.hops : [];
     const originHop = hops.find((h) => h.isOrigin) || hops[0];
-    return originHop?.fromIp || originHop?.byHost || '185.220.101.5';
+    return originHop?.fromIp || originHop?.byHost || '';
   }, [analysis]);
 
   // Fetch timeline and real database cases from backend if available
@@ -197,7 +197,7 @@ export function ThreatTimelineView({
           senderEmail: sEmail,
           returnPath: parsed.headers.returnPath,
           replyTo: parsed.headers.replyTo,
-          originIp: parsed.hops[0]?.fromIp || '185.220.101.5',
+          originIp: parsed.hops[0]?.fromIp || 'Unavailable',
           asn: parsed.hops[0]?.asn || 'Unmapped ASN',
           asnOrg: parsed.hops[0]?.org || 'Unmapped Provider',
           location: parsed.hops[0]?.city ? `${parsed.hops[0].city}, ${parsed.hops[0].countryCode || ''}` : 'Relay Location: Unresolved',
@@ -242,7 +242,7 @@ export function ThreatTimelineView({
             senderEmail: sEmail,
             returnPath: sample.headers.returnPath,
             replyTo: sample.headers.replyTo,
-            originIp: sample.hops[0]?.fromIp || '185.220.101.5',
+            originIp: sample.hops[0]?.fromIp || 'Unavailable',
             asn: sample.hops[0]?.asn || 'Unmapped ASN',
             asnOrg: sample.hops[0]?.org || 'Unmapped Provider',
             location: sample.hops[0]?.city ? `${sample.hops[0].city}, ${sample.hops[0].countryCode || ''}` : 'Relay Location: Unresolved',
@@ -291,92 +291,6 @@ export function ThreatTimelineView({
         isCurrentAnalysis: false
       });
     });
-
-    // 4. Synthesize realistic prior historical incidents if list length is low (to give SOC analyst a rich timeline pattern for any domain/sender)
-    if (list.length < 3) {
-      const baseTime = new Date().getTime();
-      const priorIncidents: TimelineIncident[] = [
-        {
-          id: `synth_hist_01_${currentDomain}`,
-          date: new Date(baseTime - 86400000 * 14).toUTCString(),
-          timestampMs: baseTime - 86400000 * 14,
-          caseId: `CASE-2026-0816-PREV`,
-          subject: `[ALERT] Verification Required: Account ${currentDomain} Security Update`,
-          sender: `"${currentDomain.split('.')[0].toUpperCase()} Security" <support@${currentDomain}>`,
-          senderEmail: `support@${currentDomain}`,
-          returnPath: `bounce@auth-gateway-${currentDomain}`,
-          replyTo: `no-reply@auth-gateway-${currentDomain}`,
-          originIp: '89.144.20.12',
-          asn: 'AS24940',
-          asnOrg: 'Hetzner Online GmbH',
-          location: 'Frankfurt, DE',
-          verdict: 'MALICIOUS PHISH',
-          threatScore: 92,
-          spfStatus: 'FAIL',
-          dkimStatus: 'FAIL',
-          dmarcStatus: 'REJECT',
-          campaignName: `Campaign: ${currentDomain.split('.')[0].toUpperCase()} Credential Harvester Wave 1`,
-          attackVector: 'Fake Portal Login & Token Interception',
-          iocs: [`login-portal-${currentDomain}`, `auth-verify.${currentDomain}`],
-          heuristics: ['High Urgency Phishing Lure', 'Domain Alignment Violation', 'Suspicious Redirect Chain'],
-          isCurrentAnalysis: false
-        },
-        {
-          id: `synth_hist_02_${currentDomain}`,
-          date: new Date(baseTime - 86400000 * 45).toUTCString(),
-          timestampMs: baseTime - 86400000 * 45,
-          caseId: `CASE-2026-0715-RECON`,
-          subject: `Inquiry regarding pending invoice #${Math.floor(1000 + Math.random() * 9000)}`,
-          sender: `"${currentDomain.split('.')[0].toUpperCase()} Billing" <billing-dept@${currentDomain}>`,
-          senderEmail: `billing-dept@${currentDomain}`,
-          returnPath: `billing-bounce@${currentDomain}`,
-          originIp: '194.26.29.80',
-          asn: 'AS57523',
-          asnOrg: 'AlexHost SRL',
-          location: 'Chisinau, MD',
-          verdict: 'SUSPICIOUS',
-          threatScore: 78,
-          spfStatus: 'SOFTFAIL',
-          dkimStatus: 'FAIL',
-          dmarcStatus: 'QUARANTINE',
-          campaignName: `Campaign: ${currentDomain.split('.')[0].toUpperCase()} Initial Probe`,
-          attackVector: 'BEC / Executive Invoice Impersonation Probe',
-          iocs: [`invoice_document_${Math.floor(1000 + Math.random() * 9000)}.pdf.exe`],
-          heuristics: ['Executable Attachment Extension', 'DKIM Body Hash Mismatch'],
-          isCurrentAnalysis: false
-        },
-        {
-          id: `synth_hist_03_${currentDomain}`,
-          date: new Date(baseTime - 86400000 * 90).toUTCString(),
-          timestampMs: baseTime - 86400000 * 90,
-          caseId: `CASE-2026-0530-EARLY`,
-          subject: `Test communication / Domain Warmup`,
-          sender: `info@${currentDomain}`,
-          senderEmail: `info@${currentDomain}`,
-          originIp: '185.220.101.5',
-          asn: 'AS200548',
-          asnOrg: 'Zettahost Cyber Ltd',
-          location: 'Sofia, BG',
-          verdict: 'SUSPICIOUS',
-          threatScore: 64,
-          spfStatus: 'NEUTRAL',
-          dkimStatus: 'NONE',
-          dmarcStatus: 'NONE',
-          campaignName: `Campaign: ${currentDomain.split('.')[0].toUpperCase()} Infrastructure Setup`,
-          attackVector: 'Reconnaissance & Spam Filter Testing',
-          iocs: [`ping-${currentDomain}`],
-          heuristics: ['Unauthenticated Relay Node', 'Tor Exit Relay Origin'],
-          isCurrentAnalysis: false
-        }
-      ];
-
-      priorIncidents.forEach(inc => {
-        if (!seenIds.has(inc.id)) {
-          list.push(inc);
-          seenIds.add(inc.id);
-        }
-      });
-    }
 
     // Sort by date
     list.sort((a, b) => {
@@ -675,9 +589,9 @@ export function ThreatTimelineView({
           {filteredIncidents.length === 0 ? (
             <div className="bg-[#1a1712] border border-[#3a352c] rounded-xl p-8 text-center font-mono">
               <AlertOctagon className="w-10 h-10 text-[#8a8070] mx-auto mb-3" />
-              <h4 className="text-sm font-bold text-[#ede6d8] uppercase">No Matching Historical Incidents Found</h4>
+              <h4 className="text-sm font-bold text-[#ede6d8] uppercase">No Prior Recorded Incidents For This Domain</h4>
               <p className="text-xs text-[#b9af9c] max-w-md mx-auto mt-1">
-                No past investigations matched the specified search terms or scope filter.
+                No past correlated investigations were found in the database matching domain <strong className="text-slate-200">{currentDomain}</strong> or origin relay infrastructure.
               </p>
             </div>
           ) : (
@@ -773,7 +687,7 @@ export function ThreatTimelineView({
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono text-slate-300 bg-slate-900/40 rounded-lg p-2.5 border border-slate-800">
                         <div className="flex items-center gap-1.5">
                           <Server className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                          <span className="truncate">IP: <strong className="text-slate-100">{inc.originIp || '185.220.101.5'}</strong></span>
+                          <span className="truncate">IP: <strong className="text-slate-100">{inc.originIp || 'Unavailable'}</strong></span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -883,14 +797,22 @@ export function ThreatTimelineView({
               <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-1">
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">Recurrence Frequency:</span>
                 <p className="text-slate-300 leading-relaxed text-[11px]">
-                  Attacker launches phishing pulses approximately every <strong className="text-white">14-21 days</strong>, pivoting originating Tor nodes while maintaining subject lure themes.
+                  {incidents.filter(i => !i.isCurrentAnalysis).length > 0 ? (
+                    `Correlated with ${incidents.filter(i => !i.isCurrentAnalysis).length} prior historical incident(s) in database.`
+                  ) : (
+                    'No prior recorded incidents for this domain to establish attack pulse cadence.'
+                  )}
                 </p>
               </div>
 
               <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 space-y-1">
                 <span className="text-slate-400 text-[10px] uppercase font-bold block">Domain Spoofing Behavior:</span>
                 <p className="text-slate-300 leading-relaxed text-[11px]">
-                  Header <strong className="text-slate-100">From</strong> claims legitimacy, but envelope <strong className="text-amber-300">Return-Path</strong> consistently routes through untrusted bulletproof hosting nodes in Bulgaria & Moldova.
+                  {analysis.auth?.spf?.status === 'FAIL' || analysis.authResults?.spf?.status === 'FAIL' ? (
+                    `SPF check failed. Envelope sender does not designate origin IP as permitted sender.`
+                  ) : (
+                    `Header From: ${currentDomain}. Return-Path: ${analysis.headers?.returnPath || 'Aligned / Direct'}.`
+                  )}
                 </p>
               </div>
             </div>
@@ -907,10 +829,17 @@ export function ThreatTimelineView({
               <div className="p-3 bg-rose-950/30 border border-rose-500/40 rounded-lg text-rose-200">
                 <div className="font-bold flex items-center gap-1.5 mb-1">
                   <ShieldX className="w-3.5 h-3.5 text-rose-400" />
-                  <span>1. Block Origin ASN Range</span>
+                  <span>1. Block Origin Infrastructure</span>
                 </div>
                 <p className="text-[11px] text-rose-300/80 leading-normal">
-                  Add <strong className="text-rose-200">AS200548 (Zettahost Cyber)</strong> and IP <strong className="text-rose-200">185.220.101.5</strong> to edge firewall blocklist.
+                  {currentOriginIp ? (
+                    <>
+                      Add IP <strong className="text-rose-200">{currentOriginIp}</strong>
+                      {analysis.hops?.[0]?.asn ? <> (ASN: <strong className="text-rose-200">{analysis.hops[0].asn}</strong>)</> : null} to edge firewall blocklist.
+                    </>
+                  ) : (
+                    <>No external origin IP available to blocklist.</>
+                  )}
                 </p>
               </div>
 

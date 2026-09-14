@@ -19,51 +19,6 @@ export interface WebSocketAlert {
   subject?: string;
 }
 
-const INITIAL_ALERTS: WebSocketAlert[] = [
-  {
-    id: 'alt_001',
-    case_id: 'sample-1',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    severity: 'CRITICAL',
-    title: 'BEC Payroll Spoofing Attack Detected',
-    description: 'CEO impersonation attempting wire redirection. SPF neutral, display name mismatch, urgence trigger.',
-    source: 'mail-gateway-01',
-    read: false,
-    threat_score: 92,
-    category: 'BEC_IMPERSONATION',
-    sender: 'ceo-office@company-exec.net',
-    subject: 'URGENT: Updated Direct Deposit Routing'
-  },
-  {
-    id: 'alt_002',
-    case_id: 'sample-2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    severity: 'HIGH',
-    title: 'Credential Harvester Landing Page Identified',
-    description: 'Obfuscated JavaScript redirecting to cloned Microsoft 365 sign-in page on Russian bulletproof ASN.',
-    source: 'pipeline-heuristics',
-    read: false,
-    threat_score: 84,
-    category: 'CREDENTIAL_HARVESTING',
-    sender: 'security@microsoft-auth-verify.com',
-    subject: 'Action Required: Verify Office 365 Password Expiry'
-  },
-  {
-    id: 'alt_003',
-    case_id: 'sample-3',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    severity: 'MEDIUM',
-    title: 'Anomalous Email Hop Timing (14s latency in AS4837)',
-    description: 'Unusual delay detected between internal gateway and external relay node.',
-    source: 'traceroute-engine',
-    read: true,
-    threat_score: 55,
-    category: 'HOP_ANOMALY',
-    sender: 'billing@vendor-supplies.co.uk',
-    subject: 'Invoice #884920 Overdue Notification'
-  }
-];
-
 export interface CaseUpdateEvent {
   type: 'CASE_CREATED' | 'CASE_UPDATED' | 'CASE_CLOSED' | 'CASE_DELETED';
   caseId?: string;
@@ -88,7 +43,7 @@ function getSharedAudioContext(): AudioContext | null {
 }
 
 export function useWebSocketAlerts() {
-  const [alerts, setAlerts] = useState<WebSocketAlert[]>(INITIAL_ALERTS);
+  const [alerts, setAlerts] = useState<WebSocketAlert[]>([]);
   const [activeToast, setActiveToast] = useState<WebSocketAlert | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -103,12 +58,13 @@ export function useWebSocketAlerts() {
       const res = await fetch('/api/alerts');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
+        // A valid array (even if empty) represents an honest state of active alerts
+        if (Array.isArray(data)) {
           setAlerts(data);
         }
       }
     } catch {
-      // Keep initial alerts fallback
+      // Keep previous alerts state on network/server error
     }
   }, []);
 
@@ -190,22 +146,31 @@ export function useWebSocketAlerts() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data && data.type === 'CASE_CREATED' && data.case?.id) {
-            setLastCreatedCaseId(data.case.id);
+          if (data && data.type === 'CASE_CREATED' && (data.case?.id || data.caseId)) {
+            const caseId = data.case?.id || data.caseId;
+            setLastCreatedCaseId(caseId);
             setLastCaseUpdate({
               type: 'CASE_CREATED',
-              caseId: data.case.id,
+              caseId,
               case: data.case,
               timestamp: data.timestamp || new Date().toISOString()
             });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_CREATED', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+            }
           }
           if (data && (data.type === 'CASE_UPDATED' || data.type === 'CASE_CLOSED' || data.type === 'CASE_DELETED')) {
+            const caseId = data.caseId || data.case?.id;
             setLastCaseUpdate({
               type: data.type,
-              caseId: data.caseId || data.case?.id,
+              caseId,
               case: data.case,
               timestamp: data.timestamp || new Date().toISOString()
             });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+            }
           }
           if (data && data.type === 'GMAIL_SYNC_COMPLETE') {
             if (data.latest_case_id) {
@@ -213,6 +178,7 @@ export function useWebSocketAlerts() {
             }
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('GMAIL_SYNC_COMPLETE', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
             }
             const syncAlert: WebSocketAlert = {
               id: `sync_${Date.now()}`,
@@ -262,10 +228,10 @@ export function useWebSocketAlerts() {
 
       ws.onclose = () => {
         setStatus('disconnected');
-        // Retry connection after 5 seconds
+        // Retry connection after 3 seconds
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 5000);
+        }, 3000);
       };
     } catch {
       setStatus('disconnected');
@@ -274,7 +240,18 @@ export function useWebSocketAlerts() {
 
   useEffect(() => {
     connect();
+
+    // Client ping heartbeat every 20 seconds
+    const pingInterval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(JSON.stringify({ type: 'PING' }));
+        } catch {}
+      }
+    }, 20000);
+
     return () => {
+      clearInterval(pingInterval);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (wsRef.current) {
         wsRef.current.close();

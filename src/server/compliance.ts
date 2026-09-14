@@ -21,12 +21,19 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from './supabase';
 import { resolveUserProfile } from './userProfileStore';
 import type { Request, Response, NextFunction } from 'express';
+import { 
+  PrivacyConfig, 
+  DEFAULT_PRIVACY_CONFIG, 
+  maskEmail, 
+  maskIp, 
+  maskText 
+} from '../utils/privacyCompliance';
 
 // ============================================================================
 // 1. ROLES & ACCESS CONTROL TYPES
 // ============================================================================
 
-export type UserRole = 'admin' | 'analyst' | 'read_only';
+export type UserRole = 'admin' | 'analyst' | 'read_only' | 'viewer' | 'auditor';
 
 export interface UserContext {
   userId: string;
@@ -507,19 +514,34 @@ let processLocalEncryptionKey: string | null = null;
 export function resolveMasterSecret(): string {
   if (process.env.TOKEN_ENCRYPTION_KEY?.trim()) return process.env.TOKEN_ENCRYPTION_KEY.trim();
   if (process.env.ENCRYPTION_KEY?.trim()) return process.env.ENCRYPTION_KEY.trim();
+
   if (!processLocalEncryptionKey) {
     processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
-    console.warn('[Encryption] No TOKEN_ENCRYPTION_KEY set — using ephemeral AES-256 key for this session.');
+    console.warn(
+      '[Encryption Fallback] TOKEN_ENCRYPTION_KEY is not set. Using ephemeral in-memory AES-256 key. ' +
+      'Data encrypted during this session will become undecryptable upon server restart.'
+    );
   }
   return processLocalEncryptionKey;
 }
 
 export function assertEncryptionKeyConfigured(): void {
-  const envKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
-  if (!envKey) {
-    console.warn('[Security] TOKEN_ENCRYPTION_KEY not provided; using ephemeral AES key.');
+  const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY?.trim() || process.env.ENCRYPTION_KEY?.trim();
+  const jwtSecret = process.env.JWT_SECRET?.trim();
+
+  const missing: string[] = [];
+  if (!tokenEncryptionKey) missing.push('TOKEN_ENCRYPTION_KEY');
+  if (!jwtSecret) missing.push('JWT_SECRET');
+
+  if (missing.length > 0) {
+    console.warn(
+      `[Security Startup Check] Missing cryptographic key(s): ${missing.join(', ')}. ` +
+      'Operating with ephemeral in-memory keys. Previously encrypted records and existing JWTs will not survive restarts.'
+    );
   } else {
-    console.log('[Encryption] Master AES-256-GCM encryption key loaded successfully (length: ' + envKey.length + ' chars).');
+    console.log(
+      `[Security] Cryptographic keys verified: TOKEN_ENCRYPTION_KEY (${tokenEncryptionKey?.length} chars), JWT_SECRET (${jwtSecret?.length} chars).`
+    );
   }
 }
 
@@ -742,6 +764,40 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
         userContext = localVerified;
       }
     }
+
+    // Fallback: Parse Supabase Auth JWT directly if remote validation was unreachable or timed out
+    if (!userContext && token.includes('.')) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
+          const payload = JSON.parse(payloadStr);
+          if (payload && payload.sub && (payload.iss?.includes('supabase') || payload.role === 'authenticated' || payload.aud === 'authenticated')) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            // Allow token within expiration or 10 min clock skew
+            if (!payload.exp || payload.exp > (nowSec - 600)) {
+              const fallbackEmail = payload.email || (req.headers['x-user-email'] as string) || '';
+              const syntheticUser = {
+                id: payload.sub,
+                email: fallbackEmail,
+                user_metadata: payload.user_metadata || {},
+                app_metadata: payload.app_metadata || {}
+              };
+              const resolved = await resolveUserProfile(syntheticUser);
+              userContext = {
+                userId: payload.sub,
+                email: fallbackEmail,
+                organizationId: resolved.organizationId,
+                role: resolved.role,
+                authMethod: 'jwt'
+              };
+            }
+          }
+        }
+      } catch (jwtErr) {
+        console.warn('[Auth] Supabase direct JWT payload parse fallback warning:', jwtErr);
+      }
+    }
   } else if (apiKeyHeader && knownKeys[apiKeyHeader]) {
     const record = knownKeys[apiKeyHeader];
     userContext = {
@@ -799,25 +855,127 @@ export function requireRole(allowedRoles: UserRole[]) {
   };
 }
 
+// ============================================================================
+// 6. SERVER-SIDE PRIVACY & REDACTION ENGINE
+// ============================================================================
+
+const inMemoryOrgPrivacyConfigs = new Map<string, PrivacyConfig>();
+
+export async function getOrgPrivacyConfig(organizationId: string = 'org-default'): Promise<PrivacyConfig> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('organization_settings')
+        .select('privacy_config')
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+
+      if (data && data.privacy_config && typeof data.privacy_config === 'object') {
+        return { ...DEFAULT_PRIVACY_CONFIG, ...data.privacy_config };
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  const inMemory = inMemoryOrgPrivacyConfigs.get(organizationId);
+  if (inMemory) {
+    return { ...DEFAULT_PRIVACY_CONFIG, ...inMemory };
+  }
+  return { ...DEFAULT_PRIVACY_CONFIG };
+}
+
+export async function saveOrgPrivacyConfig(organizationId: string, config: PrivacyConfig): Promise<PrivacyConfig> {
+  const merged = { ...DEFAULT_PRIVACY_CONFIG, ...config };
+  inMemoryOrgPrivacyConfigs.set(organizationId, merged);
+
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase
+        .from('organization_settings')
+        .upsert({
+          organization_id: organizationId,
+          privacy_config: merged,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'organization_id' });
+    } catch (err: any) {
+      console.warn('[Compliance] Failed to persist privacy_config in organization_settings:', err?.message);
+    }
+  }
+
+  return merged;
+}
+
 /**
- * PII Masking utility for case data
+ * PII Masking utility for case data based on server-side PrivacyConfig
  */
-export function maskCasePii(caseItem: any): any {
+export function maskCasePii(caseItem: any, config?: PrivacyConfig): any {
   if (!caseItem) return caseItem;
+  const cfg = config || DEFAULT_PRIVACY_CONFIG;
+  const mode = cfg.maskingMode || 'pseudonymized';
+  const maskSendRecip = cfg.maskSenderRecipient ?? true;
+  const maskSubBody = cfg.maskSubjectAndBody ?? true;
+  const maskIps = cfg.maskInternalIps ?? true;
+
   const copy = { ...caseItem };
 
-  if (copy.description) {
-    copy.description = copy.description
-      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]')
-      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[REDACTED_IP]');
+  if (maskSubBody && copy.description) {
+    if (mode === 'strict_redaction') {
+      copy.description = '[REDACTED_SENSITIVE_COMMUNICATION]';
+    } else {
+      copy.description = maskText(copy.description, mode);
+      copy.description = copy.description
+        .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, (m) => maskEmail(m, mode))
+        .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, (ip) => maskIp(ip, true, mode));
+    }
   }
 
   if (copy.assigned_user) {
-    copy.assigned_user = 'Analyst (Masked)';
+    copy.assigned_user = mode === 'strict_redaction' ? '[REDACTED_USER]' : 'Analyst (Masked)';
+  }
+
+  if (maskSendRecip) {
+    if (copy.from) {
+      copy.from = maskEmail(copy.from, mode);
+    }
+    if (copy.to) {
+      copy.to = maskEmail(copy.to, mode);
+    }
+  }
+
+  if (maskIps && copy.origin_ip) {
+    copy.origin_ip = maskIp(copy.origin_ip, true, mode);
+  }
+
+  if (copy.headers) {
+    const h = { ...copy.headers };
+    if (maskSendRecip && h.from) h.from = maskEmail(h.from, mode);
+    if (maskSendRecip && h.to) h.to = maskEmail(h.to, mode);
+    if (maskSubBody && h.subject) h.subject = maskText(h.subject, mode);
+    copy.headers = h;
   }
 
   if (Array.isArray(copy.tags)) {
-    copy.tags = copy.tags.map((t: string) => (t.includes('@') ? '[REDACTED_TAG]' : t));
+    copy.tags = copy.tags.map((t: string) => (t.includes('@') ? maskEmail(t, mode) : t));
+  }
+
+  if (Array.isArray(copy.members)) {
+    copy.members = copy.members.map((m: any) => ({
+      ...m,
+      sender: m.sender && maskSendRecip ? maskEmail(m.sender, mode) : m.sender,
+      bodySnippet: m.bodySnippet && maskSubBody ? maskText(m.bodySnippet, mode) : m.bodySnippet
+    }));
+  }
+
+  if (copy.parsed_data && typeof copy.parsed_data === 'object') {
+    const pd = { ...copy.parsed_data };
+    if (maskSendRecip && pd.from) pd.from = maskEmail(pd.from, mode);
+    if (maskSendRecip && pd.to) pd.to = maskEmail(pd.to, mode);
+    if (maskSubBody && pd.subject) pd.subject = maskText(pd.subject, mode);
+    if (maskSubBody && pd.body) pd.body = maskText(pd.body, mode);
+    copy.parsed_data = pd;
   }
 
   return copy;

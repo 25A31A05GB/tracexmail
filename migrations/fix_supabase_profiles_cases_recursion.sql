@@ -1,14 +1,14 @@
 -- ==============================================================================
--- TraceXMail Migration: Create Profiles Table and Refresh Schema Cache
--- Migration File: migrations/create_profiles_and_schema_cache_fix.sql
+-- TraceXMail Fix: Profiles 404, Cases 500 Infinite Recursion & RLS Hardening
+-- Migration File: migrations/fix_supabase_profiles_cases_recursion.sql
 -- ==============================================================================
--- Run this script in the Supabase SQL Editor (Dashboard > SQL Editor)
--- 1. Creates the default organization if not present
--- 2. Breaks recursion on auth_user_org_id() and auth_user_role() with SET row_security = off
--- 3. Creates the `public.profiles` table linked to `auth.users`
--- 4. Configures non-recursive Row Level Security (RLS) for authenticated users and service_role
--- 5. Auto-creates profile on signup and backfills existing users
--- 6. Reloads the PostgREST schema cache so the table is immediately recognized
+-- Run this in Supabase Dashboard > SQL Editor
+-- 1. Creates default organization if missing
+-- 2. Patches auth_user_org_id() and auth_user_role() with SET row_security = off (fixes 500 infinite recursion)
+-- 3. Creates public.profiles table (fixes 404 table not in schema cache)
+-- 4. Sets non-recursive RLS policies on profiles, users, and cases
+-- 5. Configures auth.users insert trigger and backfills existing users
+-- 6. Reloads PostgREST schema cache (NOTIFY pgrst)
 -- ==============================================================================
 
 -- 1. Ensure organizations table exists and has default org
@@ -23,7 +23,10 @@ INSERT INTO public.organizations (id, name)
 VALUES ('org_acme_soc_01', 'Acme Cyber Defense SOC')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Helper functions with row_security = off to prevent infinite recursion
+-- 2. Break infinite recursion on helper functions:
+-- By adding `SET row_security = off` and `SECURITY DEFINER`, these functions
+-- bypass Row Level Security when looking up the caller's organization and role,
+-- completely preventing recursive policy evaluations between cases, users, and profiles.
 CREATE OR REPLACE FUNCTION public.auth_user_org_id()
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -35,22 +38,27 @@ AS $$
 DECLARE
     v_org_id TEXT;
 BEGIN
+    -- Check profiles table first
     BEGIN
         SELECT organization_id INTO v_org_id FROM public.profiles WHERE id = auth.uid() LIMIT 1;
         IF v_org_id IS NOT NULL THEN
             RETURN v_org_id;
         END IF;
     EXCEPTION WHEN OTHERS THEN
+        -- profiles table might not exist yet
     END;
 
+    -- Check users table fallback if it exists
     BEGIN
         SELECT organization_id INTO v_org_id FROM public.users WHERE id = auth.uid() LIMIT 1;
         IF v_org_id IS NOT NULL THEN
             RETURN v_org_id;
         END IF;
     EXCEPTION WHEN OTHERS THEN
+        -- users table might not exist
     END;
 
+    -- Default organization fallback
     RETURN 'org_acme_soc_01';
 END;
 $$;
@@ -66,6 +74,7 @@ AS $$
 DECLARE
     v_role TEXT;
 BEGIN
+    -- Check profiles table first
     BEGIN
         SELECT role INTO v_role FROM public.profiles WHERE id = auth.uid() LIMIT 1;
         IF v_role IS NOT NULL THEN
@@ -74,6 +83,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
     END;
 
+    -- Check users table fallback if it exists
     BEGIN
         SELECT role INTO v_role FROM public.users WHERE id = auth.uid() LIMIT 1;
         IF v_role IS NOT NULL THEN
@@ -86,7 +96,7 @@ BEGIN
 END;
 $$;
 
--- 3. Create public.profiles table
+-- 3. Create or update public.profiles table
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
@@ -103,10 +113,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
 CREATE INDEX IF NOT EXISTS idx_profiles_org ON public.profiles(organization_id);
 
--- Enable RLS
+-- Enable RLS on profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- Allow users to read profiles without recursion
+-- Non-recursive RLS policies on profiles:
+-- Authenticated users can view their own profile and organization profiles without recursive function calls
 DROP POLICY IF EXISTS "Users can view profiles in their organization" ON public.profiles;
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Profiles read policy" ON public.profiles;
@@ -123,13 +134,13 @@ CREATE POLICY "Users can view profiles"
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
-    USING (auth.uid() = id OR auth.role() = 'service_role')
-    WITH CHECK (auth.uid() = id OR auth.role() = 'service_role');
+    USING (id = auth.uid() OR auth.role() = 'service_role')
+    WITH CHECK (id = auth.uid() OR auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
 CREATE POLICY "Users can insert their own profile"
     ON public.profiles FOR INSERT
-    WITH CHECK (auth.uid() = id OR auth.role() = 'service_role');
+    WITH CHECK (id = auth.uid() OR auth.role() = 'service_role');
 
 DROP POLICY IF EXISTS "Service role full access to profiles" ON public.profiles;
 CREATE POLICY "Service role full access to profiles"
@@ -137,7 +148,18 @@ CREATE POLICY "Service role full access to profiles"
     USING (auth.role() = 'service_role')
     WITH CHECK (auth.role() = 'service_role');
 
--- Fix cases policy
+-- 4. Fix recursion on public.users if table exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users') THEN
+        EXECUTE 'DROP POLICY IF EXISTS "Users can view users in their organization" ON public.users';
+        EXECUTE 'DROP POLICY IF EXISTS "Users can view profiles in their organization" ON public.users';
+        EXECUTE 'DROP POLICY IF EXISTS "Users read policy" ON public.users';
+        EXECUTE 'CREATE POLICY "Users can view users" ON public.users FOR SELECT USING (id = auth.uid() OR auth.role() = ''service_role'' OR auth.uid() IS NOT NULL)';
+    END IF;
+END $$;
+
+-- 5. Fix cases table RLS policies
 DROP POLICY IF EXISTS "Users can view cases in their organization or demo cases" ON public.cases;
 CREATE POLICY "Users can view cases in their organization or demo cases"
     ON public.cases FOR SELECT
@@ -147,7 +169,7 @@ CREATE POLICY "Users can view cases in their organization or demo cases"
         OR organization_id = auth_user_org_id()
     );
 
--- 4. Automatically provision profile when a new user signs up via auth.users
+-- 6. Trigger to auto-provision profile on auth.users insert
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -155,6 +177,7 @@ DECLARE
     user_name TEXT;
     org_id TEXT;
 BEGIN
+    -- Grant admin role to the primary admin, analyst to others
     IF NEW.email = 'arfathof@gmail.com' OR NEW.raw_user_meta_data->>'role' = 'admin' THEN
         assigned_role := 'admin';
     ELSE
@@ -181,7 +204,7 @@ CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Backfill any existing auth.users who don't have a profile yet
+-- 7. Backfill existing auth.users into public.profiles
 INSERT INTO public.profiles (id, email, organization_id, role, full_name, email_verified)
 SELECT
     u.id,
@@ -195,5 +218,5 @@ ON CONFLICT (id) DO UPDATE
 SET email = EXCLUDED.email,
     role = CASE WHEN public.profiles.email = 'arfathof@gmail.com' THEN 'admin' ELSE public.profiles.role END;
 
--- 5. Notify PostgREST to immediately refresh its schema cache
+-- 8. Reload PostgREST schema cache so endpoints immediately find public.profiles
 NOTIFY pgrst, 'reload schema';

@@ -67,6 +67,7 @@ export function NewAnalysisModal({
 
       if (!parsedResult) {
         parsedResult = parseRawEml(rawContent, name);
+        parsedResult.degradedAnalysis = true;
       }
 
       pendingAnalysisRef.current = parsedResult;
