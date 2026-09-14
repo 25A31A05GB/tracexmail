@@ -591,10 +591,48 @@ export function AlertsView({
       {/* TAB 1: LIVE ALERTS FEED */}
       {activeTab === 'feed' && (
         <div className="space-y-3">
-          {filteredAlerts.length === 0 ? (
-            <div className="p-12 text-center rounded-2xl bg-slate-900/40 border border-slate-800 text-slate-500">
-              <Bell className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="text-sm font-medium">No live alerts in this category</p>
+          {liveAlerts.length === 0 ? (
+            <div className="p-10 sm:p-14 text-center rounded-2xl bg-[#14120f]/80 border border-[#3a352c] text-[#8a8070] space-y-3 max-w-2xl mx-auto my-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-950/40 border border-emerald-800/60 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_15px_rgba(72,169,117,0.15)]">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-display font-bold text-[#ede6d8]">
+                  All Clear — No Active Security Alerts
+                </h3>
+                <p className="text-xs text-[#b9af9c] max-w-md mx-auto leading-relaxed">
+                  All monitored email gateways, Gmail sync pipelines, and forensic heuristics report zero active threat warnings or unread incident flags.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={() => onBroadcastTestAlert()}
+                  className="px-3 py-1.5 rounded-lg bg-[#221e17] hover:bg-[#2c271f] border border-[#3a352c] text-[#ede6d8] text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  title="Dispatch simulated test IOC alert to verify WebSocket pipeline"
+                >
+                  <Radio className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Broadcast Test Alert</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('realworld')}
+                  className="px-3 py-1.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/50 border border-amber-800/60 text-amber-300 text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>Browse Threat Benchmark Scenarios</span>
+                </button>
+              </div>
+            </div>
+          ) : filteredAlerts.length === 0 ? (
+            <div className="p-10 text-center rounded-2xl bg-slate-900/40 border border-slate-800 text-slate-400 space-y-2">
+              <Bell className="w-7 h-7 mx-auto opacity-50 text-slate-500" />
+              <p className="text-sm font-semibold text-slate-300">No {filterSeverity} alerts in live feed</p>
+              <p className="text-xs text-slate-500">Try selecting "All" or switching severity filters above to view active alerts.</p>
+              <button
+                onClick={() => setFilterSeverity('ALL')}
+                className="mt-2 text-xs text-cyan-400 hover:underline font-mono"
+              >
+                Reset severity filter to All
+              </button>
             </div>
           ) : (
             filteredAlerts.map(alert => {

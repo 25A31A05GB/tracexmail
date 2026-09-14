@@ -26,7 +26,9 @@ import {
   ShieldAlert,
   RotateCcw,
   Info,
-  Mail
+  Mail,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -83,9 +85,36 @@ export function IngestionPipelineView({
     `[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Pipeline initialized. Ready for RFC822 ingestion.`
   ]);
 
+  // Telemetry Console disclosure state (collapsed by default, persisted per user)
+  const [isTelemetryExpanded, setIsTelemetryExpanded] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('tracexmail_telemetry_expanded');
+      if (saved !== null) return saved === 'true';
+    } catch {}
+    return false;
+  });
+
+  const toggleTelemetry = () => {
+    setIsTelemetryExpanded(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('tracexmail_telemetry_expanded', String(next));
+      } catch {}
+      return next;
+    });
+  };
+
   const addLog = (msg: string) => {
     const ts = new Date().toISOString().split('T')[1].slice(0, 8);
     setDiagnosticLogs(prev => [...prev, `[${ts}] ${msg}`]);
+  };
+
+  const handleLoadSampleHeader = () => {
+    const sample = SAMPLE_ANALYSES[0];
+    const headerStr = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\nAuthentication-Results: spf=pass dkim=pass dmarc=pass\nReceived: from relay.network.net by gateway.corp.net with ESMTP id 9823419; ${sample.headers.date}\n\n${sample.name}`;
+    setRawText(headerStr);
+    setFileName(`${sample.id}.eml`);
+    addLog(`[ACTION] Loaded benchmark RFC822 sample '${sample.id}' into editor.`);
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -541,21 +570,45 @@ export function IngestionPipelineView({
 
           {activeTab === 'paste' && (
             <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[var(--paper-dim)] font-sans">
+                  Paste full email headers or entire RFC822 payload below:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLoadSampleHeader}
+                  className="text-[11px] font-mono text-[var(--stamp)] hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Insert realistic benchmark RFC822 attack sample for immediate forensic testing"
+                >
+                  <Sparkles className="w-3 h-3 text-[var(--stamp)]" />
+                  <span>Insert Sample RFC822 Payload</span>
+                </button>
+              </div>
+
               <textarea
                 value={rawText}
                 onChange={(e) => setRawText(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && rawText.trim()) {
+                    executePipelineWithAnimation(rawText, 'pasted_message.eml');
+                  }
+                }}
                 placeholder="Paste raw email headers (Received, From, To, Subject, Authentication-Results, etc.)..."
                 rows={11}
-                className="w-full p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors"
+                className="w-full p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors shadow-inner"
               />
-              <div className="flex justify-end">
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <span className="text-[11px] text-[var(--paper-muted)] font-mono self-start sm:self-auto">
+                  {rawText.length > 0 ? `${rawText.length.toLocaleString()} bytes ready • Press ⌘↵ to run` : 'Ready for input • Supports RFC822 / MIME text'}
+                </span>
                 <button
-                  disabled={!rawText.trim()}
+                  disabled={!rawText.trim() || isScanning}
                   onClick={() => executePipelineWithAnimation(rawText, 'pasted_message.eml')}
-                  className="btn-primary text-xs font-semibold flex items-center gap-2 cursor-pointer py-2 px-4.5 disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-[var(--thread)] to-[#c94132] hover:brightness-110 active:scale-[0.99] text-white text-xs font-bold rounded-sm border border-[rgba(255,255,255,0.15)] flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span>Execute Forensic Pipeline</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -568,21 +621,24 @@ export function IngestionPipelineView({
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`p-10 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all ${
+                className={`p-10 sm:p-12 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all ${
                   isDragging
-                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.1)]'
-                    : 'border-[var(--line)] hover:border-[var(--slate)] bg-[var(--ink)]'
+                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.15)] scale-[1.01]'
+                    : 'border-[var(--line)] hover:border-[var(--slate)] bg-[var(--ink)] hover:bg-[#1a1713]'
                 }`}
               >
-                <div className="w-12 h-12 mx-auto rounded-full bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] flex items-center justify-center text-[var(--slate)] mb-3">
-                  <Upload className="w-6 h-6" />
+                <div className="w-14 h-14 mx-auto rounded-full bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] flex items-center justify-center text-[var(--slate)] mb-3 shadow-inner">
+                  <Upload className="w-7 h-7" />
                 </div>
-                <p className="text-sm font-semibold text-[var(--paper)]">
+                <p className="text-sm font-bold text-[var(--paper)]">
                   Click to select or drag &amp; drop your .EML file here
                 </p>
-                <p className="text-xs text-[var(--paper-dim)] font-sans mt-1">
-                  Supports standard RFC822 (.eml, .msg, .txt) format
+                <p className="text-xs text-[var(--paper-dim)] font-sans mt-1 max-w-sm mx-auto">
+                  Automatic MIME parsing, hop routing extraction, SPF/DKIM verification, and threat analysis.
                 </p>
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded bg-[#201c16] border border-[#3a352c] text-[11px] font-mono text-[var(--paper-muted)]">
+                  <span>Accepts: .eml, .msg, .txt RFC822</span>
+                </div>
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -607,7 +663,7 @@ export function IngestionPipelineView({
                       const rawContent = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\n\n${sample.name}`;
                       executePipelineWithAnimation(rawContent, `${sample.id}.eml`);
                     }}
-                    className="p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] hover:border-[var(--thread)] cursor-pointer transition-all space-y-1.5 group"
+                    className="p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] hover:border-[var(--thread)] cursor-pointer transition-all space-y-1.5 group hover:bg-[#1f1b15]"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-mono font-bold uppercase text-[var(--thread)] bg-[rgba(178,58,46,0.15)] border border-[rgba(178,58,46,0.3)] px-2 py-0.5 rounded-sm">
@@ -636,67 +692,105 @@ export function IngestionPipelineView({
           )}
         </div>
 
-        {/* Diagnostic Pipeline Terminal Log Panel */}
-        <div className="bg-[#100e0b] border border-[#3a352c] rounded-sm p-4 space-y-3 font-mono shadow-md">
-          <div className="flex items-center justify-between pb-2 border-b border-[#2a251e]">
-            <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-[var(--slate)]" />
-              <span className="text-xs font-bold uppercase tracking-wider text-[#ede6d8]">
-                PIPELINE DIAGNOSTIC TELEMETRY LOG
-              </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e1b15] text-[#b9af9c] border border-[#3a352c]">
-                {diagnosticLogs.length} EVENTS
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(diagnosticLogs.join('\n'));
-                  setCopiedLogs(true);
-                  setTimeout(() => setCopiedLogs(false), 2000);
-                }}
-                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
-                title="Copy diagnostic log output to clipboard"
-              >
-                {copiedLogs ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                <span>{copiedLogs ? 'Copied' : 'Copy Logs'}</span>
-              </button>
-              <button
-                onClick={() => setDiagnosticLogs([`[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Terminal logs cleared.`])}
-                className="px-2.5 py-1 text-[11px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
-                title="Clear diagnostic log terminal"
-              >
-                <Trash2 className="w-3 h-3 text-[var(--thread)]" />
-                <span>Clear</span>
-              </button>
-            </div>
-          </div>
+        {/* Diagnostic Pipeline Terminal Log Panel (Progressive Disclosure) */}
+        {(() => {
+          const hasActiveJobOrError = isScanning || isPendingBackend || !!diagnosticError || !!error;
+          const isTerminalOpen = isTelemetryExpanded || hasActiveJobOrError;
 
-          <div className="bg-[#0a0907] border border-[#24201a] rounded p-3 text-[11px] leading-relaxed max-h-52 overflow-y-auto space-y-1 text-[#b9af9c]">
-            {diagnosticLogs.map((log, index) => {
-              const isError = log.includes('[ERROR]') || log.includes('[FATAL]');
-              const isSuccess = log.includes('[SUCCESS]') || log.includes('[COMPLETE]');
-              const isIngest = log.includes('[INGEST]') || log.includes('[TRANSPORT]');
-              return (
-                <div 
-                  key={index} 
-                  className={`flex items-start gap-2 font-mono ${
-                    isError 
-                      ? 'text-rose-400 font-semibold bg-rose-950/20 px-1 py-0.5 rounded' 
-                      : isSuccess 
-                        ? 'text-emerald-400 font-semibold' 
-                        : isIngest 
-                          ? 'text-[var(--slate)]' 
-                          : 'text-[#b9af9c]'
-                  }`}
-                >
-                  <span className="text-[#6b6255] select-none">&gt;</span>
-                  <span className="break-all">{log}</span>
+          return (
+            <div className="bg-[#100e0b] border border-[#3a352c] rounded-sm font-mono shadow-md overflow-hidden transition-all duration-200">
+              <div 
+                onClick={toggleTelemetry}
+                className="flex items-center justify-between p-3 cursor-pointer bg-[#14110e] hover:bg-[#1a1612] transition-colors select-none"
+                title={isTerminalOpen ? "Click to collapse telemetry console" : "Click to expand telemetry console"}
+              >
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <Terminal className="w-4 h-4 text-[var(--slate)] shrink-0" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#ede6d8]">
+                    PIPELINE DIAGNOSTIC TELEMETRY
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1e1b15] text-[#b9af9c] border border-[#3a352c]">
+                    {diagnosticLogs.length} EVENTS
+                  </span>
+                  {hasActiveJobOrError ? (
+                    <span className="text-[9.5px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-sans font-semibold flex items-center gap-1.5 animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span>{isPendingBackend ? 'Active Telemetry Streaming' : 'Diagnostic Notice Recorded'}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-[#17140f] text-[#8a8070] font-sans">
+                      Idle • Standby
+                    </span>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        </div>
+
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  {isTerminalOpen && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(diagnosticLogs.join('\n'));
+                          setCopiedLogs(true);
+                          setTimeout(() => setCopiedLogs(false), 2000);
+                        }}
+                        className="px-2 py-1 text-[10.5px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Copy diagnostic log output to clipboard"
+                      >
+                        {copiedLogs ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedLogs ? 'Copied' : 'Copy'}</span>
+                      </button>
+                      <button
+                        onClick={() => setDiagnosticLogs([`[${new Date().toISOString().split('T')[1].slice(0, 8)}] DIAGNOSTIC: Terminal logs cleared.`])}
+                        className="px-2 py-1 text-[10.5px] bg-[#1e1b15] hover:bg-[#2a251e] text-[#b9af9c] hover:text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Clear diagnostic log terminal"
+                      >
+                        <Trash2 className="w-3 h-3 text-[var(--thread)]" />
+                        <span>Clear</span>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={toggleTelemetry}
+                    className="px-2.5 py-1 text-[11px] bg-[#221d17] hover:bg-[#2c261e] text-[#ede6d8] rounded border border-[#3a352c] flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title={isTerminalOpen ? 'Collapse diagnostic console' : 'Expand diagnostic console'}
+                  >
+                    <span>{isTerminalOpen ? 'Collapse' : 'Expand Terminal'}</span>
+                    {isTerminalOpen ? <ChevronUp className="w-3.5 h-3.5 text-[var(--slate)]" /> : <ChevronDown className="w-3.5 h-3.5 text-[var(--slate)]" />}
+                  </button>
+                </div>
+              </div>
+
+              {isTerminalOpen && (
+                <div className="p-3 bg-[#0a0907] border-t border-[#24201a]">
+                  <div className="text-[11px] leading-relaxed max-h-52 overflow-y-auto space-y-1 text-[#b9af9c]">
+                    {diagnosticLogs.map((log, index) => {
+                      const isError = log.includes('[ERROR]') || log.includes('[FATAL]');
+                      const isSuccess = log.includes('[SUCCESS]') || log.includes('[COMPLETE]');
+                      const isIngest = log.includes('[INGEST]') || log.includes('[TRANSPORT]');
+                      return (
+                        <div 
+                          key={index} 
+                          className={`flex items-start gap-2 font-mono ${
+                            isError 
+                              ? 'text-rose-400 font-semibold bg-rose-950/20 px-1 py-0.5 rounded' 
+                              : isSuccess 
+                                ? 'text-emerald-400 font-semibold' 
+                                : isIngest 
+                                  ? 'text-[var(--slate)]' 
+                                  : 'text-[#b9af9c]'
+                          }`}
+                        >
+                          <span className="text-[#6b6255] select-none">&gt;</span>
+                          <span className="break-all">{log}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Visible Forensic AlertToast Notification for Ingestion / Engine Errors */}

@@ -389,11 +389,34 @@ export default function App() {
     status: wsStatus,
     unreadCount,
     soundEnabled,
+    lastCreatedCaseId,
+    lastCaseUpdate,
     setSoundEnabled,
     dismissToast,
     broadcastTestAlert,
     reconnect: reconnectWs
   } = useWebSocketAlerts();
+
+  // Watch real-time case creations and updates from the primary WebSocket channel
+  useEffect(() => {
+    // Guard against firing on initial null values
+    if (!lastCreatedCaseId && !lastCaseUpdate) return;
+
+    // Trigger case list refresh signal across all views
+    setCasesRefreshSignal(prev => prev + 1);
+
+    // If new case was created and case details are attached, follow pattern for consistency
+    if (lastCaseUpdate?.type === 'CASE_CREATED' && lastCaseUpdate.case) {
+      try {
+        const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
+        if (mapped) {
+          console.log('[App] Real-time WebSocket CASE_CREATED synchronized:', mapped.id);
+        }
+      } catch (err) {
+        console.warn('[App] Could not map real-time WebSocket case update:', err);
+      }
+    }
+  }, [lastCreatedCaseId, lastCaseUpdate]);
 
   const handleAnalysisCreated = (newAnalysis: EmailAnalysis) => {
     console.log('📥 [App.tsx] handleAnalysisCreated received new analysis:', {
