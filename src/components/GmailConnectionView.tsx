@@ -105,6 +105,8 @@ interface QuarantineLog {
 
 interface GmailStatusResponse {
   is_connected: boolean;
+  auth_expired?: boolean;
+  auth_error?: string | null;
   oauth_configured: boolean;
   email_address: string | null;
   last_polled_at: string | null;
@@ -195,7 +197,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const fetchQueue = async () => {
     try {
       setLoadingQueue(true);
-      const res = await fetch(`${API_URL}/api/gmail/ingestion-queue`);
+      const res = await apiFetch('/api/gmail/ingestion-queue');
       if (res.ok) {
         const data = await res.json();
         if (data.queue) {
@@ -232,7 +234,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       if (selectedCategoryFilter !== 'all') q.set('category', selectedCategoryFilter);
       if (emailSearchQuery.trim()) q.set('search', emailSearchQuery.trim());
 
-      const res = await fetch(`${API_URL}/api/gmail/synced-emails?${q.toString()}`);
+      const res = await apiFetch(`/api/gmail/synced-emails?${q.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.synced_emails) {
@@ -268,9 +270,9 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     try {
       const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
       const url = targetEmail
-        ? `${API_URL}/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`
-        : `${API_URL}/api/gmail/status`;
-      const res = await fetch(url, {
+        ? `/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`
+        : `/api/gmail/status`;
+      const res = await apiFetch(url, {
         signal: controller.signal,
         headers: targetEmail ? {
           'x-user-email': targetEmail
@@ -359,7 +361,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setSyncResult(null);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/pubsub/test-push`, {
+      const res = await apiFetch('/api/gmail/pubsub/test-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -401,7 +403,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const fetchAuditLogs = async () => {
     setLoadingLogs(true);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/quarantine/logs`);
+      const res = await apiFetch('/api/gmail/quarantine/logs');
       if (res.ok) {
         const data = await res.json();
         setAuditLogs(data.logs || []);
@@ -417,7 +419,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setSavingConfig(true);
     setConfigSuccess(null);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/quarantine/config`, {
+      const res = await apiFetch('/api/gmail/quarantine/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -457,7 +459,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setErrorMsg(null);
     setDirectTokenSuccess(null);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/connect-token`, {
+      const res = await apiFetch('/api/gmail/connect-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -477,7 +479,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       // Immediately run real sync
       await handleSyncNow();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Error connecting real Gmail token');
+      setErrorMsg(err?.message || 'Error connecting real Gmail token');
     } finally {
       setConnectingToken(false);
     }
@@ -540,7 +542,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
     try {
       const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
-      const res = await fetch(`${API_URL}/api/gmail/poll-now`, {
+      const res = await apiFetch('/api/gmail/poll-now', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -552,6 +554,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       });
 
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+
+      if (res.status === 429) {
+        setSyncing(false);
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Rate limit reached. Please wait before triggering another sync cycle.');
+        return;
+      }
 
       if (res.ok) {
         const data = await res.json();
@@ -602,7 +611,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setSyncResult(null);
     setErrorMsg(null);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/simulate-inbound`, {
+      const res = await apiFetch('/api/gmail/simulate-inbound', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_malicious: isMalicious })
@@ -733,16 +742,63 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     };
   }, [onNewCasesProcessed]);
 
+  const [disconnecting, setDisconnecting] = useState<boolean>(false);
+
   const handleDisconnect = async () => {
-    if (!confirm('Are you sure you want to disconnect this Gmail account?')) return;
+    if (!confirm('Are you sure you want to disconnect this Gmail account and terminate all real-time ingestion loops?')) return;
+    setDisconnecting(true);
+    setErrorMsg(null);
     try {
-      const res = await fetch(`${API_URL}/api/gmail/disconnect`, { method: 'POST' });
+      const res = await apiFetch('/api/gmail/disconnect', { method: 'POST' });
+      if (res.status === 429) {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Strict rate limit active. Please wait a moment before trying to disconnect again.');
+        return;
+      }
       if (res.ok) {
+        // Immediately reset local connection and watch states
+        setStatus({
+          is_connected: false,
+          oauth_configured: true,
+          email_address: null,
+          history_id: null,
+          last_polled_at: null,
+          polling_interval_seconds: 30,
+          watch: {
+            enabled: false,
+            active: false,
+            topic_name: '',
+            expiration: null,
+            last_push_received_at: null
+          },
+          metrics: {
+            total_ingested: 0,
+            pre_delivery_quarantined: 0,
+            post_delivery_alerts: 0,
+            last_delivery_stage: null,
+            last_quarantine_at: null
+          }
+        });
+        setDirectTokenSuccess(null);
+        setDirectAccessToken('');
+        setPubSubState(prev => ({
+          ...prev,
+          active: false,
+          historyId: '',
+          expiration: null,
+          subscription: ''
+        }));
+        setSyncResult('Gmail live connection disconnected and background sync stopped.');
+        window.dispatchEvent(new CustomEvent('GMAIL_DISCONNECTED'));
         fetchStatus();
-        setSyncResult('Gmail account disconnected.');
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Failed to disconnect Gmail account.');
       }
     } catch (e: any) {
-      setErrorMsg('Error disconnecting Gmail account.');
+      setErrorMsg('Error disconnecting Gmail account: ' + (e?.message || 'Network error'));
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -826,11 +882,12 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             </button>
             <button
               onClick={handleDisconnect}
-              disabled={syncing}
-              className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              disabled={syncing || disconnecting}
+              className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+              title="Disconnect Gmail integration and stop real-time ingestion"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Disconnect</span>
+              {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" /> : <LogOut className="w-3.5 h-3.5" />}
+              <span>{disconnecting ? 'Disconnecting...' : 'Disconnect'}</span>
             </button>
           </div>
         ) : (
@@ -898,6 +955,37 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       )}
 
       {/* Notifications / Alerts */}
+      {(status?.auth_expired || status?.oauth_scopes?.token_status === 'expired') && (
+        <div className="p-4 bg-amber-950/40 border border-amber-500/50 rounded-xl text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md shadow-amber-950/20 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Key className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-semibold text-amber-300">Gmail OAuth Session Expired</div>
+              <p className="text-[#a89d8d] text-[11px] mt-0.5">
+                Google access credentials have expired. Reconnect your account or update the access token to resume live inbox synchronization.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleConnectGmail}
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Reconnect Gmail</span>
+            </button>
+            <button
+              onClick={() => setShowDirectTokenConnect(true)}
+              className="px-3 py-1.5 bg-[#26211a] hover:bg-[#322c22] text-[#f4efe6] border border-[#443c30] rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            >
+              Enter Token
+            </button>
+          </div>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="p-4 bg-red-950/30 border border-red-900/40 rounded-xl text-red-200 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">

@@ -704,6 +704,7 @@ export default function App() {
           onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           isMobileSidebarOpen={isMobileSidebarOpen}
+          onSyncCases={() => setCasesRefreshSignal(prev => prev + 1)}
         />
 
         {/* View Switcher Container */}

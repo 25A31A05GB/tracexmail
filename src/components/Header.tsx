@@ -37,6 +37,7 @@ import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvide
 import { EvidenceTagCard } from './EvidenceTagCard';
 import { AuthModal } from './AuthModal';
 import { UserRole } from '../hooks/useSession';
+import { AutoRefreshControl } from './AutoRefreshControl';
 import { LogOut, Keyboard, Command } from 'lucide-react';
 
 interface HeaderProps {
@@ -62,6 +63,7 @@ interface HeaderProps {
   onOpenShortcutsHelp?: () => void;
   onToggleMobileSidebar?: () => void;
   isMobileSidebarOpen?: boolean;
+  onSyncCases?: () => void | Promise<void>;
 }
 
 export function Header({
@@ -86,7 +88,8 @@ export function Header({
   onOpenCommandPalette,
   onOpenShortcutsHelp,
   onToggleMobileSidebar,
-  isMobileSidebarOpen = false
+  isMobileSidebarOpen = false,
+  onSyncCases
 }: HeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -264,6 +267,9 @@ export function Header({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-3 shrink-0">
+        {/* Background Auto-Sync / Auto-Refresh Control */}
+        <AutoRefreshControl onSyncCases={onSyncCases} />
+
         {/* Persisted View Mode Toggle (Simple / Analyst Console) */}
         {onSetViewMode && (
           <div className="hidden sm:flex items-center rounded-lg bg-[#1a1713] p-1 border border-[#342e26] text-xs">

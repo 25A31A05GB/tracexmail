@@ -225,7 +225,35 @@ export const authenticatedRateLimiter: RateLimitRequestHandler = rateLimit({
   }
 });
 
+// -----------------------------------------------------------------------------
+// Strict Rate Limiter for Sensitive Control Operations (Gmail Disconnect, Key Revocations)
+// -----------------------------------------------------------------------------
+export const strictRateLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes window
+  max: 20, // Strict cap of 20 requests per 15 minutes to prevent rapid hammering / flapping
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req: Request) => {
+    const user = (req as any).user;
+    if (user && (user.id || user.userId || user.sub)) {
+      return `strict_usr_${user.id || user.userId || user.sub}`;
+    }
+    return `strict_ip_${getClientIp(req)}`;
+  },
+  handler: (_req: Request, res: Response) => {
+    const retrySec = 60;
+    res.setHeader('Retry-After', retrySec);
+    res.status(429).json({
+      error: 'Strict security rate limit active. Please slow down requests to this security endpoint.',
+      code: 'STRICT_RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: retrySec
+    });
+  }
+});
+
 // Aliases for backwards compatibility
 export const authLimiter = authRateLimiter;
 export const publicLimiter = publicRateLimiter;
 export const authenticatedLimiter = authenticatedRateLimiter;
+export const strictLimiter = strictRateLimiter;

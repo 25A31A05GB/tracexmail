@@ -79,6 +79,7 @@ import {
   listGmailMessages,
   modifyGmailMessageLabels,
   ensureGmailLabel,
+  ensureFreshAccessToken,
   gmailEvents,
   startAutoSyncLoop,
   stopAutoSyncLoop,
@@ -90,6 +91,8 @@ import {
   queueEmailForAnalysis,
   getIngestionQueue,
   updateQueueItemStatus,
+  getAutoSyncConfig,
+  setAutoSyncConfig,
   IngestionQueueItem
 } from './src/server/gmailService';
 import {
@@ -146,7 +149,7 @@ import {
   convertThreatItemToRfc822,
   type RealWorldThreatItem
 } from './src/server/realWorldThreatService';
-import { authLimiter, publicLimiter, authenticatedLimiter } from './src/server/rateLimiter';
+import { authLimiter, publicLimiter, authenticatedLimiter, strictRateLimiter } from './src/server/rateLimiter';
 import {
   validateRequest,
   isPlausibleRfc822,
@@ -3691,11 +3694,11 @@ Link: https://verify-auth-portal.net/login`;
     }
   };
 
-  app.post('/api/gmail/watch/start', authenticatedLimiter, handleStartWatch);
-  app.post('/api/gmail/watch', authenticatedLimiter, handleStartWatch);
+  app.post('/api/gmail/watch/start', strictRateLimiter, handleStartWatch);
+  app.post('/api/gmail/watch', strictRateLimiter, handleStartWatch);
 
   // 4. Stop Gmail users.watch() endpoint
-  app.post('/api/gmail/watch/stop', authenticatedLimiter, async (req, res) => {
+  app.post('/api/gmail/watch/stop', strictRateLimiter, async (req, res) => {
     try {
       const authHeader = req.headers.authorization;
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
@@ -3759,7 +3762,8 @@ Link: https://verify-auth-portal.net/login`;
       const authHeader = req.headers.authorization;
       const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
       const token = req.body?.access_token || bearerToken;
-      const storedToken = getGmailAccessToken();
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
       const status = getGmailStatus(userEmail);
       
       const effectiveToken = (token && !token.startsWith('mock_') && !token.startsWith('enclave_'))
@@ -3808,17 +3812,25 @@ Link: https://verify-auth-portal.net/login`;
           }
           syncMessage = `Successfully polled, queued, and analyzed ${processedCasesCount} live Gmail message(s) directly from Google Workspace.`;
         } else {
-          syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
+          const latestStatus = getGmailStatus(userEmail);
+          if (latestStatus.auth_expired) {
+            syncSource = 'auth_expired';
+            syncMessage = 'Gmail OAuth access token has expired or is invalid. Please reconnect your Gmail account.';
+          } else {
+            syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
+          }
         }
       } else {
         syncSource = 'no_live_token';
         syncMessage = 'No active Google OAuth Access Token connected. Please connect your Gmail account via OAuth or provide an Access Token to analyze real live emails.';
       }
 
+      const currentStatus = getGmailStatus(userEmail);
+
       // Broadcast GMAIL_SYNC_COMPLETE event across all connected WebSocket clients
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
-          type: 'GMAIL_SYNC_COMPLETE',
+          type: currentStatus.auth_expired ? 'GMAIL_AUTH_EXPIRED' : 'GMAIL_SYNC_COMPLETE',
           timestamp: new Date().toISOString(),
           processed_count: processedCasesCount,
           latest_case_id: lastResult?.case?.id,
@@ -3826,18 +3838,21 @@ Link: https://verify-auth-portal.net/login`;
           quarantine_status: lastResult?.case?.quarantine_action || 'AUDITED',
           subject: lastResult?.case?.title || syncMessage,
           sync_source: syncSource,
+          auth_expired: currentStatus.auth_expired,
           message: syncMessage
         });
       }
 
       res.json({
-        status: effectiveToken ? 'ok' : 'notice',
+        status: currentStatus.auth_expired ? 'auth_expired' : effectiveToken ? 'ok' : 'notice',
+        auth_expired: Boolean(currentStatus.auth_expired),
+        auth_error: currentStatus.auth_error || null,
         processed_cases_count: processedCasesCount,
         latest_case_id: lastResult?.case?.id,
         delivery_stage: lastResult?.case?.delivery_stage || 'post-delivery-alert',
         quarantine_status: lastResult?.case?.quarantine_action || 'AUDITED',
         sync_source: syncSource,
-        email_address: status.email_address,
+        email_address: currentStatus.email_address,
         message: syncMessage
       });
     } catch (err: any) {
@@ -4072,10 +4087,57 @@ Thanks!`;
     res.json({ status: 'ok', watch: updated });
   });
 
-  // 13. Disconnect Gmail
-  app.post('/api/gmail/disconnect', authenticatedLimiter, requireAuth, requireRole(['admin']), async (_req, res) => {
-    const result = await disconnectGmail();
-    res.json(result);
+  // 13. Disconnect Gmail (Protected by strictRateLimiter against abuse/flapping)
+  app.post('/api/gmail/disconnect', strictRateLimiter, requireAuth, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      const result = await disconnectGmail(orgId);
+
+      // Broadcast WebSocket event across all connected tabs so UI resets instantly
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'GMAIL_DISCONNECTED',
+          timestamp: new Date().toISOString(),
+          connected: false,
+          email: null
+        });
+      }
+
+      res.json(result);
+    } catch (err: any) {
+      console.error('[GmailDisconnect] Error disconnecting Gmail:', err);
+      res.status(500).json({ success: false, error: err?.message || 'Failed to disconnect Gmail' });
+    }
+  });
+
+  // 13b. Get Auto-Sync Configuration (Status & Interval)
+  app.get('/api/gmail/sync-config', publicLimiter, (_req, res) => {
+    res.json(getAutoSyncConfig());
+  });
+
+  // 13c. Update Auto-Sync Configuration (Toggle & Polling Interval)
+  app.post('/api/gmail/sync-config', strictRateLimiter, requireAuth, (req, res) => {
+    try {
+      const { enabled, interval_seconds } = req.body || {};
+      const updated = setAutoSyncConfig(
+        typeof enabled === 'boolean' ? enabled : true,
+        typeof interval_seconds === 'number' ? interval_seconds : undefined
+      );
+
+      if (typeof broadcastWebSocketEvent === 'function') {
+        broadcastWebSocketEvent({
+          type: 'AUTO_SYNC_CONFIG_CHANGED',
+          timestamp: new Date().toISOString(),
+          config: updated
+        });
+      }
+
+      res.json({ status: 'ok', config: updated });
+    } catch (err: any) {
+      console.error('[GmailSyncConfig] Error updating auto sync config:', err);
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed to update sync config' });
+    }
   });
 
   // 14. Get Live Synced & Analyzed Gmail Inbound Stream

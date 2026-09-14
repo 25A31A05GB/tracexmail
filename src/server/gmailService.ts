@@ -46,6 +46,8 @@ export interface OAuthScopeDetail {
 export interface GmailServiceState {
   isConnected: boolean;
   oauthConfigured: boolean;
+  authExpired?: boolean;
+  authError?: string | null;
   emailAddress: string | null;
   accessToken: string | null;
   refreshToken: string | null;
@@ -182,6 +184,8 @@ export function getIngestionQueue(): IngestionQueueItem[] {
 const state: GmailServiceState = {
   isConnected: Boolean(process.env.GMAIL_USER_EMAIL && process.env.GMAIL_ACCESS_TOKEN),
   oauthConfigured: Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID),
+  authExpired: false,
+  authError: null,
   emailAddress: process.env.GMAIL_USER_EMAIL || null,
   accessToken: process.env.GMAIL_ACCESS_TOKEN || null,
   refreshToken: process.env.GMAIL_REFRESH_TOKEN || null,
@@ -248,11 +252,11 @@ export function getGmailStatus(userEmail?: string) {
   const isModifyGranted = state.activeScopes.some(s => s.includes('gmail.modify') || s === 'gmail.modify');
   const isUserInfoGranted = state.activeScopes.some(s => s.includes('userinfo.email') || s === 'userinfo.email');
 
-  const isExpired = state.tokenExpiresAt ? Date.now() > state.tokenExpiresAt : false;
+  const isExpired = state.authExpired || (state.tokenExpiresAt ? Date.now() > state.tokenExpiresAt : false);
   let tokenStatus: 'active' | 'expiring_soon' | 'expired' | 'missing_scopes' | 'disconnected' = 'active';
 
   if (!state.isConnected) {
-    tokenStatus = 'disconnected';
+    tokenStatus = state.authExpired ? 'expired' : 'disconnected';
   } else if (isExpired) {
     tokenStatus = 'expired';
   } else if (!isReadonlyGranted || !isModifyGranted) {
@@ -293,6 +297,8 @@ export function getGmailStatus(userEmail?: string) {
 
   return {
     is_connected: state.isConnected,
+    auth_expired: Boolean(state.authExpired),
+    auth_error: state.authError || null,
     oauth_configured: state.oauthConfigured,
     email_address: state.emailAddress,
     last_polled_at: state.lastPolledAt,
@@ -427,6 +433,26 @@ export function toggleOAuthScopeSimulation(scopeName: 'gmail.readonly' | 'gmail.
 }
 
 /**
+ * Helper to extract clean, readable error descriptions from Google API responses without nested Object dumps.
+ */
+function extractGoogleApiError(err: any): string {
+  const data = err?.response?.data;
+  if (data?.error?.message) {
+    return `${err?.response?.status || ''} ${data.error.message}`.trim();
+  }
+  if (data?.error_description) {
+    return `${err?.response?.status || ''} ${data.error_description}`.trim();
+  }
+  if (typeof data?.error === 'string') {
+    return `${err?.response?.status || ''} ${data.error}`.trim();
+  }
+  if (err?.message) {
+    return err.message;
+  }
+  return 'Unknown Gmail API error';
+}
+
+/**
  * Initiates the Gmail users.watch() API call on the Google server side.
  * Tells Gmail to send Cloud Pub/Sub push notifications to the configured topicName
  * whenever a new message arrives in the user's mailbox.
@@ -451,7 +477,7 @@ export async function startGmailWatch(options?: {
     process.env.GMAIL_PUBSUB_TOPIC ||
     'projects/tracexmail-enterprise/topics/inbox-watch';
   
-  const token = options?.accessToken || state.accessToken;
+  let token = options?.accessToken || state.accessToken;
   const labelIds = options?.labelIds || ['INBOX'];
   const labelFilterAction = options?.labelFilterAction || 'include';
 
@@ -463,29 +489,62 @@ export async function startGmailWatch(options?: {
 
   if (isRealOAuthToken) {
     try {
-      console.log(`[GmailWatch] Calling Gmail API users.watch() for topic: ${topicName}`);
-      const response = await axios.post(
-        'https://gmail.googleapis.com/gmail/v1/users/me/watch',
-        {
-          topicName,
-          labelIds,
-          labelFilterAction
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
+      if (token === state.accessToken) {
+        const fresh = await ensureFreshAccessToken();
+        if (fresh) token = fresh;
+      }
 
-      if (response.data) {
+      console.log(`[GmailWatch] Calling Gmail API users.watch() for topic: ${topicName}`);
+      let response;
+      try {
+        response = await axios.post(
+          'https://gmail.googleapis.com/gmail/v1/users/me/watch',
+          {
+            topicName,
+            labelIds,
+            labelFilterAction
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
+        );
+      } catch (apiErr: any) {
+        if (apiErr?.response?.status === 401 && state.refreshToken) {
+          const refreshRes = await refreshGmailAccessToken();
+          if (refreshRes.success && state.accessToken) {
+            response = await axios.post(
+              'https://gmail.googleapis.com/gmail/v1/users/me/watch',
+              {
+                topicName,
+                labelIds,
+                labelFilterAction
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${state.accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                timeout: 10000
+              }
+            );
+          } else {
+            throw apiErr;
+          }
+        } else {
+          throw apiErr;
+        }
+      }
+
+      if (response?.data) {
         historyId = response.data.historyId || historyId;
         expiration = response.data.expiration ? Number(response.data.expiration) : expiration;
       }
     } catch (err: any) {
-      console.warn('[GmailWatch] Live Gmail users.watch() call returned:', err?.response?.data || err?.message);
+      console.warn('[GmailWatch] Live Gmail users.watch() returned:', extractGoogleApiError(err));
       // Even if Google Cloud project permissions need Pub/Sub publisher grants, maintain graceful state
     }
   } else {
@@ -528,11 +587,16 @@ export async function stopGmailWatch(options?: {
   active: boolean;
   message: string;
 }> {
-  const token = options?.accessToken || state.accessToken;
+  let token = options?.accessToken || state.accessToken;
   const isRealOAuthToken = Boolean(token && token !== 'mock_oauth2_access_token_encrypted' && !token.startsWith('mock_'));
 
   if (isRealOAuthToken) {
     try {
+      if (token === state.accessToken) {
+        const fresh = await ensureFreshAccessToken();
+        if (fresh) token = fresh;
+      }
+
       console.log('[GmailWatch] Calling Gmail API users.stop()');
       await axios.post(
         'https://gmail.googleapis.com/gmail/v1/users/me/stop',
@@ -546,7 +610,7 @@ export async function stopGmailWatch(options?: {
         }
       );
     } catch (err: any) {
-      console.warn('[GmailWatch] Live Gmail users.stop() returned:', err?.response?.data || err?.message);
+      console.warn('[GmailWatch] Live Gmail users.stop() returned:', extractGoogleApiError(err));
     }
   }
 
@@ -568,30 +632,55 @@ export async function stopGmailWatch(options?: {
  * Fetches raw RFC 822 email format from Gmail API if token is valid.
  */
 export async function fetchGmailMessageRaw(messageId: string, accessToken?: string): Promise<string | null> {
-  const token = accessToken || state.accessToken;
+  let token = accessToken || state.accessToken;
   if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
     return null;
   }
 
   try {
-    const res = await axios.get(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=raw`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`
-        },
-        timeout: 10000
-      }
-    );
+    if (token === state.accessToken) {
+      const fresh = await ensureFreshAccessToken();
+      if (fresh) token = fresh;
+    }
 
-    if (res.data?.raw) {
+    let res;
+    try {
+      res = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=raw`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          timeout: 10000
+        }
+      );
+    } catch (apiErr: any) {
+      if (apiErr?.response?.status === 401 && state.refreshToken) {
+        const refreshRes = await refreshGmailAccessToken();
+        if (refreshRes.success && state.accessToken) {
+          res = await axios.get(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}?format=raw`,
+            {
+              headers: { Authorization: `Bearer ${state.accessToken}` },
+              timeout: 10000
+            }
+          );
+        } else {
+          throw apiErr;
+        }
+      } else {
+        throw apiErr;
+      }
+    }
+
+    if (res?.data?.raw) {
       // Decode Base64URL
       const base64 = res.data.raw.replace(/-/g, '+').replace(/_/g, '/');
       return Buffer.from(base64, 'base64').toString('utf8');
     }
     return null;
   } catch (err: any) {
-    console.warn(`[GmailFetch] Failed fetching raw message ${messageId}:`, err?.message);
+    console.warn(`[GmailFetch] Failed fetching raw message ${messageId}:`, extractGoogleApiError(err));
     return null;
   }
 }
@@ -601,16 +690,40 @@ export async function fetchGmailMessageRaw(messageId: string, accessToken?: stri
  * Creates it if not present and returns the label ID.
  */
 export async function ensureGmailLabel(labelName: string, accessToken: string): Promise<string | null> {
-  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+  let token = accessToken || state.accessToken;
+  if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
     return null;
   }
 
   try {
+    if (token === state.accessToken) {
+      const fresh = await ensureFreshAccessToken();
+      if (fresh) token = fresh;
+    }
+
     // 1. Check existing labels
-    const listRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      timeout: 8000
-    });
+    let listRes;
+    try {
+      listRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 8000
+      });
+    } catch (apiErr: any) {
+      if (apiErr?.response?.status === 401 && state.refreshToken) {
+        const refreshRes = await refreshGmailAccessToken();
+        if (refreshRes.success && state.accessToken) {
+          token = state.accessToken;
+          listRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000
+          });
+        } else {
+          throw apiErr;
+        }
+      } else {
+        throw apiErr;
+      }
+    }
 
     const existing = (listRes.data?.labels || []).find(
       (l: any) => l.name?.toLowerCase() === labelName.toLowerCase()
@@ -634,7 +747,7 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
         },
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           timeout: 8000
@@ -643,7 +756,7 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
       return createRes.data?.id || null;
     } catch (colorErr: any) {
       // Gmail rejects unsupported hex colors with 400 Invalid color; automatically retry without color
-      console.warn(`[GmailLabel] Custom color rejected for "${labelName}", retrying without color payload:`, colorErr?.response?.data || colorErr?.message);
+      console.warn(`[GmailLabel] Custom color rejected for "${labelName}", retrying without color payload:`, extractGoogleApiError(colorErr));
       const retryRes = await axios.post(
         'https://gmail.googleapis.com/gmail/v1/users/me/labels',
         {
@@ -653,7 +766,7 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
         },
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           timeout: 8000
@@ -662,7 +775,7 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
       return retryRes.data?.id || null;
     }
   } catch (err: any) {
-    console.warn(`[GmailLabel] Could not ensure label ${labelName}:`, err?.response?.data || err?.message);
+    console.warn(`[GmailLabel] Could not ensure label ${labelName}:`, extractGoogleApiError(err));
     return null;
   }
 }
@@ -676,11 +789,17 @@ export async function modifyGmailMessageLabels(
   removeLabelNames: string[],
   accessToken: string
 ): Promise<boolean> {
-  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+  let token = accessToken || state.accessToken;
+  if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
     return false;
   }
 
   try {
+    if (token === state.accessToken) {
+      const fresh = await ensureFreshAccessToken();
+      if (fresh) token = fresh;
+    }
+
     const STANDARD_LABELS = new Set(['INBOX', 'UNREAD', 'SPAM', 'TRASH', 'STARRED', 'IMPORTANT']);
 
     const addLabelIds: string[] = [];
@@ -688,7 +807,7 @@ export async function modifyGmailMessageLabels(
       if (STANDARD_LABELS.has(name.toUpperCase())) {
         addLabelIds.push(name.toUpperCase());
       } else {
-        const id = await ensureGmailLabel(name, accessToken);
+        const id = await ensureGmailLabel(name, token);
         if (id) addLabelIds.push(id);
       }
     }
@@ -698,29 +817,57 @@ export async function modifyGmailMessageLabels(
       if (STANDARD_LABELS.has(name.toUpperCase())) {
         removeLabelIds.push(name.toUpperCase());
       } else {
-        const id = await ensureGmailLabel(name, accessToken);
+        const id = await ensureGmailLabel(name, token);
         if (id) removeLabelIds.push(id);
       }
     }
 
-    await axios.post(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
-      {
-        addLabelIds,
-        removeLabelIds
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+    try {
+      await axios.post(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+        {
+          addLabelIds,
+          removeLabelIds
         },
-        timeout: 10000
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+    } catch (apiErr: any) {
+      if (apiErr?.response?.status === 401 && state.refreshToken) {
+        const refreshRes = await refreshGmailAccessToken();
+        if (refreshRes.success && state.accessToken) {
+          token = state.accessToken;
+          await axios.post(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`,
+            {
+              addLabelIds,
+              removeLabelIds
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              timeout: 10000
+            }
+          );
+        } else {
+          throw apiErr;
+        }
+      } else {
+        throw apiErr;
       }
-    );
+    }
+
     console.log(`[GmailModify] Successfully modified labels on message ${messageId} (added: ${addLabelNames.join(', ')}, removed: ${removeLabelNames.join(', ')})`);
     return true;
   } catch (err: any) {
-    console.warn(`[GmailModify] Failed modifying labels for message ${messageId}:`, err?.response?.data || err?.message);
+    console.warn(`[GmailModify] Failed modifying labels for message ${messageId}:`, extractGoogleApiError(err));
     return false;
   }
 }
@@ -733,21 +880,64 @@ export async function listGmailMessages(
   query: string = 'label:INBOX',
   maxResults: number = 10
 ): Promise<Array<{ id: string; threadId: string }>> {
-  if (!accessToken || accessToken === 'mock_oauth2_access_token_encrypted' || accessToken.startsWith('mock_')) {
+  let token = accessToken || state.accessToken;
+  if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
     return [];
   }
 
   try {
-    const res = await axios.get(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        timeout: 10000
+    if (token === state.accessToken) {
+      const fresh = await ensureFreshAccessToken();
+      if (fresh) token = fresh;
+    }
+
+    try {
+      const res = await axios.get(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }
+      );
+      return res.data?.messages || [];
+    } catch (apiErr: any) {
+      if (apiErr?.response?.status === 401 && state.refreshToken) {
+        console.log('[GmailList] Received 401 Unauthorized from Gmail API. Attempting token refresh...');
+        const refreshRes = await refreshGmailAccessToken();
+        if (refreshRes.success && state.accessToken) {
+          const retryRes = await axios.get(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+            {
+              headers: { Authorization: `Bearer ${state.accessToken}` },
+              timeout: 10000
+            }
+          );
+          return retryRes.data?.messages || [];
+        }
       }
-    );
-    return res.data?.messages || [];
+      throw apiErr;
+    }
   } catch (err: any) {
-    console.warn('[GmailList] Failed listing messages from Gmail API:', err?.response?.data || err?.message);
+    const errorDetail = extractGoogleApiError(err);
+    if (
+      err?.response?.status === 401 ||
+      String(errorDetail).includes('401') ||
+      String(errorDetail).includes('invalid authentication credentials')
+    ) {
+      if (!state.authExpired) {
+        state.authExpired = true;
+        state.isConnected = false;
+        state.authError = 'OAuth access token expired or invalid. Please reconnect Gmail.';
+        stopAutoSyncLoop();
+        gmailEvents.emit('gmail_auth_expired', {
+          timestamp: new Date().toISOString(),
+          error: errorDetail
+        });
+        console.warn(`[GmailList] Gmail token expired (401). Pausing auto-sync loop until reconnection.`);
+      }
+    } else {
+      console.warn(`[GmailList] Failed listing messages from Gmail API: ${errorDetail}`);
+    }
     return [];
   }
 }
@@ -1358,25 +1548,33 @@ export async function markMessageProcessed(params: {
 }
 
 /**
- * Disconnects Gmail account and shuts down Google server-side watch.
+ * Disconnects Gmail account and shuts down Google server-side watch and polling loops.
  */
 export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; message: string }> {
+  // 1. Immediately kill the background auto-sync loop & clear any active cycle lock
   stopAutoSyncLoop();
+  isSyncCycleActive = false;
 
-  // Teardown Gmail watch on Google server side
+  // 2. Teardown Gmail watch on Google server side
   try {
     await stopGmailWatch();
   } catch (watchErr) {
     console.warn('[GmailService] stopGmailWatch during disconnect warning:', watchErr);
   }
 
+  // 3. Clear memory state and authentication credentials
   state.isConnected = false;
   state.emailAddress = null;
   state.accessToken = null;
   state.refreshToken = null;
   state.tokenExpiresAt = null;
   state.watch.active = false;
+  state.watch.enabled = false;
+  state.watch.expiration = null;
+  state.watch.subscription = null;
+  ingestionQueue.length = 0;
 
+  // 4. Clear database tokens in Supabase so they are not resurrected
   const supabase = getSupabaseAdminClient();
   if (supabase) {
     try {
@@ -1384,6 +1582,9 @@ export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{
         .update({
           is_connected: false,
           watch_active: false,
+          watch_enabled: false,
+          access_token_encrypted: null,
+          refresh_token_encrypted: null,
           watch_stopped_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -1393,7 +1594,12 @@ export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{
     }
   }
 
-  return { success: true, message: 'Gmail disconnected and watch unregistered successfully.' };
+  // 5. Emit stopped and disconnected events to listeners
+  gmailEvents.emit('watch_stopped', { orgId, timestamp: new Date().toISOString() });
+  gmailEvents.emit('sync_cycle_stopped', { orgId, timestamp: new Date().toISOString() });
+  gmailEvents.emit('gmail_disconnected', { orgId, timestamp: new Date().toISOString() });
+
+  return { success: true, message: 'Gmail live connection disconnected and watch stopped successfully.' };
 }
 
 // Automated Inbox Sync Loop
@@ -1405,6 +1611,10 @@ let isSyncCycleActive = false;
  * Guarantees message deduplication via persistent ledger and immediately clears UNREAD state.
  */
 export async function runAutoSyncCycle(): Promise<{ count: number; error?: string }> {
+  if (!state.isConnected) {
+    stopAutoSyncLoop();
+    return { count: 0, error: 'Gmail is disconnected' };
+  }
   if (isSyncCycleActive) return { count: 0 };
   isSyncCycleActive = true;
   try {
@@ -1500,7 +1710,26 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
           }
         }
       } catch (apiErr: any) {
-        console.warn('[GmailSyncLoop] Error fetching messages from Gmail API:', apiErr?.response?.data || apiErr?.message);
+        const errorDetail = extractGoogleApiError(apiErr);
+        if (
+          apiErr?.response?.status === 401 ||
+          String(errorDetail).includes('401') ||
+          String(errorDetail).includes('invalid authentication credentials')
+        ) {
+          if (!state.authExpired) {
+            state.authExpired = true;
+            state.isConnected = false;
+            state.authError = 'OAuth access token expired or invalid. Please reconnect Gmail.';
+            stopAutoSyncLoop();
+            gmailEvents.emit('gmail_auth_expired', {
+              timestamp: new Date().toISOString(),
+              error: errorDetail
+            });
+            console.warn('[GmailSyncLoop] Gmail OAuth token expired (401). Pausing auto-sync loop until reconnection.');
+          }
+        } else {
+          console.warn('[GmailSyncLoop] Error fetching messages from Gmail API:', errorDetail);
+        }
       }
     }
 
@@ -1558,5 +1787,36 @@ export function stopAutoSyncLoop(): void {
     autoSyncTimer = null;
     console.log('[GmailService] Auto-sync loop stopped');
   }
+}
+
+/**
+ * Returns current configuration of automated periodic synchronization.
+ */
+export function getAutoSyncConfig() {
+  return {
+    enabled: Boolean(autoSyncTimer && state.isConnected),
+    interval_seconds: state.pollingIntervalSeconds || 30,
+    is_connected: state.isConnected,
+    email_address: state.emailAddress,
+    last_polled_at: state.lastPolledAt,
+    is_syncing: isSyncCycleActive
+  };
+}
+
+/**
+ * Configures automated periodic synchronization interval and running state.
+ */
+export function setAutoSyncConfig(enabled: boolean, intervalSeconds?: number) {
+  if (typeof intervalSeconds === 'number' && intervalSeconds >= 5 && intervalSeconds <= 600) {
+    state.pollingIntervalSeconds = intervalSeconds;
+  }
+  if (enabled) {
+    if (state.isConnected) {
+      startAutoSyncLoop(state.pollingIntervalSeconds);
+    }
+  } else {
+    stopAutoSyncLoop();
+  }
+  return getAutoSyncConfig();
 }
 
