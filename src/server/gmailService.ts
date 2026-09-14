@@ -619,28 +619,48 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
       return existing.id;
     }
 
-    // 2. Create the label
-    const createRes = await axios.post(
-      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
-      {
-        name: labelName,
-        labelListVisibility: 'labelShow',
-        messageListVisibility: 'show',
-        color: {
-          textColor: '#ffffff',
-          backgroundColor: '#cc3a21'
-        }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
+    // 2. Create the label - attempt with known-supported Gmail label color first
+    try {
+      const createRes = await axios.post(
+        'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+        {
+          name: labelName,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show',
+          color: {
+            textColor: '#ffffff',
+            backgroundColor: '#fb4c2f'
+          }
         },
-        timeout: 8000
-      }
-    );
-
-    return createRes.data?.id || null;
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 8000
+        }
+      );
+      return createRes.data?.id || null;
+    } catch (colorErr: any) {
+      // Gmail rejects unsupported hex colors with 400 Invalid color; automatically retry without color
+      console.warn(`[GmailLabel] Custom color rejected for "${labelName}", retrying without color payload:`, colorErr?.response?.data || colorErr?.message);
+      const retryRes = await axios.post(
+        'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+        {
+          name: labelName,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show'
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 8000
+        }
+      );
+      return retryRes.data?.id || null;
+    }
   } catch (err: any) {
     console.warn(`[GmailLabel] Could not ensure label ${labelName}:`, err?.response?.data || err?.message);
     return null;
@@ -648,7 +668,7 @@ export async function ensureGmailLabel(labelName: string, accessToken: string): 
 }
 
 /**
- * Modifies labels on a live Gmail message (e.g. adding Quarantine label, removing INBOX).
+ * Modifies labels on a live Gmail message (e.g. adding Quarantine label, removing INBOX or UNREAD).
  */
 export async function modifyGmailMessageLabels(
   messageId: string,
@@ -661,15 +681,26 @@ export async function modifyGmailMessageLabels(
   }
 
   try {
+    const STANDARD_LABELS = new Set(['INBOX', 'UNREAD', 'SPAM', 'TRASH', 'STARRED', 'IMPORTANT']);
+
     const addLabelIds: string[] = [];
     for (const name of addLabelNames) {
-      const id = await ensureGmailLabel(name, accessToken);
-      if (id) addLabelIds.push(id);
+      if (STANDARD_LABELS.has(name.toUpperCase())) {
+        addLabelIds.push(name.toUpperCase());
+      } else {
+        const id = await ensureGmailLabel(name, accessToken);
+        if (id) addLabelIds.push(id);
+      }
     }
 
     const removeLabelIds: string[] = [];
-    if (removeLabelNames.includes('INBOX')) {
-      removeLabelIds.push('INBOX');
+    for (const name of removeLabelNames) {
+      if (STANDARD_LABELS.has(name.toUpperCase())) {
+        removeLabelIds.push(name.toUpperCase());
+      } else {
+        const id = await ensureGmailLabel(name, accessToken);
+        if (id) removeLabelIds.push(id);
+      }
     }
 
     await axios.post(
@@ -1111,6 +1142,12 @@ export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID):
         console.warn('[GmailService] Failed decrypting refresh token:', err);
       }
     }
+    if (data.token_expires_at) {
+      state.tokenExpiresAt = new Date(data.token_expires_at).getTime();
+    }
+    if (data.last_refreshed_at) {
+      state.lastRefreshedAt = data.last_refreshed_at;
+    }
     if (data.watch_topic_name) state.watch.topicName = data.watch_topic_name;
     if (data.watch_subscription) state.watch.subscription = data.watch_subscription;
     if (typeof data.watch_enabled === 'boolean') state.watch.enabled = data.watch_enabled;
@@ -1139,31 +1176,224 @@ export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID):
 syncGmailConnectionFromDb().catch(() => {});
 
 /**
- * Disconnects Gmail account.
+ * ==============================================================================
+ * GOOGLE OAUTH TOKEN REFRESH ENGINE
+ * ==============================================================================
  */
-export function disconnectGmail(orgId: string = DEFAULT_ORG_ID) {
+
+/**
+ * Refreshes Google OAuth access token using stored refresh token.
+ */
+export async function refreshGmailAccessToken(orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; accessToken?: string; error?: string }> {
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
+  const refreshToken = state.refreshToken;
+
+  if (!refreshToken || refreshToken.startsWith('mock_')) {
+    return { success: false, error: 'No valid refresh token available for Gmail OAuth.' };
+  }
+
+  if (!clientId || !clientSecret) {
+    return { success: false, error: 'GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing.' };
+  }
+
+  try {
+    console.log('[GmailAuth] Refreshing Google OAuth access token...');
+    const params = new URLSearchParams();
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
+    params.append('refresh_token', refreshToken);
+    params.append('grant_type', 'refresh_token');
+
+    const res = await axios.post('https://oauth2.googleapis.com/token', params.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: 10000
+    });
+
+    if (res.data?.access_token) {
+      const newAccessToken = res.data.access_token;
+      const expiresIn = Number(res.data.expires_in) || 3600;
+      const newExpiresAt = Date.now() + expiresIn * 1000;
+      const refreshedAt = new Date().toISOString();
+
+      state.accessToken = newAccessToken;
+      state.tokenExpiresAt = newExpiresAt;
+      state.lastRefreshedAt = refreshedAt;
+      state.isConnected = true;
+
+      // Persist refreshed credentials to Supabase
+      const supabase = getSupabaseAdminClient();
+      if (supabase) {
+        try {
+          const encryptedAccess = encryptToken(newAccessToken);
+          await supabase
+            .from('gmail_connections')
+            .update({
+              access_token_encrypted: encryptedAccess,
+              token_expires_at: new Date(newExpiresAt).toISOString(),
+              last_refreshed_at: refreshedAt,
+              updated_at: refreshedAt
+            })
+            .eq('organization_id', orgId);
+        } catch (dbErr: any) {
+          console.warn('[GmailAuth] Failed updating refreshed token in DB:', dbErr?.message);
+        }
+      }
+
+      console.log(`[GmailAuth] Google OAuth access token refreshed successfully. Valid for ${expiresIn}s.`);
+      return { success: true, accessToken: newAccessToken };
+    } else {
+      return { success: false, error: 'No access token returned in refresh response.' };
+    }
+  } catch (err: any) {
+    const msg = err?.response?.data?.error_description || err?.response?.data?.error || err?.message;
+    console.warn('[GmailAuth] Failed refreshing Google OAuth access token:', msg);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Ensures access token is fresh before making Gmail API requests.
+ * Proactively refreshes if token expires within 5 minutes.
+ */
+export async function ensureFreshAccessToken(orgId: string = DEFAULT_ORG_ID): Promise<string | null> {
+  const isRealToken = Boolean(state.accessToken && !state.accessToken.startsWith('mock_'));
+  if (!isRealToken) return state.accessToken;
+
+  const now = Date.now();
+  const expiresAt = state.tokenExpiresAt || 0;
+  const bufferMs = 5 * 60 * 1000; // 5 minutes
+
+  if (expiresAt > 0 && now + bufferMs >= expiresAt) {
+    console.log('[GmailAuth] Access token expires within 5 minutes. Proactively refreshing before API call...');
+    const result = await refreshGmailAccessToken(orgId);
+    if (result.success && result.accessToken) {
+      return result.accessToken;
+    }
+  }
+
+  return state.accessToken;
+}
+
+/**
+ * ==============================================================================
+ * PROCESSED MESSAGE LEDGER (DEDUPLICATION)
+ * ==============================================================================
+ */
+
+const processedMessageIdSet = new Set<string>();
+
+/**
+ * Checks if a Gmail message has already been processed by the pipeline.
+ */
+export async function isMessageAlreadyProcessed(messageId: string, orgId: string = DEFAULT_ORG_ID): Promise<boolean> {
+  if (!messageId) return false;
+
+  const memKey = `${orgId}:${messageId}`;
+  if (processedMessageIdSet.has(memKey)) {
+    return true;
+  }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from('gmail_processed_messages')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('message_id', messageId)
+      .maybeSingle();
+
+    if (!error && data) {
+      processedMessageIdSet.add(memKey);
+      return true;
+    }
+  } catch (err: any) {
+    console.warn('[GmailService] Error checking processed message ledger:', err?.message);
+  }
+
+  return false;
+}
+
+/**
+ * Marks a Gmail message as processed in the persistent ledger.
+ */
+export async function markMessageProcessed(params: {
+  messageId: string;
+  orgId?: string;
+  threadId?: string;
+  queueId?: string;
+  caseId?: string;
+  threatScore?: number;
+  quarantined?: boolean;
+  details?: any;
+}): Promise<void> {
+  const orgId = params.orgId || DEFAULT_ORG_ID;
+  const memKey = `${orgId}:${params.messageId}`;
+  processedMessageIdSet.add(memKey);
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('gmail_processed_messages').upsert(
+      {
+        id: `${orgId}_${params.messageId}`,
+        organization_id: orgId,
+        message_id: params.messageId,
+        thread_id: params.threadId || null,
+        queue_id: params.queueId || null,
+        case_id: params.caseId || null,
+        threat_score: params.threatScore ?? null,
+        quarantined: Boolean(params.quarantined),
+        processed_at: new Date().toISOString(),
+        details: params.details || {}
+      },
+      { onConflict: 'organization_id,message_id' }
+    );
+  } catch (err: any) {
+    console.warn('[GmailService] Failed recording message in processed ledger:', err?.message);
+  }
+}
+
+/**
+ * Disconnects Gmail account and shuts down Google server-side watch.
+ */
+export async function disconnectGmail(orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; message: string }> {
   stopAutoSyncLoop();
+
+  // Teardown Gmail watch on Google server side
+  try {
+    await stopGmailWatch();
+  } catch (watchErr) {
+    console.warn('[GmailService] stopGmailWatch during disconnect warning:', watchErr);
+  }
+
   state.isConnected = false;
   state.emailAddress = null;
   state.accessToken = null;
   state.refreshToken = null;
+  state.tokenExpiresAt = null;
   state.watch.active = false;
 
   const supabase = getSupabaseAdminClient();
   if (supabase) {
-    supabase.from('gmail_connections')
-      .update({
-        is_connected: false,
-        watch_active: false,
-        updated_at: new Date().toISOString()
-      })
-      .eq('organization_id', orgId)
-      .then(({ error }) => {
-        if (error) console.warn('[GmailService] Error updating disconnected status in DB:', error.message);
-      });
+    try {
+      await supabase.from('gmail_connections')
+        .update({
+          is_connected: false,
+          watch_active: false,
+          watch_stopped_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('organization_id', orgId);
+    } catch (dbErr: any) {
+      console.warn('[GmailService] Error updating disconnected status in DB:', dbErr?.message);
+    }
   }
 
-  return { success: true };
+  return { success: true, message: 'Gmail disconnected and watch unregistered successfully.' };
 }
 
 // Automated Inbox Sync Loop
@@ -1172,12 +1402,16 @@ let isSyncCycleActive = false;
 
 /**
  * Runs a single polling cycle to query and evaluate new unread emails from the connected Gmail account.
+ * Guarantees message deduplication via persistent ledger and immediately clears UNREAD state.
  */
 export async function runAutoSyncCycle(): Promise<{ count: number; error?: string }> {
   if (isSyncCycleActive) return { count: 0 };
   isSyncCycleActive = true;
   try {
     state.lastPolledAt = new Date().toISOString();
+
+    // Ensure access token is fresh (proactively refreshes within 5 minutes of expiration)
+    await ensureFreshAccessToken();
 
     const isLiveToken = Boolean(
       state.accessToken &&
@@ -1188,18 +1422,59 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
     let fetchedCount = 0;
     if (isLiveToken) {
       try {
-        const listResp = await axios.get(
-          'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
-          {
-            headers: { Authorization: `Bearer ${state.accessToken}` },
-            timeout: 8000
+        let listResp;
+        try {
+          listResp = await axios.get(
+            'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+            {
+              headers: { Authorization: `Bearer ${state.accessToken}` },
+              timeout: 8000
+            }
+          );
+        } catch (apiErr: any) {
+          // Retry once on 401 Unauthorized by refreshing token
+          if (apiErr?.response?.status === 401) {
+            console.log('[GmailSyncLoop] Received 401 Unauthorized from Gmail API. Attempting token refresh...');
+            const refreshRes = await refreshGmailAccessToken();
+            if (refreshRes.success && state.accessToken) {
+              listResp = await axios.get(
+                'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+                {
+                  headers: { Authorization: `Bearer ${state.accessToken}` },
+                  timeout: 8000
+                }
+              );
+            } else {
+              throw apiErr;
+            }
+          } else {
+            throw apiErr;
           }
-        );
-        const messages = listResp.data?.messages || [];
+        }
+
+        const messages = listResp?.data?.messages || [];
         for (const msg of messages) {
+          // Check persistent deduplication ledger
+          const alreadyProcessed = await isMessageAlreadyProcessed(msg.id, DEFAULT_ORG_ID);
+          if (alreadyProcessed) {
+            // Still ensure UNREAD label is removed so Gmail stops matching is:unread
+            if (state.accessToken) {
+              await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(() => {});
+            }
+            continue;
+          }
+
           const raw = await fetchGmailMessageRaw(msg.id, state.accessToken || undefined);
           if (raw) {
             fetchedCount++;
+
+            // Record in deduplication ledger immediately
+            await markMessageProcessed({
+              messageId: msg.id,
+              threadId: msg.threadId,
+              orgId: DEFAULT_ORG_ID
+            });
+
             // Queue immediately for automated forensic analysis
             queueEmailForAnalysis({
               messageId: msg.id,
@@ -1208,6 +1483,13 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
               rawEml: raw,
               deliveryStage: 'pre-delivery-hold'
             });
+
+            // Remove UNREAD label immediately so it stops matching is:unread on next cycle
+            if (state.accessToken) {
+              await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(err => {
+                console.warn(`[GmailSyncLoop] Failed removing UNREAD label from message ${msg.id}:`, err?.message);
+              });
+            }
 
             gmailEvents.emit('inbound_mail_push', {
               emailAddress: state.emailAddress,

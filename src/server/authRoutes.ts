@@ -6,6 +6,25 @@ import { getSupabaseAdminClient, getSupabaseClient, DEFAULT_ORG_ID } from './sup
 import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRole, signUserToken, verifyUserToken } from './compliance';
 import { authLimiter, getClientIp } from './rateLimiter';
 import { getEmailAlertConfig } from './emailAlertService';
+import {
+  saveOtp,
+  getOtp,
+  updateOtpAttempts,
+  deleteOtp,
+  saveMagicLink,
+  getMagicLink,
+  markMagicLinkUsed,
+  deleteMagicLink,
+  checkMagicLinkCooldown,
+  saveResetToken,
+  getResetToken,
+  deleteResetToken,
+  OtpRecord,
+  MagicLinkRecord,
+  ResetTokenRecord
+} from './authTokenStore';
+
+export type { OtpRecord, MagicLinkRecord, ResetTokenRecord };
 
 export interface AuthSecurityOptions {
   broadcastAlertFn: (alert: any, extraData?: any) => Promise<void> | void;
@@ -23,38 +42,6 @@ const failedAttemptsByAccount = new Map<string, FailedAttemptTracker>();
 
 const MONITORING_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const FAILED_LOGIN_ALERT_THRESHOLD = 5; // Alert SOC upon 5 failed attempts
-
-// In-memory OTP storage structure with timing-safe validation & auto-expiry
-interface OtpRecord {
-  code: string;
-  email: string;
-  type: 'signup' | 'recovery' | 'invite' | 'reset';
-  expiresAt: number;
-  attempts: number;
-  lastSentAt: number;
-  payload?: any;
-}
-
-const activeOtpStore = new Map<string, OtpRecord>();
-
-// Temporary reset tokens for validated password recovery
-interface ResetTokenRecord {
-  email: string;
-  expiresAt: number;
-}
-const activeResetTokens = new Map<string, ResetTokenRecord>();
-
-// Magic link storage structure for passwordless signin, signup verification, and recovery
-export interface MagicLinkRecord {
-  token: string;
-  email: string;
-  type: 'signin' | 'signup' | 'recovery';
-  expiresAt: number;
-  lastSentAt: number;
-  used: boolean;
-  payload?: any;
-}
-const activeMagicLinks = new Map<string, MagicLinkRecord>();
 
 // Resilient local user account credentials store
 export interface LocalUserAccount {
@@ -540,7 +527,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const now = Date.now();
 
     // Check cooldown rate limit (5 seconds between rapid requests per email)
-    const existing = activeOtpStore.get(otpKey);
+    const existing = await getOtp(otpKey);
     if (existing && now - existing.lastSentAt < 5 * 1000) {
       const waitSeconds = Math.ceil((5 * 1000 - (now - existing.lastSentAt)) / 1000);
       return res.status(429).json({
@@ -563,12 +550,12 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       payload: payload || null
     };
 
-    activeOtpStore.set(otpKey, record);
+    await saveOtp(otpKey, record);
     // Store under wildcard key and recovery key for resilient lookup
-    activeOtpStore.set(`any:${cleanEmail}`, record);
+    await saveOtp(`any:${cleanEmail}`, record);
     if (type === 'recovery' || type === 'reset') {
-      activeOtpStore.set(`recovery:${cleanEmail}`, record);
-      activeOtpStore.set(`reset:${cleanEmail}`, record);
+      await saveOtp(`recovery:${cleanEmail}`, record);
+      await saveOtp(`reset:${cleanEmail}`, record);
     }
 
     console.log(`[AuthRouter:OTP] Code generated for ${cleanEmail} (type: ${type}): ${code}`);
@@ -657,14 +644,14 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanCode = String(code).trim();
     const otpKey = `${type}:${cleanEmail}`;
-    let otpRecord = activeOtpStore.get(otpKey);
+    let otpRecord = await getOtp(otpKey);
     
     // Resilient fallback lookup if specific type key was not found
     if (!otpRecord) {
-      otpRecord = activeOtpStore.get(`recovery:${cleanEmail}`) ||
-                  activeOtpStore.get(`reset:${cleanEmail}`) ||
-                  activeOtpStore.get(`signup:${cleanEmail}`) ||
-                  activeOtpStore.get(`any:${cleanEmail}`);
+      otpRecord = (await getOtp(`recovery:${cleanEmail}`)) ||
+                  (await getOtp(`reset:${cleanEmail}`)) ||
+                  (await getOtp(`signup:${cleanEmail}`)) ||
+                  (await getOtp(`any:${cleanEmail}`));
     }
     const now = Date.now();
 
@@ -676,8 +663,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     if (now > otpRecord.expiresAt) {
-      activeOtpStore.delete(otpKey);
-      activeOtpStore.delete(`any:${cleanEmail}`);
+      await deleteOtp(otpKey);
+      await deleteOtp(`any:${cleanEmail}`);
       return res.status(400).json({
         error: 'Verification code has expired. Please request a new code.',
         code: 'OTP_EXPIRED'
@@ -685,8 +672,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     if (otpRecord.attempts >= 5) {
-      activeOtpStore.delete(otpKey);
-      activeOtpStore.delete(`any:${cleanEmail}`);
+      await deleteOtp(otpKey);
+      await deleteOtp(`any:${cleanEmail}`);
       return res.status(400).json({
         error: 'Too many incorrect attempts. For security, please request a new verification code.',
         code: 'OTP_MAX_ATTEMPTS_EXCEEDED'
@@ -698,7 +685,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     if (!isCodeMatch) {
       otpRecord.attempts += 1;
-      activeOtpStore.set(otpKey, otpRecord);
+      await updateOtpAttempts(otpKey, otpRecord.attempts);
 
       await logAuditAction({
         organization_id: DEFAULT_ORG_ID,
@@ -719,10 +706,10 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     // Code verified! Clean from active stores
-    activeOtpStore.delete(otpKey);
-    activeOtpStore.delete(`any:${cleanEmail}`);
-    activeOtpStore.delete(`recovery:${cleanEmail}`);
-    activeOtpStore.delete(`reset:${cleanEmail}`);
+    await deleteOtp(otpKey);
+    await deleteOtp(`any:${cleanEmail}`);
+    await deleteOtp(`recovery:${cleanEmail}`);
+    await deleteOtp(`reset:${cleanEmail}`);
 
     const assignedRole: UserRole = role === 'admin' ? 'admin' : role === 'read_only' ? 'read_only' : 'analyst';
     const assignedOrg = accountType === 'organization' ? (orgName?.trim() || 'Acme Cyber Defense SOC') : 'Personal Sandbox';
@@ -823,10 +810,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     if (type === 'recovery' || type === 'reset') {
       const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
-      activeResetTokens.set(resetToken, {
-        email: cleanEmail,
-        expiresAt: now + 30 * 60 * 1000 // 30 minutes TTL
-      });
+      await saveResetToken(resetToken, cleanEmail, now + 30 * 60 * 1000);
 
       await logAuditAction({
         organization_id: DEFAULT_ORG_ID,
@@ -875,15 +859,13 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const now = Date.now();
 
     // Check cooldown rate limit (5 seconds between rapid requests per email)
-    for (const [, rec] of activeMagicLinks) {
-      if (rec.email === cleanEmail && now - rec.lastSentAt < 5 * 1000) {
-        const waitSeconds = Math.ceil((5 * 1000 - (now - rec.lastSentAt)) / 1000);
-        return res.status(429).json({
-          error: `Please wait ${waitSeconds} seconds before requesting another magic link.`,
-          code: 'MAGIC_LINK_RATE_LIMITED',
-          retry_after: waitSeconds
-        });
-      }
+    const cooldown = await checkMagicLinkCooldown(cleanEmail, 5 * 1000);
+    if (cooldown.rateLimited) {
+      return res.status(429).json({
+        error: `Please wait ${cooldown.retryAfterSeconds || 5} seconds before requesting another magic link.`,
+        code: 'MAGIC_LINK_RATE_LIMITED',
+        retry_after: cooldown.retryAfterSeconds || 5
+      });
     }
 
     const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
@@ -900,13 +882,10 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       payload: payload || null
     };
 
-    activeMagicLinks.set(token, record);
+    await saveMagicLink(token, record);
 
     if (type === 'recovery') {
-      activeResetTokens.set(token, {
-        email: cleanEmail,
-        expiresAt
-      });
+      await saveResetToken(token, cleanEmail, expiresAt);
     }
 
     // Determine the base origin
@@ -1031,19 +1010,21 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     const cleanToken = String(token).trim();
-    let record = activeMagicLinks.get(cleanToken);
+    let record = await getMagicLink(cleanToken);
 
-    // Also allow activeResetTokens lookup if type was recovery
-    if (!record && activeResetTokens.has(cleanToken)) {
-      const rRec = activeResetTokens.get(cleanToken)!;
-      record = {
-        token: cleanToken,
-        email: rRec.email,
-        type: 'recovery',
-        expiresAt: rRec.expiresAt,
-        lastSentAt: rRec.expiresAt - 30 * 60 * 1000,
-        used: false
-      };
+    // Also allow reset token lookup if type was recovery
+    if (!record) {
+      const rRec = await getResetToken(cleanToken);
+      if (rRec) {
+        record = {
+          token: cleanToken,
+          email: rRec.email,
+          type: 'recovery',
+          expiresAt: rRec.expiresAt,
+          lastSentAt: rRec.expiresAt - 30 * 60 * 1000,
+          used: false
+        };
+      }
     }
 
     const now = Date.now();
@@ -1056,7 +1037,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     if (now > record.expiresAt) {
-      activeMagicLinks.delete(cleanToken);
+      await deleteMagicLink(cleanToken);
       return res.status(400).json({
         error: 'This magic link has expired. For security, please request a fresh link.',
         code: 'MAGIC_LINK_EXPIRED'
@@ -1070,19 +1051,16 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       });
     }
 
-    // Mark as used
-    record.used = true;
-    activeMagicLinks.delete(cleanToken);
+    // Mark as used and delete
+    await markMagicLinkUsed(cleanToken);
+    await deleteMagicLink(cleanToken);
 
     const cleanEmail = record.email.toLowerCase();
 
     // If recovery, grant clearance to reset password
     if (record.type === 'recovery') {
       const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
-      activeResetTokens.set(resetToken, {
-        email: cleanEmail,
-        expiresAt: now + 30 * 60 * 1000
-      });
+      await saveResetToken(resetToken, cleanEmail, now + 30 * 60 * 1000);
 
       return res.status(200).json({
         status: 'success',
@@ -1102,6 +1080,32 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     const supabaseAdmin = getSupabaseAdminClient();
     let finalUserId = `usr_${crypto.randomBytes(8).toString('hex')}`;
+
+    // Provision real Supabase Auth user if password was provided during signup
+    if (supabaseAdmin) {
+      try {
+        if (payload.password) {
+          const { data: createdAuthUser, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
+            email: cleanEmail,
+            password: String(payload.password),
+            email_confirm: true,
+            user_metadata: {
+              full_name: assignedName,
+              org_name: assignedOrg,
+              role: assignedRole,
+              account_type: accountType || 'personal'
+            }
+          });
+          if (createdAuthUser?.user?.id) {
+            finalUserId = createdAuthUser.user.id;
+          } else if (createAuthErr) {
+            console.warn('[AuthRouter:MagicLink] Supabase admin createUser notice:', createAuthErr.message);
+          }
+        }
+      } catch (authErr: any) {
+        console.warn('[AuthRouter:MagicLink] Error creating Supabase auth user:', authErr?.message);
+      }
+    }
 
     // Look up existing local user account
     let existingAccount = localUserAccounts.get(cleanEmail);
@@ -1215,28 +1219,28 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     let isAuthorized = false;
 
-    if (resetToken && activeResetTokens.has(resetToken)) {
-      const tokenRec = activeResetTokens.get(resetToken)!;
-      if (tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
+    if (resetToken) {
+      const tokenRec = await getResetToken(resetToken);
+      if (tokenRec && tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
         isAuthorized = true;
-        activeResetTokens.delete(resetToken);
-        activeMagicLinks.delete(resetToken);
-      }
-    } else if (resetToken && activeMagicLinks.has(resetToken)) {
-      const mlRec = activeMagicLinks.get(resetToken)!;
-      if (mlRec.email === cleanEmail && Date.now() < mlRec.expiresAt) {
-        isAuthorized = true;
-        activeResetTokens.delete(resetToken);
-        activeMagicLinks.delete(resetToken);
+        await deleteResetToken(resetToken);
+        await deleteMagicLink(resetToken);
+      } else {
+        const mlRec = await getMagicLink(resetToken);
+        if (mlRec && mlRec.email === cleanEmail && Date.now() < mlRec.expiresAt) {
+          isAuthorized = true;
+          await deleteResetToken(resetToken);
+          await deleteMagicLink(resetToken);
+        }
       }
     } else if (code) {
       const cleanCode = String(code).trim();
       const candidateKeys = [`recovery:${cleanEmail}`, `reset:${cleanEmail}`, `signup:${cleanEmail}`, `any:${cleanEmail}`];
       for (const k of candidateKeys) {
-        const otpRec = activeOtpStore.get(k);
+        const otpRec = await getOtp(k);
         if (otpRec && otpRec.code === cleanCode && Date.now() < otpRec.expiresAt) {
           isAuthorized = true;
-          activeOtpStore.delete(k);
+          await deleteOtp(k);
           break;
         }
       }
@@ -1670,8 +1674,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       // Store enclave recovery magic link token
       const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
       const expiresAt = Date.now() + 30 * 60 * 1000;
-      activeResetTokens.set(token, { email: cleanEmail, expiresAt });
-      activeMagicLinks.set(token, {
+      await saveResetToken(token, cleanEmail, expiresAt);
+      await saveMagicLink(token, {
         token,
         email: cleanEmail,
         type: 'recovery',

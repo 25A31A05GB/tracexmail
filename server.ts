@@ -71,6 +71,7 @@ import {
   fetchQuarantineAuditLogs,
   saveGmailConnectionToDb,
   disconnectGmail,
+  markMessageProcessed,
   processInboundQuarantineGate,
   startGmailWatch,
   stopGmailWatch,
@@ -404,6 +405,19 @@ This email was intercepted by the TraceXMail ingestion service and automatically
       snippet: analysisResult.analysis?.email?.snippet || 'Analyzed inbound email artifact.',
       fullAnalysis: analysisResult.analysis
     });
+
+    // Update deduplication ledger with final caseId and verdict
+    if (queueItem.messageId) {
+      await markMessageProcessed({
+        messageId: queueItem.messageId,
+        queueId: queueItem.queueId,
+        caseId,
+        threatScore,
+        quarantined: isQuarantined
+      }).catch(err => {
+        console.warn('[IngestionQueueWorker] Error updating processed message ledger:', err?.message);
+      });
+    }
 
     // If threat score exceeds threshold and live access token exists, apply quarantine label in real Gmail
     if (isQuarantined && queueItem.messageId && !queueItem.messageId.startsWith('pubsub_') && !queueItem.messageId.startsWith('sim_')) {
@@ -4058,8 +4072,9 @@ Thanks!`;
   });
 
   // 13. Disconnect Gmail
-  app.post('/api/gmail/disconnect', authenticatedLimiter, requireAuth, requireRole(['admin']), (_req, res) => {
-    res.json(disconnectGmail());
+  app.post('/api/gmail/disconnect', authenticatedLimiter, requireAuth, requireRole(['admin']), async (_req, res) => {
+    const result = await disconnectGmail();
+    res.json(result);
   });
 
   // 14. Get Live Synced & Analyzed Gmail Inbound Stream
