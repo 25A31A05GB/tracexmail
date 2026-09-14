@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ShieldAlert,
@@ -65,6 +65,26 @@ export function CasesView({
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [maskPii, setMaskPii] = useState<boolean>(isReadOnly);
+
+  // Newly added case IDs for subtle slide-in animation & visual feedback
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
+  const previousCaseIdsRef = useRef<Set<string> | null>(null);
+
+  const markCaseAsNew = (caseId?: string) => {
+    if (!caseId) return;
+    setNewlyAddedIds(prev => {
+      const next = new Set(prev);
+      next.add(caseId);
+      return next;
+    });
+    setTimeout(() => {
+      setNewlyAddedIds(prev => {
+        const next = new Set(prev);
+        next.delete(caseId);
+        return next;
+      });
+    }, 6500);
+  };
 
   // Create Case Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -237,12 +257,47 @@ export function CasesView({
     }
   };
 
+  // Detect newly added case IDs whenever cases array updates
+  useEffect(() => {
+    if (previousCaseIdsRef.current === null) {
+      previousCaseIdsRef.current = new Set(cases.map(c => c.id).filter(Boolean));
+      return;
+    }
+
+    const prevIds = previousCaseIdsRef.current;
+    const incomingNewIds = cases
+      .map(c => c.id)
+      .filter(id => id && !prevIds.has(id));
+
+    if (incomingNewIds.length > 0) {
+      setNewlyAddedIds(prev => {
+        const next = new Set(prev);
+        incomingNewIds.forEach(id => next.add(id));
+        return next;
+      });
+
+      const timer = setTimeout(() => {
+        setNewlyAddedIds(prev => {
+          const next = new Set(prev);
+          incomingNewIds.forEach(id => next.delete(id));
+          return next;
+        });
+      }, 6500);
+
+      previousCaseIdsRef.current = new Set(cases.map(c => c.id).filter(Boolean));
+      return () => clearTimeout(timer);
+    } else {
+      previousCaseIdsRef.current = new Set(cases.map(c => c.id).filter(Boolean));
+    }
+  }, [cases]);
+
   // Immediate optimistic update on real-time WebSocket case events
   useEffect(() => {
     if (!lastCaseUpdate) return;
     const { type, case: caseData, caseId } = lastCaseUpdate;
 
     if (type === 'CASE_CREATED' && caseData && caseData.id) {
+      markCaseAsNew(caseData.id);
       setCases(prev => {
         if (prev.some(c => c.id === caseData.id)) {
           return prev.map(c => (c.id === caseData.id ? { ...c, ...caseData } : c));
@@ -276,6 +331,7 @@ export function CasesView({
     const handleLiveEvent = (e: any) => {
       const detail = e.detail;
       if (detail?.case && detail.case.id) {
+        markCaseAsNew(detail.case.id);
         setCases(prev => {
           if (prev.some(c => c.id === detail.case.id)) {
             return prev.map(c => (c.id === detail.case.id ? { ...c, ...detail.case } : c));
@@ -462,6 +518,7 @@ export function CasesView({
             .single();
 
           if (!sbErr && sbData) {
+            markCaseAsNew(sbData.id);
             setCases(prev => [sbData, ...prev]);
             setCreateSuccess(`Case ${sbData.id} successfully initialized in Supabase.`);
             setTimeout(() => {
@@ -477,6 +534,7 @@ export function CasesView({
 
       const result = await forensicApi.createCase(payload);
       if (result && result.id) {
+        markCaseAsNew(result.id);
         setCases(prev => [result, ...prev]);
         setCreateSuccess(`Case ${result.id} successfully initialized.`);
         setTimeout(() => {
@@ -868,41 +926,72 @@ export function CasesView({
                   </td>
                 </tr>
               ) : (
-                filteredCases.map((c, i) => {
-                  const title = c.title || c.name || c.headers?.subject || c.subject || 'Untitled Forensic Case';
-                  const desc = c.analyst_notes || c.description || c.headers?.from || c.from || 'Standard message analysis';
-                  const stdVerdict = getStandardizedVerdict(c);
-                  const threatScore = stdVerdict.score;
-                  const severity = (c.severity || c.threat || stdVerdict.severity || 'HIGH').toUpperCase();
-                  const status = (c.status || 'open').toLowerCase();
-                  const totalLinked = c.total_emails ?? (c.members?.length || c.email_ids?.length || 1);
-                  const suggestedCount = c.suggested_members?.length || 0;
+                <AnimatePresence initial={false}>
+                  {filteredCases.map((c, i) => {
+                    const title = c.title || c.name || c.headers?.subject || c.subject || 'Untitled Forensic Case';
+                    const desc = c.analyst_notes || c.description || c.headers?.from || c.from || 'Standard message analysis';
+                    const stdVerdict = getStandardizedVerdict(c);
+                    const threatScore = stdVerdict.score;
+                    const severity = (c.severity || c.threat || stdVerdict.severity || 'HIGH').toUpperCase();
+                    const status = (c.status || 'open').toLowerCase();
+                    const totalLinked = c.total_emails ?? (c.members?.length || c.email_ids?.length || 1);
+                    const suggestedCount = c.suggested_members?.length || 0;
+                    const isNewlyAdded = !!c.id && newlyAddedIds.has(c.id);
 
-                  return (
-                    <motion.tr
-                      key={c.id || i}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.3), ease: [0.16, 1, 0.3, 1] }}
-                      className="hover:bg-slate-800/40 transition-colors"
-                    >
-                      <td className="py-3.5 px-4 font-bold text-blue-400">
-                        <div className="flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-blue-500" />
-                          <span>{c.id || `TXM-CASE-${i + 1}`}</span>
-                        </div>
-                        <div className="mt-1">
-                          {c.is_demo ? (
-                            <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono inline-block">
-                              CORPUS / DEMO
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 rounded text-[9px] font-mono inline-block">
-                              LIVE INGEST
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                    return (
+                      <motion.tr
+                        key={c.id || `case-${i}`}
+                        initial={
+                          isNewlyAdded
+                            ? { opacity: 0, x: -32, backgroundColor: 'rgba(59, 130, 246, 0.20)' }
+                            : { opacity: 0, x: -14 }
+                        }
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                          backgroundColor: isNewlyAdded ? 'rgba(59, 130, 246, 0.05)' : 'rgba(0, 0, 0, 0)'
+                        }}
+                        exit={{ opacity: 0, x: 24, transition: { duration: 0.2 } }}
+                        transition={{
+                          duration: isNewlyAdded ? 0.45 : 0.24,
+                          delay: isNewlyAdded ? 0 : Math.min(i * 0.02, 0.2),
+                          ease: [0.16, 1, 0.3, 1]
+                        }}
+                        className={`transition-colors relative ${
+                          isNewlyAdded
+                            ? 'bg-blue-950/25 hover:bg-slate-800/50 border-l-2 border-l-blue-400'
+                            : 'hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <td className="py-3.5 px-4 font-bold text-blue-400">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Layers className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate">{c.id || `TXM-CASE-${i + 1}`}</span>
+                            {isNewlyAdded && (
+                              <motion.span
+                                initial={{ scale: 0.6, opacity: 0, x: -4 }}
+                                animate={{ scale: 1, opacity: 1, x: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="px-1.5 py-0.5 bg-blue-500/25 text-blue-300 border border-blue-400/60 rounded text-[9px] font-mono font-bold inline-flex items-center gap-1 shadow-xs"
+                                title="Newly added forensic case"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping shrink-0" />
+                                <span>NEW</span>
+                              </motion.span>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 flex-wrap">
+                            {c.is_demo ? (
+                              <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono inline-block">
+                                CORPUS / DEMO
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 rounded text-[9px] font-mono inline-block">
+                                LIVE INGEST
+                              </span>
+                            )}
+                          </div>
+                        </td>
                       <td className="py-3.5 px-4 max-w-md">
                         <div className="font-semibold text-slate-200 truncate">{title}</div>
                         <div className="text-[11px] text-slate-400 truncate mt-0.5">{desc}</div>
@@ -1056,8 +1145,9 @@ export function CasesView({
                       </td>
                     </motion.tr>
                   );
-                })
-              )}
+                })}
+              </AnimatePresence>
+            )}
             </tbody>
           </table>
         </div>
