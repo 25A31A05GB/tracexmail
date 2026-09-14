@@ -178,6 +178,10 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
 
+  // In-Thread Quarantine Reports Sync State
+  const [syncingReports, setSyncingReports] = useState<boolean>(false);
+  const [syncReportsResult, setSyncReportsResult] = useState<string | null>(null);
+
   // Synced & Analyzed Emails Stream State
   const [syncedEmails, setSyncedEmails] = useState<SyncedEmailItem[]>([]);
   const [loadingSyncedEmails, setLoadingSyncedEmails] = useState<boolean>(false);
@@ -603,6 +607,36 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       setSyncing(false);
       setErrorMsg('Error during sync: ' + e.message);
+    }
+  };
+
+  const handleSyncQuarantineReports = async () => {
+    try {
+      setSyncingReports(true);
+      setSyncReportsResult(null);
+      const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
+      const res = await apiFetch('/api/gmail/sync-quarantine-reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-email': targetEmail
+        },
+        body: JSON.stringify({ user_email: targetEmail, limit: 50 })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSyncReportsResult(data.message || 'Quarantine reports successfully inserted into Gmail threads.');
+        fetchSyncedEmails();
+        fetchStatus();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setSyncReportsResult(`Failed to sync reports: ${err.error || 'Server error'}`);
+      }
+    } catch (e: any) {
+      setSyncReportsResult(`Error syncing reports: ${e.message}`);
+    } finally {
+      setSyncingReports(false);
+      setTimeout(() => setSyncReportsResult(null), 10000);
     }
   };
 
@@ -1746,8 +1780,18 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       {/* Quarantine & Gate Settings Drawer */}
       {status?.is_connected && (
         <div className="space-y-3">
+          {syncReportsResult && (
+            <div className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-lg flex items-center justify-between text-xs text-amber-200">
+              <span className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-amber-400 shrink-0" />
+                {syncReportsResult}
+              </span>
+              <button onClick={() => setSyncReportsResult(null)} className="text-amber-400 hover:text-amber-200 font-bold ml-2">×</button>
+            </div>
+          )}
+
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setShowWatchConfig(!showWatchConfig)}
                 className="text-xs text-slate-300 hover:text-white flex items-center gap-1.5 font-semibold transition-colors cursor-pointer"
@@ -1764,6 +1808,16 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                 <Sliders className="w-3.5 h-3.5 text-blue-400" />
                 <span>Pre-Delivery Quarantine Gate</span>
                 {showConfig ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              <button
+                onClick={handleSyncQuarantineReports}
+                disabled={syncingReports}
+                className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded flex items-center gap-1.5 font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                title="Ensure all emails in label:TraceXMail-Quarantine have summarized forensic reports inserted directly into their Gmail threads"
+              >
+                {syncingReports ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <FileText className="w-3.5 h-3.5 text-amber-400" />}
+                <span>{syncingReports ? 'Inserting Reports...' : 'Sync In-Thread Reports'}</span>
               </button>
             </div>
 

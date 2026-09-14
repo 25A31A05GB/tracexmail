@@ -80,6 +80,7 @@ import {
   listGmailMessages,
   modifyGmailMessageLabels,
   insertQuarantineReportNote,
+  backfillQuarantineReportNotes,
   ensureGmailLabel,
   ensureFreshAccessToken,
   gmailEvents,
@@ -458,15 +459,17 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
           authInfo
         ].filter(Boolean).join('\n');
 
+        const rawCleanSubject = analysisObj.headers?.subject || subject || 'Inbound Mail Evaluation';
+
         await insertQuarantineReportNote({
           threadId: effectiveThreadId,
           accessToken,
-          subject,
+          subject: rawCleanSubject,
           reportSummary,
           caseId: caseId || `case_${Date.now()}`,
           threatScore,
           verdict: verdictStr,
-          originalMessageId: analysisObj.headers?.messageId,
+          originalMessageId: queueItem.messageId || analysisObj.headers?.messageId,
           topReason: topFinding
         }).catch(err => console.warn('[Quarantine] Failed to insert report note into Gmail thread:', err?.message));
       }
@@ -3776,14 +3779,14 @@ Link: https://verify-auth-portal.net/login`;
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GMAIL_REDIRECT_URL || process.env.GMAIL_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
-    const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
+    const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
 
     // Return authorization URL
     res.json({
       status: 'ok',
       url: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`,
       redirect_uri: redirectUri,
-      scopes: ['gmail.readonly', 'gmail.modify', 'userinfo.email'],
+      scopes: ['gmail.readonly', 'gmail.modify', 'gmail.insert', 'userinfo.email'],
       mode: 'real-time-pubsub-push'
     });
   });
@@ -3801,7 +3804,7 @@ Link: https://verify-auth-portal.net/login`;
       const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || 'tracexmail-soc-client';
       const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
       const redirectUri = process.env.GOOGLE_REDIRECT_URI || process.env.GMAIL_REDIRECT_URL || process.env.GMAIL_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
-      const scopesParam = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email');
+      const scopesParam = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
 
       res.json({
         status: 'ok',
@@ -4219,28 +4222,42 @@ Link: https://verify-auth-portal.net/login`;
                   authInfo
                 ].filter(Boolean).join('\n');
 
+                const rawCleanSubject = analysisObj.headers?.subject || 'Inbound Mail Evaluation';
+
                 await insertQuarantineReportNote({
                   threadId: effectiveThreadId,
                   accessToken: effectiveToken,
-                  subject: caseObj.title || analysisObj.headers?.subject || 'Inbound Mail Evaluation',
+                  subject: rawCleanSubject,
                   reportSummary,
                   caseId: caseObj.id || `case_${Date.now()}`,
                   threatScore: currentScore,
                   verdict: verdictStr,
-                  originalMessageId: analysisObj.headers?.messageId,
+                  originalMessageId: msg.id || analysisObj.headers?.messageId,
                   topReason: topFinding
                 }).catch(err => console.warn('[Quarantine] Failed to insert report note into Gmail thread:', err?.message));
               }
             }
           }
           syncMessage = `Successfully polled, queued, and analyzed ${processedCasesCount} live Gmail message(s) directly from Google Workspace.`;
+
+          // Backfill/sync report notes for existing quarantined messages lacking notes
+          const backfillRes = await backfillQuarantineReportNotes(effectiveToken, 30).catch(() => ({ inserted: 0 }));
+          if (backfillRes && backfillRes.inserted > 0) {
+            syncMessage += ` Backfilled ${backfillRes.inserted} summarized in-thread quarantine report(s).`;
+          }
         } else {
           const latestStatus = getGmailStatus(userEmail);
           if (latestStatus.auth_expired) {
             syncSource = 'auth_expired';
             syncMessage = 'Gmail OAuth access token has expired or is invalid. Please reconnect your Gmail account.';
           } else {
-            syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
+            // Check if any existing quarantined messages need report notes
+            const backfillRes = await backfillQuarantineReportNotes(effectiveToken, 30).catch(() => ({ inserted: 0 }));
+            if (backfillRes && backfillRes.inserted > 0) {
+              syncMessage = `Synced ${backfillRes.inserted} summarized quarantine report(s) directly into your Gmail threads.`;
+            } else {
+              syncMessage = 'Connected to live Gmail API. 0 new messages found matching query.';
+            }
           }
         }
       } else {
@@ -4280,6 +4297,46 @@ Link: https://verify-auth-portal.net/login`;
       });
     } catch (err: any) {
       console.error('[GmailPoll] Error during mailbox poll:', err);
+      res.status(500).json({ status: 'error', error: err.message });
+    }
+  });
+
+  // 6b.1 Dedicated Endpoint: Sync & Insert Quarantine Report Notes
+  app.post('/api/gmail/sync-quarantine-reports', authenticatedLimiter, async (req, res) => {
+    try {
+      const userEmail = req.body?.user_email || req.body?.email || (req.headers['x-user-email'] as string);
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const token = req.body?.access_token || bearerToken;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+
+      const effectiveToken = (token && !token.startsWith('mock_') && !token.startsWith('enclave_'))
+        ? token
+        : (storedToken && !storedToken.startsWith('mock_') && !storedToken.startsWith('enclave_'))
+          ? storedToken
+          : null;
+
+      if (!effectiveToken) {
+        return res.status(400).json({
+          status: 'error',
+          error: 'No active Google OAuth access token available to query Gmail mailbox.'
+        });
+      }
+
+      const maxToScan = typeof req.body?.limit === 'number' ? Math.min(req.body.limit, 50) : 40;
+      console.log(`[SyncQuarantineReports] Scanning up to ${maxToScan} messages under label:TraceXMail-Quarantine...`);
+      const result = await backfillQuarantineReportNotes(effectiveToken, maxToScan);
+
+      res.json({
+        status: 'ok',
+        scanned: result.scanned,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        message: `Processed ${result.scanned} quarantined email(s): ${result.inserted} report note(s) inserted, ${result.skipped} skipped (already reported or up to date).`
+      });
+    } catch (err: any) {
+      console.error('[SyncQuarantineReports] Error:', err);
       res.status(500).json({ status: 'error', error: err.message });
     }
   });

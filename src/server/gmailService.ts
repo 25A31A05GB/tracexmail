@@ -277,6 +277,7 @@ const state: GmailServiceState = {
   activeScopes: process.env.GMAIL_USER_EMAIL ? [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ] : [],
   scopesGrantedAt: null,
@@ -493,6 +494,7 @@ export function refreshOAuthPermissionsState(options?: {
   state.activeScopes = options?.scopes || [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ];
   state.scopesGrantedAt = new Date().toISOString();
@@ -997,11 +999,23 @@ export async function modifyGmailMessageLabels(
  * via the Gmail API messages.insert endpoint (WITHOUT sending an email to anyone).
  * The user sees this note immediately alongside the quarantined email in their mailbox.
  */
+/**
+ * Inserts an automated TraceXMail quarantine forensic summary note
+ * directly into the target Gmail thread as an internal annotation.
+ * 
+ * Complies strictly with Gmail API and RFC 2822 threading criteria:
+ * 1. threadId specified in the Message resource payload.
+ * 2. internalDateSource=receivedTime to place the note at the end of the thread,
+ *    triggering Gmail's list view snippet preview with the quarantine verdict.
+ * 3. Exact Subject matching the target thread.
+ * 4. RFC 2822 In-Reply-To and References pointing to parent Message-ID.
+ * 5. Uses users.messages.insert to write directly to mailbox without external delivery.
+ */
 export async function insertQuarantineReportNote(params: {
   threadId: string;
   accessToken: string;
   subject: string;
-  reportSummary: string; // short plain-text summary, a few lines
+  reportSummary: string;
   caseId: string;
   threatScore: number;
   verdict: string;
@@ -1020,82 +1034,206 @@ export async function insertQuarantineReportNote(params: {
       if (fresh) token = fresh;
     }
 
-    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_INSERT, 'messages.insert');
+    let targetThreadId = (params.threadId || '').trim();
+    let threadSubject = (params.subject || '').trim();
+    let parentMessageId = (params.originalMessageId || '').trim();
+    let parentReferences = '';
 
-    // 1. Determine punchy one-line reason (under ~100 characters for visible snippet in Gmail list view)
-    const prefix = `⚠️ ${params.verdict} (${params.threatScore}/100) — `;
-    const maxReasonLen = Math.max(15, 96 - prefix.length);
-    let rawReason = (params.topReason || '').trim();
-    if (!rawReason && params.reportSummary) {
+    // 1. Resolve canonical threadId, exact Subject, and parent Message-ID from Gmail API
+    // Attempt lookup by message ID first if available
+    const lookupCandidate = params.originalMessageId || (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_') ? targetThreadId : '');
+    
+    if (lookupCandidate && !lookupCandidate.startsWith('<')) {
+      try {
+        const msgRes = await axios.get(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(lookupCandidate)}?format=full`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000
+          }
+        );
+        if (msgRes.data) {
+          if (msgRes.data.threadId) {
+            targetThreadId = msgRes.data.threadId;
+          }
+          const headers: any[] = msgRes.data.payload?.headers || [];
+          const s = headers.find((h: any) => h.name?.toLowerCase() === 'subject')?.value;
+          if (s && s.trim()) threadSubject = s.trim();
+          const mId = headers.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value;
+          if (mId && mId.trim()) parentMessageId = mId.trim();
+          const refs = headers.find((h: any) => h.name?.toLowerCase() === 'references')?.value;
+          if (refs && refs.trim()) parentReferences = refs.trim();
+        }
+      } catch {
+        // If lookupCandidate was not a message ID, it will be queried as thread ID next
+      }
+    }
+
+    // 2. Query target thread to verify thread metadata, check for existing report, and extract latest Message-ID
+    if (targetThreadId && !targetThreadId.startsWith('pubsub_') && !targetThreadId.startsWith('sim_')) {
+      try {
+        const threadRes = await axios.get(
+          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(targetThreadId)}?format=full`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000
+          }
+        );
+        const threadData = threadRes.data;
+        const messages: any[] = Array.isArray(threadData?.messages) ? threadData.messages : [];
+        if (messages.length > 0) {
+          // Strict duplicate check: verify if a genuine TraceXMail report note was already inserted
+          const alreadyReported = messages.some((m: any) => {
+            const hList: any[] = m.payload?.headers || [];
+            const fromVal = (hList.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '').toLowerCase();
+            const msgIdVal = (hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || '').toLowerCase();
+            const hasReportHeader = hList.some((h: any) => h.name?.toLowerCase() === 'x-tracexmail-report');
+            return fromVal.includes('tracexmail security') ||
+                   fromVal.includes('security@tracexmail') ||
+                   msgIdVal.includes('tracexmail-report') ||
+                   msgIdVal.includes('@tracexmail.internal') ||
+                   hasReportHeader;
+          });
+
+          if (alreadyReported) {
+            console.log(`[GmailInsert] Verified report note already present in thread ${targetThreadId}. Skipping duplicate.`);
+            return true;
+          }
+
+          // In Gmail threading, the Subject of the conversation is defined by the first message
+          const firstHeaders = messages[0]?.payload?.headers || [];
+          const matchedSubject = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'subject')?.value;
+          if (matchedSubject && matchedSubject.trim()) {
+            threadSubject = matchedSubject.trim();
+          }
+
+          // Extract latest message in thread for In-Reply-To and References
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const hList = messages[i]?.payload?.headers || [];
+            const foundMsgId = hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value;
+            if (foundMsgId && foundMsgId.trim()) {
+              parentMessageId = foundMsgId.trim();
+              const foundRefs = hList.find((h: any) => h.name?.toLowerCase() === 'references')?.value;
+              if (foundRefs && foundRefs.trim()) parentReferences = foundRefs.trim();
+              break;
+            }
+          }
+        }
+      } catch (threadErr: any) {
+        console.warn(`[GmailInsert] Note: Could not fetch thread ${targetThreadId}:`, threadErr?.message);
+      }
+    }
+
+    if (!threadSubject) {
+      threadSubject = 'Inbound Mail Evaluation';
+    }
+
+    // 3. Format first-line snippet to trigger Gmail's thread snippet preview view
+    // Gmail list view displays the first ~100-140 chars of the latest message body.
+    let cleanReason = (params.topReason || '').trim();
+    if (!cleanReason && params.reportSummary) {
       const firstLine = params.reportSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
-      rawReason = firstLine;
+      cleanReason = firstLine;
     }
-    if (!rawReason) {
-      rawReason = 'High-risk malicious indicators detected';
+    if (!cleanReason) {
+      cleanReason = 'High threat risk anomalies flagged by enterprise mail defense policies';
     }
-    const oneLineReason = rawReason.length > maxReasonLen
-      ? `${rawReason.substring(0, maxReasonLen - 1)}…`
-      : rawReason;
+    const maxReasonLen = 85;
+    const truncatedReason = cleanReason.length > maxReasonLen
+      ? `${cleanReason.substring(0, maxReasonLen - 1)}…`
+      : cleanReason;
 
-    const line1 = `${prefix}${oneLineReason}`;
+    // Snippet line (starts immediately at line 1 with no leading space or decorators)
+    const snippetLine = `[TraceXMail: QUARANTINED (Threat Score: ${params.threatScore}/100)] — ${truncatedReason}. Intercepted and isolated under TraceXMail-Quarantine.`;
 
-    // 2. Build short RFC 822 plain-text body (4-6 lines total)
+    // 4. Construct detailed RFC 822 forensic briefing body
     const bodyLines = [
-      line1,
+      snippetLine,
       '',
+      '================================================================',
+      '🛡️ TRACEXMAIL ENTERPRISE FORENSIC INCIDENT BRIEFING',
+      '================================================================',
+      `Verdict:          ${params.verdict}`,
+      `Threat Score:     ${params.threatScore} / 100`,
+      `Quarantine Gate:  PRE-DELIVERY HOLD (Isolated from Inbox)`,
+      `Applied Label:    TraceXMail-Quarantine`,
+      `Case ID:          ${params.caseId}`,
+      `Timestamp:        ${new Date().toUTCString()}`,
+      '',
+      'FORENSIC SUMMARY & ANOMALIES:',
       params.reportSummary.trim(),
       '',
-      `Full analysis: https://tracexmail.vercel.app/cases/${params.caseId}`
+      'SECURITY INCIDENT DOSSIER & REMEDIATION:',
+      `Inspect raw MIME headers, routing hops, and IOC telemetry:`,
+      `https://tracexmail.vercel.app/cases/${params.caseId}`,
+      '================================================================'
     ];
     const bodyText = bodyLines.join('\r\n');
 
-    // 3. Assemble RFC 822 Headers
-    const selfEmail = state.emailAddress || 'me';
-    const headers: string[] = [
+    // 5. Build RFC 822 / 2822 compliant message structure
+    const selfEmail = state.emailAddress || 'security@tracexmail.internal';
+    const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${Math.random().toString(36).slice(2, 7)}@tracexmail.internal>`;
+
+    const rfcHeaders: string[] = [
       `From: TraceXMail Security <${selfEmail}>`,
       `To: <${selfEmail}>`,
-      `Subject: [TraceXMail: ${params.verdict}] ${params.subject}`,
+      `Subject: ${threadSubject}`,
       `Date: ${new Date().toUTCString()}`,
-      `Message-ID: <tracexmail-report-${params.caseId || Date.now()}@tracexmail.internal>`
+      `Message-ID: ${noteMessageId}`,
+      'X-TraceXMail-Report: true',
+      `X-TraceXMail-Case: ${params.caseId}`,
+      `X-TraceXMail-Threat-Score: ${params.threatScore}`,
+      `X-TraceXMail-Verdict: ${params.verdict}`
     ];
 
-    if (params.originalMessageId) {
-      const orig = params.originalMessageId.trim();
-      const formattedOrig = orig.startsWith('<') && orig.endsWith('>') ? orig : `<${orig}>`;
-      headers.push(`In-Reply-To: ${formattedOrig}`);
-      headers.push(`References: ${formattedOrig}`);
+    if (parentMessageId) {
+      const formattedParent = parentMessageId.startsWith('<') && parentMessageId.endsWith('>')
+        ? parentMessageId
+        : `<${parentMessageId}>`;
+      rfcHeaders.push(`In-Reply-To: ${formattedParent}`);
+      
+      const combinedRefs = parentReferences
+        ? `${parentReferences} ${formattedParent}`
+        : formattedParent;
+      rfcHeaders.push(`References: ${combinedRefs}`);
     }
 
-    headers.push('MIME-Version: 1.0');
-    headers.push('Content-Type: text/plain; charset="UTF-8"');
-    headers.push('Content-Transfer-Encoding: 8bit');
+    rfcHeaders.push('MIME-Version: 1.0');
+    rfcHeaders.push('Content-Type: text/plain; charset="UTF-8"');
+    rfcHeaders.push('Content-Transfer-Encoding: 8bit');
 
-    const fullRfc822 = headers.join('\r\n') + '\r\n\r\n' + bodyText;
+    const fullRfcContent = rfcHeaders.join('\r\n') + '\r\n\r\n' + bodyText;
 
-    // 4. Base64url-encode raw RFC 822 message per Gmail API requirements
-    const rawBase64Url = Buffer.from(fullRfc822, 'utf8')
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    // 5. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
+    // 6. Ensure TraceXMail-Quarantine label exists so inserted message is tagged alongside flagged thread
     const labelIds: string[] = ['UNREAD'];
     const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
     if (quarantineLabelId && !labelIds.includes(quarantineLabelId)) {
       labelIds.push(quarantineLabelId);
     }
 
-    const insertPayload = {
-      raw: rawBase64Url,
-      threadId: params.threadId,
+    const encodeBase64Url = (str: string) =>
+      Buffer.from(str, 'utf8')
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_INSERT, 'messages.insert');
+
+    // 7. Insert message directly into target thread using users.messages.insert
+    // internalDateSource=receivedTime ensures it is placed at the end of the thread,
+    // making its snippet view immediately active in the Gmail mailbox.
+    const insertPayload: any = {
+      raw: encodeBase64Url(fullRfcContent),
       labelIds
     };
+    if (targetThreadId) {
+      insertPayload.threadId = targetThreadId;
+    }
 
-    let response;
     try {
-      response = await axios.post(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert',
+      const res = await axios.post(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert?internalDateSource=receivedTime',
         insertPayload,
         {
           headers: {
@@ -1105,36 +1243,131 @@ export async function insertQuarantineReportNote(params: {
           timeout: 10000
         }
       );
-    } catch (apiErr: any) {
-      if (apiErr?.response?.status === 401 && state.refreshToken) {
-        const refreshRes = await refreshGmailAccessToken();
-        if (refreshRes.success && state.accessToken) {
-          token = state.accessToken;
-          response = await axios.post(
-            'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert',
-            insertPayload,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-              },
-              timeout: 10000
-            }
-          );
-        } else {
-          throw apiErr;
-        }
-      } else {
-        throw apiErr;
-      }
-    }
 
-    console.log(`[GmailInsert] Successfully inserted quarantine report note into thread ${params.threadId} (messageId: ${response?.data?.id})`);
-    return true;
+      const returnedThreadId = res.data?.threadId;
+      const insertedMsgId = res.data?.id;
+
+      if (returnedThreadId && targetThreadId && returnedThreadId === targetThreadId) {
+        console.log(`[GmailInsert] Successfully inserted quarantine report note into thread ${targetThreadId} (messageId: ${insertedMsgId}). Snippet view triggered.`);
+      } else {
+        console.log(`[GmailInsert] Inserted quarantine report note into Gmail (threadId: ${returnedThreadId}, messageId: ${insertedMsgId}).`);
+      }
+      return true;
+    } catch (primaryErr: any) {
+      console.warn(`[GmailInsert] In-thread insert failed (${primaryErr?.response?.status || primaryErr.message}). Retrying with fallback insert...`);
+
+      // Fallback: If Gmail rejected threadId (e.g. malformed or nonexistent thread), insert standalone without threadId
+      const fallbackPayload: any = {
+        raw: encodeBase64Url(fullRfcContent),
+        labelIds
+      };
+
+      const fallbackRes = await axios.post(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/insert?internalDateSource=receivedTime',
+        fallbackPayload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+      console.log(`[GmailInsert] Standalone quarantine report inserted with label TraceXMail-Quarantine (messageId: ${fallbackRes.data?.id})`);
+      return true;
+    }
   } catch (err: any) {
     console.warn('[GmailInsert] Failed to insert quarantine report note into Gmail thread:', extractGoogleApiError(err));
     return false;
   }
+}
+
+/**
+ * Scans all messages currently under the TraceXMail-Quarantine label in Gmail,
+ * and backfills/inserts missing in-thread summarized forensic reports.
+ */
+export async function backfillQuarantineReportNotes(
+  accessToken?: string,
+  maxToScan: number = 30
+): Promise<{ scanned: number; inserted: number; skipped: number }> {
+  let token = accessToken || state.accessToken;
+  if (!token || token.startsWith('mock_') || token.startsWith('enclave_')) {
+    return { scanned: 0, inserted: 0, skipped: 0 };
+  }
+
+  let scanned = 0;
+  let inserted = 0;
+  let skipped = 0;
+
+  try {
+    const messages = await listGmailMessages(token, 'label:TraceXMail-Quarantine', maxToScan);
+    scanned = messages.length;
+
+    for (const msg of messages) {
+      const threadId = msg.threadId || msg.id;
+
+      // Check if this thread already has a report
+      try {
+        const threadRes = await axios.get(
+          `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(threadId)}?format=full`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 8000
+          }
+        );
+        const tData = threadRes.data;
+        const msgs: any[] = Array.isArray(tData?.messages) ? tData.messages : [];
+        const hasReport = msgs.some((m: any) => {
+          const hList: any[] = m.payload?.headers || [];
+          const fromVal = (hList.find((h: any) => h.name?.toLowerCase() === 'from')?.value || '').toLowerCase();
+          const msgIdVal = (hList.find((h: any) => h.name?.toLowerCase() === 'message-id')?.value || '').toLowerCase();
+          const hasReportHeader = hList.some((h: any) => h.name?.toLowerCase() === 'x-tracexmail-report');
+          return fromVal.includes('tracexmail security') ||
+                 fromVal.includes('security@tracexmail') ||
+                 msgIdVal.includes('tracexmail-report') ||
+                 msgIdVal.includes('@tracexmail.internal') ||
+                 hasReportHeader;
+        });
+
+        if (hasReport) {
+          skipped++;
+          continue;
+        }
+
+        // Get first message subject
+        const firstHeaders = msgs[0]?.payload?.headers || [];
+        const subj = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'subject')?.value || 'Quarantined Email';
+        const sender = firstHeaders.find((h: any) => h.name?.toLowerCase() === 'from')?.value || 'External Sender';
+
+        // Insert report note
+        const ok = await insertQuarantineReportNote({
+          threadId,
+          accessToken: token,
+          subject: subj,
+          reportSummary: `• Intercepted inbound email from ${sender}.\n• High threat risk detected by quarantine rule policy.\n• Isolated from Inbox and tagged under TraceXMail-Quarantine.`,
+          caseId: `case_quar_${msg.id.slice(0, 10)}`,
+          threatScore: 85,
+          verdict: 'MALICIOUS PHISH',
+          originalMessageId: msg.id,
+          topReason: 'Quarantined high-threat email isolated from Inbox'
+        });
+
+        if (ok) {
+          inserted++;
+        } else {
+          skipped++;
+        }
+      } catch (innerErr: any) {
+        console.warn(`[Backfill] Failed checking/inserting thread ${threadId}:`, innerErr?.message);
+        skipped++;
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Backfill] Failed scanning quarantined messages:', extractGoogleApiError(err));
+  }
+
+  console.log(`[Backfill] Finished: ${scanned} scanned, ${inserted} reports inserted, ${skipped} skipped.`);
+  return { scanned, inserted, skipped };
 }
 
 /**
