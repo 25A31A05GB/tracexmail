@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { EmailAnalysis } from '../../types';
 import { SAMPLE_ANALYSES } from '../../data/samples';
+import { mapBackendCaseToAnalysis } from '../../utils/parser';
 
 export type NodeType = 'USER' | 'ATTACKER' | 'CHECKPOINT' | 'RELAY';
 
@@ -162,20 +163,50 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
   onOpenConsole
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [selectedCaseIndex, setSelectedCaseIndex] = useState<number>(0);
+  const [dbCases, setDbCases] = useState<any[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('sample-0');
   const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(currentAnalysis || SAMPLE_ANALYSES[0]);
   const [selectedNode, setSelectedNode] = useState<Dynamic3DNode | null>(null);
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [explanationMode, setExplanationMode] = useState<'simple' | 'technical'>('simple');
   const [nodeScreenCoords, setNodeScreenCoords] = useState<{ id: string; x: number; y: number; visible: boolean; depth: number }[]>([]);
 
-  // Update active analysis when sample preset is clicked
+  // Fetch real database cases on mount
+  useEffect(() => {
+    fetch('/api/cases')
+      .then(r => r.json())
+      .then(casesList => {
+        if (Array.isArray(casesList) && casesList.length > 0) {
+          setDbCases(casesList);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Update active analysis when sample preset or real database case is clicked
   const handleSelectPreset = (idx: number) => {
-    setSelectedCaseIndex(idx);
+    setSelectedCaseId(`sample-${idx}`);
     const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0];
     setActiveAnalysis(sample);
     if (onSelectCase) {
       onSelectCase(sample);
+    }
+  };
+
+  const handleSelectRealCase = (caseItem: any) => {
+    setSelectedCaseId(caseItem.id);
+    try {
+      const mapped = mapBackendCaseToAnalysis(caseItem);
+      if (mapped) {
+        setActiveAnalysis(mapped);
+        if (onSelectCase) {
+          onSelectCase(mapped);
+        }
+      }
+    } catch {
+      const sample = SAMPLE_ANALYSES[0];
+      setActiveAnalysis(sample);
+      if (onSelectCase) onSelectCase(sample);
     }
   };
 
@@ -502,46 +533,74 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
             Every email is a journey across the internet. TraceXMail reconstructs each stop along the way, separating malicious attackers from protected users in real time.
           </p>
 
-          {/* Preset Case Buttons to switch live database case structure */}
+          {/* Real Database Case Selection & Presets */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
-            <span className="text-[12px] text-[#8e8574] font-['IBM_Plex_Mono',monospace] mr-1">
-              Select Live Case:
+            <span className="text-[12px] text-[#8e8574] font-['IBM_Plex_Mono',monospace] mr-1 flex items-center gap-1">
+              <Database className="w-3.5 h-3.5 text-[#c9a227]" />
+              <span>Select Live Database Case:</span>
             </span>
-            <button
-              onClick={() => handleSelectPreset(0)}
-              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCaseIndex === 0
-                  ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
-                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-              <span>Nazario PayPal Phish</span>
-            </button>
 
-            <button
-              onClick={() => handleSelectPreset(1)}
-              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCaseIndex === 1
-                  ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
-                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-              <span>CEO BEC Wire Fraud</span>
-            </button>
+            {/* If real DB cases are fetched, show them */}
+            {dbCases.length > 0 ? (
+              dbCases.slice(0, 4).map((caseItem) => {
+                const isSelected = selectedCaseId === caseItem.id;
+                const isCritical = caseItem.severity === 'CRITICAL' || caseItem.severity === 'HIGH';
+                const isClean = caseItem.severity === 'CLEAN';
 
-            <button
-              onClick={() => handleSelectPreset(2)}
-              className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
-                selectedCaseIndex === 2
-                  ? 'bg-[#22c55e] text-[#14120f] font-bold shadow-md'
-                  : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-              <span>Safe GitHub Verification</span>
-            </button>
+                return (
+                  <button
+                    key={caseItem.id}
+                    onClick={() => handleSelectRealCase(caseItem)}
+                    className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-[#c9a227] text-[#0b0a08] font-bold shadow-md'
+                        : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isCritical ? 'bg-[#ef4444]' : isClean ? 'bg-[#22c55e]' : 'bg-[#eab308]'}`} />
+                    <span className="truncate max-w-[170px]">{caseItem.title || caseItem.id}</span>
+                  </button>
+                );
+              })
+            ) : (
+              <>
+                <button
+                  onClick={() => handleSelectPreset(0)}
+                  className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedCaseId === 'sample-0'
+                      ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
+                      : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                  <span>Nazario PayPal Phish</span>
+                </button>
+
+                <button
+                  onClick={() => handleSelectPreset(1)}
+                  className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedCaseId === 'sample-1'
+                      ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
+                      : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                  <span>CEO BEC Wire Fraud</span>
+                </button>
+
+                <button
+                  onClick={() => handleSelectPreset(2)}
+                  className={`px-3 py-1.5 rounded-[4px] text-[12.5px] font-['IBM_Plex_Mono',monospace] transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedCaseId === 'sample-2'
+                      ? 'bg-[#22c55e] text-[#14120f] font-bold shadow-md'
+                      : 'bg-[#1a1712] border border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8]'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                  <span>Safe GitHub Verification</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

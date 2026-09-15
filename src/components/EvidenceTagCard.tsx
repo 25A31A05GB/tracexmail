@@ -647,16 +647,18 @@ export function EvidenceTagCard({
     hidden: { 
       opacity: 0, 
       y: 28,
-      scale: 0.985
+      scale: 0.97,
+      rotateX: 3
     },
     visible: {
       opacity: 1, 
       y: 0,
       scale: 1,
+      rotateX: 0,
       transition: {
         duration: 0.45,
-        ease: 'easeOut',
-        staggerChildren: 0.045,
+        ease: [0.16, 1, 0.3, 1],
+        staggerChildren: 0.04,
         delayChildren: 0.05
       }
     }
@@ -677,15 +679,44 @@ export function EvidenceTagCard({
     }
   };
 
+  const stampVariants: Variants = {
+    hidden: { 
+      opacity: 0, 
+      scale: 2.2, 
+      rotate: -18,
+      filter: 'blur(4px)'
+    },
+    visible: { 
+      opacity: 1, 
+      scale: 1, 
+      rotate: -4,
+      filter: 'blur(0px)',
+      transition: {
+        type: 'spring',
+        damping: 12,
+        stiffness: 240,
+        delay: 0.32
+      }
+    }
+  };
+
   const cardHtml = (
     <motion.div 
       ref={cardRef}
       id="card"
-      className="evidence-card relative select-text"
+      className="evidence-card relative select-text overflow-hidden"
       variants={cardContainerVariants}
       initial="hidden"
       animate="visible"
     >
+      {/* Subtle Holographic Laser Sweep on Load */}
+      <motion.div
+        initial={{ x: '-100%', opacity: 0.6 }}
+        animate={{ x: '200%', opacity: 0 }}
+        transition={{ duration: 1.2, ease: 'easeInOut', delay: 0.2 }}
+        className="pointer-events-none absolute inset-0 z-30 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent skew-x-12"
+      />
+
       {/* Folder Tab Header */}
       <motion.div variants={cardItemVariants} className="tab">
         <div className="caseid">
@@ -697,11 +728,21 @@ export function EvidenceTagCard({
       </motion.div>
 
       {/* Main Body */}
-      <div className="body">
-        {/* Rubber-Stamp Verdict Badge */}
-        <motion.div variants={cardItemVariants} className={`stamp ${stampClass}`}>
+      <div className="body relative">
+        {/* Rubber-Stamp Verdict Badge with Ink Slam Animation */}
+        <motion.div 
+          variants={stampVariants} 
+          className={`stamp ${stampClass}`}
+        >
           {cardData.verdict.text}
           <small>{cardData.verdict.scoreLabel}</small>
+          {/* Stamp Ink Shockwave */}
+          <motion.span
+            initial={{ scale: 0.8, opacity: 0.8 }}
+            animate={{ scale: 1.4, opacity: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="pointer-events-none absolute inset-0 rounded border-2 border-current opacity-0"
+          />
         </motion.div>
 
         {/* Subject */}

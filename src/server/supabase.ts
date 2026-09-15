@@ -43,11 +43,48 @@ export function getSupabaseAdminClient(): SupabaseClient | null {
   if (!serviceRoleKey) {
     if (!hasLoggedAdminNotice) {
       hasLoggedAdminNotice = true;
-      console.error(
-        '[Supabase Admin] CRITICAL CONFIGURATION ERROR: SUPABASE_SERVICE_ROLE_KEY environment variable is missing. ' +
-        'The admin client strictly requires the service role key to bypass RLS for administrative operations and pipeline writes. ' +
-        'Fallback to anon keys has been disabled to prevent silent permission failures.'
-      );
+      if (process.env.NODE_ENV === 'production') {
+        console.warn(
+          '[Supabase Admin] SUPABASE_SERVICE_ROLE_KEY is not defined. Operating in resilient in-memory storage mode.'
+        );
+      } else {
+        console.info('[Supabase Admin] SUPABASE_SERVICE_ROLE_KEY not configured. Operating in local in-memory storage mode.');
+      }
+    }
+    return null;
+  }
+
+  // Validate that serviceRoleKey is a valid JWT matching the Supabase project ref
+  const urlMatch = url.match(/https?:\/\/([^.]+)\.supabase\./i);
+  const urlRef = urlMatch ? urlMatch[1].toLowerCase() : null;
+
+  try {
+    const parts = serviceRoleKey.split('.');
+    if (parts.length === 3) {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+      if (urlRef && payload.ref && payload.ref.toLowerCase() !== urlRef) {
+        if (!hasLoggedAdminNotice) {
+          hasLoggedAdminNotice = true;
+          console.warn(
+            `[Supabase Admin] SUPABASE_SERVICE_ROLE_KEY project ref mismatch (URL: "${urlRef}", Key: "${payload.ref}"). Operating in resilient in-memory storage mode.`
+          );
+        }
+        return null;
+      }
+      if (payload.role && payload.role !== 'service_role') {
+        if (!hasLoggedAdminNotice) {
+          hasLoggedAdminNotice = true;
+          console.warn(
+            `[Supabase Admin] SUPABASE_SERVICE_ROLE_KEY has role "${payload.role}" (expected "service_role"). Operating in resilient in-memory storage mode.`
+          );
+        }
+        return null;
+      }
+    }
+  } catch (parseErr) {
+    if (!hasLoggedAdminNotice) {
+      hasLoggedAdminNotice = true;
+      console.warn('[Supabase Admin] SUPABASE_SERVICE_ROLE_KEY is not a valid JWT. Operating in resilient in-memory storage mode.');
     }
     return null;
   }

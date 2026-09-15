@@ -394,6 +394,27 @@ export interface EmailAnalysis {
    * it; never fabricated. See src/utils/realSenderIp.ts.
    */
   realSenderIp?: RealSenderIpInfo;
+  status?: 'NEW' | 'OPEN' | 'TRIAGED' | 'ESCALATED' | 'CLOSED' | string;
+  severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | string;
+  tags?: string[];
+  assigned_user?: string;
+  assignedUser?: string;
+  analyst_notes?: string;
+  analystNotes?: string;
+  analyst_verdict?: string;
+  analystVerdict?: string;
+  resolution_type?: string;
+  resolutionType?: string;
+  updated_at?: string;
+  updatedAt?: string;
+  caseNotes?: Array<{
+    id: string;
+    case_id: string;
+    author_email?: string;
+    label: string;
+    body: string;
+    created_at: string;
+  }>;
 }
 
 export interface EvidenceCardData {

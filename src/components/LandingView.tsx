@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Menu, X, Terminal, ArrowUpRight, Sparkles, Box, Layers, Globe, ShieldAlert, CheckCircle2, ArrowRight, Upload, Zap, FileSearch } from 'lucide-react';
+import { Menu, X, Terminal, ArrowUpRight, Layers, Globe, ShieldAlert, CheckCircle2, ArrowRight, Upload, Zap, FileSearch, Route, ShieldCheck, Sparkles, Box } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
+import { TraceXLogo } from './common/TraceXLogo';
+import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { HeroForensicNexus3D } from './landing/HeroForensicNexus3D';
-import { Forensic3DDataVisualizer } from './landing/Forensic3DDataVisualizer';
+import { ForensicRouteDissector } from './landing/ForensicRouteDissector';
 import { HeaderXRayInspector } from './landing/HeaderXRayInspector';
-import { TraceXLogo3D } from './3d/TraceXLogo3D';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
+import { GlobalDeconstructionEngine } from './landing/GlobalDeconstructionEngine';
+import { CompleteProject3DShowcase } from './3d';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -23,7 +26,7 @@ export function LandingView({
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [heroViewMode, setHeroViewMode] = useState<'3d' | 'board'>('3d');
+  const [heroMode, setHeroMode] = useState<'3d' | 'board'>('board');
 
   const sampleCases = [
     {
@@ -98,7 +101,7 @@ export function LandingView({
       <nav className="sticky top-0 z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <TraceXLogo3D size="sm" onClick={onOpenConsole} title="TraceXMail 3D Cryptographic Core - Click to open Console" />
+            <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core - Click to open Console" />
             <span className="font-['Fraunces',serif] text-[18px] sm:text-[19px] font-semibold text-[#ede6d8]">
               TraceXMail
             </span>
@@ -108,9 +111,13 @@ export function LandingView({
           </div>
 
           <div className="hidden lg:flex items-center gap-8 text-[14.5px]">
-            <button onClick={() => scrollToSection('r3f-forensic-matrix')} className="text-[#ede6d8] hover:text-[#ff8d7d] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5 font-medium">
+            <button onClick={() => scrollToSection('project-3d-showcase')} className="text-[#ede6d8] hover:text-[#ff8d7d] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5 font-medium">
               <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
-              <span>3D Forensic Matrix</span>
+              <span>3D Architecture</span>
+            </button>
+            <button onClick={() => scrollToSection('evidence-chain')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5">
+              <Route className="w-3.5 h-3.5 text-[#c9a227]" />
+              <span>Evidence Route</span>
             </button>
             <button onClick={() => scrollToSection('pipeline')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               How it works
@@ -162,11 +169,18 @@ export function LandingView({
         {mobileMenuOpen && (
           <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-4 flex flex-col gap-2">
             <button
-              onClick={() => { scrollToSection('r3f-forensic-matrix'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-semibold flex items-center gap-2 text-[#ff8d7d]"
+              onClick={() => { scrollToSection('project-3d-showcase'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-semibold flex items-center gap-2 text-[#c9a227]"
             >
               <Sparkles className="w-4 h-4 text-[#c9a227]" />
-              <span>3D Forensic Matrix</span>
+              <span>3D Architecture</span>
+            </button>
+            <button
+              onClick={() => { scrollToSection('evidence-chain'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium flex items-center gap-2 text-[#ff8d7d]"
+            >
+              <Route className="w-4 h-4 text-[#c9a227]" />
+              <span>Evidence Route</span>
             </button>
             <button
               onClick={() => { scrollToSection('pipeline'); setMobileMenuOpen(false); }}
@@ -217,22 +231,22 @@ export function LandingView({
       </nav>
 
       {/* Hero Section */}
-      <section className="py-12 sm:py-16 lg:py-24 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-center relative z-10">
-          <div>
+      <section className="py-14 sm:py-18 lg:py-22 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center relative z-10">
+          <div className="lg:col-span-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227] mb-4">
-              <TraceXLogo3D size="sm" interactive={false} />
+              <TraceXLogo size="xs" />
               <span>TraceXMail Forensic Core v2.4</span>
             </div>
 
-            <h1 className="font-['Fraunces',serif] text-[28px] xs:text-[34px] sm:text-[44px] lg:text-[50px] font-medium leading-[1.12] text-[#ede6d8] tracking-tight max-w-xl">
+            <h1 className="font-['Fraunces',serif] text-[28px] xs:text-[34px] sm:text-[44px] lg:text-[48px] font-medium leading-[1.14] text-[#ede6d8] tracking-tight">
               Every phishing email leaves a trail. We follow it to the source.
             </h1>
-            <p className="mt-4 sm:mt-6 max-w-lg text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
+            <p className="mt-4 sm:mt-5 text-[#b9af9c] text-[15px] sm:text-[16px] leading-relaxed">
               TraceXMail reconstructs an email's real path: headers, authentication, hops, and infrastructure, turned into evidence your SOC can act on and defend in front of whoever asks how you know.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5 mt-6 sm:mt-8">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5 mt-6 sm:mt-7">
               <button
                 onClick={onOpenConsole}
                 className="w-full sm:w-auto text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3 sm:py-3.5 rounded-[3px] font-semibold text-[14.5px] sm:text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg flex items-center justify-center gap-2 group"
@@ -241,16 +255,16 @@ export function LandingView({
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => scrollToSection('r3f-forensic-matrix')}
+                onClick={() => scrollToSection('evidence-chain')}
                 className="w-full sm:w-auto text-center px-6 py-3 sm:py-3.5 rounded-[3px] font-medium text-[14.5px] sm:text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <Sparkles className="w-4 h-4 text-[#c9a227]" />
-                <span>Explore 3D Matrix</span>
+                <Route className="w-4 h-4 text-[#c9a227]" />
+                <span>Inspect Evidence Route</span>
               </button>
             </div>
 
             {/* Quick 1-Click Sample Previews for instant conversion */}
-            <div className="mt-6 p-3 rounded-[4px] bg-[#181510] border border-[#3a352c] max-w-lg">
+            <div className="mt-6 p-3 rounded-[4px] bg-[#181510] border border-[#3a352c]">
               <div className="flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] mb-2">
                 <span className="flex items-center gap-1">
                   <Zap className="w-3 h-3 text-[#c9a227]" />
@@ -296,35 +310,33 @@ export function LandingView({
             </div>
           </div>
 
-          {/* Hero Visual Area with View Switcher (3D WebGL vs Physical Cork Board) */}
-          <div className="w-full max-w-[500px] mx-auto flex flex-col gap-2.5">
-            
-            {/* Segmented Mode Switcher */}
+          {/* Hero Visual Area: Toggleable 3D Threat Nexus or Evidence Board */}
+          <div className="lg:col-span-6 w-full flex flex-col gap-2.5">
             <div className="flex items-center justify-between px-1">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574] uppercase tracking-wider font-semibold">
-                Hero Perspective:
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#8e8574] uppercase tracking-wider font-semibold">
+                HERO PERSPECTIVE:
               </span>
-              <div className="flex items-center gap-1 p-0.5 bg-[#1a1712] border border-[#3a352c] rounded-[4px]">
+              <div className="flex items-center gap-1 p-0.5 bg-[#181510] border border-[#3a352c] rounded-[4px]">
                 <button
-                  onClick={() => setHeroViewMode('3d')}
-                  className={`px-2.5 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    heroViewMode === '3d'
+                  onClick={() => setHeroMode('3d')}
+                  className={`px-3 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    heroMode === '3d'
                       ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
-                      : 'text-[#b9af9c] hover:text-[#ede6d8]'
+                      : 'text-[#8e8574] hover:text-[#ede6d8]'
                   }`}
-                  title="Switch to interactive 3D WebGL Threat Nexus"
+                  title="Switch to interactive 3D Threat Nexus"
                 >
                   <Box className="w-3.5 h-3.5" />
                   <span>3D Nexus</span>
                 </button>
                 <button
-                  onClick={() => setHeroViewMode('board')}
-                  className={`px-2.5 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    heroViewMode === 'board'
+                  onClick={() => setHeroMode('board')}
+                  className={`px-3 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    heroMode === 'board'
                       ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
-                      : 'text-[#b9af9c] hover:text-[#ede6d8]'
+                      : 'text-[#8e8574] hover:text-[#ede6d8]'
                   }`}
-                  title="Switch to classic pin-and-thread evidence cork board"
+                  title="Switch to pinned evidence board"
                 >
                   <Layers className="w-3.5 h-3.5" />
                   <span>Evidence Board</span>
@@ -332,101 +344,17 @@ export function LandingView({
               </div>
             </div>
 
-            {/* Container for Visual */}
-            <div className="w-full relative h-[390px] sm:h-[450px]">
-              {heroViewMode === '3d' ? (
-                <HeroForensicNexus3D
-                  onExploreCase={handleCaseClick}
-                />
-              ) : (
-                /* Evidence Board Visual (Responsive Cork + Pinned Cards) */
-                <div className="w-full h-full relative rounded-[6px] border border-[#3d2f1f] bg-[repeating-radial-gradient(circle_at_12%_18%,rgba(0,0,0,0.10)_0px,rgba(0,0,0,0.10)_1px,transparent_2px,transparent_34px),repeating-radial-gradient(circle_at_70%_62%,rgba(0,0,0,0.08)_0px,rgba(0,0,0,0.08)_1px,transparent_2px,transparent_41px),linear-gradient(155deg,#2e2318,#241b12_55%,#1d1610)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55),0_40px_90px_-30px_rgba(0,0,0,0.7)] select-none overflow-hidden">
-                  {/* SVG Connecting Thread Paths */}
-                  <svg className="absolute inset-0 w-full h-full drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)] pointer-events-none" viewBox="0 0 400 440">
-                    <path
-                      d="M 60 106 C 120 78, 155 66, 196 76 C 246 88, 274 138, 306 186"
-                      fill="none"
-                      stroke="#b23a2e"
-                      strokeWidth="1.5"
-                      opacity="0.92"
-                      strokeDasharray="600"
-                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards]"
-                    />
-                    <path
-                      d="M 196 76 C 205 148, 196 200, 232 224"
-                      fill="none"
-                      stroke="#b23a2e"
-                      strokeWidth="1.5"
-                      opacity="0.92"
-                      strokeDasharray="600"
-                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.15s]"
-                    />
-                    <path
-                      d="M 306 186 C 256 236, 200 268, 116 300"
-                      fill="none"
-                      stroke="#b23a2e"
-                      strokeWidth="1.5"
-                      opacity="0.92"
-                      strokeDasharray="600"
-                      className="animate-[draw_1.9s_cubic-bezier(.3,.7,.3,1)_forwards_0.3s]"
-                    />
-                  </svg>
-
-                  {/* Card 1: Tor Exit Node */}
-                  <div className="absolute top-[12%] left-[22%] -translate-x-1/2 -rotate-4 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
-                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">185.220.101.5</div>
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TOR EXIT NODE</div>
-                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                        <div className="h-full bg-[#b23a2e] w-[92%]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 2: SPF Softfail */}
-                  <div className="absolute top-[6%] left-[64%] sm:left-[60%] -translate-x-1/2 rotate-3 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(1)}>
-                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">SPF · SOFTFAIL</div>
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">UNAUTHORIZED SENDER</div>
-                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                        <div className="h-full bg-[#b23a2e] w-[70%]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 3: ASN Bulgaria */}
-                  <div className="absolute top-[36%] left-[72%] sm:left-[76%] -translate-x-1/2 -rotate-2 shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(2)}>
-                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-medium text-[#2a2620]">AS200548</div>
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold truncate">BULGARIA · ZETTAHOST</div>
-                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                        <div className="h-full bg-[#b23a2e] w-[55%]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card 4: Typosquat Domain */}
-                  <div className="absolute top-[60%] left-[28%] sm:left-[32%] -translate-x-1/2 rotate-[2.5deg] shadow-xl z-10 transition-transform hover:scale-105 hover:z-30 cursor-pointer" onClick={() => handleCaseClick(0)}>
-                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full z-20 bg-[radial-gradient(circle_at_32%_28%,#ff8d7d_0%,#b23a2e_48%,#7a2e26_100%)] shadow-[0_1px_1px_rgba(255,255,255,0.35)_inset,0_3px_4px_rgba(0,0,0,0.55)]" />
-                    <div className="w-[136px] sm:w-[155px] md:w-[165px] bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/20 rounded-[2px] p-2 sm:p-2.5 md:p-3 text-[#211d17]">
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10.5px] font-medium text-[#2a2620] truncate">paypal-secure-update.com</div>
-                      <div className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10px] text-[#7a2e26] mt-0.5 sm:mt-1 tracking-wider font-semibold">TYPOSQUAT DOMAIN</div>
-                      <div className="h-1.5 rounded-[1px] bg-black/10 mt-1.5 sm:mt-2 overflow-hidden">
-                        <div className="h-full bg-[#b23a2e] w-[88%]" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stamp Overlay */}
-                  <div className="absolute bottom-3 right-3 sm:bottom-6 sm:right-6 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] md:text-[12px] font-bold tracking-wider text-[#b23a2e] bg-[radial-gradient(circle,transparent_58%,rgba(178,58,46,0.10)_60%,transparent_62%)] shadow-[0_0_0_2px_#b23a2e,0_0_0_4px_transparent,0_0_0_5.5px_rgba(178,58,46,0.35)] -rotate-12 transform hover:rotate-0 transition-transform">
-                    VERDICT<br />PHISHING<br />CONFIRMED
-                  </div>
-                </div>
-              )}
-            </div>
+            {heroMode === '3d' ? (
+              <HeroForensicNexus3D
+                onExploreCase={handleCaseClick}
+                onOpenConsole={onOpenConsole}
+              />
+            ) : (
+              <HeroEvidenceBoard
+                onExploreCase={handleCaseClick}
+                onOpenConsole={onOpenConsole}
+              />
+            )}
           </div>
         </div>
       </section>
@@ -435,6 +363,18 @@ export function LandingView({
       <LiveDynamicTelemetryRibbon
         onSelectCase={onSelectCase}
         onOpenConsole={onOpenConsole}
+      />
+
+      {/* Global Deconstruction Engine - Real Database Evidence Ingestion Section */}
+      <GlobalDeconstructionEngine
+        onSelectCase={onSelectCase}
+        onOpenConsole={onOpenConsole}
+      />
+
+      {/* Complete Project 3D Interactive Architecture Showcase */}
+      <CompleteProject3DShowcase
+        onOpenConsole={onOpenConsole}
+        onSelectCase={onSelectCase}
       />
 
       {/* Problem Section */}
@@ -587,8 +527,8 @@ export function LandingView({
         </div>
       </section>
 
-      {/* Interactive 3D Forensic Threat Laboratory */}
-      <Forensic3DDataVisualizer
+      {/* Interactive Forensic Route & Hop Dissector */}
+      <ForensicRouteDissector
         onExploreCase={onOpenConsole}
         onSelectCase={onSelectCase}
       />
@@ -834,9 +774,9 @@ export function LandingView({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Exhibit A */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[2px] p-7 relative shadow-[0_18px_34px_-18px_rgba(0,0,0,0.6)] transform -rotate-1 hover:rotate-0 hover:-translate-y-1 transition-all">
+            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
               <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
                 EXHIBIT A
               </span>
@@ -849,7 +789,7 @@ export function LandingView({
             </div>
 
             {/* Exhibit B */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[2px] p-7 relative shadow-[0_18px_34px_-18px_rgba(0,0,0,0.6)] transform rotate-1 hover:rotate-0 hover:-translate-y-1 transition-all md:mt-4">
+            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
               <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
                 EXHIBIT B
               </span>
@@ -862,7 +802,7 @@ export function LandingView({
             </div>
 
             {/* Exhibit C */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[2px] p-7 relative shadow-[0_18px_34px_-18px_rgba(0,0,0,0.6)] transform rotate-[0.5deg] hover:rotate-0 hover:-translate-y-1 transition-all">
+            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
               <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
                 EXHIBIT C
               </span>
@@ -875,7 +815,7 @@ export function LandingView({
             </div>
 
             {/* Exhibit D */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[2px] p-7 relative shadow-[0_18px_34px_-18px_rgba(0,0,0,0.6)] transform -rotate-[0.5deg] hover:rotate-0 hover:-translate-y-1 transition-all md:mt-2">
+            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
               <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
                 EXHIBIT D
               </span>
@@ -1307,11 +1247,11 @@ export function LandingView({
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={() => scrollToSection('r3f-forensic-matrix')}
+              onClick={() => scrollToSection('evidence-chain')}
               className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center gap-2"
             >
-              <Sparkles className="w-4 h-4 text-[#c9a227]" />
-              <span>Explore 3D Threat Lab</span>
+              <Route className="w-4 h-4 text-[#c9a227]" />
+              <span>Explore Evidence Chain</span>
             </button>
           </div>
         </div>

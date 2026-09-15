@@ -38,12 +38,18 @@ function handleDbSchemaError(errMessage?: string) {
     lower.includes('schema cache') ||
     lower.includes('relation "intelligence_cache" does not exist') ||
     lower.includes('pgrst205') ||
-    lower.includes('42p01')
+    lower.includes('42p01') ||
+    lower.includes('invalid api key') ||
+    lower.includes('jwt') ||
+    lower.includes('unauthorized') ||
+    lower.includes('forbidden') ||
+    lower.includes('permission denied') ||
+    lower.includes('apikey')
   ) {
     if (isDbCacheAvailable !== false) {
       isDbCacheAvailable = false;
       lastDbCheckTime = Date.now();
-      console.info('[IntelligenceCache] Supabase table "public.intelligence_cache" not detected in database schema. Operating with in-memory L1 cache.');
+      console.info(`[IntelligenceCache] Supabase L2 persistence unavailable (${errMessage}). Operating with in-memory L1 cache.`);
     }
   }
 }

@@ -1,511 +1,645 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Eye, ShieldAlert, Zap, Globe, Lock, RefreshCw, Layers, Compass, Sparkles, MousePointer, ZoomIn, CheckCircle2, UserCheck } from 'lucide-react';
+import { 
+  ShieldAlert, 
+  ShieldCheck, 
+  Zap, 
+  Globe, 
+  Lock, 
+  RefreshCw, 
+  Layers, 
+  Sparkles, 
+  MousePointer, 
+  ZoomIn, 
+  CheckCircle2, 
+  Play, 
+  Pause, 
+  RotateCcw,
+  ArrowRight,
+  Fingerprint,
+  FileCode2,
+  Mail,
+  UserCheck,
+  Server
+} from 'lucide-react';
 
-interface ForensicNode {
+export interface ForensicStation {
   id: string;
-  label: string;
-  shortTag: string;
-  sublabel: string;
-  type: 'USER' | 'IP' | 'AUTH' | 'DOMAIN' | 'GEO';
-  status: 'MALICIOUS' | 'SUSPICIOUS' | 'CLEAN';
-  details: string;
-  risk: number;
+  stepNumber: number;
+  name: string;
+  badge: string;
+  subtitle: string;
+  conceptPlainEnglish: string;
+  forensicEvidenceLine: string;
+  whyAttackersFail: string;
+  verdict: 'BLOCKED' | 'SUSPICIOUS' | 'VERIFIED';
+  colorHex: number;
+  emissiveHex: number;
   position: [number, number, number];
-  shape: 'diamond' | 'spiked' | 'ring' | 'sphere';
+  icon: string;
 }
+
+const FORENSIC_STATIONS: ForensicStation[] = [
+  {
+    id: 'station-origin',
+    stepNumber: 1,
+    name: 'Spoofed Sender Origin',
+    badge: 'STEP 1: THE DISGUISE',
+    subtitle: 'Attacker Injects Forged From Display Name',
+    conceptPlainEnglish: 'The attacker writes "PayPal Security" or "CEO" in quotation marks. Ordinary email apps only show the display name inside the quotes, tricking victims into trusting the message.',
+    forensicEvidenceLine: 'From: "PayPal Security Resolution" <security@paypal.com>\nReal Socket IP: 185.220.101.5 (Sofia, Bulgaria - Tor Exit Node)',
+    whyAttackersFail: 'Attackers can type whatever display name they want, but the physical internet connection requires their actual server IP address.',
+    verdict: 'BLOCKED',
+    colorHex: 0xef4444,
+    emissiveHex: 0xb23a2e,
+    position: [-3.2, 0.4, 0.2],
+    icon: 'ShieldAlert'
+  },
+  {
+    id: 'station-relays',
+    stepNumber: 2,
+    name: 'MTA Transport Hops',
+    badge: 'STEP 2: PERMANENT FOOTPRINTS',
+    subtitle: 'Internet Relays Stamp Received Headers',
+    conceptPlainEnglish: 'Emails do not fly directly into inboxes. They pass through intermediary mail servers. Every server that handles the message stamps an indelible, timestamped "Received:" header.',
+    forensicEvidenceLine: 'Received: from origin-vps.anonymizing.bg ([185.220.101.5])\n    by mx01.enterprise-inbox.net with ESMTP; Sun, 15 Sep 2026 14:12:08',
+    whyAttackersFail: 'Even if an attacker injects fake headers at the bottom of their email, the receiving gateway stamps the true client socket IP at the top of the stack.',
+    verdict: 'SUSPICIOUS',
+    colorHex: 0x38bdf8,
+    emissiveHex: 0x0284c7,
+    position: [-1.6, -0.6, -0.2],
+    icon: 'Server'
+  },
+  {
+    id: 'station-crypto',
+    stepNumber: 3,
+    name: 'Cryptographic Signature Gate',
+    badge: 'STEP 3: MATHEMATICAL PROOF',
+    subtitle: 'SPF, DKIM & DMARC Validation',
+    conceptPlainEnglish: 'The receiving server checks DNS: Is this IP allowed by PayPal (SPF)? Does this email carry the secret RSA cryptographic private key (DKIM)? And does the domain align (DMARC)?',
+    forensicEvidenceLine: 'Authentication-Results: mx.defense.net;\n    spf=fail (185.220.101.5 not authorized in DNS);\n    dkim=fail (RSA signature invalid); dmarc=fail (p=reject)',
+    whyAttackersFail: 'Cryptographic keys cannot be guessed. Without the legitimate company\'s private key in DNS, the digital signature fails with 100% certainty.',
+    verdict: 'BLOCKED',
+    colorHex: 0xeab308,
+    emissiveHex: 0xc9a227,
+    position: [0.0, 0.8, 0.3],
+    icon: 'Fingerprint'
+  },
+  {
+    id: 'station-mime',
+    stepNumber: 4,
+    name: 'MIME Boundary Deconstruction',
+    badge: 'STEP 4: ENVELOPE UNSEALING',
+    subtitle: 'Body Hash (bh=) & Payload Dissection',
+    conceptPlainEnglish: 'TraceXMail peels apart the multi-part envelope: isolating text, encoded attachments, tracking pixels, and checking the SHA-256 body hash to detect hidden trojans.',
+    forensicEvidenceLine: 'Content-Type: multipart/alternative; boundary="==_Part_9812"\nPayload: Attachment "Invoice_482.pdf.exe" [Entropy: 7.94 • AsyncRAT Trojan]',
+    whyAttackersFail: 'Attackers hiding executable payloads behind double extensions (.pdf.exe) are unmasked by binary magic-byte inspection and entropy analysis.',
+    verdict: 'BLOCKED',
+    colorHex: 0xa855f7,
+    emissiveHex: 0x7e22ce,
+    position: [1.6, -0.5, -0.1],
+    icon: 'Layers'
+  },
+  {
+    id: 'station-inbox',
+    stepNumber: 5,
+    name: 'Shielded Corporate Mailbox',
+    badge: 'STEP 5: ZERO TRUST OUTCOME',
+    subtitle: 'Automated Quarantine & Protected User',
+    conceptPlainEnglish: 'Because all forensic evidence confirms spoofing and malware, the threat is automatically quarantined. The targeted employee is safe, and the SOC team receives an audit report.',
+    forensicEvidenceLine: 'Decision: REJECTED AT GATEWAY • QUARANTINE VAULT #EV-9821\nVictim Inbox: employee@company.com [Protected • 0 Exposure]',
+    whyAttackersFail: 'Zero-trust header analysis stops phishing at the perimeter before any user can ever be tricked into clicking a link.',
+    verdict: 'VERIFIED',
+    colorHex: 0x22c55e,
+    emissiveHex: 0x16a34a,
+    position: [3.2, 0.5, 0.2],
+    icon: 'UserCheck'
+  }
+];
 
 interface HeroForensicNexus3DProps {
   onNodeClick?: (nodeId: string) => void;
   onExploreCase?: (caseIndex: number) => void;
+  onOpenConsole?: () => void;
 }
-
-const FORENSIC_NODES: ForensicNode[] = [
-  {
-    id: 'node-user',
-    label: 'Protected Employee Inbox',
-    shortTag: 'TRACED USER',
-    sublabel: 'Targeted Recipient (Shielded)',
-    type: 'USER',
-    status: 'CLEAN',
-    details: 'The intended victim inbox. TraceXMail verified the user profile and prevented credential exposure.',
-    risk: 0,
-    position: [2.3, -0.6, 0.7],
-    shape: 'diamond'
-  },
-  {
-    id: 'node-tor',
-    label: '185.220.101.5',
-    shortTag: 'ATTACKER TOR',
-    sublabel: 'Hidden Attacker Relay (Bulgaria)',
-    type: 'IP',
-    status: 'MALICIOUS',
-    details: 'The computer that sent the email. It used an anonymous Tor gateway to hide its real identity.',
-    risk: 98,
-    position: [-2.2, 1.1, 0.8],
-    shape: 'spiked'
-  },
-  {
-    id: 'node-spf',
-    label: 'Security Checkpoint (SPF)',
-    shortTag: 'GATEWAY FAILED',
-    sublabel: 'Unauthorized Sender Identity',
-    type: 'AUTH',
-    status: 'MALICIOUS',
-    details: 'The digital signature failed because this sender is not allowed to send email for this company.',
-    risk: 94,
-    position: [0.2, 2.2, 0.3],
-    shape: 'ring'
-  },
-  {
-    id: 'node-domain',
-    label: 'paypal-security-update.com',
-    shortTag: 'FAKE DOMAIN',
-    sublabel: 'Lookalike Phishing Website',
-    type: 'DOMAIN',
-    status: 'MALICIOUS',
-    details: 'A fake web address created 3 days ago designed to trick people into typing their passwords.',
-    risk: 96,
-    position: [-1.2, -1.6, 1.1],
-    shape: 'spiked'
-  },
-  {
-    id: 'node-geo',
-    label: 'Inbound Mail Relay',
-    shortTag: 'SAFE TRANSIT',
-    sublabel: 'Legitimate Mail Server',
-    type: 'GEO',
-    status: 'CLEAN',
-    details: 'Standard internet mail server that routed the message and passed it to the security scanner.',
-    risk: 6,
-    position: [1.4, 1.5, -0.8],
-    shape: 'sphere'
-  }
-];
 
 export const HeroForensicNexus3D: React.FC<HeroForensicNexus3DProps> = ({
   onNodeClick,
-  onExploreCase
+  onExploreCase,
+  onOpenConsole
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const [selectedNode, setSelectedNode] = useState<ForensicNode | null>(FORENSIC_NODES[0]);
-  const [hoveredNode, setHoveredNode] = useState<ForensicNode | null>(null);
-  const [isRotating, setIsRotating] = useState<boolean>(true);
-  const [showFloatingLabels, setShowFloatingLabels] = useState<boolean>(true);
-  const [particleSpeed, setParticleSpeed] = useState<number>(1);
-  const [activePulse, setActivePulse] = useState<boolean>(false);
-  const [projectedCoords, setProjectedCoords] = useState<{ id: string; x: number; y: number; visible: boolean; depthScale: number }[]>([]);
+  const [activeStep, setActiveStep] = useState<number>(3); // Default to Cryptographic Gate
+  const [isPlayingTour, setIsPlayingTour] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<'concept' | 'technical'>('concept');
+  const [cameraProgress, setCameraProgress] = useState<number>(0.5);
+
+  // References for Three.js state
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const stationMeshesRef = useRef<{ id: string; group: THREE.Group; mesh: THREE.Mesh; ring: THREE.Mesh }[]>([]);
+  const packetMeshRef = useRef<THREE.Mesh | null>(null);
+  const curveRef = useRef<THREE.CatmullRomCurve3 | null>(null);
+  const isPlayingRef = useRef<boolean>(true);
+  const activeStepRef = useRef<number>(3);
+
+  // Sync state with refs
+  useEffect(() => {
+    isPlayingRef.current = isPlayingTour;
+  }, [isPlayingTour]);
+
+  useEffect(() => {
+    activeStepRef.current = activeStep;
+  }, [activeStep]);
+
+  const activeStation = FORENSIC_STATIONS.find(s => s.stepNumber === activeStep) || FORENSIC_STATIONS[2];
 
   useEffect(() => {
     const container = mountRef.current;
     if (!container) return;
 
-    let width = container.clientWidth || 450;
-    let height = container.clientHeight || 440;
+    let width = container.clientWidth || 500;
+    let height = container.clientHeight || 460;
 
-    // Three.js Scene Setup
+    // 1. Scene & Camera Setup
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
-    camera.position.z = 6.2;
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100);
+    camera.position.set(0, 0.8, 6.2);
+    cameraRef.current = camera;
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
-    // Dynamic Lights
-    const ambientLight = new THREE.AmbientLight(0xfff5e6, 1.1);
+    // 2. Lighting
+    const ambientLight = new THREE.AmbientLight(0xfff8ee, 1.2);
     scene.add(ambientLight);
 
-    const primaryLight = new THREE.DirectionalLight(0xede6d8, 1.4);
-    primaryLight.position.set(5, 5, 5);
-    scene.add(primaryLight);
+    const keyLight = new THREE.DirectionalLight(0xffeedd, 1.6);
+    keyLight.position.set(4, 5, 6);
+    scene.add(keyLight);
 
-    const redThreatLight = new THREE.PointLight(0xef4444, 2.5, 12);
-    redThreatLight.position.set(-3, -2, 2);
-    scene.add(redThreatLight);
+    const fillLight = new THREE.DirectionalLight(0x7fa3ba, 0.8);
+    fillLight.position.set(-5, -2, -3);
+    scene.add(fillLight);
 
-    const greenUserLight = new THREE.PointLight(0x22c55e, 2.5, 12);
-    greenUserLight.position.set(3, -2, 2);
-    scene.add(greenUserLight);
+    // Root Group
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
 
-    // Root Group for interactive rotation
-    const nexusGroup = new THREE.Group();
-    scene.add(nexusGroup);
+    // 3. Construct the 3D Spline Curve for the email flight path
+    const points = FORENSIC_STATIONS.map(s => new THREE.Vector3(...s.position));
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.5);
+    curveRef.current = curve;
 
-    // Central Forensic Core Sphere
-    const coreGeom = new THREE.SphereGeometry(0.7, 16, 16);
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: 0xc9a227,
-      wireframe: true,
+    // Glowing Fiber-Optic Cable (Spline Tube)
+    const tubeGeom = new THREE.TubeGeometry(curve, 100, 0.03, 12, false);
+    const tubeMat = new THREE.MeshStandardMaterial({
+      color: 0x3a352c,
+      emissive: 0x221e17,
+      roughness: 0.4,
+      metalness: 0.8,
       transparent: true,
-      opacity: 0.25
+      opacity: 0.7
     });
-    const coreMesh = new THREE.Mesh(coreGeom, coreMat);
-    nexusGroup.add(coreMesh);
+    const tubeMesh = new THREE.Mesh(tubeGeom, tubeMat);
+    rootGroup.add(tubeMesh);
 
-    // Gimbal Ring 1
-    const ring1Geom = new THREE.TorusGeometry(2.3, 0.012, 16, 64);
-    const ring1Mat = new THREE.MeshBasicMaterial({ color: 0x8a8070, transparent: true, opacity: 0.3 });
-    const ring1 = new THREE.Mesh(ring1Geom, ring1Mat);
-    ring1.rotation.x = Math.PI / 3;
-    nexusGroup.add(ring1);
+    // Glowing Energy Line running parallel
+    const energyPoints = curve.getPoints(120);
+    const energyLineGeom = new THREE.BufferGeometry().setFromPoints(energyPoints);
+    const energyLineMat = new THREE.LineBasicMaterial({
+      color: 0xc9a227,
+      transparent: true,
+      opacity: 0.45
+    });
+    const energyLine = new THREE.Line(energyLineGeom, energyLineMat);
+    rootGroup.add(energyLine);
 
-    // Dynamic Nodes with distinct Geometries & Colors
-    const nodeMeshes: { nodeData: ForensicNode; mesh: THREE.Mesh }[] = [];
-    const pulsePackets: { mesh: THREE.Mesh; startPos: THREE.Vector3 }[] = [];
+    // 4. Create 5 Distinct, Iconic Forensic Stations in 3D
+    const stationMeshes: { id: string; group: THREE.Group; mesh: THREE.Mesh; ring: THREE.Mesh }[] = [];
 
-    FORENSIC_NODES.forEach((node) => {
-      const nodeGroup = new THREE.Group();
-      nodeGroup.position.set(...node.position);
+    FORENSIC_STATIONS.forEach((station) => {
+      const stationGroup = new THREE.Group();
+      stationGroup.position.set(...station.position);
 
-      const isClean = node.status === 'CLEAN';
-      const isUser = node.type === 'USER';
-      const isMalicious = node.status === 'MALICIOUS';
+      let coreGeom: THREE.BufferGeometry;
 
-      const nodeColor = isUser ? 0x22c55e : isMalicious ? 0xef4444 : 0xf59e0b;
-      const emColor = isUser ? 0x4ade80 : isMalicious ? 0xff8d7d : 0xfcd34d;
-
-      let nGeom: THREE.BufferGeometry;
-      switch (node.shape) {
-        case 'diamond':
-          nGeom = new THREE.OctahedronGeometry(0.32, 0);
+      // Unique geometry representing each forensic station
+      switch (station.stepNumber) {
+        case 1: // Attacker Origin: Spiked warning core
+          coreGeom = new THREE.DodecahedronGeometry(0.38, 0);
           break;
-        case 'spiked':
-          nGeom = new THREE.DodecahedronGeometry(0.34, 0);
+        case 2: // MTA Relays: Network server cylinder
+          coreGeom = new THREE.CylinderGeometry(0.32, 0.32, 0.5, 16);
           break;
-        case 'ring':
-          nGeom = new THREE.TorusGeometry(0.28, 0.07, 16, 24);
+        case 3: // Cryptographic Gate: Holographic Torus Ring
+          coreGeom = new THREE.TorusGeometry(0.36, 0.08, 16, 32);
           break;
-        case 'sphere':
+        case 4: // MIME Deconstruction: Layered Octahedron
+          coreGeom = new THREE.OctahedronGeometry(0.38, 0);
+          break;
+        case 5: // Shielded User Inbox: Crystalline Diamond
         default:
-          nGeom = new THREE.SphereGeometry(0.26, 20, 20);
+          coreGeom = new THREE.OctahedronGeometry(0.42, 1);
           break;
       }
 
-      const nMat = new THREE.MeshStandardMaterial({
-        color: nodeColor,
-        emissive: emColor,
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: station.colorHex,
+        emissive: station.emissiveHex,
         emissiveIntensity: 0.9,
-        roughness: 0.2
+        roughness: 0.2,
+        metalness: 0.4
       });
-      const nMesh = new THREE.Mesh(nGeom, nMat);
-      nodeGroup.add(nMesh);
-      nodeMeshes.push({ nodeData: node, mesh: nMesh });
+      const coreMesh = new THREE.Mesh(coreGeom, coreMat);
+      stationGroup.add(coreMesh);
 
-      // Pulsing Halo Ring
-      const haloGeom = new THREE.RingGeometry(0.36, 0.44, 20);
+      // Rotating Aura / Halo Ring around each station
+      const haloGeom = new THREE.TorusGeometry(0.55, 0.015, 12, 40);
       const haloMat = new THREE.MeshBasicMaterial({
-        color: nodeColor,
-        side: THREE.DoubleSide,
+        color: station.colorHex,
         transparent: true,
-        opacity: 0.6
+        opacity: 0.5
       });
       const haloMesh = new THREE.Mesh(haloGeom, haloMat);
       haloMesh.rotation.x = Math.PI / 2;
-      nodeGroup.add(haloMesh);
+      stationGroup.add(haloMesh);
 
-      // Connecting Ray to Core
-      const lineGeom = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(-node.position[0], -node.position[1], -node.position[2])
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({
-        color: nodeColor,
+      // Ground Tech Radar Disc
+      const discGeom = new THREE.RingGeometry(0.2, 0.65, 32);
+      const discMat = new THREE.MeshBasicMaterial({
+        color: station.colorHex,
         transparent: true,
-        opacity: 0.35
+        opacity: 0.15,
+        side: THREE.DoubleSide
       });
-      const line = new THREE.Line(lineGeom, lineMat);
-      nodeGroup.add(line);
+      const discMesh = new THREE.Mesh(discGeom, discMat);
+      discMesh.rotation.x = Math.PI / 2;
+      discMesh.position.y = -0.55;
+      stationGroup.add(discMesh);
 
-      // Packet Pulse
-      const packetGeom = new THREE.SphereGeometry(0.06, 8, 8);
-      const packetMat = new THREE.MeshBasicMaterial({ color: emColor });
-      const packet = new THREE.Mesh(packetGeom, packetMat);
-      nexusGroup.add(packet);
-      pulsePackets.push({ mesh: packet, startPos: new THREE.Vector3(...node.position) });
-
-      nexusGroup.add(nodeGroup);
+      rootGroup.add(stationGroup);
+      stationMeshes.push({
+        id: station.id,
+        group: stationGroup,
+        mesh: coreMesh,
+        ring: haloMesh
+      });
     });
 
-    // Mouse Drag Rotation & Hover
-    let isMouseDown = false;
-    let prevMouseX = 0;
-    let prevMouseY = 0;
-    let targetRotationX = 0.2;
-    let targetRotationY = 0.4;
+    stationMeshesRef.current = stationMeshes;
+
+    // 5. Traveling Email Data Packet (Luminous Cyber Envelope Core)
+    const packetGroup = new THREE.Group();
+    const packetGeom = new THREE.SphereGeometry(0.12, 16, 16);
+    const packetMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xc9a227,
+      emissiveIntensity: 2.0
+    });
+    const packetCore = new THREE.Mesh(packetGeom, packetMat);
+    packetGroup.add(packetCore);
+
+    // Glowing Pulse Shell around packet
+    const pulseShellGeom = new THREE.SphereGeometry(0.22, 16, 16);
+    const pulseShellMat = new THREE.MeshBasicMaterial({
+      color: 0xc9a227,
+      transparent: true,
+      opacity: 0.4,
+      wireframe: true
+    });
+    const pulseShell = new THREE.Mesh(pulseShellGeom, pulseShellMat);
+    packetGroup.add(pulseShell);
+
+    rootGroup.add(packetGroup);
+    packetMeshRef.current = packetGroup as any;
+
+    // 6. Interactive Raycasting for Hover & Click
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-
-    const handlePointerDown = (e: PointerEvent) => {
-      isMouseDown = true;
-      prevMouseX = e.clientX;
-      prevMouseY = e.clientY;
-    };
 
     const handlePointerMove = (e: PointerEvent) => {
       const rect = container.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-      if (isMouseDown) {
-        const deltaX = e.clientX - prevMouseX;
-        const deltaY = e.clientY - prevMouseY;
-        targetRotationY += deltaX * 0.008;
-        targetRotationX += deltaY * 0.008;
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-      }
-
-      // Check hover on nodes
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(nodeMeshes.map(n => n.mesh));
-      if (intersects.length > 0) {
-        const hit = nodeMeshes.find(n => n.mesh === intersects[0].object);
-        if (hit) {
-          setHoveredNode(hit.nodeData);
-          container.style.cursor = 'pointer';
-        }
+      const targets = stationMeshes.map(s => s.mesh);
+      const hits = raycaster.intersectObjects(targets);
+
+      if (hits.length > 0) {
+        container.style.cursor = 'pointer';
       } else {
-        setHoveredNode(null);
-        container.style.cursor = isMouseDown ? 'grabbing' : 'grab';
+        container.style.cursor = 'default';
       }
     };
 
-    const handlePointerUp = () => {
-      isMouseDown = false;
-    };
+    const handleClick = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-    const handleClick = () => {
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(nodeMeshes.map(n => n.mesh));
-      if (intersects.length > 0) {
-        const hit = nodeMeshes.find(n => n.mesh === intersects[0].object);
-        if (hit) {
-          setSelectedNode(hit.nodeData);
-          if (onNodeClick) onNodeClick(hit.nodeData.id);
+      const targets = stationMeshes.map(s => s.mesh);
+      const hits = raycaster.intersectObjects(targets);
+
+      if (hits.length > 0) {
+        const hitMesh = hits[0].object;
+        const found = stationMeshes.find(s => s.mesh === hitMesh);
+        if (found) {
+          const stationObj = FORENSIC_STATIONS.find(st => st.id === found.id);
+          if (stationObj) {
+            setActiveStep(stationObj.stepNumber);
+            setIsPlayingTour(false); // Pause auto-tour when user interacts
+            if (onNodeClick) onNodeClick(stationObj.id);
+          }
         }
       }
     };
 
-    container.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
+    container.addEventListener('pointermove', handlePointerMove);
     container.addEventListener('click', handleClick);
 
-    // Resize Observer
-    const resizeObserver = new ResizeObserver(() => {
-      if (!container) return;
-      width = container.clientWidth || 450;
-      height = container.clientHeight || 440;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-    });
-    resizeObserver.observe(container);
-
-    // Animation Loop
-    let animationId: number;
+    // 7. Animation Loop
+    let animationFrameId: number;
     let clock = new THREE.Clock();
+    let packetT = 0.5; // Progress 0 to 1 along curve
 
     const animate = () => {
-      animationId = requestAnimationFrame(animate);
+      animationFrameId = requestAnimationFrame(animate);
       const delta = clock.getDelta();
-      const elapsedTime = clock.getElapsedTime();
+      const time = clock.getElapsedTime();
 
-      // Rotation damping
-      if (isRotating && !isMouseDown) {
-        nexusGroup.rotation.y += 0.004 * particleSpeed;
-        nexusGroup.rotation.x += 0.001 * particleSpeed;
-      } else {
-        nexusGroup.rotation.y += (targetRotationY - nexusGroup.rotation.y) * 0.1;
-        nexusGroup.rotation.x += (targetRotationX - nexusGroup.rotation.x) * 0.1;
-      }
+      // Rotate individual station meshes on their own axes
+      stationMeshes.forEach((st, idx) => {
+        st.mesh.rotation.y += 0.015;
+        st.mesh.rotation.x = Math.sin(time + idx) * 0.15;
+        st.ring.rotation.z += 0.02;
 
-      // Individual mesh rotations
-      nodeMeshes.forEach(({ mesh, nodeData }) => {
-        if (nodeData.shape === 'diamond') {
-          mesh.rotation.y += delta * 0.8;
-        } else if (nodeData.shape === 'spiked') {
-          mesh.rotation.y += delta * 0.5;
+        // Highlight active station with subtle pulsation
+        const isActive = (idx + 1) === activeStepRef.current;
+        if (isActive) {
+          const scale = 1.0 + Math.sin(time * 4) * 0.08;
+          st.group.scale.set(scale, scale, scale);
+        } else {
+          st.group.scale.lerp(new THREE.Vector3(0.9, 0.9, 0.9), 0.1);
         }
       });
 
-      // Packet Pulses along rays
-      pulsePackets.forEach(({ mesh, startPos }, idx) => {
-        const progress = (elapsedTime * 0.7 * particleSpeed + idx * 0.2) % 1;
-        mesh.position.lerpVectors(startPos, new THREE.Vector3(0, 0, 0), progress);
-      });
+      // Update Traveling Email Packet along 3D Curve
+      if (curveRef.current && packetMeshRef.current) {
+        if (isPlayingRef.current) {
+          packetT = (packetT + delta * 0.18) % 1.0;
+        } else {
+          // Snap packet position towards the active step
+          const targetT = (activeStepRef.current - 1) / (FORENSIC_STATIONS.length - 1);
+          packetT += (targetT - packetT) * 0.08;
+        }
 
-      // Project 3D Node positions to 2D screen coordinates
-      const coords: { id: string; x: number; y: number; visible: boolean; depthScale: number }[] = [];
-      FORENSIC_NODES.forEach((node) => {
-        const worldPos = new THREE.Vector3(...node.position);
-        worldPos.applyMatrix4(nexusGroup.matrixWorld);
-        const projected = worldPos.clone().project(camera);
+        const pointOnCurve = curveRef.current.getPointAt(packetT);
+        packetMeshRef.current.position.copy(pointOnCurve);
 
-        const isBehind = projected.z > 1;
-        const screenX = ((projected.x + 1) * width) / 2;
-        const screenY = ((-projected.y + 1) * height) / 2;
-        
-        const depthScale = Math.max(0.8, Math.min(1.1, (6.5 - worldPos.z) / 6.0));
+        // If playing auto-tour, update active step when packet passes stations
+        if (isPlayingRef.current) {
+          const calculatedStep = Math.min(
+            5,
+            Math.max(1, Math.round(packetT * (FORENSIC_STATIONS.length - 1)) + 1)
+          );
+          if (calculatedStep !== activeStepRef.current) {
+            setActiveStep(calculatedStep);
+          }
+        }
+      }
 
-        coords.push({
-          id: node.id,
-          x: screenX,
-          y: screenY,
-          visible: !isBehind && screenX >= 10 && screenX <= width - 10 && screenY >= 10 && screenY <= height - 10,
-          depthScale
-        });
-      });
-      setProjectedCoords(coords);
+      // Smooth subtle camera drift to create depth
+      const activeObj = FORENSIC_STATIONS[activeStepRef.current - 1] || FORENSIC_STATIONS[2];
+      const targetCamX = activeObj.position[0] * 0.35;
+      const targetCamY = 0.6 + activeObj.position[1] * 0.2;
+      camera.position.x += (targetCamX - camera.position.x) * 0.04;
+      camera.position.y += (targetCamY - camera.position.y) * 0.04;
+      camera.lookAt(targetCamX * 0.5, 0, 0);
 
       renderer.render(scene, camera);
     };
 
     animate();
 
+    // Resize Observer
+    const resizeObserver = new ResizeObserver(() => {
+      if (!container) return;
+      width = container.clientWidth || 500;
+      height = container.clientHeight || 460;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    });
+    resizeObserver.observe(container);
+
     return () => {
-      cancelAnimationFrame(animationId);
+      cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
-      container.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
+      container.removeEventListener('pointermove', handlePointerMove);
       container.removeEventListener('click', handleClick);
       renderer.dispose();
+      container.innerHTML = '';
     };
-  }, [isRotating, particleSpeed]);
+  }, []);
+
+  const handleSelectStep = (stepNum: number) => {
+    setActiveStep(stepNum);
+    setIsPlayingTour(false);
+  };
+
+  const handleReset = () => {
+    setActiveStep(1);
+    setIsPlayingTour(true);
+  };
 
   return (
-    <div className="w-full h-full relative flex flex-col justify-between select-none overflow-hidden rounded-[6px] border border-[#3d2f1f] bg-[radial-gradient(ellipse_at_top,#261c14_0%,#14120f_80%)] shadow-2xl">
+    <div className="w-full bg-[#14110d] border border-[#3a352c] rounded-md shadow-2xl overflow-hidden font-sans">
       
-      {/* 3D WebGL Canvas Viewport */}
-      <div 
-        ref={mountRef} 
-        className="absolute inset-0 w-full h-full z-0 cursor-grab active:cursor-grabbing"
-        title="Click and drag to rotate the 3D map"
-      />
-
-      {/* Dynamic 3D Floating Spatial Labels */}
-      {showFloatingLabels && projectedCoords.map((coord) => {
-        if (!coord.visible) return null;
-        const node = FORENSIC_NODES.find(n => n.id === coord.id);
-        if (!node) return null;
-        const isSelected = (hoveredNode || selectedNode)?.id === node.id;
-        const isMalicious = node.status === 'MALICIOUS';
-        const isUser = node.type === 'USER';
-
-        return (
-          <div
-            key={node.id}
-            style={{
-              position: 'absolute',
-              left: `${coord.x}px`,
-              top: `${coord.y - 22}px`,
-              transform: `translate(-50%, -50%) scale(${coord.depthScale})`,
-              zIndex: 15
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedNode(node);
-              if (onNodeClick) onNodeClick(node.id);
-            }}
-            className={`px-2 py-0.5 rounded-[4px] text-[10.5px] font-['IBM_Plex_Mono',monospace] font-bold tracking-wider cursor-pointer whitespace-nowrap transition-all select-none backdrop-blur-md flex items-center gap-1.5 shadow-xl ${
-              isSelected
-                ? 'bg-[#ede6d8] text-[#14120f] scale-110 ring-2 ring-[#c9a227] z-25'
-                : isUser
-                  ? 'bg-[#0e1912]/90 text-[#4ade80] border border-[#22c55e]/60 hover:bg-[#22c55e] hover:text-[#14120f]'
-                  : isMalicious
-                    ? 'bg-[#18100e]/90 text-[#ff8d7d] border border-[#ef4444]/60 hover:bg-[#ef4444] hover:text-[#ede6d8]'
-                    : 'bg-[#14120f]/90 text-[#d6cdbe] border border-[#3a352c] hover:border-[#c9a227]'
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${isUser ? 'bg-[#22c55e]' : isMalicious ? 'bg-[#ef4444] animate-pulse' : 'bg-[#c9a227]'}`} />
-            <span>{node.shortTag}</span>
+      {/* Top Interactive Concept Bar */}
+      <div className="p-3.5 sm:p-4 bg-[#1a1612] border-b border-[#3a352c] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] font-bold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
+            <span>Forensic 3D Concept Engine</span>
           </div>
-        );
-      })}
-
-      {/* Top HUD Controls Overlay */}
-      <div className="relative z-10 p-3 sm:p-4 flex items-center justify-between border-b border-[#3a352c]/60 bg-[#14120f]/80 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-ping" />
-          <span className="font-['IBM_Plex_Mono',monospace] text-[11px] font-bold text-[#ede6d8] tracking-wider uppercase">
-            3D Journey Nexus
-          </span>
-          <span className="hidden xs:inline-block font-['IBM_Plex_Mono',monospace] text-[10px] text-[#b9af9c] px-1.5 py-0.5 rounded bg-[#26221b] border border-[#3a352c]">
-            Interactive Map
+          <span className="text-[12px] text-[#8e8574] font-['IBM_Plex_Mono',monospace] hidden md:inline">
+            Follow an email's cryptographic flight path
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        {/* Controls: Auto-Tour & View Mode Toggle */}
+        <div className="flex items-center gap-2 text-[11px] font-['IBM_Plex_Mono',monospace]">
           <button
-            onClick={() => setIsRotating(!isRotating)}
-            className={`px-2 py-1 rounded text-[10.5px] font-['IBM_Plex_Mono',monospace] border transition-colors cursor-pointer flex items-center gap-1 ${
-              isRotating
-                ? 'bg-[#c9a227]/20 border-[#c9a227] text-[#ede6d8]'
-                : 'bg-[#1d1a15] border-[#3a352c] text-[#b9af9c]'
+            onClick={() => setIsPlayingTour(!isPlayingTour)}
+            className={`px-2.5 py-1 rounded-[2px] border transition-all cursor-pointer flex items-center gap-1.5 ${
+              isPlayingTour 
+                ? 'bg-[#262017] border-[#c9a227] text-[#c9a227] font-bold' 
+                : 'bg-[#15120e] border-[#3a352c] text-[#8e8574] hover:text-[#ede6d8]'
             }`}
-            title="Toggle Continuous Orbit"
+            title={isPlayingTour ? 'Pause automatic journey tour' : 'Play automatic journey tour'}
           >
-            <Compass className="w-3 h-3" />
-            <span className="hidden sm:inline">{isRotating ? 'Orbit' : 'Paused'}</span>
+            {isPlayingTour ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+            <span>{isPlayingTour ? 'Auto Journey' : 'Tour Paused'}</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode(viewMode === 'concept' ? 'technical' : 'concept')}
+            className="px-2.5 py-1 rounded-[2px] bg-[#15120e] border border-[#3a352c] hover:border-[#c9a227] text-[#ede6d8] transition-all cursor-pointer flex items-center gap-1.5"
+            title="Toggle between simple plain-English explanation and raw RFC822 header inspection"
+          >
+            <FileCode2 className="w-3 h-3 text-[#c9a227]" />
+            <span>{viewMode === 'concept' ? 'Switch to Technical' : 'Switch to Concept'}</span>
+          </button>
+
+          <button
+            onClick={handleReset}
+            className="p-1 rounded-[2px] bg-[#15120e] border border-[#3a352c] hover:border-[#c9a227] text-[#8e8574] hover:text-[#ede6d8] cursor-pointer"
+            title="Reset to Step 1"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Floating Interactive Hover / Selection Card (Simplified for Beginners) */}
-      <div className="relative z-10 p-3 sm:p-4 mt-auto">
-        <div className="bg-[#181510]/95 border border-[#3a352c] rounded-[4px] p-3 sm:p-3.5 backdrop-blur-md shadow-2xl transition-all">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${
-                (hoveredNode || selectedNode)?.type === 'USER'
-                  ? 'bg-[#22c55e]'
-                  : (hoveredNode || selectedNode)?.status === 'MALICIOUS'
-                    ? 'bg-[#ef4444]'
-                    : 'bg-[#c9a227]'
-              }`} />
-              <span className="font-['IBM_Plex_Mono',monospace] text-[12px] font-bold text-[#ede6d8] truncate">
-                {(hoveredNode || selectedNode)?.label}
-              </span>
-            </div>
-            
-            <span className={`font-['IBM_Plex_Mono',monospace] text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
-              (hoveredNode || selectedNode)?.type === 'USER'
-                ? 'bg-[#22c55e]/20 text-[#4ade80] border border-[#22c55e]/40'
-                : (hoveredNode || selectedNode)?.status === 'MALICIOUS'
-                  ? 'bg-[#ef4444]/20 text-[#ff8d7d] border border-[#ef4444]/40'
-                  : 'bg-[#c9a227]/20 text-[#c9a227] border border-[#c9a227]/40'
-            }`}>
-              {(hoveredNode || selectedNode)?.type === 'USER' ? 'PROTECTED' : `${(hoveredNode || selectedNode)?.risk}% RISK`}
+      {/* Main 3D Canvas Viewport */}
+      <div className="relative w-full h-[320px] sm:h-[380px] bg-[#0c0a08] overflow-hidden">
+        
+        {/* 3D Mount Container */}
+        <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+
+        {/* Floating Dynamic Stage Pill on 3D viewport */}
+        <div className="absolute top-4 left-4 pointer-events-none">
+          <div className="px-3 py-1.5 rounded bg-[#16130f]/90 border border-[#3a352c] shadow-xl backdrop-blur-sm flex items-center gap-2">
+            <span 
+              className="w-2.5 h-2.5 rounded-full animate-ping"
+              style={{ backgroundColor: `#${activeStation.colorHex.toString(16)}` }}
+            />
+            <span className="font-['IBM_Plex_Mono',monospace] text-[11px] font-bold text-[#ede6d8]">
+              {activeStation.badge}
             </span>
-          </div>
-
-          <p className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] mb-1 font-medium">
-            {(hoveredNode || selectedNode)?.sublabel}
-          </p>
-
-          <p className="text-[12px] text-[#b9af9c] leading-snug line-clamp-2 m-0">
-            {(hoveredNode || selectedNode)?.details}
-          </p>
-
-          {/* Action to test in console */}
-          <div className="mt-2.5 pt-2 border-t border-[#3a352c]/60 flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace]">
-            <span className="text-[#8e8574] flex items-center gap-1">
-              <MousePointer className="w-3 h-3 text-[#c9a227]" />
-              <span>Tap nodes to inspect</span>
+            <span className="text-[#8e8574] font-['IBM_Plex_Mono',monospace] text-[10px]">
+              • {activeStation.name}
             </span>
-            <button
-              onClick={() => onExploreCase ? onExploreCase(0) : null}
-              className="text-[#ede6d8] hover:text-[#c94a3d] transition-colors flex items-center gap-1 font-semibold cursor-pointer bg-transparent border-none p-0"
-            >
-              <span>Inspect in Console</span>
-              <span>→</span>
-            </button>
           </div>
         </div>
+
+        {/* Floating Legend / Click Guidance */}
+        <div className="absolute bottom-3 right-4 pointer-events-none hidden sm:block">
+          <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#645c4e] flex items-center gap-1.5">
+            <MousePointer className="w-3 h-3 text-[#c9a227]" />
+            <span>Click any 3D station to inspect its forensic evidence</span>
+          </span>
+        </div>
+
+      </div>
+
+      {/* Interactive 5-Step Journey Stepper Buttons */}
+      <div className="bg-[#181410] border-t border-[#3a352c] p-2 sm:p-3 overflow-x-auto no-scrollbar">
+        <div className="flex items-center justify-between gap-2 min-w-max">
+          {FORENSIC_STATIONS.map((station) => {
+            const isSelected = station.stepNumber === activeStep;
+            return (
+              <button
+                key={station.id}
+                onClick={() => handleSelectStep(station.stepNumber)}
+                className={`px-3 py-2 rounded-[3px] border transition-all cursor-pointer flex items-center gap-2 text-left ${
+                  isSelected
+                    ? 'bg-[#251f18] border-[#c9a227] shadow-md'
+                    : 'bg-[#12100d] border-[#2b261e] hover:border-[#4a4235] hover:bg-[#1a1612]'
+                }`}
+              >
+                <span 
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold font-['IBM_Plex_Mono',monospace] shrink-0"
+                  style={{ 
+                    backgroundColor: isSelected ? `#${station.colorHex.toString(16)}` : '#2d2820',
+                    color: isSelected ? '#0b0a08' : '#8e8574'
+                  }}
+                >
+                  {station.stepNumber}
+                </span>
+                <div className="text-[11px] font-['IBM_Plex_Mono',monospace]">
+                  <div className={`font-bold truncate max-w-[130px] ${isSelected ? 'text-[#ede6d8]' : 'text-[#8e8574]'}`}>
+                    {station.name}
+                  </div>
+                  <div className="text-[9.5px] text-[#645c4e] truncate max-w-[130px]">
+                    {station.verdict}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Explanatory Forensic Concept Card (The "Why It's Easy To Understand" Engine) */}
+      <div className="p-4 sm:p-6 bg-[#16130f] border-t border-[#3a352c] space-y-4">
+        
+        {/* Step Title & Status */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#2b251e]">
+          <div className="space-y-0.5">
+            <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold tracking-wider uppercase">
+              {activeStation.badge}
+            </span>
+            <h3 className="text-[17px] sm:text-[19px] font-bold text-[#ede6d8]">
+              {activeStation.name}: {activeStation.subtitle}
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className={`px-2.5 py-1 rounded text-[11px] font-bold font-['IBM_Plex_Mono',monospace] border ${
+              activeStation.verdict === 'BLOCKED' ? 'bg-[#b23a2e]/20 text-[#ff8d7d] border-[#b23a2e]/40' :
+              activeStation.verdict === 'VERIFIED' ? 'bg-[#22c55e]/20 text-[#4ade80] border-[#22c55e]/40' :
+              'bg-amber-950/40 text-amber-300 border-amber-800/40'
+            }`}>
+              RESULT: {activeStation.verdict}
+            </span>
+          </div>
+        </div>
+
+        {/* View Mode 1: Plain English Concept (Easy to understand for any executive or analyst) */}
+        {viewMode === 'concept' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[#110f0c] p-4 rounded border border-[#2b261e] space-y-2">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] uppercase font-bold block">
+                The Concept in 10 Seconds:
+              </span>
+              <p className="text-[13.5px] text-[#ede6d8] leading-relaxed">
+                {activeStation.conceptPlainEnglish}
+              </p>
+            </div>
+
+            <div className="bg-[#110f0c] p-4 rounded border border-[#2b261e] space-y-2">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#4ade80] uppercase font-bold block">
+                Why Attackers Cannot Win Here:
+              </span>
+              <p className="text-[13.5px] text-[#b9af9c] leading-relaxed">
+                {activeStation.whyAttackersFail}
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* View Mode 2: Technical RFC822 Header Proof */
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574]">
+              <span>Extracted RFC5322 Protocol Evidence:</span>
+              <span>Syntax: Verifiable Header Segment</span>
+            </div>
+            <pre className="bg-[#0c0a08] p-3.5 rounded border border-[#262017] text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[12px] leading-relaxed overflow-x-auto select-all">
+              {activeStation.forensicEvidenceLine}
+            </pre>
+          </div>
+        )}
+
       </div>
 
     </div>

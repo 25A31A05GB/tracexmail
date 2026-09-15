@@ -4,6 +4,7 @@ import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
 import { JargonTooltip } from './JargonTooltip';
 import { Interactive3DTiltCard, CyberThreatCore3D } from './3d';
 import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
+import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
 
 interface ForensicCaseTwoPanelProps {
   analysis: EmailAnalysis;
@@ -420,7 +421,13 @@ export function ForensicCaseTwoPanel({
             </div>
           )}
 
-          {/* 5. RELATED INCIDENTS (CROSS-CASE CORRELATION) */}
+          {/* 5. REAL-TIME SOC CASE TRIAGE & TEAM ACTIVITY */}
+          <CaseRealtimeTriageCard
+            analysis={analysis}
+            onNavigateToCases={onNavigateToCases}
+          />
+
+          {/* 6. RELATED INCIDENTS (CROSS-CASE CORRELATION) */}
           <RelatedIncidentsWidget
             analysis={analysis}
             onSelectAnalysis={onSelectAnalysis}

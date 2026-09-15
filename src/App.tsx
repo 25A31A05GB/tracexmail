@@ -424,19 +424,144 @@ export default function App() {
     // Trigger case list refresh signal across all views
     setCasesRefreshSignal(prev => prev + 1);
 
-    // If new case was created and case details are attached, synchronize active analysis
-    if (lastCaseUpdate?.type === 'CASE_CREATED' && lastCaseUpdate.case) {
-      try {
-        const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
-        if (mapped) {
-          console.log('[App] Real-time WebSocket CASE_CREATED synchronized:', mapped.id);
-          setCurrentAnalysis(mapped);
+    if (!lastCaseUpdate) return;
+
+    const targetCaseId = lastCaseUpdate.caseId || lastCaseUpdate.case?.id;
+
+    // Handle CASE_CREATED
+    if (lastCaseUpdate.type === 'CASE_CREATED') {
+      if (lastCaseUpdate.case) {
+        try {
+          const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
+          if (mapped) {
+            console.log('[App] Real-time WebSocket CASE_CREATED synchronized:', mapped.id);
+            // Synchronize if user hasn't selected a specific case yet, or if it matches active
+            if (!currentAnalysis || currentAnalysis.id === mapped.id) {
+              setCurrentAnalysis(mapped);
+            }
+          }
+        } catch (err) {
+          console.warn('[App] Could not map real-time WebSocket case creation:', err);
         }
-      } catch (err) {
-        console.warn('[App] Could not map real-time WebSocket case update:', err);
+      }
+      return;
+    }
+
+    // Handle real-time updates to the currently active case (CASE_UPDATED, CASE_CLOSED, CASE_NOTE_ADDED, etc.)
+    if (targetCaseId && currentAnalysis) {
+      const isCurrentActiveCase =
+        currentAnalysis.id === targetCaseId ||
+        currentAnalysis.evidenceId === targetCaseId ||
+        currentAnalysis.sessionId === targetCaseId ||
+        currentAnalysis.trackingId === targetCaseId;
+
+      if (isCurrentActiveCase) {
+        console.log('[App] Real-time WebSocket pushing case update directly to active Overview:', lastCaseUpdate);
+
+        // Immediate optimistic merge into currentAnalysis so the active view updates with zero latency
+        setCurrentAnalysis(prev => {
+          if (!prev) return prev;
+          let nextState = { ...prev };
+
+          if (lastCaseUpdate.case) {
+            const mapped = mapBackendCaseToAnalysis(lastCaseUpdate.case);
+            nextState = {
+              ...prev,
+              ...mapped,
+              headers: { ...prev.headers, ...(mapped.headers || {}) },
+              auth: mapped.auth || prev.auth,
+              status: lastCaseUpdate.case.status || mapped.status || prev.status,
+              severity: lastCaseUpdate.case.severity || mapped.severity || prev.severity,
+              tags: lastCaseUpdate.case.tags || mapped.tags || prev.tags,
+              assigned_user: lastCaseUpdate.case.assigned_user ?? mapped.assigned_user ?? prev.assigned_user,
+              assignedUser: lastCaseUpdate.case.assigned_user ?? mapped.assignedUser ?? prev.assignedUser,
+              analyst_notes: lastCaseUpdate.case.analyst_notes ?? mapped.analyst_notes ?? prev.analyst_notes,
+              analystNotes: lastCaseUpdate.case.analyst_notes ?? mapped.analystNotes ?? prev.analystNotes,
+              analyst_verdict: lastCaseUpdate.case.analyst_verdict ?? mapped.analyst_verdict ?? prev.analyst_verdict,
+              analystVerdict: lastCaseUpdate.case.analyst_verdict ?? mapped.analystVerdict ?? prev.analystVerdict,
+              resolution_type: lastCaseUpdate.case.resolution_type || mapped.resolution_type || prev.resolution_type,
+              resolutionType: lastCaseUpdate.case.resolution_type || mapped.resolutionType || prev.resolutionType,
+              updated_at: lastCaseUpdate.timestamp || new Date().toISOString(),
+              updatedAt: lastCaseUpdate.timestamp || new Date().toISOString()
+            };
+          }
+
+          if (lastCaseUpdate.type === 'CASE_CLOSED') {
+            nextState.status = 'CLOSED';
+            if (lastCaseUpdate.case?.analyst_verdict) {
+              nextState.analyst_verdict = lastCaseUpdate.case.analyst_verdict;
+              nextState.analystVerdict = lastCaseUpdate.case.analyst_verdict;
+            }
+            if (lastCaseUpdate.case?.resolution_type) {
+              nextState.resolution_type = lastCaseUpdate.case.resolution_type;
+              nextState.resolutionType = lastCaseUpdate.case.resolution_type;
+            }
+          }
+
+          if (lastCaseUpdate.type === 'CASE_NOTE_ADDED' && lastCaseUpdate.note) {
+            const existingNotes = nextState.caseNotes || [];
+            const exists = existingNotes.some(n => n.id === lastCaseUpdate.note?.id);
+            nextState.caseNotes = exists ? existingNotes : [lastCaseUpdate.note, ...existingNotes];
+            if (lastCaseUpdate.note.body) {
+              nextState.analyst_notes = lastCaseUpdate.note.body;
+              nextState.analystNotes = lastCaseUpdate.note.body;
+            }
+          }
+
+          nextState.updated_at = lastCaseUpdate.timestamp || new Date().toISOString();
+          nextState.updatedAt = lastCaseUpdate.timestamp || new Date().toISOString();
+          return nextState;
+        });
+
+        // Background authoritative fetch to reconcile server data and complete notes list
+        (async () => {
+          try {
+            const [caseRes, notesRes] = await Promise.all([
+              fetch(`/api/cases/${targetCaseId}`),
+              fetch(`/api/cases/${targetCaseId}/notes`)
+            ]);
+
+            if (caseRes.ok) {
+              const freshCase = await caseRes.json();
+              if (freshCase && (freshCase.id || freshCase.case_id)) {
+                const freshMapped = mapBackendCaseToAnalysis(freshCase);
+                let freshNotes: any[] = [];
+                if (notesRes.ok) {
+                  try {
+                    freshNotes = await notesRes.json();
+                  } catch {}
+                }
+
+                setCurrentAnalysis(prev => {
+                  if (!prev || (prev.id !== targetCaseId && prev.evidenceId !== targetCaseId)) return prev;
+                  return {
+                    ...prev,
+                    ...freshMapped,
+                    status: freshCase.status || freshMapped.status || prev.status,
+                    severity: freshCase.severity || freshMapped.severity || prev.severity,
+                    tags: freshCase.tags || freshMapped.tags || prev.tags,
+                    assigned_user: freshCase.assigned_user ?? freshMapped.assigned_user ?? prev.assigned_user,
+                    assignedUser: freshCase.assigned_user ?? freshMapped.assignedUser ?? prev.assignedUser,
+                    analyst_notes: freshCase.analyst_notes ?? freshMapped.analyst_notes ?? prev.analyst_notes,
+                    analystNotes: freshCase.analyst_notes ?? freshMapped.analystNotes ?? prev.analystNotes,
+                    analyst_verdict: freshCase.analyst_verdict ?? freshMapped.analyst_verdict ?? prev.analyst_verdict,
+                    analystVerdict: freshCase.analyst_verdict ?? freshMapped.analystVerdict ?? prev.analystVerdict,
+                    resolution_type: freshCase.resolution_type || freshMapped.resolution_type || prev.resolution_type,
+                    resolutionType: freshCase.resolution_type || freshMapped.resolutionType || prev.resolutionType,
+                    caseNotes: Array.isArray(freshNotes) && freshNotes.length > 0 ? freshNotes : prev.caseNotes,
+                    updated_at: freshCase.updated_at || new Date().toISOString(),
+                    updatedAt: freshCase.updated_at || new Date().toISOString()
+                  };
+                });
+              }
+            }
+          } catch (fetchErr) {
+            console.warn('[App] Authoritative case reconcile error (non-fatal):', fetchErr);
+          }
+        })();
       }
     }
-  }, [lastCreatedCaseId, lastCaseUpdate]);
+  }, [lastCreatedCaseId, lastCaseUpdate, currentAnalysis?.id]);
 
   const handleAnalysisCreated = (newAnalysis: EmailAnalysis) => {
     console.log('📥 [App.tsx] handleAnalysisCreated received new analysis:', {

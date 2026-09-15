@@ -134,6 +134,27 @@ export function CasesView({
 
   // Real-Time WebSocket Alerts Hook
   const { alerts, lastCreatedCaseId, lastCaseUpdate } = useWebSocketAlerts();
+  const [recentWebSocketCaseIds, setRecentWebSocketCaseIds] = useState<Record<string, number>>({});
+
+  // Clean up old WebSocket highlights after 8 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setRecentWebSocketCaseIds(prev => {
+        let changed = false;
+        const next: Record<string, number> = {};
+        for (const [id, ts] of Object.entries(prev)) {
+          if (now - ts < 8000) {
+            next[id] = ts;
+          } else {
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Real-World Threat Seeding State
   const [seedingRealWorld, setSeedingRealWorld] = useState<boolean>(false);
@@ -273,6 +294,7 @@ export function CasesView({
     const { type, case: caseData, caseId } = lastCaseUpdate;
 
     if (type === 'CASE_CREATED' && caseData && caseData.id) {
+      setRecentWebSocketCaseIds(prev => ({ ...prev, [caseData.id]: Date.now() }));
       setCases(prev => {
         if (prev.some(c => c.id === caseData.id)) {
           return prev.map(c => (c.id === caseData.id ? { ...c, ...caseData } : c));
@@ -281,6 +303,7 @@ export function CasesView({
       });
     } else if ((type === 'CASE_UPDATED' || type === 'CASE_CLOSED') && caseData) {
       const targetId = caseId || caseData.id;
+      setRecentWebSocketCaseIds(prev => ({ ...prev, [targetId]: Date.now() }));
       setCases(prev => prev.map(c => (c.id === targetId ? { ...c, ...caseData } : c)));
       if (selectedCaseDetail?.id === targetId) {
         setSelectedCaseDetail((prev: any) => ({ ...prev, ...caseData }));
@@ -295,6 +318,12 @@ export function CasesView({
     // Follow-up background sync
     fetchCases(true);
   }, [lastCaseUpdate]);
+
+  useEffect(() => {
+    if (lastCreatedCaseId) {
+      setRecentWebSocketCaseIds(prev => ({ ...prev, [lastCreatedCaseId]: Date.now() }));
+    }
+  }, [lastCreatedCaseId]);
 
   // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert
   useEffect(() => {
@@ -923,193 +952,217 @@ export function CasesView({
                   </td>
                 </tr>
               ) : (
-                filteredCases.map((c, i) => {
-                  const title = c.title || c.name || c.headers?.subject || c.subject || 'Untitled Forensic Case';
-                  const desc = c.analyst_notes || c.description || c.headers?.from || c.from || 'Standard message analysis';
-                  const stdVerdict = getStandardizedVerdict(c);
-                  const threatScore = stdVerdict.score;
-                  const severity = (c.severity || c.threat || stdVerdict.severity || 'HIGH').toUpperCase();
-                  const status = (c.status || 'open').toLowerCase();
-                  const totalLinked = c.total_emails ?? (c.members?.length || c.email_ids?.length || 1);
-                  const suggestedCount = c.suggested_members?.length || 0;
+                <AnimatePresence initial={false} mode="popLayout">
+                  {filteredCases.map((c, i) => {
+                    const title = c.title || c.name || c.headers?.subject || c.subject || 'Untitled Forensic Case';
+                    const desc = c.analyst_notes || c.description || c.headers?.from || c.from || 'Standard message analysis';
+                    const stdVerdict = getStandardizedVerdict(c);
+                    const threatScore = stdVerdict.score;
+                    const severity = (c.severity || c.threat || stdVerdict.severity || 'HIGH').toUpperCase();
+                    const status = (c.status || 'open').toLowerCase();
+                    const totalLinked = c.total_emails ?? (c.members?.length || c.email_ids?.length || 1);
+                    const suggestedCount = c.suggested_members?.length || 0;
+                    const isNewWsCase = Boolean(recentWebSocketCaseIds[c.id] || (lastCreatedCaseId && lastCreatedCaseId === c.id));
 
-                  return (
-                    <motion.tr
-                      key={c.id || i}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.22, delay: Math.min(i * 0.03, 0.3), ease: [0.16, 1, 0.3, 1] }}
-                      className="hover:bg-slate-800/40 transition-colors"
-                    >
-                      <td className="py-3.5 px-4 font-bold text-blue-400">
-                        <div className="flex items-center gap-1.5">
-                          <Layers className="w-3.5 h-3.5 text-blue-500" />
-                          <span>{c.id || `TXM-CASE-${i + 1}`}</span>
-                        </div>
-                        <div className="mt-1">
-                          {c.is_demo ? (
-                            <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono inline-block">
-                              CORPUS / DEMO
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 rounded text-[9px] font-mono inline-block">
-                              LIVE INGEST
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 max-w-md">
-                        <div className="font-semibold text-slate-200 truncate">{title}</div>
-                        <div className="text-[11px] text-slate-400 truncate mt-0.5">{desc}</div>
-                        <div className="mt-1.5">
-                          {c.tags && c.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-1.5">
-                              {c.tags.map((tag: string, idx: number) => (
-                                <span key={idx} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[9px] border border-slate-700 flex items-center gap-1">
-                                  <Tag className="w-2 h-2 text-slate-400" />
-                                  {tag}
-                                  <button 
-                                    onClick={(e) => { e.stopPropagation(); handleRowRemoveTag(c, tag); }}
-                                    disabled={rowTagLoading === c.id}
-                                    className="text-slate-400 hover:text-red-400 ml-0.5 focus:outline-none disabled:opacity-50"
-                                  >
-                                    <X className="w-2 h-2" />
-                                  </button>
-                                </span>
-                              ))}
+                    return (
+                      <motion.tr
+                        key={c.id || i}
+                        layout
+                        initial={{ opacity: 0, x: -32, scale: 0.98 }}
+                        animate={{ 
+                          opacity: 1, 
+                          x: 0, 
+                          scale: 1,
+                          backgroundColor: isNewWsCase ? 'rgba(6, 78, 59, 0.22)' : 'rgba(0, 0, 0, 0)'
+                        }}
+                        exit={{ opacity: 0, x: 32, scale: 0.96 }}
+                        transition={{ 
+                          duration: 0.38, 
+                          delay: isNewWsCase ? 0 : Math.min(i * 0.02, 0.2), 
+                          ease: [0.16, 1, 0.3, 1] 
+                        }}
+                        className={`hover:bg-slate-800/40 transition-colors relative ${isNewWsCase ? 'ring-1 ring-inset ring-emerald-500/50' : ''}`}
+                      >
+                        <td className="py-3.5 px-4 font-bold text-blue-400">
+                          <div className="flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-blue-500" />
+                            <span>{c.id || `TXM-CASE-${i + 1}`}</span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {isNewWsCase && (
+                              <motion.span 
+                                initial={{ scale: 0.85, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/60 rounded text-[9px] font-mono inline-flex items-center gap-1 animate-pulse"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span>LIVE WS INGEST</span>
+                              </motion.span>
+                            )}
+                            {c.is_demo ? (
+                              <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px] font-mono inline-block">
+                                CORPUS / DEMO
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 rounded text-[9px] font-mono inline-block">
+                                LIVE INGEST
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 max-w-md">
+                          <div className="font-semibold text-slate-200 truncate">{title}</div>
+                          <div className="text-[11px] text-slate-400 truncate mt-0.5">{desc}</div>
+                          <div className="mt-1.5">
+                            {c.tags && c.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1.5">
+                                {c.tags.map((tag: string, idx: number) => (
+                                  <span key={idx} className="px-1.5 py-0.5 bg-slate-800 text-slate-300 rounded text-[9px] border border-slate-700 flex items-center gap-1">
+                                    <Tag className="w-2 h-2 text-slate-400" />
+                                    {tag}
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); handleRowRemoveTag(c, tag); }}
+                                      disabled={rowTagLoading === c.id}
+                                      className="text-slate-400 hover:text-red-400 ml-0.5 focus:outline-none disabled:opacity-50"
+                                    >
+                                      <X className="w-2 h-2" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={rowTagInputs[c.id] || ''}
+                                onChange={(e) => handleRowTagChange(c.id, e.target.value)}
+                                onKeyDown={(e) => handleRowAddTag(e, c)}
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Type tag & Enter..."
+                                disabled={rowTagLoading === c.id}
+                                className="w-32 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[9px] text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                              />
+                              {rowTagLoading === c.id && <RefreshCw className="w-2 h-2 animate-spin text-slate-400" />}
                             </div>
-                          )}
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={rowTagInputs[c.id] || ''}
-                              onChange={(e) => handleRowTagChange(c.id, e.target.value)}
-                              onKeyDown={(e) => handleRowAddTag(e, c)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Type tag & Enter..."
-                              disabled={rowTagLoading === c.id}
-                              className="w-32 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[9px] text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
-                            />
-                            {rowTagLoading === c.id && <RefreshCw className="w-2 h-2 animate-spin text-slate-400" />}
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded font-semibold border border-slate-700">
-                            {totalLinked} {totalLinked === 1 ? 'email' : 'emails'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded font-semibold border border-slate-700">
+                              {totalLinked} {totalLinked === 1 ? 'email' : 'emails'}
+                            </span>
+                            {suggestedCount > 0 && (
+                              <span className="px-1.5 py-0.5 bg-amber-950/80 border border-amber-600/60 text-amber-300 rounded text-[10px] flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                +{suggestedCount} suggested
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                              severity.includes('CRIT') || severity.includes('PHISH')
+                                ? 'bg-rose-950/80 border-rose-600 text-rose-300'
+                                : severity.includes('HIGH') || severity.includes('SUSP')
+                                ? 'bg-amber-950/80 border-amber-600 text-amber-300'
+                                : 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                            }`}
+                          >
+                            {severity}
                           </span>
-                          {suggestedCount > 0 && (
-                            <span className="px-1.5 py-0.5 bg-amber-950/80 border border-amber-600/60 text-amber-300 rounded text-[10px] flex items-center gap-1">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              +{suggestedCount} suggested
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                            severity.includes('CRIT') || severity.includes('PHISH')
-                              ? 'bg-rose-950/80 border-rose-600 text-rose-300'
-                              : severity.includes('HIGH') || severity.includes('SUSP')
-                              ? 'bg-amber-950/80 border-amber-600 text-amber-300'
-                              : 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
-                          }`}
-                        >
-                          {severity}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${stdVerdict.colors.bar}`}
-                              style={{ width: `${Math.min(threatScore, 100)}%` }}
-                            ></div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 h-2 bg-slate-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${stdVerdict.colors.bar}`}
+                                style={{ width: `${Math.min(threatScore, 100)}%` }}
+                              ></div>
+                            </div>
+                            <span className="font-bold text-slate-200">{threatScore}/100</span>
                           </div>
-                          <span className="font-bold text-slate-200">{threatScore}/100</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <select
-                          value={status}
-                          onChange={(e) => handleQuickStatusChange(c, e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`px-2 py-1 rounded text-[10px] uppercase font-semibold border cursor-pointer focus:outline-none ${
-                            status === 'open'
-                              ? 'bg-blue-950/80 border-blue-600 text-blue-300'
-                              : status === 'investigating' || status === 'in_progress'
-                              ? 'bg-purple-950/80 border-purple-600 text-purple-300'
-                              : status === 'escalated'
-                              ? 'bg-rose-950/80 border-rose-600 text-rose-300'
-                              : status === 'resolved'
-                              ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
-                              : 'bg-slate-800 border-slate-700 text-slate-300'
-                          }`}
-                        >
-                          <option value="open">OPEN</option>
-                          <option value="investigating">INVESTIGATING</option>
-                          <option value="escalated">ESCALATED</option>
-                          <option value="resolved">RESOLVED</option>
-                          <option value="quarantined">QUARANTINED</option>
-                        </select>
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {slackFeedbackMsg?.id === c.id && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
-                              slackFeedbackMsg.type === 'success' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
-                            }`}>
-                              {slackFeedbackMsg.text}
-                            </span>
-                          )}
-                          <button
-                            onClick={(e) => handleSendCaseToSlack(e, c)}
-                            disabled={sendingSlackCaseId === c.id}
-                            title="Dispatch Block Kit case alert to Slack"
-                            className="px-2 py-1.5 bg-emerald-950/80 hover:bg-emerald-800/80 text-emerald-400 border border-emerald-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <select
+                            value={status}
+                            onChange={(e) => handleQuickStatusChange(c, e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`px-2 py-1 rounded text-[10px] uppercase font-semibold border cursor-pointer focus:outline-none ${
+                              status === 'open'
+                                ? 'bg-blue-950/80 border-blue-600 text-blue-300'
+                                : status === 'investigating' || status === 'in_progress'
+                                ? 'bg-purple-950/80 border-purple-600 text-purple-300'
+                                : status === 'escalated'
+                                ? 'bg-rose-950/80 border-rose-600 text-rose-300'
+                                : status === 'resolved'
+                                ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                                : 'bg-slate-800 border-slate-700 text-slate-300'
+                            }`}
                           >
-                            <Share2 className={`w-3 h-3 ${sendingSlackCaseId === c.id ? 'animate-spin' : ''}`} />
-                            <span className="hidden sm:inline">Slack</span>
-                          </button>
-                          {((c.members && c.members.length > 0) || (c.suggested_members && c.suggested_members.length > 0) || (c.correlation_count > 0) || c.campaign_suggestion) && (
+                            <option value="open">OPEN</option>
+                            <option value="investigating">INVESTIGATING</option>
+                            <option value="escalated">ESCALATED</option>
+                            <option value="resolved">RESOLVED</option>
+                            <option value="quarantined">QUARANTINED</option>
+                          </select>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {slackFeedbackMsg?.id === c.id && (
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${
+                                slackFeedbackMsg.type === 'success' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                              }`}>
+                                {slackFeedbackMsg.text}
+                              </span>
+                            )}
                             <button
-                              onClick={() => handleOpenCaseDetail(c)}
-                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                              title="Manage case members and review auto-correlated candidate incidents"
+                              onClick={(e) => handleSendCaseToSlack(e, c)}
+                              disabled={sendingSlackCaseId === c.id}
+                              title="Dispatch Block Kit case alert to Slack"
+                              className="px-2 py-1.5 bg-emerald-950/80 hover:bg-emerald-800/80 text-emerald-400 border border-emerald-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
                             >
-                              <span>Manage</span>
-                              <ChevronRight className="w-3 h-3" />
+                              <Share2 className={`w-3 h-3 ${sendingSlackCaseId === c.id ? 'animate-spin' : ''}`} />
+                              <span className="hidden sm:inline">Slack</span>
                             </button>
-                          )}
-                          <button
-                            onClick={() => handlePreviewEvidence(c)}
-                            title="Inspect Forensic Evidence Tag Card"
-                            className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-800/80 text-amber-300 border border-amber-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <Tag className="w-3 h-3" />
-                            <span className="hidden sm:inline">Evidence</span>
-                          </button>
-                          <button
-                            onClick={() => handleInspectCase(c)}
-                            className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <span>Inspect</span>
-                            <ArrowUpRight className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteCase(e, c)}
-                            title="Delete or archive case"
-                            className="p-1.5 bg-slate-800/80 hover:bg-rose-950 hover:text-rose-400 text-slate-400 border border-slate-700 hover:border-rose-800/60 rounded-lg text-xs cursor-pointer transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })
+                            {((c.members && c.members.length > 0) || (c.suggested_members && c.suggested_members.length > 0) || (c.correlation_count > 0) || c.campaign_suggestion) && (
+                              <button
+                                onClick={() => handleOpenCaseDetail(c)}
+                                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Manage case members and review auto-correlated candidate incidents"
+                              >
+                                <span>Manage</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePreviewEvidence(c)}
+                              title="Inspect Forensic Evidence Tag Card"
+                              className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-800/80 text-amber-300 border border-amber-700/60 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Tag className="w-3 h-3" />
+                              <span className="hidden sm:inline">Evidence</span>
+                            </button>
+                            <button
+                              onClick={() => handleInspectCase(c)}
+                              className="px-2.5 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <span>Inspect</span>
+                              <ArrowUpRight className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteCase(e, c)}
+                              title="Delete or archive case"
+                              className="p-1.5 bg-slate-800/80 hover:bg-rose-950 hover:text-rose-400 text-slate-400 border border-slate-700 hover:border-rose-800/60 rounded-lg text-xs cursor-pointer transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
               )}
             </tbody>
           </table>

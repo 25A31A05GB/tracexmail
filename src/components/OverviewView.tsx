@@ -52,6 +52,7 @@ import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvide
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
 import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
+import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -333,6 +334,54 @@ export function OverviewView({
     timestamp: string;
     notes: string;
   } | null>(null);
+
+  const [realtimeNotice, setRealtimeNotice] = useState<{
+    message: string;
+    type: string;
+    timestamp: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleCaseEvent = (event: any) => {
+      const data = event.detail;
+      if (!data) return;
+      const targetId = data.caseId || data.case?.id || data.case_id;
+      const activeId = analysis.id || analysis.evidenceId || analysis.sessionId || analysis.trackingId;
+      if (targetId && activeId && (targetId === activeId || String(targetId).includes(String(activeId)) || String(activeId).includes(String(targetId)))) {
+        let msg = 'Case updated by team member';
+        if (data.type === 'CASE_NOTE_ADDED') {
+          const noteSnippet = (data.note?.body || '').trim();
+          msg = `New note from ${data.note?.author_email || 'analyst'}: "${noteSnippet.length > 50 ? noteSnippet.slice(0, 50) + '...' : noteSnippet}"`;
+        } else if (data.type === 'CASE_CLOSED') {
+          msg = `Case closed by team member (Verdict: ${data.case?.analyst_verdict || data.analyst_verdict || 'Resolved'})`;
+        } else if (data.type === 'CASE_UPDATED') {
+          const status = data.case?.status || data.status;
+          const severity = data.case?.severity || data.severity;
+          if (status && severity) {
+            msg = `Triage updated by team: Status ${status} • Severity ${severity}`;
+          } else if (status) {
+            msg = `Triage updated by team: Status ${status}`;
+          } else {
+            msg = 'Case telemetry and notes synchronized from team member';
+          }
+        }
+        setRealtimeNotice({
+          message: msg,
+          type: data.type,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        const timer = setTimeout(() => {
+          setRealtimeNotice(null);
+        }, 8000);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    window.addEventListener('CASE_EVENT', handleCaseEvent);
+    return () => {
+      window.removeEventListener('CASE_EVENT', handleCaseEvent);
+    };
+  }, [analysis.id, analysis.evidenceId]);
 
   const formatCreationDate = (dateStr?: string) => {
     if (!dateStr) return '15/10/2023';
@@ -707,12 +756,49 @@ export function OverviewView({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-neutral-400">
+          <div className="flex items-center gap-2 text-xs text-neutral-400 flex-wrap">
             <span className="text-neutral-600 hidden sm:inline">|</span>
             <span>Case: <strong className="text-neutral-200 font-mono">{analysis.id || effectiveEvidenceId}</strong></span>
+
+            {/* Real-time Status Badge */}
+            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+              (analysis.status || 'OPEN').toUpperCase() === 'CLOSED'
+                ? 'bg-emerald-950/70 border-emerald-500/60 text-emerald-300'
+                : (analysis.status || 'OPEN').toUpperCase() === 'TRIAGED'
+                ? 'bg-amber-950/70 border-amber-500/60 text-amber-300'
+                : (analysis.status || 'OPEN').toUpperCase() === 'ESCALATED'
+                ? 'bg-rose-950/70 border-rose-500/60 text-rose-300'
+                : 'bg-blue-950/70 border-blue-500/60 text-blue-300'
+            }`}>
+              {(analysis.status || 'OPEN').toUpperCase()}
+            </span>
+
+            {/* Real-time Severity Badge */}
+            {analysis.severity && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                analysis.severity.toUpperCase() === 'CRITICAL'
+                  ? 'bg-red-950/80 border-red-500 text-red-200'
+                  : analysis.severity.toUpperCase() === 'HIGH'
+                  ? 'bg-amber-950/80 border-amber-500 text-amber-200'
+                  : analysis.severity.toUpperCase() === 'MEDIUM'
+                  ? 'bg-yellow-950/80 border-yellow-500 text-yellow-200'
+                  : 'bg-slate-900 border-slate-700 text-slate-300'
+              }`}>
+                {analysis.severity.toUpperCase()}
+              </span>
+            )}
+
+            {/* Assigned Analyst */}
+            {(analysis.assigned_user || analysis.assignedUser) && (
+              <span className="text-[11px] text-slate-300 font-mono hidden md:inline-flex items-center gap-1 bg-[#161922] px-2 py-0.5 rounded border border-slate-700/60">
+                <span className="text-slate-400">Analyst:</span>
+                <span className="text-blue-300">{analysis.assigned_user || analysis.assignedUser}</span>
+              </span>
+            )}
+
             <span className="text-emerald-400 flex items-center gap-1.5 font-medium ml-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-              Preserved
+              Live Sync
             </span>
           </div>
         </div>
@@ -793,6 +879,30 @@ export function OverviewView({
         </div>
       </div>
 
+      {/* Real-Time WebSocket Case Update Toast Banner */}
+      {realtimeNotice && (
+        <div
+          id="realtime-case-update-alert"
+          className="mb-6 p-3.5 rounded-lg bg-blue-950/80 border border-blue-500 text-blue-100 flex items-center justify-between gap-3 shadow-lg backdrop-blur-sm"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider shrink-0">
+              Live Team Update [{realtimeNotice.timestamp}]
+            </span>
+            <span className="text-xs font-sans text-slate-200 truncate">
+              {realtimeNotice.message}
+            </span>
+          </div>
+          <button
+            onClick={() => setRealtimeNotice(null)}
+            className="text-xs text-slate-400 hover:text-slate-100 font-mono px-2 py-0.5 rounded hover:bg-white/10 transition-colors shrink-0 cursor-pointer"
+          >
+            Dismiss ✕
+          </button>
+        </div>
+      )}
+
       {/* Degraded Analysis / Fallback Warning Banner */}
       {(analysis.degradedAnalysis || analysis.isClientFallback || analysis.analysisSource === 'client_fallback_unverified') && (
         <div 
@@ -856,7 +966,13 @@ export function OverviewView({
         <div className="grid grid-cols-12 gap-6">
           {/* Left Columns: Evidence Vault, Auth status cards, Geo Origin panel, Metadata & Links */}
           <div className="col-span-12 xl:col-span-7 2xl:col-span-8 space-y-6">
-        {/* Evidence Vault & Chain of Custody Immutable Ledger Banner */}
+            {/* Real-Time SOC Case Triage & Team Collaboration Banner */}
+            <CaseRealtimeTriageCard
+              analysis={analysis}
+              onNavigateToCases={onNavigateToCases}
+            />
+
+            {/* Evidence Vault & Chain of Custody Immutable Ledger Banner */}
         <div className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-4 shadow-sm relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
             <div className="flex items-center gap-2.5">

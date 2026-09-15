@@ -597,7 +597,20 @@ export function mapBackendCaseToAnalysis(
         'backend/data/maxmind/GeoLite2-ASN-Blocks-IPv4.csv'
       ]
     } : undefined),
-    isOfflineFallback: false
+    isOfflineFallback: false,
+    status: data.status || 'OPEN',
+    severity: (data.severity || (calculatedRiskScore >= 70 ? 'CRITICAL' : calculatedRiskScore >= 40 ? 'HIGH' : 'LOW')).toUpperCase(),
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    assigned_user: data.assigned_user || data.assignedUser || undefined,
+    assignedUser: data.assigned_user || data.assignedUser || undefined,
+    analyst_notes: data.analyst_notes || data.analystNotes || data.notes || undefined,
+    analystNotes: data.analyst_notes || data.analystNotes || data.notes || undefined,
+    analyst_verdict: data.analyst_verdict || data.analystVerdict || undefined,
+    analystVerdict: data.analyst_verdict || data.analystVerdict || undefined,
+    resolution_type: data.resolution_type || undefined,
+    resolutionType: data.resolution_type || undefined,
+    updated_at: data.updated_at || data.updatedAt || undefined,
+    updatedAt: data.updated_at || data.updatedAt || undefined
   };
 }
 
@@ -1014,7 +1027,12 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
         'backend/data/maxmind/GeoLite2-ASN-Blocks-IPv4.csv'
       ]
     } : undefined),
-    isOfflineFallback: false
+    isOfflineFallback: false,
+    status: 'NEW',
+    severity: (riskScore >= 70 ? 'CRITICAL' : riskScore >= 40 ? 'HIGH' : 'LOW'),
+    tags: [],
+    updated_at: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
 }
 

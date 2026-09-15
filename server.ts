@@ -2001,49 +2001,58 @@ async function startServer() {
     });
   });
 
-  // Dashboard Stats (Deterministic computation from Supabase Postgres)
+  // Dashboard Stats (Deterministic computation from Supabase Postgres with in-memory fallback)
   const handleStatsResponse = async (req: express.Request, res: express.Response) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId || (req.query.organization_id as string);
     const includeDemo = req.query.include_demo === 'true';
 
     try {
-      let casesQuery = supabase.from('cases').select('*');
-      if (orgId) {
-        casesQuery = casesQuery.eq('organization_id', orgId);
-      }
-      const { data: casesData, error: casesError } = await casesQuery;
-      if (casesError) {
-        return res.status(500).json({ error: casesError.message });
-      }
+      let casesData: any[] = [];
+      let campData: any[] = [];
+      let alertData: any[] = [];
 
-      let campQuery = supabase.from('campaigns').select('id, name, organization_id, is_demo, threat_actor, target_sector, status');
-      if (orgId) {
-        if (includeDemo) {
-          campQuery = campQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        } else {
-          campQuery = campQuery.eq('organization_id', orgId).eq('is_demo', false);
+      if (supabase) {
+        let casesQuery = supabase.from('cases').select('*');
+        if (orgId) {
+          casesQuery = casesQuery.eq('organization_id', orgId);
         }
-      } else if (!includeDemo) {
-        campQuery = campQuery.eq('is_demo', false);
-      }
-      const { data: campData } = await campQuery;
+        const { data: cData, error: casesError } = await casesQuery;
+        if (!casesError && cData) {
+          casesData = cData;
+        } else {
+          casesData = Array.from(inMemoryCases.values());
+        }
 
-      let alertQuery = supabase.from('alerts').select('*').order('timestamp', { ascending: false });
-      if (orgId) {
-        if (includeDemo) {
-          alertQuery = alertQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        } else {
-          alertQuery = alertQuery.eq('organization_id', orgId).eq('is_demo', false);
+        let campQuery = supabase.from('campaigns').select('id, name, organization_id, is_demo, threat_actor, target_sector, status');
+        if (orgId) {
+          if (includeDemo) {
+            campQuery = campQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+          } else {
+            campQuery = campQuery.eq('organization_id', orgId).eq('is_demo', false);
+          }
+        } else if (!includeDemo) {
+          campQuery = campQuery.eq('is_demo', false);
         }
-      } else if (!includeDemo) {
-        alertQuery = alertQuery.eq('is_demo', false);
+        const { data: cpData } = await campQuery;
+        campData = cpData || [];
+
+        let alertQuery = supabase.from('alerts').select('*').order('timestamp', { ascending: false });
+        if (orgId) {
+          if (includeDemo) {
+            alertQuery = alertQuery.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+          } else {
+            alertQuery = alertQuery.eq('organization_id', orgId).eq('is_demo', false);
+          }
+        } else if (!includeDemo) {
+          alertQuery = alertQuery.eq('is_demo', false);
+        }
+        const { data: alData } = await alertQuery;
+        alertData = alData || [];
+      } else {
+        casesData = Array.from(inMemoryCases.values());
       }
-      const { data: alertData } = await alertQuery;
 
       const allCases = casesData || [];
       const realCases = allCases.filter(c => !c.is_demo);
@@ -3042,6 +3051,7 @@ async function startServer() {
         broadcastWebSocketEvent({
           type: 'CASE_CREATED',
           case: created.case,
+          caseId: created.case.id,
           source_feed: threatItem.source,
           timestamp: new Date().toISOString()
         });
@@ -3080,6 +3090,7 @@ async function startServer() {
           broadcastWebSocketEvent({
             type: 'CASE_CREATED',
             case: result.case,
+            caseId: result.case.id,
             timestamp: new Date().toISOString()
           });
         }

@@ -20,9 +20,11 @@ export interface WebSocketAlert {
 }
 
 export interface CaseUpdateEvent {
-  type: 'CASE_CREATED' | 'CASE_UPDATED' | 'CASE_CLOSED' | 'CASE_DELETED';
+  type: 'CASE_CREATED' | 'CASE_UPDATED' | 'CASE_CLOSED' | 'CASE_DELETED' | 'CASE_NOTE_ADDED' | 'CASE_NOTE_DELETED' | 'CASE_MEMBERS_ADDED' | 'CORRELATION_UPDATED';
   caseId?: string;
   case?: any;
+  note?: any;
+  triage_action?: string;
   timestamp: string;
 }
 
@@ -166,6 +168,21 @@ export function useWebSocketAlerts() {
               type: data.type === 'CASE_DELETED' ? 'CASE_DELETED' : (data.type === 'CASE_CLOSED' ? 'CASE_CLOSED' : 'CASE_UPDATED'),
               caseId,
               case: data.case,
+              triage_action: data.triage_action,
+              timestamp: data.timestamp || new Date().toISOString()
+            });
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+              window.dispatchEvent(new CustomEvent(data.type, { detail: data }));
+            }
+          }
+          if (data && (data.type === 'CASE_NOTE_ADDED' || data.type === 'CASE_NOTE_DELETED')) {
+            const caseId = data.caseId || data.case_id;
+            setLastCaseUpdate({
+              type: data.type as any,
+              caseId,
+              case: data.case,
+              note: data.note,
               timestamp: data.timestamp || new Date().toISOString()
             });
             if (typeof window !== 'undefined') {

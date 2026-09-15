@@ -20,11 +20,8 @@ export default defineConfig({
             if (id.includes('lucide-react')) {
               return 'vendor-icons';
             }
-            if (id.includes('@xyflow/react')) {
-              return 'vendor-flow';
-            }
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'vendor-charts';
+            if (id.includes('@xyflow/react') || id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-viz';
             }
             if (id.includes('leaflet') || id.includes('react-leaflet')) {
               return 'vendor-leaflet';
