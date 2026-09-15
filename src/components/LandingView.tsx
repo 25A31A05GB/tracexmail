@@ -72,7 +72,7 @@ export function LandingView({
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [activeChallengeIdx, setActiveChallengeIdx] = useState<number>(0);
-  const [selectedFont, setSelectedFont] = useState<LandingFontPreset>('ibm');
+  const [selectedFont, setSelectedFont] = useState<LandingFontPreset>('serif');
   const [fontMenuOpen, setFontMenuOpen] = useState<boolean>(false);
 
   const fontOptions: { id: LandingFontPreset; name: string; headingClass: string; bodyClass: string; desc: string; category: string }[] = [
@@ -683,20 +683,20 @@ export function LandingView({
 
 
 
-      {/* Dedicated Section: What TraceXMail Solves, The Forensic Solution, and How It's Different */}
+      {/* Dedicated Section: Attack Vector Taxonomy, Forensic Countermeasures & Architectural Differences */}
       <section id="challenges-solution" className="py-16 sm:py-24 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Section Header */}
           <div className="max-w-[760px] mb-12">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
-              Challenges &amp; The TraceXMail Way
+              THREAT VECTOR ANALYSIS &amp; FORENSIC COUNTERMEASURES
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[38px] font-medium text-[#ede6d8] leading-tight">
-              Why traditional email tools fail — and how we solve it in plain English
+            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[38px] font-medium text-[#ede6d8] leading-tight`}>
+              Critical Limitations in Legacy Filtering &amp; The Deterministic Forensic Standard
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[16px] leading-relaxed">
-              Standard filters guess based on keywords and produce vague risk percentages. TraceXMail follows the physical transmission path and inspects the digital wax seals so anyone can understand exactly how an attack works.
+            <p className="text-[#b9af9c] mt-3 text-[16px] leading-relaxed font-sans">
+              Heuristic scanners compute non-deterministic statistical probabilities on surface content. TraceXMail conducts backward hop traversal, validates RFC cryptographic signatures, and establishes an auditable chain of custody.
             </p>
           </div>
 
@@ -705,12 +705,12 @@ export function LandingView({
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#b23a2e]" />
-                <h3 className="font-['Fraunces',serif] text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]">
-                  Interactive Breakdown: Pick a Real-World Email Attack
+                <h3 className={`${currentFont.headingClass} text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]`}>
+                  Forensic Deconstruction: Common Adversary Attack Vectors
                 </h3>
               </div>
               <span className="text-xs font-mono text-[#8e8574] hidden sm:inline">
-                Click any card to see how TraceXMail exposes it
+                Select attack vector to inspect deterministic countermeasure
               </span>
             </div>
 
@@ -719,33 +719,33 @@ export function LandingView({
               {[
                 {
                   id: 0,
-                  badge: 'TRICK #1',
-                  name: 'Fake Boss / Wire Transfer',
-                  sub: 'Display name spoofing',
+                  badge: 'VECTOR #1',
+                  name: 'Executive Impersonation (BEC)',
+                  sub: 'Display name & return-path spoofing',
                   icon: AlertOctagon,
                   color: '#b23a2e'
                 },
                 {
                   id: 1,
-                  badge: 'TRICK #2',
-                  name: 'Fake Server Routes',
-                  sub: 'Forged header injection',
+                  badge: 'VECTOR #2',
+                  name: 'Synthetic MTA Route Injection',
+                  sub: 'Forged Received header fabrication',
                   icon: Network,
                   color: '#c9a227'
                 },
                 {
                   id: 2,
-                  badge: 'TRICK #3',
-                  name: 'Mysterious "AI Risk" Scores',
-                  sub: 'Black-box numbers with no proof',
+                  badge: 'VECTOR #3',
+                  name: 'Black-Box Heuristic Ambiguity',
+                  sub: 'Unverifiable ML risk scoring',
                   icon: Cpu,
                   color: '#60a5fa'
                 },
                 {
                   id: 3,
-                  badge: 'TRICK #4',
-                  name: 'Offshore Anonymous Relays',
-                  sub: 'Tor and bulletproof hosts',
+                  badge: 'VECTOR #4',
+                  name: 'Offshore Anonymized Transit',
+                  sub: 'Tor exit nodes & bulletproof ASNs',
                   icon: Globe,
                   color: '#a855f7'
                 }
@@ -772,7 +772,7 @@ export function LandingView({
                       <IconC className="w-3.5 h-3.5 shrink-0" style={{ color: item.color }} />
                       <span className="truncate">{item.name}</span>
                     </div>
-                    <div className="text-[11.5px] text-[#8e8574] truncate mt-0.5">
+                    <div className="text-[11.5px] text-[#8e8574] truncate mt-0.5 font-mono">
                       {item.sub}
                     </div>
                   </button>
@@ -787,32 +787,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <AlertOctagon className="w-3.5 h-3.5" />
-                      The Problem (How Attackers Trick You)
+                      Adversary Technique: Display Name Deception
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      &quot;The email said it was from our CEO, but it wasn&apos;t.&quot;
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      RFC 5322 Visual Display Name Forgery
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Anyone can set the visible &quot;From&quot; name to <em>&quot;Tim Cook &lt;ceo@apple.com&gt;&quot;</em> while sending from an untraceable free webmail server. Regular email apps show the friendly name in bold, tricking finance teams into sending urgent wire transfers.
+                      Adversaries forge the high-visibility Friendly From header while originating from unrelated third-party mail infrastructure. Standard MUA clients highlight the trusted identity while suppressing the unaligned envelope return-path.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ What standard filters do: Check the display name only, flag nothing suspicious, and let the message land directly in the inbox.
+                      ⚠ Legacy Scanner Defect: Evaluates string matching on display names without enforcing cryptographic DMARC identifier alignment.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      The TraceXMail Solution
+                      TraceXMail Countermeasure
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      We verify the sender&apos;s digital seal against DNS netblocks
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Cryptographic Domain Alignment &amp; RFC Authentication Matrix
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail ignores visual display names and directly checks if the true sending computer was authorized by Apple&apos;s official cryptographic records (SPF &amp; DKIM). If there&apos;s a mismatch, we immediately flag the impersonation.
+                      TraceXMail bypasses superficial headers to validate connecting socket IP authorizations against published DNS TXT netblocks (SPF) and verifies 2048-bit RSA/Ed25519 digital signatures (DKIM) under strict DMARC alignment criteria.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ What TraceXMail outputs: &quot;SPF Softfail + DMARC Disalignment: Sender IP 185.220.101.5 is NOT authorized by apple.com.&quot;
+                      ✓ Deterministic Finding: SPF Softfail + DMARC Disalignment: Origin IP 185.220.101.5 is NOT authorized by domain netblock.
                     </div>
                   </div>
                 </div>
@@ -823,32 +823,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Network className="w-3.5 h-3.5" />
-                      The Problem (How Attackers Trick You)
+                      Adversary Technique: Synthetic Route Injection
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      &quot;The hacker typed fake Google &amp; Microsoft server lines.&quot;
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Fabrication of Intermediate MTA Received Headers
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Attackers often write fake intermediate server hops into their email headers claiming the message passed through official Microsoft or Google mail relays. Basic scanners get confused and believe the fake server history.
+                      Attackers inject fabricated `Received:` trace fields into the raw message payload, simulating legitimate transit through Microsoft 365 or Google Workspace relays to deceive linear header parsers.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ What standard filters do: Read headers top-to-bottom without checking who actually handed the message to whom.
+                      ⚠ Legacy Scanner Defect: Parses trace headers sequentially top-down without validating TCP socket handshake provenance.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      The TraceXMail Solution
+                      TraceXMail Countermeasure
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      Backward Hop Traversal: We only trust verified server handoffs
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Reverse Hop Traversal &amp; Boundary Handshake Isolation
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail starts from your own verified mail server and steps backwards one connection at a time. The exact moment an unauthenticated outside computer handed over the message, we stop and lock that IP as the true origin.
+                      TraceXMail executes backward hop traversal starting from the perimeter MX server, verifying bidirectional TLS handshakes and isolating the exact TCP socket boundary where external unauthenticated transmission occurred.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ What TraceXMail outputs: Discards 3 forged Microsoft lines and isolates real origin server in Sofia, Bulgaria.
+                      ✓ Deterministic Finding: Discards 3 synthetic Microsoft M365 trace records; isolates authenticated origin socket in Sofia, Bulgaria.
                     </div>
                   </div>
                 </div>
@@ -859,32 +859,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Cpu className="w-3.5 h-3.5" />
-                      The Problem (How Attackers Trick You)
+                      Legacy Defect: Black-Box Confidence Ambiguity
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      &quot;Our tool gave it a 78% risk score, but can&apos;t explain why.&quot;
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Unverifiable Statistical Threat Probabilities
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Many modern security tools use black-box machine learning that generates a mystery probability number. If a manager, auditor, or legal team asks <em>&quot;How do we know this is a crime?&quot;</em>, no one has concrete evidence to show.
+                      Opaque heuristic engines generate arbitrary probability figures without forensic provenance, leaving incident response teams without verifiable evidence during executive briefings or regulatory audits.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ What standard filters do: Output arbitrary confidence numbers without proof or cryptographic audit trails.
+                      ⚠ Legacy Scanner Defect: Outputs unexplainable risk scores lacking deterministic root-cause analysis or reproducible telemetry.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      The TraceXMail Solution
+                      TraceXMail Countermeasure
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      Court-Ready Proof with SHA-256 Custody Seals
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Deterministic Signal Breakdown &amp; NIST SP 800-86 Custody Seals
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail provides a transparent, item-by-item breakdown of every technical check (DNS records, server certificates, attachment entropy) and stamps it with an immutable cryptographic hash you can hand to legal counsel or police.
+                      TraceXMail provides a granular breakdown of verified forensic signals (DNS TXT records, X.509 certificates, Shannon entropy) anchored by an immutable SHA-256 evidence digest.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ What TraceXMail outputs: Deterministic checklist with Evidence IDs, NIST SP 800-86 timestamps, and SHA-256 tamper seal.
+                      ✓ Deterministic Finding: Atomic signal ledger with RFC 5322 timelines and court-admissible SHA-256 evidence digest.
                     </div>
                   </div>
                 </div>
@@ -895,32 +895,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Globe className="w-3.5 h-3.5" />
-                      The Problem (How Attackers Trick You)
+                      Adversary Technique: Bulletproof Anonymized Transit
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      &quot;The scammer routed through Tor and offshore proxies.&quot;
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Tor Onion Routing &amp; Non-Cooperative Autonomous Systems
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Professional criminal syndicates send attacks through anonymized proxy networks and bulletproof hosting providers in countries that ignore takedown notices, hiding their true physical location.
+                      Threat actors route SMTP traffic through multi-layered onion networks and bulletproof hosting providers operating in non-compliant jurisdictions to conceal origin infrastructure.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ What standard filters do: Treat all IP addresses equally and fail to recognize anonymized proxy infrastructure.
+                      ⚠ Legacy Scanner Defect: Classifies connection endpoints without autonomous system reputation scoring or exit-node intelligence.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      The TraceXMail Solution
+                      TraceXMail Countermeasure
                     </div>
-                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
-                      Live BGP, Autonomous System &amp; Tor Exit Node Mapping
+                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
+                      Global BGP Routing &amp; Autonomous System (ASN) Attribution
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      We query global routing tables and live Tor directories to flag proxy exit nodes, VPN services, and bulletproof hosters (such as AlexHost Moldova) on an interactive 3D map.
+                      TraceXMail queries authoritative BGP routing registries, MaxMind GeoLite2 databases, and active Tor consensus directories to flag proxy exit relays and bulletproof hosting infrastructure (such as AlexHost Moldova AS57523).
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ What TraceXMail outputs: Flagged as AS200548 (Tor Exit Relay in Sofia, BG) + Threat Intensity 98/100.
+                      ✓ Deterministic Finding: Origin socket mapped to Tor Exit Node (AS200548) with real-time transit telemetry on 3D globe.
                     </div>
                   </div>
                 </div>
@@ -928,12 +928,12 @@ export function LandingView({
             </div>
           </div>
 
-          {/* Part 2: Quick Comparison Matrix */}
+          {/* Part 2: Forensic Architecture Comparison Matrix */}
           <div>
             <div className="flex items-center gap-2 mb-6">
               <span className="w-2 h-2 rounded-full bg-[#c9a227]" />
-              <h3 className="font-['Fraunces',serif] text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]">
-                How TraceXMail Compares to Other Tools
+              <h3 className={`${currentFont.headingClass} text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]`}>
+                Comparative Forensic Capability Matrix
               </h3>
             </div>
 
@@ -941,9 +941,9 @@ export function LandingView({
               <table className="w-full text-left text-[13.5px] border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-[#3a352c] bg-[#14120f] font-mono text-[11px] text-[#8e8574] uppercase tracking-wider">
-                    <th className="py-3 px-4 font-semibold">What You Need</th>
-                    <th className="py-3 px-4 font-semibold">Standard Email Filters</th>
-                    <th className="py-3 px-4 font-semibold">Virus Scanners</th>
+                    <th className="py-3 px-4 font-semibold">Forensic Dimension</th>
+                    <th className="py-3 px-4 font-semibold">Standard Gateway Filters</th>
+                    <th className="py-3 px-4 font-semibold">Signature AV Scanners</th>
                     <th className="py-3 px-4 font-semibold text-[#c9a227] bg-[#241f17]">TraceXMail Forensic Core</th>
                   </tr>
                 </thead>
@@ -1245,44 +1245,44 @@ export function LandingView({
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Core Engineering
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8]">
-              What&apos;s actually doing the work
+            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[36px] font-medium text-[#ede6d8]`}>
+              Four Pillars of the Forensic Reconstruction Engine
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px] leading-relaxed">
-              Four systems most email tools skip, because they&apos;re the difference between a plausible guess and evidence that holds up.
+              Deterministic architectures engineered for court-admissible audit trails, immutable cryptographic ledgers, and RFC-compliant hop isolation.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT A</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Evidence Vault</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Cryptographic Evidence Vault</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
-                Every finding is hashed and timestamped the moment it&apos;s produced. Nothing in a report can be quietly edited after the fact. A changed field means a new record, not an overwrite.
+                Every forensic finding is hashed via SHA-256 and timestamped the moment analysis executes. Immutability guarantees prevent post-hoc report tampering.
               </p>
             </div>
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT B</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Trust-boundary origin engine</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Trust-Boundary Origin Resolver</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
-                The earliest IP in a header isn&apos;t always the attacker&apos;s. TraceXMail knows which hops to trust before it names a source.
+                Reconstructs transmission backwards from verified destination MTAs, isolating untrusted perimeter hops while discarding attacker-forged Received headers.
               </p>
             </div>
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT C</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Attribution engine</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>NIST-Aligned Attribution Classifier</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
-                Every verdict comes with the evidence behind it, labeled as a fact, a finding, or a hypothesis, and never blurred together into one confident-sounding line.
+                Strict epistemological categorization separates verified forensic Facts, contextual Findings, and threat actor Hypotheses into distinct audit tiers.
               </p>
             </div>
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT D</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Campaign correlation</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Cross-Vector Campaign Correlation</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
-                One email rarely stands alone. Shared infrastructure and timing surface the wider campaign, tiered by how strong the link really is.
+                Correlates concurrent phishing waves sharing bulletproof autonomous systems, identical DKIM selectors, and matching payload entropy profiles.
               </p>
             </div>
           </div>
@@ -1311,11 +1311,11 @@ export function LandingView({
 
             {/* Right Copy - Matching Image 1 */}
             <div className="space-y-4 max-w-[680px]">
-              <h2 className="font-['Fraunces',serif] text-[32px] sm:text-[42px] font-medium text-[#ede6d8] leading-[1.15]">
-                We&apos;d rather tell you we<br className="hidden sm:inline" /> don&apos;t know.
+              <h2 className={`${currentFont.headingClass} text-[32px] sm:text-[42px] font-medium text-[#ede6d8] leading-[1.15]`}>
+                Deterministic Integrity: We Refuse Manufactured Confidence
               </h2>
               <p className="text-[#b9af9c] text-[16px] sm:text-[17px] leading-relaxed">
-                When the evidence doesn&apos;t support a verdict, TraceXMail says so, instead of manufacturing confidence your team would have to defend later in front of a client or a regulator without the evidence to back it up.
+                When cryptographic signatures or network telemetry are inconclusive, TraceXMail declares &quot;Inconclusive / Unknown&quot; rather than hallucinating statistical probabilities that crumble under regulatory deposition or adversarial scrutiny.
               </p>
             </div>
 
@@ -1330,36 +1330,36 @@ export function LandingView({
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Access Governance
             </div>
-            <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
-              Built around who&apos;s actually looking at it
+            <h2 className={`${currentFont.headingClass} text-[26px] sm:text-[32px] font-medium text-[#ede6d8]`}>
+              Role-Based Access Control &amp; Privacy Safeguards
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
-              Access matches the job. Nobody sees more than they need, and nobody with real work to do is left waiting on a request.
+              Tiered operational clearances enforce strict separation of duties, ensuring PII redaction and read-only audit integrity across SOC echelons.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#c9a227]">CLEARANCE · ADMIN</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Admin</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Admin</h3>
               <p className="text-[#b9af9c] text-[14px]">
-                Manages the organization, invites the team, and sets who can see unmasked evidence.
+                Manages organizational certificates, user provisioning, and authorization policies for unmasked forensic raw header inspection.
               </p>
             </div>
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#22c55e]">CLEARANCE · ANALYST</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Analyst</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Analyst</h3>
               <p className="text-[#b9af9c] text-[14px]">
-                Uploads, investigates, and closes cases: the full working view, evidence and all.
+                Full investigative telemetry access: executes reverse hop reconstruction, validates DMARC matrix, and generates forensic dossiers.
               </p>
             </div>
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#7fb2e8]">CLEARANCE · READ-ONLY</span>
-              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Auditor</h3>
+              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Auditor</h3>
               <p className="text-[#b9af9c] text-[14px]">
-                Sees the same cases with personal data masked by default, and can&apos;t alter what&apos;s on file.
+                Enforces compliance review with automated PII masking, RFC verification logs, and immutable SHA-256 chain of custody reports.
               </p>
             </div>
           </div>
@@ -1373,11 +1373,11 @@ export function LandingView({
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Core Engineering &amp; Research
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              The people behind the forensic core
+            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[34px] font-medium text-[#ede6d8]`}>
+              Forensic Core Engineering &amp; Threat Intelligence Research
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
-              Six engineers and researchers building deterministic email attribution, RFC validation, and forensic evidence pipelines.
+              Specialized research engineers dedicated to deterministic email attribution, RFC verification protocols, and high-fidelity threat intelligence.
             </p>
           </div>
 
@@ -1434,13 +1434,13 @@ export function LandingView({
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[650px] mb-10">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
-              Evaluation &amp; Access
+              Operational Deployment
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              Pricing
+            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[34px] font-medium text-[#ede6d8]`}>
+              Deployment Tiers &amp; SOC Access
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
-              We&apos;re in pilot with a small number of security teams right now, so this reflects that stage, not a finished commercial plan.
+              Active pilot deployments available for SOC response units, security incident responders, and digital forensics laboratories.
             </p>
           </div>
 
@@ -1448,7 +1448,7 @@ export function LandingView({
             <div className="bg-[#1d1a15] border border-[#b23a2e] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
                 <span className="text-xs font-mono text-[#ff8d7d] font-bold">PILOT ACCESS</span>
-                <div className="font-['Fraunces',serif] text-[32px] font-bold text-[#ede6d8] mt-1">Free</div>
+                <div className={`${currentFont.headingClass} text-[32px] font-bold text-[#ede6d8] mt-1`}>No Cost Evaluation</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For security teams evaluating TraceXMail during the pilot phase</p>
               </div>
               <ul className="space-y-2 text-sm text-[#ede6d8]">
@@ -1476,7 +1476,7 @@ export function LandingView({
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
                 <span className="text-xs font-mono text-[#c9a227] font-bold">ENTERPRISE</span>
-                <div className="font-['Fraunces',serif] text-[32px] font-bold text-[#ede6d8] mt-1">Let&apos;s talk</div>
+                <div className={`${currentFont.headingClass} text-[32px] font-bold text-[#ede6d8] mt-1`}>Custom Ingress &amp; SLAs</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For organizations needing custom deployment, SLAs, or on-prem hosting</p>
               </div>
               <ul className="space-y-2 text-sm text-[#ede6d8]">
@@ -1509,13 +1509,13 @@ export function LandingView({
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[720px] mb-10">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
-              Frequently Asked Questions
+              Technical Documentation &amp; FAQ
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8]">
-              Everything you need to know, explained simply
+            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[36px] font-medium text-[#ede6d8]`}>
+              Forensic Architecture &amp; Protocol Verification FAQ
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
-              Clear answers on how TraceXMail works, why it is safer than regular filters, and how it protects your privacy.
+              Technical specifications on socket verification, cryptographic validation matrices, and zero-retention privacy architecture.
             </p>
           </div>
 
