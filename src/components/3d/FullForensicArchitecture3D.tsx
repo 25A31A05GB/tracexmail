@@ -551,11 +551,11 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
   const currentStageMeta = STAGES_META[activeStage];
 
   return (
-    <section id="full-architecture-3d" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#12100d]">
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="full-architecture-3d" className="py-12 sm:py-20 border-b border-[#3a352c] bg-[#12100d] overflow-hidden">
+      <div className="w-full mx-auto px-3.5 sm:px-6 lg:px-8">
         
         {/* Top 4 Stage Selector Tabs - Matching Image 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3.5 mb-5 sm:mb-6">
           {STAGES_META.map((stage, idx) => {
             const isActive = activeStage === idx;
             const IconComponent = stage.icon;
@@ -563,26 +563,26 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
               <button
                 key={idx}
                 onClick={() => setActiveStage(idx)}
-                className={`p-4 rounded-[4px] text-left transition-all cursor-pointer relative ${
+                className={`p-3 sm:p-4 rounded-[4px] text-left transition-all cursor-pointer relative ${
                   isActive
                     ? 'bg-[#1a1712] border border-[#c9a227] ring-1 ring-[#c9a227]/40 shadow-xl'
                     : 'bg-[#15130f] border border-[#3a352c] hover:border-[#8e8574] hover:bg-[#1a1712]'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="w-7 h-7 rounded-[3px] bg-[#221e17] flex items-center justify-center border border-[#3a352c]">
-                    <IconComponent className={`w-3.5 h-3.5 ${isActive ? 'text-[#c9a227]' : 'text-[#8e8574]'}`} />
+                <div className="flex items-center justify-between mb-1.5 sm:mb-2">
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-[3px] bg-[#221e17] flex items-center justify-center border border-[#3a352c]">
+                    <IconComponent className={`w-3 sm:w-3.5 h-3 sm:h-3.5 ${isActive ? 'text-[#c9a227]' : 'text-[#8e8574]'}`} />
                   </div>
-                  <span className={`font-mono text-[10px] uppercase font-bold tracking-wider ${
+                  <span className={`font-mono text-[9px] sm:text-[10px] uppercase font-bold tracking-wider ${
                     isActive ? 'text-[#c9a227]' : 'text-[#8e8574]'
                   }`}>
                     {isActive ? 'ACTIVE' : 'INSPECT'}
                   </span>
                 </div>
-                <div className="font-mono text-[11px] text-[#8e8574] uppercase tracking-wider mb-0.5">
+                <div className="font-mono text-[10px] sm:text-[11px] text-[#8e8574] uppercase tracking-wider mb-0.5">
                   {stage.num}
                 </div>
-                <div className="font-semibold text-[15px] text-[#ede6d8] leading-tight">
+                <div className="font-semibold text-[13px] sm:text-[15px] text-[#ede6d8] leading-tight line-clamp-1 sm:line-clamp-none">
                   {stage.title}
                 </div>
               </button>
@@ -591,27 +591,27 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
         </div>
 
         {/* Main 3D Hardware Accelerated Split View - Matching Image 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-stretch">
           
           {/* Left: 3D Hardware Accelerated Viewport */}
-          <div className="lg:col-span-7 bg-[#0b0a08] border border-[#3a352c] rounded-[6px] relative min-h-[480px] flex flex-col justify-between overflow-hidden shadow-2xl">
+          <div className="lg:col-span-7 bg-[#0b0a08] border border-[#3a352c] rounded-[6px] relative min-h-[380px] xs:min-h-[420px] sm:min-h-[480px] flex flex-col justify-between overflow-hidden shadow-2xl">
             
             {/* Top Bar with Green Dot and Target Pills */}
-            <div className="p-3 bg-[#12100d]/95 border-b border-[#3a352c] flex items-center justify-between z-10">
-              <div className="flex items-center gap-2 font-mono text-[11px] font-bold text-[#ede6d8] tracking-wider uppercase">
-                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
-                <span>3D HARDWARE ACCELERATED VIEW • {currentStageMeta.headerTag}</span>
+            <div className="p-2.5 sm:p-3 bg-[#12100d]/95 border-b border-[#3a352c] flex flex-wrap items-center justify-between gap-2 z-10">
+              <div className="flex items-center gap-1.5 sm:gap-2 font-mono text-[10px] sm:text-[11px] font-bold text-[#ede6d8] tracking-wider uppercase truncate">
+                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse shrink-0" />
+                <span className="truncate">3D VIEW • {currentStageMeta.headerTag}</span>
               </div>
               
               {/* Target Scenario Switcher Pills */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
                 {TARGET_SCENARIOS.map((t) => {
                   const isSelected = activeTargetId === t.id;
                   return (
                     <button
                       key={t.id}
                       onClick={() => setActiveTargetId(t.id)}
-                      className={`px-2.5 py-1 rounded-[3px] text-xs font-mono font-medium transition-colors cursor-pointer ${
+                      className={`px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-[3px] text-[11px] sm:text-xs font-mono font-medium transition-colors cursor-pointer ${
                         isSelected
                           ? 'bg-[#b23a2e] text-[#ede6d8] font-bold shadow-md'
                           : 'bg-[#1a1712] text-[#8e8574] hover:text-[#ede6d8] border border-[#3a352c]'
@@ -625,38 +625,38 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
             </div>
 
             {/* Orbit Hint Overlay */}
-            <div className="absolute top-14 right-4 z-10 px-2.5 py-1 rounded-[3px] bg-[#14120f]/80 border border-[#3a352c] text-[10.5px] font-mono text-[#b9af9c] flex items-center gap-1.5 backdrop-blur-sm pointer-events-none">
-              <RotateCw className="w-3 h-3 text-[#c9a227]" />
-              <span>Drag to orbit • Scroll to zoom</span>
+            <div className="absolute top-12 sm:top-14 right-2 sm:right-4 z-10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-[3px] bg-[#14120f]/85 border border-[#3a352c] text-[9.5px] sm:text-[10.5px] font-mono text-[#b9af9c] flex items-center gap-1.5 backdrop-blur-sm pointer-events-none">
+              <RotateCw className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#c9a227]" />
+              <span>Drag to orbit</span>
             </div>
 
             {/* 3D Three.js Interactive Canvas Mount */}
             <div
               ref={mountRef}
-              className="w-full flex-1 min-h-[360px] cursor-grab active:cursor-grabbing relative"
+              className="w-full flex-1 min-h-[280px] xs:min-h-[320px] sm:min-h-[360px] cursor-grab active:cursor-grabbing relative"
               title="Click and drag to orbit 3D view"
             />
 
             {/* Dynamic Stage Forensic Telemetry Metric Overlay (Bottom-Left) */}
-            <div className="absolute bottom-14 left-4 z-10 p-3 rounded-[4px] bg-[#14120f]/90 border border-[#3a352c] backdrop-blur-md shadow-xl max-w-[280px]">
-              <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase text-[#c9a227] tracking-wider font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227] animate-ping" />
-                <span>{currentTarget.stageMetrics[activeStage]?.label || 'STAGE METRIC'}</span>
+            <div className="absolute bottom-12 sm:bottom-14 left-2.5 sm:left-4 z-10 p-2.5 sm:p-3 rounded-[4px] bg-[#14120f]/90 border border-[#3a352c] backdrop-blur-md shadow-xl max-w-[210px] xs:max-w-[250px] sm:max-w-[280px]">
+              <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-mono uppercase text-[#c9a227] tracking-wider font-semibold truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227] animate-ping shrink-0" />
+                <span className="truncate">{currentTarget.stageMetrics[activeStage]?.label || 'STAGE METRIC'}</span>
               </div>
-              <div className="font-['Fraunces',serif] text-[22px] sm:text-[24px] font-bold text-[#ede6d8] leading-none mt-1">
+              <div className="font-['Fraunces',serif] text-[18px] sm:text-[24px] font-bold text-[#ede6d8] leading-none mt-1 truncate">
                 {currentTarget.stageMetrics[activeStage]?.value || currentTarget.distance}
               </div>
-              <div className="text-[11px] font-mono text-[#b9af9c] mt-1.5 leading-snug border-t border-[#3a352c]/60 pt-1.5">
+              <div className="text-[10px] sm:text-[11px] font-mono text-[#b9af9c] mt-1 sm:mt-1.5 leading-snug border-t border-[#3a352c]/60 pt-1 sm:pt-1.5 line-clamp-2">
                 {currentTarget.stageMetrics[activeStage]?.subtext}
               </div>
             </div>
 
             {/* Bottom Footer Bar */}
-            <div className="p-3 bg-[#12100d]/95 border-t border-[#3a352c] flex items-center justify-between text-xs font-mono z-10">
-              <div className="text-[#8e8574] truncate max-w-[340px]">
+            <div className="p-2.5 sm:p-3 bg-[#12100d]/95 border-t border-[#3a352c] flex flex-col xs:flex-row items-start xs:items-center justify-between gap-1 text-[11px] sm:text-xs font-mono z-10">
+              <div className="text-[#8e8574] truncate max-w-full xs:max-w-[280px] sm:max-w-[340px]">
                 Active Target: <span className="text-[#ede6d8]">{currentTarget.targetFullName}</span>
               </div>
-              <div className="font-bold">
+              <div className="font-bold shrink-0">
                 <span className="text-[#8e8574]">Threat Score: </span>
                 <span className={currentTarget.threatScore >= 60 ? 'text-[#ff8d7d]' : 'text-[#22c55e]'}>
                   {currentTarget.threatScore}/100
@@ -667,47 +667,47 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
           </div>
 
           {/* Right: Forensic Spec & Direct Analysis Panel */}
-          <div className="lg:col-span-5 flex flex-col justify-between bg-[#15130f] border border-[#3a352c] rounded-[6px] p-6 shadow-xl">
-            <div className="space-y-4">
+          <div className="lg:col-span-5 flex flex-col justify-between bg-[#15130f] border border-[#3a352c] rounded-[6px] p-4 sm:p-6 shadow-xl">
+            <div className="space-y-3.5 sm:space-y-4">
               
               {/* Header Badge & Title */}
               <div>
-                <div className="inline-block px-2 py-0.5 rounded-[2px] bg-[#221e17] border border-[#3a352c] font-mono text-[10.5px] uppercase font-bold text-[#c9a227] mb-2.5">
+                <div className="inline-block px-2 py-0.5 rounded-[2px] bg-[#221e17] border border-[#3a352c] font-mono text-[9.5px] sm:text-[10.5px] uppercase font-bold text-[#c9a227] mb-2">
                   {currentStageMeta.headerTag}
                 </div>
-                <h2 className="font-['Fraunces',serif] text-[24px] sm:text-[26px] font-semibold text-[#ede6d8] leading-tight">
+                <h2 className="font-['Fraunces',serif] text-[20px] sm:text-[24px] lg:text-[26px] font-semibold text-[#ede6d8] leading-tight">
                   {currentStageMeta.h2}
                 </h2>
-                <p className="text-[#b9af9c] mt-2.5 text-[14px] leading-relaxed">
+                <p className="text-[#b9af9c] mt-2 text-[13px] sm:text-[14px] leading-relaxed">
                   {currentStageMeta.desc}
                 </p>
               </div>
 
               {/* Data Table Spec Box - Matching Image 2 */}
-              <div className="bg-[#100e0c] border border-[#3a352c] rounded-[4px] p-3.5 space-y-2 font-mono text-xs">
-                <div className="flex items-start justify-between gap-2 border-b border-[#3a352c]/50 pb-2">
+              <div className="bg-[#100e0c] border border-[#3a352c] rounded-[4px] p-3 sm:p-3.5 space-y-2 font-mono text-[11px] sm:text-xs">
+                <div className="flex flex-col xs:flex-row xs:items-start justify-between gap-1 border-b border-[#3a352c]/50 pb-1.5 sm:pb-2">
                   <span className="text-[#8e8574] shrink-0">RFC 5322 Subject:</span>
-                  <span className="text-[#ede6d8] font-medium truncate text-right">{currentTarget.subject}</span>
+                  <span className="text-[#ede6d8] font-medium truncate text-left xs:text-right">{currentTarget.subject}</span>
                 </div>
-                <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/50 pb-2">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1 border-b border-[#3a352c]/50 pb-1.5 sm:pb-2">
                   <span className="text-[#8e8574]">Origin IP / Country:</span>
                   <span className="text-[#ede6d8] font-medium">{currentTarget.originIp} ({currentTarget.originCountry})</span>
                 </div>
-                <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/50 pb-2">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1 border-b border-[#3a352c]/50 pb-1.5 sm:pb-2">
                   <span className="text-[#8e8574]">Auth Results:</span>
                   <span className="text-[#ff8d7d] font-bold">{currentTarget.authStatus}</span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1">
                   <span className="text-[#8e8574] shrink-0">SHA-256 Custody Hash:</span>
-                  <span className="text-[#c9a227] truncate max-w-[200px]">{currentTarget.sha256}</span>
+                  <span className="text-[#c9a227] truncate max-w-full xs:max-w-[160px] sm:max-w-[200px]">{currentTarget.sha256}</span>
                 </div>
               </div>
 
               {/* Green Checkmark Key Findings */}
-              <div className="space-y-2 pt-1">
+              <div className="space-y-1.5 sm:space-y-2 pt-0.5">
                 {currentStageMeta.points.map((pt, pIdx) => (
-                  <div key={pIdx} className="flex items-start gap-2.5 text-[13.5px] text-[#ede6d8] leading-snug">
-                    <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0 mt-0.5" />
+                  <div key={pIdx} className="flex items-start gap-2 text-[12.5px] sm:text-[13.5px] text-[#ede6d8] leading-snug">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#22c55e] shrink-0 mt-0.5" />
                     <span>{pt}</span>
                   </div>
                 ))}
@@ -716,10 +716,10 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
             </div>
 
             {/* Bottom Red CTA Button - Matching Image 2 */}
-            <div className="mt-6 pt-4 border-t border-[#3a352c]">
+            <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-[#3a352c]">
               <button
                 onClick={handleLaunchTarget}
-                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-4 rounded-[4px] font-semibold text-[14.5px] border border-[#b23a2e] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg group"
+                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-2.5 sm:py-3 px-4 rounded-[4px] font-semibold text-[13.5px] sm:text-[14.5px] border border-[#b23a2e] transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg group"
               >
                 <span>Analyze this Attack in Console</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

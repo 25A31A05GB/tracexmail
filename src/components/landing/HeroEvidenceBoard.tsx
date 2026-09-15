@@ -132,7 +132,7 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
       onClick={handleClick}
       animate={isShaking ? { x: [-3, 3, -2, 2, 0], y: [2, -2, 1, 0] } : { x: 0, y: 0 }}
       transition={{ duration: 0.22 }}
-      className={`relative w-full h-[430px] sm:h-[460px] rounded-[6px] border border-[#3a352c] bg-[#14100b] overflow-hidden shadow-2xl cursor-pointer select-none group flex flex-col justify-between ${className}`}
+      className={`relative w-full h-[390px] xs:h-[420px] sm:h-[460px] rounded-[6px] border border-[#3a352c] bg-[#14100b] overflow-hidden shadow-2xl cursor-pointer select-none group flex flex-col justify-between ${className}`}
     >
       {/* Background Subtle Radar / Concentric Coordinate Grid */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
@@ -166,20 +166,20 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
       />
 
       {/* TOP HEADER CONTROLS & STEP INDICATOR */}
-      <div className="relative z-30 px-3.5 pt-3 flex items-center justify-between pointer-events-auto">
-        <div className="flex items-center gap-2 bg-[#1a1712]/95 border border-[#3a352c] px-2.5 py-1 rounded-[4px] shadow-sm">
-          <Activity className="w-3.5 h-3.5 text-[#b23a2e] animate-pulse" />
-          <span className="font-['IBM_Plex_Mono',monospace] text-[11px] font-bold text-[#ede6d8]">
-            STAGE 0{activeStep}/05:
+      <div className="relative z-30 px-2.5 sm:px-3.5 pt-2.5 sm:pt-3 flex items-center justify-between gap-2 pointer-events-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-[#1a1712]/95 border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[4px] shadow-sm truncate">
+          <Activity className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#b23a2e] animate-pulse shrink-0" />
+          <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] font-bold text-[#ede6d8] shrink-0">
+            0{activeStep}/05:
           </span>
-          <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#ff8d7d] font-semibold">
+          <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#ff8d7d] font-semibold truncate">
             {currentStepData.badge}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-[#1a1712]/95 border border-[#3a352c] p-0.5 rounded-[4px]">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-[#1a1712]/95 border border-[#3a352c] p-0.5 rounded-[4px] shrink-0">
           {/* Step dots */}
-          <div className="flex items-center gap-1 px-2">
+          <div className="flex items-center gap-1 px-1.5 sm:px-2">
             {[1, 2, 3, 4, 5].map(s => (
               <button
                 key={s}
@@ -188,7 +188,7 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                   setActiveStep(s);
                   setIsPlaying(false);
                 }}
-                className={`w-2 h-2 rounded-full transition-all cursor-pointer ${
+                className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full transition-all cursor-pointer ${
                   s === activeStep
                     ? 'bg-[#ff6b5a] scale-125 shadow-[0_0_6px_#ff6b5a]'
                     : s < activeStep
@@ -205,7 +205,7 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             className="p-1 rounded bg-[#26221b] hover:bg-[#342e24] text-[#ede6d8] text-[11px] transition-colors cursor-pointer"
             title={isPlaying ? 'Pause Sequence' : 'Resume Sequence'}
           >
-            {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 text-[#ff8d7d]" />}
+            {isPlaying ? <Pause className="w-2.5 h-2.5 sm:w-3 sm:h-3" /> : <Play className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#ff8d7d]" />}
           </button>
 
           <button
@@ -213,7 +213,7 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             className="p-1 rounded bg-[#26221b] hover:bg-[#342e24] text-[#8e8574] hover:text-[#ede6d8] text-[11px] transition-colors cursor-pointer"
             title="Replay Investigation From Step 1"
           >
-            <RotateCcw className="w-3 h-3" />
+            <RotateCcw className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
           </button>
         </div>
       </div>
@@ -344,8 +344,8 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 whileHover={{ scale: 1.07, rotate: -2, zIndex: 40 }}
               >
                 {/* Red Pushpin with Impact Ring */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
                   <div className="w-1.5 h-1 bg-[#1a1712] rounded-full opacity-60" />
                   {/* Pulse wave when pin hits */}
                   <motion.div
@@ -357,17 +357,17 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 </div>
 
                 {/* Card Body */}
-                <div className={`w-[145px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-3 pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
+                <div className={`w-[125px] xs:w-[140px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-2.5 sm:p-3 pt-3.5 sm:pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
                   activeStep === 1 || hoveredCard === 1 ? 'border-[#b23a2e] ring-2 ring-[#b23a2e]/40' : 'border-[#d6ccb8]'
                 }`}>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[12px] sm:text-[13px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[13px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
                     <span>185.220.101.5</span>
                     {activeStep === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] animate-ping" />}
                   </div>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[8.5px] sm:text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
                     TOR EXIT NODE
                   </div>
-                  <div className="w-full h-1.5 bg-[#d8cfbe] rounded-[1px] mt-2 overflow-hidden">
+                  <div className="w-full h-1 sm:h-1.5 bg-[#d8cfbe] rounded-[1px] mt-1.5 sm:mt-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-[#b23a2e]"
                       initial={{ width: 0 }}
@@ -398,8 +398,8 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 whileHover={{ scale: 1.07, rotate: 5, zIndex: 40 }}
               >
                 {/* Red Pushpin with Impact Ring */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
                   <div className="w-1.5 h-1 bg-[#1a1712] rounded-full opacity-60" />
                   <motion.div
                     className="absolute -inset-1 rounded-full border border-[#ff6b5a]"
@@ -410,17 +410,17 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 </div>
 
                 {/* Card Body */}
-                <div className={`w-[145px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-3 pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
+                <div className={`w-[125px] xs:w-[140px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-2.5 sm:p-3 pt-3.5 sm:pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
                   activeStep === 2 || hoveredCard === 2 ? 'border-[#b23a2e] ring-2 ring-[#b23a2e]/40' : 'border-[#d6ccb8]'
                 }`}>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] sm:text-[12.5px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[10.5px] sm:text-[12.5px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
                     <span>SPF · SOFTFAIL</span>
                     {activeStep === 2 && <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] animate-ping" />}
                   </div>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[8.5px] sm:text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
                     UNAUTHORIZED SENDER
                   </div>
-                  <div className="w-full h-1.5 bg-[#d8cfbe] rounded-[1px] mt-2 overflow-hidden">
+                  <div className="w-full h-1 sm:h-1.5 bg-[#d8cfbe] rounded-[1px] mt-1.5 sm:mt-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-[#b23a2e]"
                       initial={{ width: 0 }}
@@ -437,7 +437,7 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
         {/* CARD 3: AS200548 / BULGARIA · ZETTAHOST (Revealed in Step 3) */}
         <div 
           className="absolute z-20 pointer-events-auto"
-          style={{ left: '70.5%', top: '45.0%' }}
+          style={{ left: '68.0%', top: '45.0%' }}
         >
           <AnimatePresence>
             {activeStep >= 3 && (
@@ -451,8 +451,8 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 whileHover={{ scale: 1.07, rotate: 0, zIndex: 40 }}
               >
                 {/* Red Pushpin with Impact Ring */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
                   <div className="w-1.5 h-1 bg-[#1a1712] rounded-full opacity-60" />
                   <motion.div
                     className="absolute -inset-1 rounded-full border border-[#ff6b5a]"
@@ -463,17 +463,17 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 </div>
 
                 {/* Card Body */}
-                <div className={`w-[145px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-3 pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
+                <div className={`w-[125px] xs:w-[140px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-2.5 sm:p-3 pt-3.5 sm:pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
                   activeStep === 3 || hoveredCard === 3 ? 'border-[#b23a2e] ring-2 ring-[#b23a2e]/40' : 'border-[#d6ccb8]'
                 }`}>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[12px] sm:text-[13px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[13px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
                     <span>AS200548</span>
                     {activeStep === 3 && <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] animate-ping" />}
                   </div>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[8.5px] sm:text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
                     BULGARIA · ZETTAHOST
                   </div>
-                  <div className="w-full h-1.5 bg-[#d8cfbe] rounded-[1px] mt-2 overflow-hidden">
+                  <div className="w-full h-1 sm:h-1.5 bg-[#d8cfbe] rounded-[1px] mt-1.5 sm:mt-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-[#b23a2e]"
                       initial={{ width: 0 }}
@@ -504,8 +504,8 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 whileHover={{ scale: 1.07, rotate: 4, zIndex: 40 }}
               >
                 {/* Red Pushpin with Impact Ring */}
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
+                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gradient-to-br from-[#ff8375] via-[#b23a2e] to-[#4d100a] shadow-[0_3px_7px_rgba(0,0,0,0.7)] border border-[#ff9d91]/60" />
                   <div className="w-1.5 h-1 bg-[#1a1712] rounded-full opacity-60" />
                   <motion.div
                     className="absolute -inset-1 rounded-full border border-[#ff6b5a]"
@@ -516,17 +516,17 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
                 </div>
 
                 {/* Card Body */}
-                <div className={`w-[145px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-3 pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
+                <div className={`w-[125px] xs:w-[140px] sm:w-[160px] bg-[#ede6d8] text-[#14120f] p-2.5 sm:p-3 pt-3.5 sm:pt-4 rounded-[2px] shadow-[0_10px_22px_rgba(0,0,0,0.65)] border transition-all ${
                   activeStep === 4 || hoveredCard === 4 ? 'border-[#b23a2e] ring-2 ring-[#b23a2e]/40' : 'border-[#d6ccb8]'
                 }`}>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[10.5px] sm:text-[11.5px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
-                    <span>paypal-secure-update...</span>
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11.5px] font-bold text-[#14120f] tracking-tight truncate flex items-center justify-between">
+                    <span>paypal-secure...</span>
                     {activeStep === 4 && <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] animate-ping" />}
                   </div>
-                  <div className="font-['IBM_Plex_Mono',monospace] text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
+                  <div className="font-['IBM_Plex_Mono',monospace] text-[8.5px] sm:text-[9.5px] font-bold text-[#b23a2e] uppercase tracking-wider mt-0.5">
                     TYPOSQUAT DOMAIN
                   </div>
-                  <div className="w-full h-1.5 bg-[#d8cfbe] rounded-[1px] mt-2 overflow-hidden">
+                  <div className="w-full h-1 sm:h-1.5 bg-[#d8cfbe] rounded-[1px] mt-1.5 sm:mt-2 overflow-hidden">
                     <motion.div
                       className="h-full bg-[#b23a2e]"
                       initial={{ width: 0 }}
@@ -544,20 +544,20 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
         <AnimatePresence>
           {activeStep >= 5 && (
             <motion.div
-              className="absolute bottom-[16px] sm:bottom-[24px] right-[24px] sm:right-[40px] z-20 pointer-events-none"
+              className="absolute bottom-[12px] sm:bottom-[24px] right-[16px] sm:right-[40px] z-20 pointer-events-none"
               initial={{ opacity: 0, scale: 3.0, rotate: -45 }}
               animate={{ opacity: 1, scale: 1, rotate: -11 }}
               transition={{ duration: 0.38, type: 'spring', damping: 9, stiffness: 240 }}
             >
-              <div className="relative w-[126px] sm:w-[138px] h-[126px] sm:h-[138px] rounded-full border-[3.5px] border-[#b23a2e]/90 p-1 flex items-center justify-center shadow-[0_0_22px_rgba(178,58,46,0.45)] backdrop-blur-[0.5px]">
-                <div className="w-full h-full rounded-full border-[1.5px] border-[#b23a2e]/75 border-dashed flex flex-col items-center justify-center text-center p-2">
-                  <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] font-extrabold text-[#b23a2e] tracking-widest uppercase leading-tight">
+              <div className="relative w-[100px] xs:w-[118px] sm:w-[138px] h-[100px] xs:h-[118px] sm:h-[138px] rounded-full border-[3px] sm:border-[3.5px] border-[#b23a2e]/90 p-1 flex items-center justify-center shadow-[0_0_22px_rgba(178,58,46,0.45)] backdrop-blur-[0.5px]">
+                <div className="w-full h-full rounded-full border-[1.5px] border-[#b23a2e]/75 border-dashed flex flex-col items-center justify-center text-center p-1.5 sm:p-2">
+                  <span className="font-['IBM_Plex_Mono',monospace] text-[9px] sm:text-[10.5px] font-extrabold text-[#b23a2e] tracking-widest uppercase leading-tight">
                     VERDICT
                   </span>
-                  <span className="font-['IBM_Plex_Mono',monospace] text-[12.5px] font-extrabold text-[#b23a2e] tracking-wider uppercase leading-tight my-0.5">
+                  <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] sm:text-[12.5px] font-extrabold text-[#b23a2e] tracking-wider uppercase leading-tight my-0.5">
                     PHISHING
                   </span>
-                  <span className="font-['IBM_Plex_Mono',monospace] text-[10px] font-extrabold text-[#b23a2e] tracking-widest uppercase leading-tight">
+                  <span className="font-['IBM_Plex_Mono',monospace] text-[8.5px] sm:text-[10px] font-extrabold text-[#b23a2e] tracking-widest uppercase leading-tight">
                     CONFIRMED
                   </span>
                 </div>
@@ -576,16 +576,17 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
       </div>
 
       {/* BOTTOM FORENSIC DETAIL HUD TICKER */}
-      <div className="relative z-30 px-3.5 pb-3 pt-1 border-t border-[#3a352c]/70 bg-[#16120d]/95 flex items-center justify-between text-[11.5px] font-['IBM_Plex_Mono',monospace]">
-        <div className="flex items-center gap-2 truncate pr-2">
+      <div className="relative z-30 px-2.5 sm:px-3.5 pb-2.5 sm:pb-3 pt-1 border-t border-[#3a352c]/70 bg-[#16120d]/95 flex items-center justify-between gap-2 text-[10.5px] sm:text-[11.5px] font-['IBM_Plex_Mono',monospace]">
+        <div className="flex items-center gap-1.5 sm:gap-2 truncate pr-1">
           <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] shrink-0" />
-          <span className="text-[#8e8574] shrink-0 uppercase">Analysis:</span>
+          <span className="text-[#8e8574] shrink-0 uppercase hidden xs:inline">Analysis:</span>
           <span className="text-[#ede6d8] truncate font-medium">
             {currentStepData.detail}
           </span>
         </div>
-        <span className="text-[#b9af9c] group-hover:text-[#ede6d8] font-semibold shrink-0 flex items-center gap-1 transition-colors text-[11px]">
-          Inspect in Console
+        <span className="text-[#b9af9c] group-hover:text-[#ede6d8] font-semibold shrink-0 flex items-center gap-1 transition-colors text-[10.5px] sm:text-[11px]">
+          <span className="hidden xs:inline">Inspect in Console</span>
+          <span className="xs:hidden">Console</span>
           <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
         </span>
       </div>
