@@ -108,7 +108,7 @@ export function LandingView({
     {
       agentId: 'AGENT-01',
       name: 'Jayaram Sappa',
-      role: 'System Design',
+      role: 'System Design & Backend Engineering',
       dotColor: 'bg-[#b23a2e]',
     },
     {
@@ -132,7 +132,7 @@ export function LandingView({
     {
       agentId: 'AGENT-05',
       name: 'Sairam Saladi',
-      role: 'Database & Storage',
+      role: 'Database Integration',
       dotColor: 'bg-[#c9a227]',
     },
     {
@@ -338,56 +338,6 @@ export function LandingView({
                 <Route className="w-4 h-4 text-[#c9a227]" />
                 <span>Inspect Corpus Proof</span>
               </button>
-            </div>
-
-            {/* Instant 1-Click Forensic Demonstrations */}
-            <div className="pt-2">
-              <div className="text-[11.5px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="w-3.5 h-3.5 text-[#c9a227]" />
-                  <span>Instant 1-Click Forensic Demonstrations:</span>
-                </span>
-                <span className="text-[#22c55e] text-[10.5px]">No Signup Required</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => handleCaseClick(0)}
-                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#b23a2e]" />
-                  <span>Nazario PayPal Phish (Tor)</span>
-                </button>
-                <button
-                  onClick={() => handleCaseClick(1)}
-                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#b23a2e]" />
-                  <span>Executive BEC Fraud</span>
-                </button>
-                <button
-                  onClick={() => handleCaseClick(2)}
-                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#22c55e]/20 border border-[#3a352c] hover:border-[#4ade80] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-                  <span>GitHub Clean Notice</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Micro proof badges */}
-            <div className="pt-2 flex flex-wrap items-center gap-4 text-[12px] font-mono text-[#8e8574]">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#22c55e]" />
-                <span>Real SPF/DKIM/DMARC verification</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Network className="w-3.5 h-3.5 text-[#7fb2e8]" />
-                <span>MaxMind GeoLite2 attribution</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <Lock className="w-3.5 h-3.5 text-[#c9a227]" />
-                <span>SHA-256 evidence hashing</span>
-              </span>
             </div>
           </div>
 
@@ -1035,15 +985,15 @@ export function LandingView({
 
 
 
-      {/* UNKNOWN IS A VALID RESULT - EXACT REPLICA OF IMAGE 1 */}
+      {/* UNKNOWN IS A VALID RESULT - CENTERED EDITORIAL STATEMENT */}
       <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 lg:gap-20">
+          <div className="max-w-3xl mx-auto flex flex-col items-center text-center space-y-7">
             
-            {/* Left Circular Badge - Matching Image 1 */}
-            <div className="shrink-0 flex items-center justify-center">
-              <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] border-[#c9a227] p-1.5 flex items-center justify-center shadow-[0_0_30px_rgba(201,162,39,0.12)]">
-                <div className="w-full h-full rounded-full border border-[#c9a227]/40 bg-[#171410] flex flex-col items-center justify-center text-center p-4">
+            {/* Centered Circular Badge */}
+            <div className="flex items-center justify-center">
+              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full border-[3px] border-[#c9a227] p-1.5 flex items-center justify-center shadow-[0_0_35px_rgba(201,162,39,0.15)] bg-[#171410]">
+                <div className="w-full h-full rounded-full border border-[#c9a227]/40 bg-[#12100d] flex flex-col items-center justify-center text-center p-4">
                   <span className="font-['IBM_Plex_Mono',monospace] text-[13px] sm:text-[14px] font-bold text-[#c9a227] tracking-wider leading-[1.35] uppercase">
                     UNKNOWN<br />
                     IS A VALID<br />
@@ -1053,12 +1003,15 @@ export function LandingView({
               </div>
             </div>
 
-            {/* Right Copy - Matching Image 1 */}
-            <div className="space-y-4 max-w-[680px]">
-              <h2 className="font-['Source_Serif_4',serif] font-semibold text-[32px] sm:text-[42px] text-[#ede6d8] leading-[1.15]">
+            {/* Centered Copy */}
+            <div className="space-y-3.5 max-w-[720px] flex flex-col items-center">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] uppercase font-bold tracking-wider">
+                Epistemological Rigor
+              </div>
+              <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] lg:text-[40px] text-[#ede6d8] leading-[1.18]">
                 Deterministic Integrity: We Refuse Manufactured Confidence
               </h2>
-              <p className="text-[#b9af9c] text-[16px] sm:text-[17px] leading-relaxed">
+              <p className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed max-w-[680px]">
                 When cryptographic signatures or network telemetry are inconclusive, TraceXMail declares &quot;Inconclusive / Unknown&quot; rather than hallucinating statistical probabilities that crumble under regulatory deposition or adversarial scrutiny.
               </p>
             </div>
@@ -1156,7 +1109,7 @@ export function LandingView({
                   &quot;Building TraceXMail required constructing a deterministic forensic pipeline that verifies raw RFC822 headers, live SPF/DKIM/DMARC records, and BGP/ASN telemetry without relying on black-box heuristics.&quot;
                 </p>
                 <footer className="text-xs font-mono text-[#22c55e] uppercase">
-                  — JAYARAM SAPPA · SYSTEM ARCHITECTURE &amp; BACKEND
+                  — JAYARAM SAPPA · SYSTEM DESIGN &amp; BACKEND ENGINEERING
                 </footer>
               </div>
 
@@ -1173,39 +1126,39 @@ export function LandingView({
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Deployment / Pricing Section - CENTERED */}
       <section id="pricing" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[650px] mb-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+          <div className="max-w-2xl mx-auto text-center mb-12 flex flex-col items-center">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold tracking-wider">
               Operational Deployment
             </div>
-            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[34px] text-[#ede6d8]">
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] text-[#ede6d8]">
               Deployment Tiers &amp; SOC Access
             </h2>
-            <p className="text-[#b9af9c] mt-2 text-[15px]">
+            <p className="text-[#b9af9c] mt-2.5 text-[15px] max-w-[580px] leading-relaxed">
               Active pilot deployments available for SOC response units, security incident responders, and digital forensics laboratories.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-[850px]">
-            <div className="bg-[#1d1a15] border border-[#b23a2e] rounded-[4px] p-6 sm:p-8 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-[850px] mx-auto">
+            <div className="bg-[#1d1a15] border border-[#b23a2e] rounded-[4px] p-6 sm:p-8 space-y-5 text-left">
               <div>
                 <span className="text-xs font-mono text-[#ff8d7d] font-bold">PILOT ACCESS</span>
-                <div className="font-['Source_Serif_4',serif] font-semibold text-[32px] font-bold text-[#ede6d8] mt-1">No Cost Evaluation</div>
+                <div className="font-['Source_Serif_4',serif] font-semibold text-[30px] sm:text-[32px] text-[#ede6d8] mt-1">No Cost Evaluation</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For security teams evaluating TraceXMail during the pilot phase</p>
               </div>
-              <ul className="space-y-2 text-sm text-[#ede6d8]">
+              <ul className="space-y-2.5 text-sm text-[#ede6d8]">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>Full analyst console, no feature gating</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>Unlimited case uploads during the pilot window</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>A direct line to the team building it</span>
                 </li>
               </ul>
@@ -1217,23 +1170,23 @@ export function LandingView({
               </button>
             </div>
 
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 sm:p-8 space-y-5">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 sm:p-8 space-y-5 text-left">
               <div>
                 <span className="text-xs font-mono text-[#c9a227] font-bold">ENTERPRISE</span>
-                <div className="font-['Source_Serif_4',serif] font-semibold text-[32px] font-bold text-[#ede6d8] mt-1">Custom Ingress &amp; SLAs</div>
+                <div className="font-['Source_Serif_4',serif] font-semibold text-[30px] sm:text-[32px] text-[#ede6d8] mt-1">Custom Ingress &amp; SLAs</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For organizations needing custom deployment, SLAs, or on-prem hosting</p>
               </div>
-              <ul className="space-y-2 text-sm text-[#ede6d8]">
+              <ul className="space-y-2.5 text-sm text-[#ede6d8]">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>Dedicated onboarding</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>Custom retention and compliance terms</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e] shrink-0" />
                   <span>Priority support</span>
                 </li>
               </ul>
@@ -1248,22 +1201,22 @@ export function LandingView({
         </div>
       </section>
 
-      {/* FAQ Section */}
+      {/* FAQ Section - CENTERED */}
       <section id="faq" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[720px] mb-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
+          <div className="max-w-2xl mx-auto text-center mb-12 flex flex-col items-center">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold tracking-wider">
               Technical Documentation &amp; FAQ
             </div>
             <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] text-[#ede6d8]">
               Forensic Architecture &amp; Protocol Verification FAQ
             </h2>
-            <p className="text-[#b9af9c] mt-2 text-[15px]">
+            <p className="text-[#b9af9c] mt-2.5 text-[15px] max-w-[620px] leading-relaxed">
               Technical specifications on socket verification, cryptographic validation matrices, and zero-retention privacy architecture.
             </p>
           </div>
 
-          <div className="max-w-[850px] divide-y divide-[#3a352c]">
+          <div className="max-w-[850px] mx-auto divide-y divide-[#3a352c]">
             <div className="py-4">
               <button
                 onClick={() => toggleFaq(0)}
