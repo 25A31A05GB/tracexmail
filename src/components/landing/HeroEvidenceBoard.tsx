@@ -31,37 +31,37 @@ interface StepInfo {
 const FORENSIC_STEPS: StepInfo[] = [
   {
     step: 1,
-    label: 'Origin Socket Provenance',
-    badge: 'HOP 01: UNMASKED',
-    detail: 'Physical connection originated from 185.220.101.5 (Sofia, Tor Exit Relay AS200548)',
+    label: 'Sender Location Traced',
+    badge: 'STEP 1: SENDER TRACED',
+    detail: 'Physical connection came from IP 185.220.101.5 (Sofia, Bulgaria via Tor relay)',
     color: '#ff6b5a'
   },
   {
     step: 2,
-    label: 'Cryptographic Auth Failure',
-    badge: 'AUTH: SPF/DKIM FAIL',
-    detail: 'Sender IP is unauthorized in PayPal DNS SPF records; RSA signature verification failed',
+    label: 'Security Checks Failed',
+    badge: 'STEP 2: AUTH FAILED',
+    detail: 'Sender failed SPF and DKIM security checks; unauthorized to send for PayPal',
     color: '#ff8d7d'
   },
   {
     step: 3,
-    label: 'BGP Routing & ASN Attribution',
-    badge: 'ASN: BULGARIAN RELAY',
-    detail: 'Transit routed via AS200548 ZettaHost bulletproof hosting infrastructure',
+    label: 'Hidden Network Found',
+    badge: 'STEP 3: RELAY IDENTIFIED',
+    detail: 'Email was routed through bulletproof offshore hosting (AS200548 ZettaHost)',
     color: '#f59e0b'
   },
   {
     step: 4,
-    label: 'Typosquat Domain Heuristics',
-    badge: 'MIME: HOMOGRAPH ATTACK',
-    detail: 'Header domain "paypal-secure-update.com" unmasked as deceptive lookalike decoy',
+    label: 'Fake Domain Detected',
+    badge: 'STEP 4: IMPOSTER DOMAIN',
+    detail: 'Domain "paypal-secure-update.com" is an imitation website created by attackers',
     color: '#ef4444'
   },
   {
     step: 5,
-    label: 'Forensic Verdict Issued',
-    badge: 'VERDICT: MALICIOUS PHISH',
-    detail: 'Chain of evidence confirms targeted phishing attack • Score: 98/100 • Blocked',
+    label: 'Verdict: Phishing Blocked',
+    badge: 'STEP 5: PHISHING DETECTED',
+    detail: 'Complete evidence confirms a fraudulent email • Threat Score: 98/100 • Blocked',
     color: '#b23a2e'
   }
 ];

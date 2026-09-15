@@ -346,27 +346,28 @@ export function IngestionPipelineView({
           isOpen={isScanning}
           filename={fileName}
           rawSnippet={rawText}
+          analysis={pendingAnalysis}
           onComplete={handleScanAnimationComplete}
         />
       )}
 
       <div className="flex-1 flex flex-col h-full bg-[var(--ink)] overflow-y-auto w-full max-w-full min-w-0 p-3.5 sm:p-6 space-y-4 sm:space-y-6">
         {/* Top Banner */}
-        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-4 sm:p-6 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-3.5 sm:p-5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 rounded-full border-[1.5px] border-[var(--thread)] flex items-center justify-center bg-[rgba(178,58,46,0.1)] shrink-0">
-              <Database className="w-5 h-5 text-[var(--thread)]" />
+            <div className="w-9 sm:w-10 h-9 sm:h-10 rounded-full border-[1.5px] border-[var(--thread)] flex items-center justify-center bg-[rgba(178,58,46,0.1)] shrink-0">
+              <Database className="w-4 sm:w-5 h-4 sm:h-5 text-[var(--thread)]" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-display font-bold text-[var(--paper)] flex items-center gap-2">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base md:text-lg font-display font-bold text-[var(--paper)] flex items-center gap-2">
                 <span>Upload &amp; Inspect Email</span>
               </h2>
-              <p className="text-xs text-[var(--paper-dim)] mt-0.5 font-sans leading-relaxed">
+              <p className="text-[11px] sm:text-xs text-[var(--paper-dim)] mt-0.5 font-sans leading-relaxed line-clamp-2 sm:line-clamp-none">
                 Upload an email file (.eml, .msg, or raw text) to instantly verify sender, route, links, and security status.
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
             <button
               onClick={onNavigateToOverview}
               className="w-full sm:w-auto justify-center px-3.5 py-2 bg-[var(--ink)] hover:bg-[#252019] text-[var(--paper)] text-xs font-semibold rounded-sm border border-[var(--line)] flex items-center gap-2 transition-all cursor-pointer shadow-sm"
@@ -517,39 +518,41 @@ export function IngestionPipelineView({
         )}
 
         {/* Main Ingestion Box */}
-        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-4 sm:p-6 shadow-md space-y-4 max-w-full min-w-0">
+        <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-3.5 sm:p-6 shadow-md space-y-4 max-w-full min-w-0">
           {/* Ingestion Method Tabs with Visual Priority */}
           <div className="flex flex-wrap sm:flex-nowrap items-center justify-between border-b border-[var(--line)] gap-2 pb-0">
-            <div className="flex gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full">
+            <div className="flex gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full pb-0.5">
               {/* Primary Direct Ingestion Methods */}
               <button
                 onClick={() => setActiveTab('paste')}
-                className={`pb-2.5 sm:pb-3 px-3 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                className={`pb-2 sm:pb-3 px-2.5 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'paste'
                     ? 'border-[var(--thread)] text-[var(--paper)] font-bold bg-[rgba(178,58,46,0.08)] rounded-t-sm'
                     : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5 text-[var(--thread)] shrink-0" />
-                <span>Paste Headers / RFC822</span>
+                <span className="hidden xs:inline">Paste Headers</span>
+                <span className="xs:hidden inline">Paste</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('upload')}
-                className={`pb-2.5 sm:pb-3 px-3 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                className={`pb-2 sm:pb-3 px-2.5 sm:px-4 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                   activeTab === 'upload'
                     ? 'border-[var(--thread)] text-[var(--paper)] font-bold bg-[rgba(178,58,46,0.08)] rounded-t-sm'
                     : 'border-transparent text-[var(--paper-dim)] hover:text-[var(--paper)]'
                 }`}
               >
                 <Upload className="w-3.5 h-3.5 text-[var(--slate)] shrink-0" />
-                <span>Upload .EML</span>
+                <span className="hidden xs:inline">Upload File</span>
+                <span className="xs:hidden inline">Upload</span>
               </button>
 
               {/* Secondary Power-User & Integration Methods */}
               <button
                 onClick={() => setActiveTab('batch')}
-                className={`pb-2.5 sm:pb-3 px-2.5 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                className={`pb-2 sm:pb-3 px-2 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                   activeTab === 'batch'
                     ? 'border-[var(--stamp)] text-[var(--paper)] font-bold bg-[rgba(201,162,39,0.08)] rounded-t-sm'
                     : 'border-transparent text-[#8a8070] hover:text-[var(--paper-dim)]'
@@ -562,7 +565,7 @@ export function IngestionPipelineView({
 
               <button
                 onClick={() => setActiveTab('gmail')}
-                className={`pb-2.5 sm:pb-3 px-2.5 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                className={`pb-2 sm:pb-3 px-2 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                   activeTab === 'gmail'
                     ? 'border-amber-500 text-[var(--paper)] font-bold bg-amber-500/10 rounded-t-sm'
                     : 'border-transparent text-[#8a8070] hover:text-[var(--paper-dim)]'
@@ -571,7 +574,8 @@ export function IngestionPipelineView({
               >
                 <Mail className="w-3 h-3 text-amber-500 shrink-0" />
                 <span className="flex items-center gap-1.5">
-                  <span>Gmail Live Sync</span>
+                  <span className="hidden sm:inline">Gmail Live Sync</span>
+                  <span className="sm:hidden inline">Gmail Sync</span>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 </span>
               </button>
@@ -579,15 +583,15 @@ export function IngestionPipelineView({
           </div>
 
           {activeTab === 'paste' && (
-            <div className="space-y-3 pt-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
-                <span className="text-[var(--paper-dim)] font-sans">
-                  Paste full email headers or entire RFC822 payload below:
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-1.5 text-xs">
+                <span className="text-[var(--paper-dim)] font-sans text-[11px] sm:text-xs">
+                  Paste raw email headers or RFC822 payload:
                 </span>
                 <button
                   type="button"
                   onClick={handleLoadSampleHeader}
-                  className="text-[11px] font-mono text-[var(--stamp)] hover:underline flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                  className="text-[11px] font-mono text-[var(--stamp)] hover:underline flex items-center gap-1 cursor-pointer self-start xs:self-auto py-0.5"
                   title="Insert realistic benchmark RFC822 attack sample for immediate forensic testing"
                 >
                   <Sparkles className="w-3 h-3 text-[var(--stamp)] shrink-0" />
@@ -604,18 +608,18 @@ export function IngestionPipelineView({
                   }
                 }}
                 placeholder="Paste raw email headers (Received, From, To, Subject, Authentication-Results, etc.)..."
-                rows={11}
-                className="w-full p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors shadow-inner"
+                rows={8}
+                className="w-full p-3 sm:p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] font-mono text-xs text-[var(--paper)] placeholder-[var(--paper-muted)] focus:outline-none focus:border-[var(--slate)] transition-colors shadow-inner"
               />
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
                 <span className="text-[11px] text-[var(--paper-muted)] font-mono self-start sm:self-auto">
                   {rawText.length > 0 ? `${rawText.length.toLocaleString()} bytes ready • Press ⌘↵ to run` : 'Ready for input • Supports RFC822 / MIME text'}
                 </span>
                 <button
                   disabled={!rawText.trim() || isScanning}
                   onClick={() => executePipelineWithAnimation(rawText, 'pasted_message.eml')}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-[var(--thread)] to-[#c94132] hover:brightness-110 active:scale-[0.99] text-white text-xs font-bold rounded-sm border border-[rgba(255,255,255,0.15)] flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-5 sm:px-6 py-2.5 bg-gradient-to-r from-[var(--thread)] to-[#c94132] hover:brightness-110 active:scale-[0.99] text-white text-xs font-bold rounded-sm border border-[rgba(255,255,255,0.15)] flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed min-h-[40px]"
                 >
                   <span>Execute Forensic Pipeline</span>
                   <ArrowRight className="w-4 h-4" />

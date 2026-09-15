@@ -102,7 +102,6 @@ export function Header({
   inactivityRemainingSecs,
   onLockWorkspace
 }: HeaderProps) {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -115,7 +114,6 @@ export function Header({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('.dropdown-container')) {
-        setDropdownOpen(false);
         setUserDropdownOpen(false);
         setToolsDropdownOpen(false);
       }
@@ -123,7 +121,6 @@ export function Header({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setDropdownOpen(false);
         setUserDropdownOpen(false);
         setToolsDropdownOpen(false);
       }
@@ -204,157 +201,48 @@ export function Header({
     }
   };
 
-  const getVerdictBadge = (verdict: string) => {
-    switch (verdict?.toUpperCase()) {
-      case 'MALICIOUS':
-      case 'PHISHING':
-        return {
-          bg: 'bg-red-950/60 border-red-800/80 text-red-400',
-          icon: ShieldAlert,
-          label: 'MALICIOUS / PHISHING'
-        };
-      case 'SUSPICIOUS':
-        return {
-          bg: 'bg-amber-950/60 border-amber-800/80 text-amber-400',
-          icon: AlertTriangle,
-          label: 'SUSPICIOUS'
-        };
-      default:
-        return {
-          bg: 'bg-emerald-950/60 border-emerald-800/80 text-emerald-400',
-          icon: ShieldCheck,
-          label: 'LEGITIMATE / CLEAN'
-        };
-    }
-  };
-
-  const badge = getVerdictBadge(currentAnalysis.threatVerdict || 'MALICIOUS');
-  const BadgeIcon = badge.icon;
-
   return (
-    <header className="h-16 border-b border-[#3a352c] bg-[#14120f]/95 backdrop-blur px-3 sm:px-4 md:px-6 flex items-center justify-between shrink-0 z-20 select-none gap-2">
-      {/* Left: Mobile Toggle & Active Case Switcher & Title */}
+    <header className="h-14 sm:h-16 border-b border-[#3a352c] bg-[#14120f]/95 backdrop-blur px-2.5 sm:px-4 md:px-6 flex items-center justify-between shrink-0 z-20 select-none gap-2">
+      {/* Left: Mobile Toggle & Brand / Title */}
       <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
         {onToggleMobileSidebar && (
           <button
             type="button"
             id="btn-mobile-sidebar-toggle"
             onClick={onToggleMobileSidebar}
-            className="md:hidden p-2 rounded-md bg-[#221e17] border border-[#3a352c] text-[#ede6d8] hover:text-[var(--stamp)] hover:border-[var(--stamp)] transition-colors cursor-pointer flex items-center justify-center shrink-0 min-w-[40px] min-h-[40px]"
+            className="md:hidden p-1.5 sm:p-2 rounded-md bg-[#221e17] border border-[#3a352c] text-[#ede6d8] hover:text-[var(--stamp)] hover:border-[var(--stamp)] transition-colors cursor-pointer flex items-center justify-center shrink-0 min-w-[36px] min-h-[36px]"
             aria-label={isMobileSidebarOpen ? "Close Navigation Menu" : "Open Navigation Menu"}
           >
-            {isMobileSidebarOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
+            {isMobileSidebarOpen ? <X className="w-4 h-4 text-amber-400" /> : <Menu className="w-4 h-4" />}
           </button>
         )}
 
-        {/* Unified Case & Ingestion Sync Group (Progressive Disclosure) */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <div className="hidden sm:flex items-center">
-            <TraceXLogo3D size="sm" title="TraceXMail Cryptographic Core" />
-          </div>
-          <div className="relative dropdown-container">
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-md bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-sm font-medium text-[#ede6d8] transition-colors cursor-pointer"
-              title="Switch Case / Dataset Presets"
-            >
-              <Shield className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-[#7fa3ba] shrink-0" />
-              <span className="max-w-[110px] sm:max-w-[160px] md:max-w-[180px] truncate font-mono text-xs text-[#ede6d8]">
-                {currentAnalysis.id || 'CASE-ACTIVE'}
-              </span>
-              <ChevronDown className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#8a8070] shrink-0" />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 mt-2 w-80 max-w-[calc(100vw-24px)] rounded-lg bg-[#1a1712] border border-[#3a352c] shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="flex items-center justify-between pb-2 border-b border-[#2d2820] mb-2 px-1">
-                  <span className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] tracking-wider">
-                    Case &amp; Ingestion Hub
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Live Enclave
-                  </span>
-                </div>
-
-                <div className="p-2 rounded bg-[#12100d] border border-[#2d2820] mb-2.5 text-xs">
-                  <div className="text-[10px] font-mono text-[#8a8070]">Active Investigation:</div>
-                  <div className="font-semibold text-[#ede6d8] truncate mt-0.5">{currentAnalysis.subject}</div>
-                  <div className="text-[10.5px] font-mono text-[#b9af9c] truncate mt-0.5">{currentAnalysis.from}</div>
-                </div>
-
-                <div className="text-[10px] font-mono font-semibold uppercase text-[#8a8070] px-1 py-1 tracking-wider">
-                  Benchmark Forensic Samples
-                </div>
-                <div className="space-y-1 mt-1 max-h-52 overflow-y-auto">
-                  {SAMPLE_ANALYSES.map((sample) => (
-                    <button
-                      key={sample.id}
-                      onClick={() => {
-                        onSelectAnalysis(sample);
-                        setDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-2.5 py-2 rounded text-xs transition-colors flex flex-col gap-0.5 cursor-pointer ${
-                        sample.id === currentAnalysis.id
-                          ? 'bg-[#b23a2e]/20 border border-[#b23a2e]/40 text-[#ede6d8]'
-                          : 'hover:bg-[#221e17] text-[#b9af9c]'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-display font-semibold truncate text-[#ede6d8]">{sample.subject}</span>
-                        <span className="text-[9.5px] font-mono uppercase px-1 py-0.2 rounded bg-black/40 text-amber-300 shrink-0">
-                          {sample.threatVerdict || sample.verdict}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#8a8070] font-mono truncate">{sample.from}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
+        <div className="flex items-center gap-2">
+          <TraceXLogo3D size="sm" title="TraceXMail Cryptographic Core" />
+          <span className="font-['Fraunces',serif] font-bold text-sm tracking-tight text-[#ede6d8]">
+            TraceXMail
+          </span>
           {/* Integrated Auto-Sync / Auto-Refresh Control */}
-          <AutoRefreshControl onSyncCases={onSyncCases} />
+          <div className="hidden sm:flex items-center">
+            <AutoRefreshControl onSyncCases={onSyncCases} />
+          </div>
         </div>
 
-        <div className="hidden lg:flex flex-col min-w-0">
-          <h1 className="font-display text-sm font-semibold text-[#ede6d8] truncate max-w-xs xl:max-w-md">
+        <div className="hidden lg:flex flex-col min-w-0 border-l border-[#2d2820] pl-3 ml-1">
+          <h1 className="font-display text-xs font-semibold text-[#ede6d8] truncate max-w-xs xl:max-w-md">
             {currentAnalysis.subject || 'Forensic Case View'}
           </h1>
-          <span className="text-xs text-[#8a8070] truncate">
+          <span className="text-[11px] text-[#8a8070] truncate">
             From: <span className="text-[#b9af9c] font-mono">{currentAnalysis.from}</span>
           </span>
-        </div>
-
-        {/* Verdict Pill */}
-        <div className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full border text-[11px] sm:text-xs font-semibold ${badge.bg}`}>
-          <BadgeIcon className="w-3.5 h-3.5 shrink-0" />
-          <span className="truncate">{badge.label}</span>
-          <span className="opacity-80 font-mono text-[10.5px]">({currentAnalysis.threatScore || 0}/100)</span>
         </div>
       </div>
 
       {/* Right: Consolidated Actions with Progressive Disclosure */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
 
-        {/* Command Palette / Quick Search Trigger */}
-        {onOpenCommandPalette && (
-          <button
-            onClick={onOpenCommandPalette}
-            className="hidden xl:flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[#4d4439] text-xs text-[#9d9282] hover:text-[#f4efe6] transition-all cursor-pointer group"
-            title="Open Command Palette & IOC Search (⌘K / Ctrl+K)"
-          >
-            <Search className="w-3.5 h-3.5 text-amber-400/80 group-hover:text-amber-400" />
-            <span className="font-sans">Command Deck</span>
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-[#26211a] border border-[#3a352c] rounded text-amber-400/90 group-hover:text-amber-300">
-              ⌘K
-            </kbd>
-          </button>
-        )}
-
-        {/* Enclave Tools & Safety Overflow Menu (Progressive Disclosure) */}
-        <div className="relative dropdown-container">
+        {/* Enclave Tools & Safety Overflow Menu (Hidden on mobile, visible on sm+) */}
+        <div className="hidden sm:block relative dropdown-container">
           <button
             onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all cursor-pointer border text-xs ${
@@ -365,7 +253,7 @@ export function Header({
             title="Enclave Tools, View Modes & Privacy Controls"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--stamp)]" />
-            <span className="hidden sm:inline font-medium">Tools</span>
+            <span className="font-medium">Tools</span>
             {privacyConfig?.maskingEnabled && (
               <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" title="PII Masking Active" />
             )}
@@ -489,15 +377,12 @@ export function Header({
         <div className="relative dropdown-container">
           <button 
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1.5 rounded-md hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
+            className="flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2.5 py-1.5 rounded-md hover:bg-[#221e17] transition-all cursor-pointer border border-[#342e26] bg-[#1a1713]"
             title={`Workspace Status & Operator Clearance | ${sessionUser?.email || userLabel}`}
           >
             <span className={`w-2 h-2 rounded-full shrink-0 ${role === 'admin' ? 'bg-amber-400' : 'bg-emerald-400'}`} />
             <span className="hidden sm:inline text-xs font-semibold text-[#f4efe6] capitalize">
               {role === 'admin' ? 'Admin' : 'Analyst'}
-            </span>
-            <span className="hidden md:inline text-[10px] font-mono text-[#8a8070] bg-[#100e0b] px-1 py-0.2 rounded border border-[#2d2820]">
-              0/100
             </span>
             <div className="w-5 h-5 rounded bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-[10px] font-bold text-amber-300">
               {userLabel.slice(0, 2)}
@@ -601,28 +486,28 @@ export function Header({
           )}
         </div>
 
-        {/* Forensic Dossier & Executive Compliance Report Button */}
+        {/* Forensic Dossier & Executive Compliance Report Button (Visible on sm+) */}
         {onOpenReportModal && (
           <button
             onClick={onOpenReportModal}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-sm bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[var(--stamp)] text-xs font-mono font-semibold text-[#ede6d8] transition-all cursor-pointer shrink-0 group shadow-sm"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-sm bg-[#1c1813] hover:bg-[#25201a] border border-[#342e26] hover:border-[var(--stamp)] text-xs font-mono font-semibold text-[#ede6d8] transition-all cursor-pointer shrink-0 group shadow-sm"
             title="Open Forensic Dossier & Executive Incident Report"
           >
             <FileText className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
-            <span className="hidden sm:inline">Forensic Report</span>
-            <span className="inline sm:hidden">Report</span>
+            <span className="hidden md:inline">Forensic Report</span>
+            <span className="inline md:hidden">Report</span>
           </button>
         )}
 
-        {/* Primary CTA: New Analysis Button with Shortcut Badge */}
+        {/* Primary CTA: New Analysis Button */}
         <button
           onClick={onOpenNewModal}
-          className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer shrink-0"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-sm bg-[var(--thread)] hover:bg-[#c94337] text-xs font-mono font-bold text-[#ede6d8] shadow-md transition-all cursor-pointer shrink-0"
           title="Create New Email Analysis (⌘N / Ctrl+N)"
         >
-          <Plus className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
-          <span className="hidden xs:inline sm:inline">New Analysis</span>
-          <span className="inline xs:hidden sm:hidden">New</span>
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden xs:inline">New Analysis</span>
+          <span className="inline xs:hidden">New</span>
           <kbd className="hidden md:inline-block px-1.5 py-0.2 bg-black/25 border border-white/20 rounded text-[9.5px] font-mono text-amber-200">
             ⌘N
           </kbd>

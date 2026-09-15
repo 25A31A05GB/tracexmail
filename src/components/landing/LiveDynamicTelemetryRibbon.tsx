@@ -247,51 +247,43 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
     <div className={`w-full bg-[#110f0c] border-y border-[#3a352c] relative overflow-hidden ${className}`}>
       
       {/* Top Ticker Metric Bar */}
-      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
         
         {/* Left Live Status Signal */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap justify-center sm:justify-start">
           <div className="flex items-center gap-2 px-2.5 py-1 rounded-[2px] bg-[#22c55e]/10 border border-[#22c55e]/30 text-[#4ade80] font-['IBM_Plex_Mono',monospace] text-[11px] font-bold">
             <span className={`w-2 h-2 rounded-full bg-[#22c55e] ${recentFlash ? 'scale-150 animate-ping' : 'animate-pulse'}`} />
-            <span>GLOBAL DECONSTRUCTION ENGINE ACTIVE</span>
+            <span>LIVE SYSTEM ACTIVE</span>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1.5 font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574]">
             <Database className="w-3 h-3 text-[#c9a227]" />
-            <span>Real Database Feed {isDbSynced ? '(Live Postgres/Supabase)' : '(In-Memory Stream)'}</span>
+            <span>Live Feed</span>
           </span>
         </div>
 
         {/* Center Live Real-Time Database Counts */}
-        <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 font-['IBM_Plex_Mono',monospace] text-[11.5px]">
-          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Real RFC822 / MIME cases deconstructed in database">
+        <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[11.5px]">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Emails analyzed in database">
             <Layers className="w-3.5 h-3.5 text-[#c9a227]" />
-            <span>Deconstructed Cases:</span>
-            <strong className="text-[#ede6d8] transition-all font-bold">
+            <span>Analyzed Emails:</span>
+            <strong className="text-[#ede6d8] font-bold">
               {deconstructedCount.toLocaleString()}
             </strong>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Cryptographically validated SPF & DKIM records">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Validated sender signatures">
             <Fingerprint className="w-3.5 h-3.5 text-[#22c55e]" />
-            <span>DKIM/SPF Verified:</span>
+            <span>Verified Senders:</span>
             <strong className="text-[#ede6d8] font-bold">
               {cryptoVerifiedCount.toLocaleString()}
             </strong>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Tor relays & offshore bulletproof hops intercepted">
+          <div className="flex items-center gap-1.5 text-[#b9af9c]" title="Phishing and spoofing attempts blocked">
             <ShieldAlert className="w-3.5 h-3.5 text-[#ff8d7d]" />
-            <span>Anomalous Interceptions:</span>
+            <span>Threats Blocked:</span>
             <strong className="text-[#ff8d7d] font-bold">
               {torInterceptionsCount.toLocaleString()}
-            </strong>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-1.5 text-[#b9af9c]" title="Active SOC enclaves monitoring database stream">
-            <Zap className="w-3.5 h-3.5 text-[#7fa3ba]" />
-            <span>SOC Status:</span>
-            <strong className="text-[#ede6d8] font-bold">
-              Active Ingest
             </strong>
           </div>
         </div>
@@ -299,9 +291,9 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
         {/* Right Action Trigger */}
         <button
           onClick={onOpenConsole}
-          className="shrink-0 px-3 py-1 rounded-[2px] bg-[#221e17] hover:bg-[#b23a2e] border border-[#3a352c] hover:border-[#b23a2e] text-[#ede6d8] font-['IBM_Plex_Mono',monospace] text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 group"
+          className="shrink-0 px-3 py-1.5 min-h-[32px] rounded-[2px] bg-[#221e17] hover:bg-[#b23a2e] border border-[#3a352c] hover:border-[#b23a2e] text-[#ede6d8] font-['IBM_Plex_Mono',monospace] text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 group"
         >
-          <span>Open Live Stream</span>
+          <span>Open Console</span>
           <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
         </button>
 
@@ -312,10 +304,10 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 min-w-max text-[11px] font-['IBM_Plex_Mono',monospace]">
           <span className="text-[#c9a227] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
             <Radio className="w-3 h-3 animate-pulse text-[#c9a227]" />
-            <span>Live Database Evidence Log:</span>
+            <span>Recent Email Log:</span>
           </span>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {events.map((ev) => {
               const isMal = ev.verdict === 'MALICIOUS';
               const isWarn = ev.verdict === 'WARNING';
@@ -324,16 +316,15 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
                   key={ev.id}
                   onClick={() => handleInspectTrace(ev)}
                   className="flex items-center gap-2 px-2.5 py-1 rounded bg-[#16130f] border border-[#2d2820] hover:border-[#c9a227] hover:bg-[#221e17] cursor-pointer transition-all shrink-0 group"
-                  title="Click to load this real database case directly in Console"
+                  title="Click to view this case"
                 >
                   <span className={`w-1.5 h-1.5 rounded-full ${isMal ? 'bg-[#b23a2e]' : isWarn ? 'bg-[#eab308]' : 'bg-[#22c55e]'}`} />
-                  <span className="text-[#c9a227] font-semibold">{ev.hash}</span>
-                  <span className="text-[#ede6d8] truncate max-w-[180px] group-hover:text-white">{ev.subject}</span>
-                  <span className="text-[#8e8574] text-[10px] hidden sm:inline">[{ev.source}]</span>
-                  <span className={`px-1 rounded text-[9.5px] font-bold ${
+                  <span className="text-[#ede6d8] truncate max-w-[190px] group-hover:text-white font-medium">{ev.subject}</span>
+                  <span className="text-[#8e8574] text-[10px] hidden sm:inline">({ev.source})</span>
+                  <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
                     isMal ? 'bg-[#b23a2e]/20 text-[#ff8d7d]' : isWarn ? 'bg-amber-950/40 text-amber-300' : 'bg-[#22c55e]/20 text-[#4ade80]'
                   }`}>
-                    {ev.verdict} ({ev.threatScore})
+                    {isMal ? 'PHISH' : isWarn ? 'SUSPICIOUS' : 'SAFE'}
                   </span>
                   <span className="text-[#645c4e] text-[10px]">{ev.timeAgo}</span>
                 </div>

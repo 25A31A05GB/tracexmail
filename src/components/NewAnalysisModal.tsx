@@ -143,6 +143,7 @@ export function NewAnalysisModal({
           isOpen={isScanning}
           filename={fileName}
           rawSnippet={pastedRaw}
+          analysis={pendingAnalysis}
           onComplete={handleScanAnimationComplete}
         />
       )}
