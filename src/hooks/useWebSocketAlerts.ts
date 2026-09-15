@@ -160,15 +160,41 @@ export function useWebSocketAlerts() {
               window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
             }
           }
-          if (data && (data.type === 'CASE_UPDATED' || data.type === 'CASE_CLOSED' || data.type === 'CASE_DELETED')) {
+          if (data && (data.type === 'CASE_UPDATED' || data.type === 'CASE_CLOSED' || data.type === 'CASE_DELETED' || data.type === 'CASE_MEMBERS_ADDED' || data.type === 'CORRELATION_UPDATED')) {
             const caseId = data.caseId || data.case?.id;
             setLastCaseUpdate({
-              type: data.type,
+              type: data.type === 'CASE_DELETED' ? 'CASE_DELETED' : (data.type === 'CASE_CLOSED' ? 'CASE_CLOSED' : 'CASE_UPDATED'),
               caseId,
               case: data.case,
               timestamp: data.timestamp || new Date().toISOString()
             });
             if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+              window.dispatchEvent(new CustomEvent(data.type, { detail: data }));
+            }
+          }
+          if (data && data.type === 'CORRELATION_DETECTED') {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CORRELATION_DETECTED', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+            }
+            const corrAlert: WebSocketAlert = {
+              id: `corr_${Date.now()}`,
+              case_id: data.caseId,
+              timestamp: data.timestamp || new Date().toISOString(),
+              severity: data.strength === 'CRITICAL' ? 'CRITICAL' : 'HIGH',
+              title: `Forensic Correlation: ${data.topRule || 'Multi-Factor Overlap'}`,
+              description: data.topReason || `Engine correlated ${data.correlatedCount || 1} incident(s) sharing infrastructure`,
+              source: 'correlation-engine',
+              read: false,
+              threat_score: Math.round((data.similarityScore || 0.85) * 100),
+              category: 'CORRELATION'
+            };
+            addAlert(corrAlert);
+          }
+          if (data && data.type === 'CAMPAIGN_UPDATED') {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CAMPAIGN_UPDATED', { detail: data }));
               window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
             }
           }

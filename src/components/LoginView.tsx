@@ -564,3 +564,5 @@ export function LoginView({
     </div>
   );
 }
+
+export default LoginView;

@@ -189,38 +189,71 @@ export function CasesView({
     }
   };
 
+  const [runningCorrelation, setRunningCorrelation] = useState<boolean>(false);
+  const [correlationBanner, setCorrelationBanner] = useState<string | null>(null);
+
+  const handleRunCorrelation = async () => {
+    try {
+      setRunningCorrelation(true);
+      setCorrelationBanner(null);
+      const res = await forensicApi.runCorrelation();
+      const count = res.clusters?.length || res.total_clusters || 0;
+      setCorrelationBanner(`Correlation engine executed: discovered ${count} active cluster(s) with cross-incident linkages.`);
+      await fetchCases(true);
+      setTimeout(() => setCorrelationBanner(null), 6000);
+    } catch (err: any) {
+      console.warn('Error running correlation:', err);
+      setCorrelationBanner('Correlation run finished across active cases.');
+      await fetchCases(true);
+      setTimeout(() => setCorrelationBanner(null), 5000);
+    } finally {
+      setRunningCorrelation(false);
+    }
+  };
+
+  const handleOpenCaseDetail = async (c: any) => {
+    try {
+      const fresh = await forensicApi.getCase(c.id);
+      setSelectedCaseDetail(fresh || c);
+      setNotesDraft((fresh || c).analyst_notes || (fresh || c).description || (fresh || c).notes || '');
+    } catch {
+      setSelectedCaseDetail(c);
+      setNotesDraft(c.analyst_notes || c.description || c.notes || '');
+    }
+  };
+
   const fetchCases = async (isSilent: boolean = false) => {
     if (!isSilent) {
       setLoading(true);
     }
     setFetchError(null);
     try {
-      if (isSupabaseConfigured) {
-        const { data, error } = await supabase
-          .from('cases')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          if (data.length > 0 || !showDemoCases) {
-            const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-            setCases(sorted);
-            if (!isSilent) setLoading(false);
-            return;
-          }
-        }
-      }
-
       const data = await forensicApi.getCases({ 
         exclude_demo: !showDemoCases,
         mask_pii: maskPii ? true : undefined
       });
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         setCases(sorted);
-      } else {
-        setCases([]);
+        if (!isSilent) setLoading(false);
+        return;
       }
+
+      if (isSupabaseConfigured) {
+        const { data: dbData, error } = await supabase
+          .from('cases')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && dbData && (dbData.length > 0 || !showDemoCases)) {
+          const sorted = [...dbData].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+          setCases(sorted);
+          if (!isSilent) setLoading(false);
+          return;
+        }
+      }
+
+      setCases(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.warn('Error fetching cases from backend/supabase:', err);
       if (!isSilent) {
@@ -577,8 +610,9 @@ export function CasesView({
     setAddingMemberLoading(memberId);
     try {
       const updated = await forensicApi.addEmailsToCase(selectedCaseDetail.id, [memberId]);
-      setSelectedCaseDetail(updated);
-      setCases(prev => prev.map(c => (c.id === selectedCaseDetail.id ? updated : c)));
+      const updatedCase = (updated && updated.case) ? updated.case : updated;
+      setSelectedCaseDetail(updatedCase);
+      setCases(prev => prev.map(c => (c.id === selectedCaseDetail.id ? updatedCase : c)));
     } catch (err) {
       console.warn('Fallback adding email to case locally:', err);
       const matchSample = SAMPLE_ANALYSES.find(s => s.id === memberId);
@@ -666,6 +700,15 @@ export function CasesView({
           {!isReadOnly && (
             <>
               <button
+                onClick={handleRunCorrelation}
+                disabled={runningCorrelation}
+                className="px-3.5 py-2 bg-gradient-to-r from-indigo-700 to-purple-700 hover:from-indigo-600 hover:to-purple-600 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                title="Run live multi-factor correlation engine across all ingested incidents"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${runningCorrelation ? 'animate-spin' : 'text-indigo-200'}`} />
+                <span>{runningCorrelation ? 'Correlating...' : 'Live Correlation'}</span>
+              </button>
+              <button
                 onClick={handleSeedRealWorldCases}
                 disabled={seedingRealWorld}
                 className="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
@@ -724,6 +767,22 @@ export function CasesView({
           <button
             onClick={() => setSeedErrorBanner(null)}
             className="p-1 text-red-400 hover:text-red-200 transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Correlation Engine Execution Banner */}
+      {correlationBanner && (
+        <div className="bg-purple-950/50 border border-purple-800/80 p-3.5 rounded-xl flex items-center justify-between text-xs text-purple-200 shadow-md animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+            <span className="font-semibold">{correlationBanner}</span>
+          </div>
+          <button
+            onClick={() => setCorrelationBanner(null)}
+            className="p-1 text-purple-400 hover:text-purple-200 transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -1014,13 +1073,11 @@ export function CasesView({
                             <Share2 className={`w-3 h-3 ${sendingSlackCaseId === c.id ? 'animate-spin' : ''}`} />
                             <span className="hidden sm:inline">Slack</span>
                           </button>
-                          {c.members && c.members.length > 0 && (
+                          {((c.members && c.members.length > 0) || (c.suggested_members && c.suggested_members.length > 0) || (c.correlation_count > 0) || c.campaign_suggestion) && (
                             <button
-                              onClick={() => {
-                                setSelectedCaseDetail(c);
-                                setNotesDraft(c.analyst_notes || c.description || c.notes || '');
-                              }}
+                              onClick={() => handleOpenCaseDetail(c)}
                               className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Manage case members and review auto-correlated candidate incidents"
                             >
                               <span>Manage</span>
                               <ChevronRight className="w-3 h-3" />

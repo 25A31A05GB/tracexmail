@@ -125,6 +125,41 @@ export function CampaignsView() {
     fetchCampaigns();
   }, []);
 
+  const [addingMemberId, setAddingMemberId] = useState<string | null>(null);
+
+  const handleAddMemberToCampaign = async (emailId: string) => {
+    if (!campaignDetail?.id) return;
+    setAddingMemberId(emailId);
+    try {
+      await forensicApi.addCampaignMembers(campaignDetail.id, [emailId]);
+      await handleSelectCampaign(campaignDetail.id);
+      await fetchCampaigns();
+    } catch (err) {
+      console.error('Failed to add candidate to campaign:', err);
+    } finally {
+      setAddingMemberId(null);
+    }
+  };
+
+  useEffect(() => {
+    const handleCampaignSync = () => {
+      fetchCampaigns();
+      if (selectedCampaignId) {
+        handleSelectCampaign(selectedCampaignId);
+      }
+    };
+    window.addEventListener('CAMPAIGN_UPDATED', handleCampaignSync);
+    window.addEventListener('CORRELATION_DETECTED', handleCampaignSync);
+    window.addEventListener('CORRELATION_UPDATED', handleCampaignSync);
+    window.addEventListener('CASE_MEMBERS_ADDED', handleCampaignSync);
+    return () => {
+      window.removeEventListener('CAMPAIGN_UPDATED', handleCampaignSync);
+      window.removeEventListener('CORRELATION_DETECTED', handleCampaignSync);
+      window.removeEventListener('CORRELATION_UPDATED', handleCampaignSync);
+      window.removeEventListener('CASE_MEMBERS_ADDED', handleCampaignSync);
+    };
+  }, [selectedCampaignId]);
+
   const handleSelectCampaign = async (campaignId: string) => {
     setSelectedCampaignId(campaignId);
     setLoadingDetail(true);
@@ -406,6 +441,44 @@ export function CampaignsView() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Correlated Candidate Incidents (Pending Analyst Merge) */}
+                    {campaignDetail?.possible_related && campaignDetail.possible_related.length > 0 && (
+                      <div className="bg-amber-950/20 border border-amber-800/60 rounded-xl p-5 space-y-3">
+                        <h3 className="text-sm font-bold text-amber-300 flex items-center justify-between">
+                          <span className="flex items-center gap-2">
+                            <LinkIcon className="w-4 h-4 text-amber-400" />
+                            Correlated Candidate Incidents ({campaignDetail.possible_related.length})
+                          </span>
+                          <span className="text-[10px] font-mono text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded border border-amber-700">
+                            Medium Tier (Requires Confirmation)
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          The multi-factor correlation engine discovered cross-case linkages with this campaign. Review and merge below:
+                        </p>
+                        <div className="space-y-2.5 font-mono text-xs">
+                          {campaignDetail.possible_related.map((cand: any, idx: number) => (
+                            <div key={cand.email_id || idx} className="p-3 bg-slate-950/90 border border-amber-900/40 rounded-lg flex items-center justify-between">
+                              <div className="space-y-1 min-w-0 pr-3">
+                                <div className="text-slate-200 font-semibold truncate">{cand.subject || cand.email_id}</div>
+                                <div className="text-[11px] text-amber-300/80">
+                                  {cand.reason || `Similarity: ${Math.round((cand.similarity_score || 0.7) * 100)}%`}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleAddMemberToCampaign(cand.email_id)}
+                                disabled={addingMemberId === cand.email_id}
+                                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow transition-colors shrink-0 disabled:opacity-50"
+                              >
+                                <Plus className={`w-3.5 h-3.5 ${addingMemberId === cand.email_id ? 'animate-spin' : ''}`} />
+                                <span>{addingMemberId === cand.email_id ? 'Merging...' : 'Merge to Campaign'}</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Col: Shared Evidence & Fast Stats */}

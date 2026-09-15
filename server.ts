@@ -151,6 +151,17 @@ import {
   type ClassifierCorrection
 } from './src/server/classifierFeedback';
 import {
+  correlateEmails,
+  correlateCaseWithCases,
+  correlateAllCases,
+  extractForensicRecord,
+  compareRecords,
+  type CampaignCluster,
+  type CorrelationEvidence,
+  type CorrelatedCaseMatch,
+  type EmailForensicRecord
+} from './src/server/correlationEngine';
+import {
   REAL_WORLD_THREAT_FEED,
   getLiveThreatFeed,
   createDynamicRealWorldCase,
@@ -1162,6 +1173,30 @@ async function parseRawEmailToAnalysis(
     }
   }
 
+  // Real-time forensic cross-case correlation computation
+  try {
+    const existingPool = Array.from(inMemoryCases.values());
+    const corr = correlateCaseWithCases(newCaseItem, existingPool);
+    if (corr.correlatedCases.length > 0) {
+      newCaseItem.suggested_members = corr.suggestedMembers;
+      newCaseItem.correlation_evidence = corr.correlationEvidence;
+      newCaseItem.correlation_count = corr.correlatedCases.length;
+      if (corr.campaignSuggestion) {
+        newCaseItem.campaign_id = corr.campaignSuggestion.id;
+        newCaseItem.campaign_name = corr.campaignSuggestion.name;
+      }
+    } else {
+      newCaseItem.suggested_members = [];
+      newCaseItem.correlation_evidence = [];
+      newCaseItem.correlation_count = 0;
+    }
+  } catch (corrErr) {
+    console.warn('[Correlation] Error during email ingest correlation:', corrErr);
+    newCaseItem.suggested_members = [];
+    newCaseItem.correlation_evidence = [];
+    newCaseItem.correlation_count = 0;
+  }
+
   // Always store in memory so newly analyzed cases are immediately visible in GET /api/cases
   inMemoryCases.set(newCaseItem.id, newCaseItem);
 
@@ -1173,6 +1208,23 @@ async function parseRawEmailToAnalysis(
       caseId: newCaseItem.id,
       timestamp: new Date().toISOString()
     });
+
+    if (newCaseItem.correlation_count > 0) {
+      broadcastWebSocketEvent({
+        type: 'CORRELATION_DETECTED',
+        caseId: newCaseItem.id,
+        caseTitle: newCaseItem.title,
+        correlatedCaseIds: (newCaseItem.suggested_members || []).map((m: any) => m.case_id || m.email_id),
+        correlatedCount: newCaseItem.correlation_count,
+        topRule: newCaseItem.correlation_evidence?.[0]?.rule || 'TECHNICAL_OVERLAP',
+        topReason: newCaseItem.suggested_members?.[0]?.reason || 'Correlated technical IOC overlap identified',
+        strength: newCaseItem.suggested_members?.[0]?.relationship_strength || 'STRONG',
+        similarityScore: newCaseItem.suggested_members?.[0]?.similarity_score || 0.85,
+        campaignId: newCaseItem.campaign_id,
+        campaignName: newCaseItem.campaign_name,
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
   try {
@@ -1992,14 +2044,34 @@ async function startServer() {
     const shouldMask = !user || isViewerOrAuditor || req.query.mask_pii === 'true' || privacyConfig.maskingEnabled;
     const excludeDemo = req.query.exclude_demo === 'true' || req.query.real_only === 'true';
 
+    const enrichWithCorrelation = (casesList: any[]) => {
+      try {
+        const { caseEnrichmentMap } = correlateAllCases(casesList);
+        return casesList.map((c: any) => {
+          const meta = caseEnrichmentMap.get(c.id);
+          return {
+            ...c,
+            suggested_members: meta?.suggested_members || [],
+            correlation_count: meta?.correlation_count || 0,
+            campaign_id: c.campaign_id || meta?.campaign_id,
+            campaign_name: c.campaign_name || meta?.campaign_name,
+            shared_evidence: meta?.shared_evidence || []
+          };
+        });
+      } catch (e) {
+        console.warn('[Correlation] Error enriching cases:', e);
+        return casesList;
+      }
+    };
+
     const getFallbackCases = () => {
       let cases = Array.from(inMemoryCases.values());
-      // Sort cases descending by created_at
       cases.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       if (excludeDemo) {
         cases = cases.filter(c => !c.is_demo);
       }
-      return shouldMask ? cases.map((c: any) => maskCasePii(c, privacyConfig)) : cases;
+      const correlated = enrichWithCorrelation(cases);
+      return shouldMask ? correlated.map((c: any) => maskCasePii(c, privacyConfig)) : correlated;
     };
 
     if (!supabase) {
@@ -2022,7 +2094,8 @@ async function startServer() {
         tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : ['Custom']),
         is_demo: Boolean(c.is_demo)
       }));
-      const results = shouldMask ? formatted.map((c: any) => maskCasePii(c, privacyConfig)) : formatted;
+      const correlated = enrichWithCorrelation(formatted);
+      const results = shouldMask ? correlated.map((c: any) => maskCasePii(c, privacyConfig)) : correlated;
       res.json(results);
     } catch (err: any) {
       console.warn('[API /api/cases] Exception fallback triggered:', err?.message);
@@ -2041,14 +2114,72 @@ async function startServer() {
     const isViewerOrAuditor = ['read_only', 'viewer', 'auditor'].includes(userRole);
     const shouldMask = !user || isViewerOrAuditor || req.query.mask_pii === 'true' || privacyConfig.maskingEnabled;
 
-    const getFallbackCase = () => {
+    const getAllCasesPool = async () => {
+      let pool = Array.from(inMemoryCases.values());
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('cases').select('*');
+          if (data && data.length > 0) {
+            pool = data;
+          }
+        } catch {}
+      }
+      return pool;
+    };
+
+    const enrichSingleCase = (targetCase: any, pool: any[]) => {
+      try {
+        const corr = correlateCaseWithCases(targetCase, pool);
+        let members = Array.isArray(targetCase.members) ? targetCase.members : [];
+        if (Array.isArray(targetCase.email_ids) && targetCase.email_ids.length > 0) {
+          const map = new Map<string, any>(members.map((m: any) => [m.id || m.email_id, m]));
+          for (const eid of targetCase.email_ids) {
+            if (!map.has(eid)) {
+              const src = pool.find((p: any) => p.id === eid) || inMemoryCases.get(eid);
+              if (src) {
+                map.set(eid, {
+                  id: src.id,
+                  email_id: src.id,
+                  subject: src.title || src.subject || 'Linked Message',
+                  sender: src.from || src.sender || src.from_domain || 'Unknown Sender',
+                  threat_score: src.threat_score || 75,
+                  severity: src.severity || 'SUSPICIOUS',
+                  created_at: src.created_at || new Date().toISOString()
+                });
+              }
+            }
+          }
+          members = Array.from(map.values());
+        }
+
+        return {
+          ...targetCase,
+          members,
+          total_emails: Math.max(1, targetCase.email_ids?.length || members.length || 1),
+          suggested_members: corr.suggestedMembers,
+          correlation_evidence: corr.correlationEvidence,
+          correlated_cases: corr.correlatedCases,
+          correlation_count: corr.correlatedCases.length,
+          campaign_suggestion: corr.campaignSuggestion,
+          campaign_id: targetCase.campaign_id || corr.campaignSuggestion?.id,
+          campaign_name: targetCase.campaign_name || corr.campaignSuggestion?.name
+        };
+      } catch (err) {
+        console.warn('[Correlation] Error enriching single case:', err);
+        return targetCase;
+      }
+    };
+
+    const getFallbackCase = async () => {
       const c = inMemoryCases.get(caseId);
       if (!c) return null;
-      return shouldMask ? maskCasePii(c, privacyConfig) : c;
+      const pool = await getAllCasesPool();
+      const enriched = enrichSingleCase(c, pool);
+      return shouldMask ? maskCasePii(enriched, privacyConfig) : enriched;
     };
 
     if (!supabase) {
-      const fallback = getFallbackCase();
+      const fallback = await getFallbackCase();
       if (!fallback) return res.status(404).json({ error: 'Case not found' });
       return res.json(fallback);
     }
@@ -2056,7 +2187,7 @@ async function startServer() {
     try {
       const { data, error } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
       if (error || !data) {
-        const fallback = getFallbackCase();
+        const fallback = await getFallbackCase();
         if (fallback) return res.json(fallback);
         if (error) return res.status(500).json({ error: error.message });
         return res.status(404).json({ error: 'Case not found' });
@@ -2066,12 +2197,43 @@ async function startServer() {
         tags: Array.isArray(data.tags) ? data.tags : (typeof data.tags === 'string' ? JSON.parse(data.tags || '[]') : ['Custom']),
         is_demo: Boolean(data.is_demo)
       };
-      res.json(shouldMask ? maskCasePii(formatted, privacyConfig) : formatted);
+      const pool = await getAllCasesPool();
+      const enriched = enrichSingleCase(formatted, pool);
+      res.json(shouldMask ? maskCasePii(enriched, privacyConfig) : enriched);
     } catch (err: any) {
-      const fallback = getFallbackCase();
+      const fallback = await getFallbackCase();
       if (fallback) return res.json(fallback);
       res.status(500).json({ error: err.message || 'Failed to fetch case' });
     }
+  });
+
+  // Dedicated Real-time Correlation Endpoint
+  app.get('/api/cases/:caseId/correlation', publicLimiter, async (req, res) => {
+    const supabase = getSupabaseClient();
+    const caseId = req.params.caseId;
+    let pool = Array.from(inMemoryCases.values());
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*');
+        if (data && data.length > 0) pool = data;
+      } catch {}
+    }
+
+    const target = pool.find((c: any) => c.id === caseId) || inMemoryCases.get(caseId);
+    if (!target) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    const correlation = correlateCaseWithCases(target, pool);
+    res.json({
+      caseId: target.id,
+      caseTitle: target.title || target.subject,
+      correlatedCasesCount: correlation.correlatedCases.length,
+      correlatedCases: correlation.correlatedCases,
+      suggestedMembers: correlation.suggestedMembers,
+      correlationEvidence: correlation.correlationEvidence,
+      campaignSuggestion: correlation.campaignSuggestion
+    });
   });
 
   app.post('/api/cases', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), validateRequest({ body: createCaseSchema }), async (req, res, next) => {
@@ -2825,8 +2987,125 @@ async function startServer() {
     res.status(201).json(newCorrection);
   });
 
-  app.post('/api/cases/:caseId/emails', publicLimiter, (req, res) => {
-    res.json({ status: 'success', message: 'Emails added to case' });
+  app.post('/api/cases/:caseId/emails', publicLimiter, async (req, res) => {
+    const caseId = req.params.caseId;
+    const emailIds: string[] = Array.isArray(req.body?.email_ids) ? req.body.email_ids : [];
+    if (emailIds.length === 0) {
+      return res.status(400).json({ error: 'email_ids array is required' });
+    }
+
+    const supabase = getSupabaseClient();
+    let allCases = Array.from(inMemoryCases.values());
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*');
+        if (data && data.length > 0) allCases = data;
+      } catch (dbErr) {
+        console.warn('[Cases] DB fetch error in add emails:', dbErr);
+      }
+    }
+
+    let target = allCases.find((c: any) => c.id === caseId) || inMemoryCases.get(caseId);
+    if (!target) {
+      return res.status(404).json({ error: 'Target case not found' });
+    }
+
+    const existingIds = new Set<string>(Array.isArray(target.email_ids) ? target.email_ids : []);
+    const addedMembers: any[] = [];
+
+    for (const eid of emailIds) {
+      existingIds.add(eid);
+      const memberSource = allCases.find((c: any) => c.id === eid) || inMemoryCases.get(eid);
+      if (memberSource) {
+        addedMembers.push({
+          id: memberSource.id,
+          email_id: memberSource.id,
+          subject: memberSource.title || memberSource.subject || 'Investigated Message',
+          sender: memberSource.from || memberSource.sender || memberSource.from_domain || 'Unknown Sender',
+          from: memberSource.from || memberSource.sender || '',
+          threat_score: memberSource.threat_score || 75,
+          severity: memberSource.severity || 'SUSPICIOUS',
+          created_at: memberSource.created_at || new Date().toISOString(),
+          linked_at: new Date().toISOString()
+        });
+      } else {
+        addedMembers.push({
+          id: eid,
+          email_id: eid,
+          subject: `Message ${eid}`,
+          sender: 'External Telemetry',
+          threat_score: 75,
+          severity: 'SUSPICIOUS',
+          created_at: new Date().toISOString(),
+          linked_at: new Date().toISOString()
+        });
+      }
+    }
+
+    const existingMembers = Array.isArray(target.members) ? target.members : [];
+    const memberMap = new Map<string, any>(existingMembers.map((m: any) => [m.id || m.email_id, m]));
+    for (const m of addedMembers) {
+      memberMap.set(m.id, m);
+    }
+    const updatedMembers = Array.from(memberMap.values());
+    const updatedEmailIds = Array.from(existingIds);
+
+    const updates = {
+      email_ids: updatedEmailIds,
+      members: updatedMembers,
+      total_emails: Math.max(1, updatedEmailIds.length),
+      updated_at: new Date().toISOString()
+    };
+
+    const updatedCase = { ...target, ...updates };
+    inMemoryCases.set(caseId, updatedCase);
+
+    if (supabase) {
+      try {
+        await supabase.from('cases').update(updates).eq('id', caseId);
+      } catch (dbErr) {
+        console.warn('[Supabase] Member update db error:', dbErr);
+      }
+    }
+
+    // Recalculate correlation for updated case
+    const corr = correlateCaseWithCases(updatedCase, allCases);
+    updatedCase.suggested_members = corr.suggestedMembers;
+    updatedCase.correlation_evidence = corr.correlationEvidence;
+    updatedCase.correlation_count = corr.correlatedCases.length;
+    inMemoryCases.set(caseId, updatedCase);
+
+    // Broadcast WebSocket Events across all connected clients
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'CASE_MEMBERS_ADDED',
+        caseId,
+        addedEmailIds: emailIds,
+        totalEmails: updatedCase.total_emails,
+        case: updatedCase,
+        timestamp: new Date().toISOString()
+      });
+      broadcastWebSocketEvent({
+        type: 'CASE_UPDATED',
+        caseId,
+        case: updatedCase,
+        triage_action: 'MEMBERS_ADDED',
+        timestamp: new Date().toISOString()
+      });
+      broadcastWebSocketEvent({
+        type: 'CORRELATION_UPDATED',
+        caseId,
+        suggestedMembersCount: corr.suggestedMembers.length,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: `Successfully linked ${emailIds.length} email(s) to case ${caseId}`,
+      case: updatedCase,
+      suggested_members: corr.suggestedMembers
+    });
   });
 
   // ==========================================
@@ -3218,61 +3497,181 @@ async function startServer() {
     res.json(updatedConfig);
   });
 
-  // Campaigns Management via Supabase
+  // Campaigns Management via Supabase & Dynamic Correlation Engine
   app.get('/api/campaigns', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId || (req.query.organization_id as string);
 
-    try {
-      let query = supabase.from('campaigns').select('*').order('created_at', { ascending: false });
-      if (orgId) {
-        query = query.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+    let allCases = Array.from(inMemoryCases.values());
+    let dbCampaigns: any[] = [];
+
+    if (supabase) {
+      try {
+        const { data: casesData } = await supabase.from('cases').select('*');
+        if (casesData && casesData.length > 0) {
+          allCases = casesData;
+        }
+
+        let query = supabase.from('campaigns').select('*').order('created_at', { ascending: false });
+        if (orgId) {
+          query = query.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        }
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          dbCampaigns = data.map((camp: any) => ({
+            ...camp,
+            member_email_ids: Array.isArray(camp.member_email_ids)
+              ? camp.member_email_ids
+              : (typeof camp.member_email_ids === 'string' ? JSON.parse(camp.member_email_ids || '[]') : []),
+            is_demo: Boolean(camp.is_demo)
+          }));
+        }
+      } catch (err: any) {
+        console.warn('[Campaigns] DB fetch fallback to dynamic correlation clusters:', err?.message);
       }
-      const { data, error } = await query;
-      if (error) {
-        return res.status(500).json({ error: error.message });
-      }
-      const formatted = (data || []).map((camp: any) => ({
-        ...camp,
-        member_email_ids: Array.isArray(camp.member_email_ids)
-          ? camp.member_email_ids
-          : (typeof camp.member_email_ids === 'string' ? JSON.parse(camp.member_email_ids || '[]') : []),
-        is_demo: Boolean(camp.is_demo)
-      }));
-      res.json(formatted);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to fetch campaigns' });
     }
+
+    // If explicit campaigns exist in DB, enrich with member cases and return
+    if (dbCampaigns.length > 0) {
+      const formatted = dbCampaigns.map((camp: any) => {
+        const memberCases = allCases.filter((c: any) => (camp.member_email_ids || []).includes(c.id));
+        return {
+          ...camp,
+          member_cases: memberCases,
+          total_emails: Math.max(camp.total_emails || 1, memberCases.length)
+        };
+      });
+      return res.json(formatted);
+    }
+
+    // Resilient fallback: build dynamic campaign clusters directly from forensic cases
+    const forensicRecords = allCases.map(extractForensicRecord);
+    const clusters = correlateEmails(forensicRecords);
+
+    const formattedClusters = clusters.map(cl => ({
+      id: cl.id,
+      name: cl.name,
+      threat_actor: cl.threatActor,
+      status: cl.status,
+      target_industry: cl.targetIndustry,
+      total_emails: cl.totalEmails,
+      member_email_ids: cl.memberEmailIds,
+      member_cases: cl.memberCases,
+      shared_evidence: cl.sharedEvidence,
+      first_seen: cl.firstSeen,
+      last_seen: cl.lastSeen,
+      notes: cl.notes,
+      is_demo: false
+    }));
+
+    res.json(formattedClusters);
   });
 
   app.get('/api/campaigns/:campaignId', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
-    }
-    try {
-      const { data, error } = await supabase.from('campaigns').select('*').eq('id', req.params.campaignId).maybeSingle();
-      if (error) {
-        return res.status(500).json({ error: error.message });
+    const campaignId = req.params.campaignId;
+    let allCases = Array.from(inMemoryCases.values());
+
+    if (supabase) {
+      try {
+        const { data: casesData } = await supabase.from('cases').select('*');
+        if (casesData && casesData.length > 0) allCases = casesData;
+
+        const { data, error } = await supabase.from('campaigns').select('*').eq('id', campaignId).maybeSingle();
+        if (!error && data) {
+          const memberIds: string[] = Array.isArray(data.member_email_ids)
+            ? data.member_email_ids
+            : (typeof data.member_email_ids === 'string' ? JSON.parse(data.member_email_ids || '[]') : []);
+          const memberCases = allCases.filter((c: any) => memberIds.includes(c.id));
+          return res.json({
+            ...data,
+            member_email_ids: memberIds,
+            member_cases: memberCases,
+            total_emails: Math.max(data.total_emails || 1, memberCases.length),
+            is_demo: Boolean(data.is_demo)
+          });
+        }
+      } catch (err: any) {
+        console.warn('[Campaigns] DB fetch single fallback:', err?.message);
       }
-      if (!data) {
-        return res.status(404).json({ error: 'Campaign not found' });
-      }
-      const formatted = {
-        ...data,
-        member_email_ids: Array.isArray(data.member_email_ids)
-          ? data.member_email_ids
-          : (typeof data.member_email_ids === 'string' ? JSON.parse(data.member_email_ids || '[]') : []),
-        is_demo: Boolean(data.is_demo)
-      };
-      res.json(formatted);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to fetch campaign' });
     }
+
+    // Dynamic cluster search
+    const forensicRecords = allCases.map(extractForensicRecord);
+    const clusters = correlateEmails(forensicRecords);
+    const foundCluster = clusters.find(cl => cl.id === campaignId || cl.name.toLowerCase().includes(campaignId.toLowerCase()));
+    if (foundCluster) {
+      return res.json({
+        id: foundCluster.id,
+        name: foundCluster.name,
+        threat_actor: foundCluster.threatActor,
+        status: foundCluster.status,
+        target_industry: foundCluster.targetIndustry,
+        total_emails: foundCluster.totalEmails,
+        member_email_ids: foundCluster.memberEmailIds,
+        member_cases: foundCluster.memberCases,
+        shared_evidence: foundCluster.sharedEvidence,
+        first_seen: foundCluster.firstSeen,
+        last_seen: foundCluster.lastSeen,
+        notes: foundCluster.notes,
+        is_demo: false
+      });
+    }
+
+    res.status(404).json({ error: 'Campaign not found' });
+  });
+
+  // Execute on-demand automated correlation and live case enrichment
+  app.post(['/api/campaigns/auto-correlate', '/api/correlation/run'], publicLimiter, async (req, res) => {
+    const supabase = getSupabaseClient();
+    let allCases = Array.from(inMemoryCases.values());
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*');
+        if (data && data.length > 0) allCases = data;
+      } catch {}
+    }
+
+    const { clusters, caseEnrichmentMap } = correlateAllCases(allCases);
+
+    for (const [cid, meta] of caseEnrichmentMap.entries()) {
+      const existing = inMemoryCases.get(cid);
+      if (existing) {
+        inMemoryCases.set(cid, {
+          ...existing,
+          suggested_members: meta.suggested_members,
+          correlation_count: meta.correlation_count,
+          campaign_id: meta.campaign_id,
+          campaign_name: meta.campaign_name,
+          shared_evidence: meta.shared_evidence
+        });
+      }
+    }
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'CAMPAIGN_UPDATED',
+        clustersCount: clusters.length,
+        timestamp: new Date().toISOString()
+      });
+      broadcastWebSocketEvent({
+        type: 'CORRELATION_DETECTED',
+        caseCount: allCases.length,
+        clustersCount: clusters.length,
+        topRule: clusters[0]?.sharedEvidence[0]?.rule || 'MULTI_FACTOR_CORRELATION',
+        topReason: `Forensic correlation clustered ${allCases.length} incidents into ${clusters.length} active campaigns`,
+        strength: 'STRONG',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: `Correlated ${allCases.length} cases across ${clusters.length} campaign clusters`,
+      clusters_count: clusters.length,
+      clusters
+    });
   });
 
   app.get('/api/campaigns/:campaignId/timeline', publicLimiter, async (req, res) => {
@@ -3498,17 +3897,140 @@ async function startServer() {
     doc.end();
   });
 
-  app.get('/api/emails/:emailId/campaign-candidates', publicLimiter, async (_req, res) => {
+  app.get('/api/emails/:emailId/campaign-candidates', publicLimiter, async (req, res) => {
+    const emailId = req.params.emailId;
     const supabase = getSupabaseClient();
-    if (!supabase) {
-      return res.status(503).json({ error: 'Database not configured' });
+    let allCases = Array.from(inMemoryCases.values());
+    let dbCampaigns: any[] = [];
+
+    if (supabase) {
+      try {
+        const { data: cData } = await supabase.from('cases').select('*');
+        if (cData && cData.length > 0) allCases = cData;
+
+        const { data: campData } = await supabase.from('campaigns').select('*');
+        if (campData) dbCampaigns = campData;
+      } catch {}
     }
-    const { data: camps } = await supabase.from('campaigns').select('*');
-    res.json({ candidates: camps || [] });
+
+    const target = allCases.find((c: any) => c.id === emailId) || inMemoryCases.get(emailId);
+    if (!target) {
+      return res.status(404).json({ error: 'Email or Case not found' });
+    }
+
+    const targetRec = extractForensicRecord(target);
+
+    // If explicit DB campaigns exist, test similarity against member emails
+    const candidates: any[] = [];
+
+    if (dbCampaigns.length > 0) {
+      for (const camp of dbCampaigns) {
+        const memberIds = Array.isArray(camp.member_email_ids)
+          ? camp.member_email_ids
+          : (typeof camp.member_email_ids === 'string' ? JSON.parse(camp.member_email_ids || '[]') : []);
+        
+        const memberCases = allCases.filter((c: any) => memberIds.includes(c.id));
+        let bestScore = 0;
+        const sharedReasons: string[] = [];
+
+        for (const mc of memberCases) {
+          const mRec = extractForensicRecord(mc);
+          const comp = compareRecords(targetRec, mRec);
+          if (comp.score > bestScore) {
+            bestScore = comp.score;
+          }
+          for (const ev of comp.evidence) {
+            const desc = ev.description || ev.value;
+            if (!sharedReasons.includes(desc)) {
+              sharedReasons.push(desc);
+            }
+          }
+        }
+
+        if (bestScore >= 0.35 || sharedReasons.length > 0) {
+          candidates.push({
+            ...camp,
+            similarity_score: Math.round(bestScore * 100) / 100,
+            confidence: bestScore >= 0.75 ? 'HIGH' : (bestScore >= 0.5 ? 'MEDIUM' : 'LOW'),
+            match_reasons: sharedReasons.slice(0, 3),
+            total_emails: Math.max(camp.total_emails || 1, memberIds.length)
+          });
+        }
+      }
+    }
+
+    // Also include dynamic clusters
+    const clusters = correlateEmails(allCases.map(extractForensicRecord));
+    for (const cl of clusters) {
+      if (cl.memberEmailIds.includes(emailId)) {
+        if (!candidates.some(c => c.id === cl.id)) {
+          candidates.push({
+            id: cl.id,
+            name: cl.name,
+            threat_actor: cl.threatActor,
+            target_industry: cl.targetIndustry,
+            status: cl.status,
+            similarity_score: 0.95,
+            confidence: 'HIGH',
+            match_reasons: cl.sharedEvidence.map(e => e.description || e.value).slice(0, 3),
+            total_emails: cl.totalEmails,
+            member_email_ids: cl.memberEmailIds
+          });
+        }
+      }
+    }
+
+    res.json({ candidates });
   });
 
-  app.post('/api/campaigns/:campaignId/members', publicLimiter, (_req, res) => {
-    res.json({ status: 'success', message: 'Members added to campaign' });
+  app.post('/api/campaigns/:campaignId/members', publicLimiter, async (req, res) => {
+    const campaignId = req.params.campaignId;
+    const emailIds: string[] = Array.isArray(req.body?.email_ids) ? req.body.email_ids : (req.body?.email_id ? [req.body.email_id] : []);
+
+    if (emailIds.length === 0) {
+      return res.status(400).json({ error: 'email_ids array is required' });
+    }
+
+    const supabase = getSupabaseClient();
+    let updatedCampaign: any = null;
+
+    if (supabase) {
+      try {
+        const { data: existing } = await supabase.from('campaigns').select('*').eq('id', campaignId).maybeSingle();
+        if (existing) {
+          const currentMembers = Array.isArray(existing.member_email_ids)
+            ? existing.member_email_ids
+            : (typeof existing.member_email_ids === 'string' ? JSON.parse(existing.member_email_ids || '[]') : []);
+          
+          const newSet = Array.from(new Set([...currentMembers, ...emailIds]));
+          const updates = {
+            member_email_ids: newSet,
+            total_emails: Math.max(existing.total_emails || 1, newSet.length),
+            last_seen: new Date().toISOString()
+          };
+          const { data: updated } = await supabase.from('campaigns').update(updates).eq('id', campaignId).select().single();
+          updatedCampaign = updated || { ...existing, ...updates };
+        }
+      } catch (err) {
+        console.warn('[Campaigns] Error updating DB campaign members:', err);
+      }
+    }
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'CAMPAIGN_UPDATED',
+        campaignId,
+        addedEmailIds: emailIds,
+        campaign: updatedCampaign,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: `Added ${emailIds.length} email(s) to campaign ${campaignId}`,
+      campaign: updatedCampaign
+    });
   });
 
   app.post('/api/campaigns', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {

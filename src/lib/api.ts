@@ -646,6 +646,16 @@ export const forensicApi = {
     return res.data;
   },
 
+  getCaseCorrelation: async (caseId: string): Promise<any> => {
+    const res = await apiClient.get(`/cases/${caseId}/correlation`);
+    return res.data;
+  },
+
+  runCorrelation: async (): Promise<any> => {
+    const res = await apiClient.post('/correlation/run');
+    return res.data;
+  },
+
   // Campaigns Management
   getCampaigns: async (): Promise<CampaignItem[]> => {
     const res = await apiClient.get<CampaignItem[]>('/campaigns');
