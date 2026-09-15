@@ -12,10 +12,12 @@ export interface EmailForensicRecord {
   sender?: string;
   recipient?: string;
   fromDomain: string;
+  relatedDomains?: string[];
   originIp?: string;
   originAsn?: string;
   originAsnOrg?: string;
   urls: string[];
+  fileHashes?: string[];
   dkimDomain?: string;
   dkimSelector?: string;
   bodySnippet?: string;
@@ -33,7 +35,7 @@ export interface CorrelationEvidence {
   description: string;
   value: string;
   autoMergeEligible: boolean;
-  iocType?: 'URL' | 'DOMAIN' | 'IP' | 'DKIM' | 'LURE' | 'ORGANIZATION' | 'INFRASTRUCTURE';
+  iocType?: 'URL' | 'DOMAIN' | 'IP' | 'DKIM' | 'LURE' | 'ORGANIZATION' | 'INFRASTRUCTURE' | 'HASH';
 }
 
 export interface CorrelatedCaseMatch {
@@ -50,6 +52,8 @@ export interface CorrelatedCaseMatch {
   threatVerdict: string;
   fromDomain?: string;
   originIp?: string;
+  fileHashes?: string[];
+  createdAt?: string;
 }
 
 export interface CampaignCluster {
@@ -134,6 +138,20 @@ export function extractForensicRecord(item: any): EmailForensicRecord {
   
   const fromDomain = item.from_domain || item.domain || extractDomain(sender);
   
+  // Extract related domains (replyTo, returnPath)
+  const relatedDomainsSet = new Set<string>();
+  if (fromDomain) relatedDomainsSet.add(fromDomain.toLowerCase());
+  const replyTo = item.replyTo || item.headers?.replyTo || item.raw_analysis?.headers?.replyTo || '';
+  if (replyTo) {
+    const d = extractDomain(replyTo);
+    if (d) relatedDomainsSet.add(d.toLowerCase());
+  }
+  const returnPath = item.returnPath || item.headers?.returnPath || item.raw_analysis?.headers?.returnPath || '';
+  if (returnPath) {
+    const d = extractDomain(returnPath);
+    if (d) relatedDomainsSet.add(d.toLowerCase());
+  }
+
   // Extract true origin IP
   let originIp = item.origin_ip || item.raw_analysis?.originIp || item.raw_analysis?.origin_ip;
   if (!originIp && Array.isArray(item.hops) && item.hops.length > 0) {
@@ -160,6 +178,27 @@ export function extractForensicRecord(item: any): EmailForensicRecord {
     }
   }
 
+  // Extract File Hashes (Attachments, SHA-256 custody, indicators)
+  const hashSet = new Set<string>();
+  const rawAttachments = item.attachments || item.raw_analysis?.attachments || [];
+  if (Array.isArray(rawAttachments)) {
+    for (const att of rawAttachments) {
+      if (att?.sha256) hashSet.add(att.sha256.toLowerCase().trim());
+      if (att?.md5) hashSet.add(att.md5.toLowerCase().trim());
+      if (att?.hash) hashSet.add(att.hash.toLowerCase().trim());
+    }
+  }
+  const explicitHashes = item.file_hashes || item.fileHashes || item.ioc_indicators?.file_hashes || [];
+  if (Array.isArray(explicitHashes)) {
+    for (const h of explicitHashes) {
+      if (typeof h === 'string' && h.trim()) hashSet.add(h.toLowerCase().trim());
+    }
+  }
+  if (item.sha256 && typeof item.sha256 === 'string') hashSet.add(item.sha256.toLowerCase().trim());
+  if (item.sha256Hash && typeof item.sha256Hash === 'string') hashSet.add(item.sha256Hash.toLowerCase().trim());
+  if (item.raw_analysis?.sha256Hash && typeof item.raw_analysis.sha256Hash === 'string') hashSet.add(item.raw_analysis.sha256Hash.toLowerCase().trim());
+  if (item.custodyHash && typeof item.custodyHash === 'string') hashSet.add(item.custodyHash.toLowerCase().trim());
+
   // Extract DKIM
   const dkimDomain = item.dkim_domain || item.auth?.dkim?.domain || item.raw_analysis?.auth?.dkim?.domain || '';
   const dkimSelector = item.dkim_selector || item.auth?.dkim?.selector || item.raw_analysis?.auth?.dkim?.selector || '';
@@ -180,10 +219,12 @@ export function extractForensicRecord(item: any): EmailForensicRecord {
     sender,
     recipient,
     fromDomain,
+    relatedDomains: Array.from(relatedDomainsSet),
     originIp,
     originAsn,
     originAsnOrg,
     urls: Array.from(urlSet),
+    fileHashes: Array.from(hashSet),
     dkimDomain,
     dkimSelector,
     bodySnippet,
@@ -301,6 +342,70 @@ export function compareRecords(primary: EmailForensicRecord, candidate: EmailFor
         value: primary.originIp,
         autoMergeEligible: false,
         iocType: 'IP'
+      });
+    }
+  } else if (
+    primary.originIp &&
+    candidate.originIp &&
+    primary.originIp !== candidate.originIp &&
+    !isPrivateIp(primary.originIp) &&
+    !isPrivateIp(candidate.originIp)
+  ) {
+    // 3b. Shared /24 Subnet Network Block
+    const pSubnet = primary.originIp.split('.').slice(0, 3).join('.');
+    const cSubnet = candidate.originIp.split('.').slice(0, 3).join('.');
+    if (pSubnet && cSubnet && pSubnet === cSubnet && pSubnet.split('.').length === 3) {
+      scorePoints += 25;
+      sharedIocs.push(`Subnet: ${pSubnet}.0/24`);
+      evidence.push({
+        rule: 'SHARED_IP_SUBNET',
+        strength: 'MEDIUM',
+        description: `Origin relay nodes belong to identical /24 network subnet block (${pSubnet}.0/24)`,
+        value: `${pSubnet}.0/24`,
+        autoMergeEligible: false,
+        iocType: 'IP'
+      });
+    }
+  }
+
+  // 3c. Shared Auxiliary Routing / Reply Domain Overlap
+  if (primary.relatedDomains && candidate.relatedDomains && primary.relatedDomains.length > 0 && candidate.relatedDomains.length > 0) {
+    const commonRelDomains = primary.relatedDomains.filter(d => 
+      d && !GENERIC_EMAIL_DOMAINS.includes(d) && candidate.relatedDomains!.includes(d) && d !== primary.fromDomain
+    );
+    if (commonRelDomains.length > 0) {
+      scorePoints += 30;
+      sharedIocs.push(`Infrastructure Domain: ${commonRelDomains[0]}`);
+      evidence.push({
+        rule: 'SHARED_INFRASTRUCTURE_DOMAIN',
+        strength: 'STRONG',
+        description: `Shared routing/reply-to infrastructure domain: ${commonRelDomains[0]}`,
+        value: commonRelDomains[0],
+        autoMergeEligible: true,
+        iocType: 'DOMAIN'
+      });
+    }
+  }
+
+  // 3d. File Hash Overlap (Attachments / Malicious Dropper Payload) (STRONG: +50)
+  if (
+    primary.fileHashes && 
+    primary.fileHashes.length > 0 && 
+    candidate.fileHashes && 
+    candidate.fileHashes.length > 0
+  ) {
+    const commonHashes = primary.fileHashes.filter(h => candidate.fileHashes!.includes(h));
+    if (commonHashes.length > 0) {
+      scorePoints += 50;
+      const hDisplay = commonHashes[0].length > 16 ? `${commonHashes[0].slice(0, 16)}...` : commonHashes[0];
+      sharedIocs.push(`File Hash: ${hDisplay}`);
+      evidence.push({
+        rule: 'SHARED_FILE_HASH',
+        strength: 'STRONG',
+        description: `Identical cryptographic attachment file hash (SHA-256): ${commonHashes[0]}`,
+        value: commonHashes[0],
+        autoMergeEligible: true,
+        iocType: 'HASH'
       });
     }
   }
@@ -444,7 +549,9 @@ export function correlateCaseWithCases(targetCase: any, allCases: any[]): {
         threatScore: candidateRecord.threatScore || 75,
         threatVerdict: candidateRecord.threatVerdict || 'SUSPICIOUS',
         fromDomain: candidateRecord.fromDomain,
-        originIp: candidateRecord.originIp
+        originIp: candidateRecord.originIp,
+        fileHashes: candidateRecord.fileHashes,
+        createdAt: candidateRecord.createdAt
       });
 
       for (const ev of result.evidence) {

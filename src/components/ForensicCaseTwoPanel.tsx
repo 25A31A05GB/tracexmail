@@ -3,6 +3,7 @@ import { EmailAnalysis, EvidenceCardData } from '../types';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
 import { JargonTooltip } from './JargonTooltip';
 import { Interactive3DTiltCard, CyberThreatCore3D } from './3d';
+import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
 
 interface ForensicCaseTwoPanelProps {
   analysis: EmailAnalysis;
@@ -13,6 +14,8 @@ interface ForensicCaseTwoPanelProps {
   onNavigateToMap?: () => void;
   onNavigateToGraph?: () => void;
   onNavigateToLogs?: () => void;
+  onSelectAnalysis?: (analysis: EmailAnalysis) => void;
+  onNavigateToCases?: (caseId?: string) => void;
 }
 
 export function ForensicCaseTwoPanel({
@@ -24,6 +27,8 @@ export function ForensicCaseTwoPanel({
   onNavigateToMap,
   onNavigateToGraph,
   onNavigateToLogs,
+  onSelectAnalysis,
+  onNavigateToCases,
 }: ForensicCaseTwoPanelProps) {
   const [internalExpanded, setInternalExpanded] = useState<boolean>(true);
   const isTechnicalExpanded = controlledIsTechnicalExpanded !== undefined ? controlledIsTechnicalExpanded : internalExpanded;
@@ -414,6 +419,13 @@ export function ForensicCaseTwoPanel({
               )}
             </div>
           )}
+
+          {/* 5. RELATED INCIDENTS (CROSS-CASE CORRELATION) */}
+          <RelatedIncidentsWidget
+            analysis={analysis}
+            onSelectAnalysis={onSelectAnalysis}
+            onNavigateToCases={onNavigateToCases}
+          />
         </div>
       </div>
     </div>

@@ -731,12 +731,148 @@ export const inMemoryCases = new Map<string, any>([
     origin_asn: 'AS208323',
     origin_asn_org: 'Tor Exit Relay Node',
     infra_type: 'TOR_EXIT_NODE',
+    file_hashes: ['e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
     created_at: new Date(Date.now() - 3600000).toISOString(),
     updated_at: new Date().toISOString(),
     assigned_user: 'analyst@acmedefense.sec',
     tags: ['Credential Harvesting', 'Brand Impersonation', 'Tor Network'],
     is_demo: true,
     source: 'sample'
+  }],
+  ['case-paypal-wave-harvest', {
+    id: 'case-paypal-wave-harvest',
+    organization_id: 'org_acme_soc_01',
+    title: 'PhishWave: PayPal Account Verification Notice',
+    description: 'Coordinated credential harvesting wave targeting corporate finance users. Shares identical bulletproof relay and HTML payload digest.',
+    status: 'INVESTIGATING',
+    severity: 'CRITICAL',
+    threat_score: 93,
+    classification: 'PHISHING',
+    from_domain: 'paypal-account-security-update.com',
+    origin_ip: '185.220.101.5',
+    origin_country: 'DE',
+    origin_asn: 'AS208323',
+    origin_asn_org: 'Tor Exit Relay Node',
+    infra_type: 'TOR_EXIT_NODE',
+    file_hashes: ['e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+    created_at: new Date(Date.now() - 5400000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'lead-analyst@tracexmail.sec',
+    tags: ['Credential Harvesting', 'Shared Bulletproof IP', 'Identical Payload Digest'],
+    is_demo: false,
+    source: 'correlation'
+  }],
+  ['case-paypal-typosquat-lure', {
+    id: 'case-paypal-typosquat-lure',
+    organization_id: 'org_acme_soc_01',
+    title: 'Impersonation: PayPal Security Alert Resolution',
+    description: 'Brand impersonation campaign sharing auxiliary reply-to routing domain and neighboring /24 bulletproof subnet relay.',
+    status: 'OPEN',
+    severity: 'HIGH',
+    threat_score: 87,
+    classification: 'PHISHING',
+    from_domain: 'secure-pp-auth.net',
+    origin_ip: '185.220.101.55',
+    origin_country: 'DE',
+    origin_asn: 'AS208323',
+    origin_asn_org: 'Tor Exit Relay Node',
+    infra_type: 'TOR_EXIT_NODE',
+    created_at: new Date(Date.now() - 10800000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['Subnet Neighbor', 'Reply-To Domain', 'Tor Cluster'],
+    is_demo: false,
+    source: 'correlation'
+  }],
+  ['sample-citibank-wire', {
+    id: 'sample-citibank-wire',
+    organization_id: 'org_acme_soc_01',
+    title: 'Financial Phish: Citibank Commercial Wire Transfer Fraud',
+    description: 'High-risk financial wire fraud email with fake SWIFT transaction PDF attachment carrying AsyncRAT payload.',
+    status: 'OPEN',
+    severity: 'CRITICAL',
+    threat_score: 96,
+    classification: 'MALWARE_DROPPER',
+    from_domain: 'citi-secure-auth.org',
+    origin_ip: '194.26.29.112',
+    origin_country: 'NL',
+    origin_asn: 'AS44050',
+    origin_asn_org: 'Bulletproof Hosting Ltd',
+    infra_type: 'HOSTING_PROVIDER',
+    file_hashes: ['9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'],
+    created_at: new Date(Date.now() - 7200000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['AsyncRAT', 'Double Extension', 'Financial Phish'],
+    is_demo: true,
+    source: 'sample'
+  }],
+  ['case-citibank-swift-trojan', {
+    id: 'case-citibank-swift-trojan',
+    organization_id: 'org_acme_soc_01',
+    title: 'AsyncRAT Campaign: Citibank Commercial SWIFT Notice',
+    description: 'Commercial wire fraud campaign distributing AsyncRAT RAT payload from identical bulletproof MTA relay node.',
+    status: 'INVESTIGATING',
+    severity: 'CRITICAL',
+    threat_score: 97,
+    classification: 'MALWARE_DROPPER',
+    from_domain: 'citi-secure-auth.org',
+    origin_ip: '194.26.29.112',
+    origin_country: 'NL',
+    origin_asn: 'AS44050',
+    origin_asn_org: 'Bulletproof Hosting Ltd',
+    infra_type: 'HOSTING_PROVIDER',
+    file_hashes: ['9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b'],
+    created_at: new Date(Date.now() - 14400000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'lead-analyst@tracexmail.sec',
+    tags: ['AsyncRAT', 'Shared Relay IP', 'Identical SHA-256 Payload'],
+    is_demo: false,
+    source: 'correlation'
+  }],
+  ['sample-irs-fraud', {
+    id: 'sample-irs-fraud',
+    organization_id: 'org_acme_soc_01',
+    title: 'Government Impersonation: IRS Direct Refund Fraud',
+    description: 'Tax fraud lure directing taxpayers to malicious IRS refund claim portal for banking credential theft.',
+    status: 'OPEN',
+    severity: 'HIGH',
+    threat_score: 89,
+    classification: 'PHISHING',
+    from_domain: 'irs-gov-portal.org',
+    origin_ip: '45.141.87.65',
+    origin_country: 'RU',
+    origin_asn: 'AS48693',
+    origin_asn_org: 'Flynet Hosting',
+    infra_type: 'HOSTING_PROVIDER',
+    created_at: new Date(Date.now() - 18000000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['IRS Impersonation', 'Tax Fraud', 'Malicious Redirect'],
+    is_demo: true,
+    source: 'sample'
+  }],
+  ['case-irs-tax-refund-harvest', {
+    id: 'case-irs-tax-refund-harvest',
+    organization_id: 'org_acme_soc_01',
+    title: 'Govt Lure: IRS Electronic Tax Refund Disbursal Notice',
+    description: 'Shared infrastructure tax refund phishing surge originating from same ASN and spoofed gov portal domain.',
+    status: 'INVESTIGATING',
+    severity: 'HIGH',
+    threat_score: 91,
+    classification: 'PHISHING',
+    from_domain: 'irs-gov-portal.org',
+    origin_ip: '45.141.87.65',
+    origin_country: 'RU',
+    origin_asn: 'AS48693',
+    origin_asn_org: 'Flynet Hosting',
+    infra_type: 'HOSTING_PROVIDER',
+    created_at: new Date(Date.now() - 21600000).toISOString(),
+    updated_at: new Date().toISOString(),
+    assigned_user: 'analyst@acmedefense.sec',
+    tags: ['Shared Sender Domain', 'Identical Origin IP', 'Tax Phish'],
+    is_demo: false,
+    source: 'correlation'
   }],
   ['sample-bec-wire', {
     id: 'sample-bec-wire',
@@ -2228,6 +2364,62 @@ async function startServer() {
     res.json({
       caseId: target.id,
       caseTitle: target.title || target.subject,
+      correlatedCasesCount: correlation.correlatedCases.length,
+      correlatedCases: correlation.correlatedCases,
+      suggestedMembers: correlation.suggestedMembers,
+      correlationEvidence: correlation.correlationEvidence,
+      campaignSuggestion: correlation.campaignSuggestion
+    });
+  });
+
+  // Dedicated Related Incidents Endpoints (supports both ID lookup and raw analysis evaluation)
+  app.get('/api/emails/:emailId/related-incidents', publicLimiter, async (req, res) => {
+    const supabase = getSupabaseClient();
+    const emailId = req.params.emailId;
+    let pool = Array.from(inMemoryCases.values());
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*');
+        if (data && data.length > 0) pool = data;
+      } catch {}
+    }
+
+    const target = pool.find((c: any) => c.id === emailId) || inMemoryCases.get(emailId);
+    if (!target) {
+      return res.status(404).json({ error: 'Email or Case not found' });
+    }
+
+    const correlation = correlateCaseWithCases(target, pool);
+    res.json({
+      caseId: target.id,
+      caseTitle: target.title || target.subject || target.headers?.subject || 'Forensic Investigation',
+      correlatedCasesCount: correlation.correlatedCases.length,
+      correlatedCases: correlation.correlatedCases,
+      suggestedMembers: correlation.suggestedMembers,
+      correlationEvidence: correlation.correlationEvidence,
+      campaignSuggestion: correlation.campaignSuggestion
+    });
+  });
+
+  app.post('/api/emails/related-incidents', publicLimiter, async (req, res) => {
+    const supabase = getSupabaseClient();
+    let pool = Array.from(inMemoryCases.values());
+    if (supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*');
+        if (data && data.length > 0) pool = data;
+      } catch {}
+    }
+
+    const target = req.body?.analysis || req.body?.case || req.body;
+    if (!target || (!target.id && !target.headers && !target.from && !target.domain)) {
+      return res.status(400).json({ error: 'Valid analysis or case object required in body' });
+    }
+
+    const correlation = correlateCaseWithCases(target, pool);
+    res.json({
+      caseId: target.id || 'current-analysis',
+      caseTitle: target.title || target.headers?.subject || target.subject || 'Current Email Analysis',
       correlatedCasesCount: correlation.correlatedCases.length,
       correlatedCases: correlation.correlatedCases,
       suggestedMembers: correlation.suggestedMembers,

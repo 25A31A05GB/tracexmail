@@ -51,6 +51,7 @@ import { NonTechnicalEvidenceCard } from './NonTechnicalEvidenceCard';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
+import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -246,6 +247,8 @@ interface OverviewViewProps {
   onNavigateToHeaders: () => void;
   onNavigateToTimeline?: () => void;
   onNavigateToGraph?: () => void;
+  onNavigateToCases?: (caseId?: string) => void;
+  onSelectAnalysis?: (analysis: EmailAnalysis) => void;
   onOpenNewModal?: () => void;
   onOpenReportModal?: () => void;
   viewMode?: 'simple' | 'analyst';
@@ -260,6 +263,8 @@ export function OverviewView({
   onNavigateToHeaders,
   onNavigateToTimeline,
   onNavigateToGraph,
+  onNavigateToCases,
+  onSelectAnalysis,
   onOpenNewModal,
   onOpenReportModal,
   viewMode = 'simple',
@@ -844,6 +849,8 @@ export function OverviewView({
           onNavigateToMap={onNavigateToMap}
           onNavigateToGraph={onNavigateToGraph}
           onNavigateToLogs={onNavigateToLogs}
+          onSelectAnalysis={onSelectAnalysis}
+          onNavigateToCases={onNavigateToCases}
         />
       ) : (
         <div className="grid grid-cols-12 gap-6">
@@ -1739,6 +1746,13 @@ export function OverviewView({
             />
           </div>
         </div>
+
+        {/* Cross-Case Correlation: Related Incidents Widget */}
+        <RelatedIncidentsWidget
+          analysis={analysis}
+          onSelectAnalysis={onSelectAnalysis}
+          onNavigateToCases={onNavigateToCases}
+        />
 
         {/* Threat Intelligence Log Console */}
         <div className="bg-[#1a1712] border border-[#3a352c] rounded-lg flex flex-col overflow-hidden shadow-sm">

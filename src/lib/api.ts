@@ -651,6 +651,23 @@ export const forensicApi = {
     return res.data;
   },
 
+  getRelatedIncidents: async (emailIdOrCaseId?: string, analysis?: any): Promise<{
+    caseId: string;
+    caseTitle: string;
+    correlatedCasesCount: number;
+    correlatedCases: any[];
+    suggestedMembers: any[];
+    correlationEvidence: any[];
+    campaignSuggestion?: any;
+  }> => {
+    if (analysis) {
+      const res = await apiClient.post('/emails/related-incidents', { analysis });
+      return res.data;
+    }
+    const res = await apiClient.get(`/emails/${emailIdOrCaseId}/related-incidents`);
+    return res.data;
+  },
+
   runCorrelation: async (): Promise<any> => {
     const res = await apiClient.post('/correlation/run');
     return res.data;

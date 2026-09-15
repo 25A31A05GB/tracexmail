@@ -884,6 +884,8 @@ export default function App() {
                   onNavigateToHeaders={() => setActiveTab('headers')}
                   onNavigateToTimeline={() => setActiveTab('timeline')}
                   onNavigateToGraph={() => setActiveTab('graph')}
+                  onNavigateToCases={() => setActiveTab('cases')}
+                  onSelectAnalysis={setCurrentAnalysis}
                   onOpenNewModal={() => setIsNewModalOpen(true)}
                   onOpenReportModal={() => setIsReportModalOpen(true)}
                   viewMode={viewMode}
