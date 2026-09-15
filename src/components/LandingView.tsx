@@ -33,9 +33,7 @@ import {
   Fingerprint,
   Globe,
   Cpu,
-  AlertOctagon,
-  Type,
-  Check
+  AlertOctagon
 } from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
@@ -43,18 +41,6 @@ import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
 import { FullForensicArchitecture3D } from './3d/FullForensicArchitecture3D';
-
-export type LandingFontPreset = 
-  | 'ibm' 
-  | 'plus-jakarta' 
-  | 'sora' 
-  | 'jetbrains' 
-  | 'serif'
-  | 'outfit'
-  | 'manrope'
-  | 'dm-sans'
-  | 'space-grotesk'
-  | 'playfair';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -72,93 +58,6 @@ export function LandingView({
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [activeChallengeIdx, setActiveChallengeIdx] = useState<number>(0);
-  const [selectedFont, setSelectedFont] = useState<LandingFontPreset>('serif');
-  const [fontMenuOpen, setFontMenuOpen] = useState<boolean>(false);
-
-  const fontOptions: { id: LandingFontPreset; name: string; headingClass: string; bodyClass: string; desc: string; category: string }[] = [
-    {
-      id: 'ibm',
-      name: 'IBM Plex & Fraunces (Forensic Default)',
-      headingClass: 'font-[\'Fraunces\',serif]',
-      bodyClass: 'font-[\'IBM_Plex_Sans\',-apple-system,sans-serif]',
-      desc: 'Editorial serif headings + technical IBM body',
-      category: 'Forensics & Legal'
-    },
-    {
-      id: 'plus-jakarta',
-      name: 'Plus Jakarta Sans (Modern Clean SaaS)',
-      headingClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif] font-bold tracking-tight',
-      bodyClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif]',
-      desc: 'Crisp geometric modern look (like Linear/Stripe)',
-      category: 'Modern SaaS'
-    },
-    {
-      id: 'sora',
-      name: 'Sora & Inter (Cyber Security / SOC)',
-      headingClass: 'font-[\'Sora\',sans-serif] font-bold tracking-tight',
-      bodyClass: 'font-[\'Inter\',sans-serif]',
-      desc: 'High-tech tactical SOC analyst aesthetic',
-      category: 'Cyber Security'
-    },
-    {
-      id: 'outfit',
-      name: 'Outfit & Urbanist (Ultra Modern Minimalist)',
-      headingClass: 'font-[\'Outfit\',sans-serif] font-semibold tracking-tight',
-      bodyClass: 'font-[\'Urbanist\',sans-serif]',
-      desc: 'Sophisticated clean geometry with great negative space',
-      category: 'Minimalist'
-    },
-    {
-      id: 'manrope',
-      name: 'Manrope & Inter (Fintech & Enterprise)',
-      headingClass: 'font-[\'Manrope\',sans-serif] font-bold tracking-tight',
-      bodyClass: 'font-[\'Inter\',sans-serif]',
-      desc: 'Corporate enterprise security standard',
-      category: 'Enterprise'
-    },
-    {
-      id: 'dm-sans',
-      name: 'DM Sans (Editorial Product)',
-      headingClass: 'font-[\'DM_Sans\',sans-serif] font-bold tracking-tight',
-      bodyClass: 'font-[\'DM_Sans\',sans-serif]',
-      desc: 'Warm neutral modern sans, highly legible at all sizes',
-      category: 'Modern SaaS'
-    },
-    {
-      id: 'space-grotesk',
-      name: 'Space Grotesk & Plex (Tech Brutalism)',
-      headingClass: 'font-[\'Space_Grotesk\',sans-serif] font-bold',
-      bodyClass: 'font-[\'IBM_Plex_Sans\',sans-serif]',
-      desc: 'Sharp technical angles with cyber telemetry vibe',
-      category: 'Cyber Security'
-    },
-    {
-      id: 'jetbrains',
-      name: 'JetBrains Mono (Technical Command Center)',
-      headingClass: 'font-[\'JetBrains_Mono\',monospace] font-bold',
-      bodyClass: 'font-[\'JetBrains_Mono\',monospace]',
-      desc: 'Full monospace hacker and terminal telemetry feel',
-      category: 'Developer & SOC'
-    },
-    {
-      id: 'serif',
-      name: 'Source Serif 4 (Academic NIST Standard)',
-      headingClass: 'font-[\'Source_Serif_4\',serif] font-semibold',
-      bodyClass: 'font-[\'IBM_Plex_Sans\',sans-serif]',
-      desc: 'Court-admissible NIST investigation layout',
-      category: 'Forensics & Legal'
-    },
-    {
-      id: 'playfair',
-      name: 'Playfair & Plus Jakarta (Luxury Security)',
-      headingClass: 'font-[\'Playfair_Display\',serif] font-bold italic',
-      bodyClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif]',
-      desc: 'High-end luxury editorial with modern clean body',
-      category: 'Editorial Luxury'
-    }
-  ];
-
-  const currentFont = fontOptions.find(f => f.id === selectedFont) || fontOptions[0];
 
   const sampleCases = [
     {
@@ -264,11 +163,11 @@ export function LandingView({
   };
 
   return (
-    <div className={`w-full min-h-screen bg-[#14120f] text-[#ede6d8] ${currentFont.bodyClass} text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0`}>
+    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
       
       {/* Top Header Navigation */}
       <nav className="sticky top-0 z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core" />
             <span className="font-['Fraunces',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8]">
@@ -313,57 +212,6 @@ export function LandingView({
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3.5">
-            {/* Interactive Font Selector Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setFontMenuOpen(!fontMenuOpen)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[3px] bg-[#1a1712] border border-[#3a352c] text-[#c9a227] hover:border-[#c9a227] text-xs font-mono transition-colors cursor-pointer"
-                title="Change landing page typography style"
-              >
-                <Type className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline font-semibold">Font:</span>
-                <span className="text-[#ede6d8] truncate max-w-[100px] sm:max-w-[140px]">{currentFont.name.split(' ')[0]}</span>
-              </button>
-
-              {fontMenuOpen && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-84 bg-[#16130f] border border-[#3a352c] rounded-[4px] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 max-h-[480px] overflow-y-auto">
-                  <div className="px-2 py-1.5 border-b border-[#3a352c]/60 text-[11px] font-mono text-[#8e8574] uppercase tracking-wider flex items-center justify-between sticky top-0 bg-[#16130f] z-10">
-                    <span>Select Page Typography</span>
-                    <span className="text-[#c9a227] font-bold">10 Presets</span>
-                  </div>
-                  <div className="py-1 space-y-1">
-                    {fontOptions.map((opt) => {
-                      const isSelected = selectedFont === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => {
-                            setSelectedFont(opt.id);
-                            setFontMenuOpen(false);
-                          }}
-                          className={`w-full text-left p-2 rounded-[3px] transition-colors cursor-pointer flex items-start justify-between ${
-                            isSelected
-                              ? 'bg-[#221e17] border border-[#c9a227]/60 text-[#ede6d8]'
-                              : 'hover:bg-[#1d1914] text-[#b9af9c] hover:text-[#ede6d8] border border-transparent'
-                          }`}
-                        >
-                          <div>
-                            <div className="font-semibold text-xs text-[#ede6d8] flex items-center gap-1.5">
-                              <span>{opt.name}</span>
-                            </div>
-                            <div className="text-[11px] text-[#8e8574] mt-0.5 font-mono">
-                              {opt.desc}
-                            </div>
-                          </div>
-                          {isSelected && <Check className="w-4 h-4 text-[#c9a227] shrink-0 mt-0.5" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
             <button
               onClick={onOpenConsole}
               className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
@@ -457,113 +305,9 @@ export function LandingView({
         )}
       </nav>
 
-      {/* Live Typography Showcase & Selection Grid */}
-      <section className="py-12 sm:py-16 border-b border-[#3a352c] bg-[#100e0c]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#1a1712] border border-[#3a352c] text-[#c9a227] font-mono text-[11px] mb-2 uppercase">
-                <Type className="w-3.5 h-3.5" />
-                <span>Live Typography Suite</span>
-              </div>
-              <h2 className={`${currentFont.headingClass} text-[26px] sm:text-[34px] font-medium text-[#ede6d8] leading-tight`}>
-                Choose your reading experience
-              </h2>
-              <p className="text-[#b9af9c] mt-1 text-[14.5px]">
-                Click any option below to instantly change the entire page’s headings, body text, and UI density.
-              </p>
-            </div>
-            <div className="shrink-0 font-mono text-xs text-[#8e8574]">
-              Active: <span className="text-[#c9a227] font-bold">{currentFont.name}</span>
-            </div>
-          </div>
-
-          {/* 5 Live Rendered Font Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {fontOptions.map((opt, idx) => {
-              const isSelected = selectedFont === opt.id;
-              return (
-                <div
-                  key={opt.id}
-                  onClick={() => setSelectedFont(opt.id)}
-                  className={`p-5 rounded-[4px] border transition-all cursor-pointer flex flex-col justify-between relative group ${
-                    isSelected
-                      ? 'bg-[#1b1712] border-[#c9a227] ring-1 ring-[#c9a227]/40 shadow-xl'
-                      : 'bg-[#15130f] border-[#3a352c] hover:border-[#8e8574] hover:bg-[#1a1712]'
-                  }`}
-                >
-                  <div>
-                    {/* Header with Option Number, Category, and Select Indicator */}
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="px-2 py-0.5 rounded-[2px] bg-[#221e17] border border-[#3a352c] font-mono text-[10.5px] font-bold text-[#c9a227]">
-                          OPTION 0{idx + 1}
-                        </span>
-                        <span className="px-1.5 py-0.5 rounded-[2px] bg-[#1a1712] border border-[#3a352c]/60 font-mono text-[9.5px] text-[#8e8574]">
-                          {opt.category}
-                        </span>
-                      </div>
-                      <span className={`text-xs font-mono font-semibold flex items-center gap-1 ${
-                        isSelected ? 'text-[#c9a227]' : 'text-[#8e8574] group-hover:text-[#ede6d8]'
-                      }`}>
-                        {isSelected ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>APPLIED</span>
-                          </>
-                        ) : (
-                          <span>CLICK TO APPLY</span>
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Font Family Name */}
-                    <h3 className="font-mono text-[13px] font-bold text-[#ede6d8] mb-1">
-                      {opt.name}
-                    </h3>
-                    <p className="text-[12px] font-mono text-[#8e8574] mb-4">
-                      {opt.desc}
-                    </p>
-
-                    {/* Real Rendered Sample Box in that exact font */}
-                    <div className={`bg-[#0d0c0a] border border-[#3a352c]/70 rounded-[3px] p-3.5 mb-3 space-y-2 ${opt.bodyClass}`}>
-                      <div className={`${opt.headingClass} text-[18px] text-[#ede6d8] leading-tight`}>
-                        Every phishing email leaves a trail.
-                      </div>
-                      <div className="text-[13px] text-[#b9af9c] leading-relaxed">
-                        TraceXMail unmasks spoofed display names, isolates malicious MTAs, and seals tamper-proof evidence.
-                      </div>
-                      <div className="font-mono text-[11px] text-[#c9a227] flex items-center justify-between pt-1 border-t border-[#3a352c]/50">
-                        <span>SPF:PASS • DKIM:2048</span>
-                        <span>0.042s</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Apply Button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFont(opt.id);
-                    }}
-                    className={`w-full py-2 px-3 rounded-[3px] text-xs font-mono font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-[#c9a227] text-[#14120f] font-bold shadow-md'
-                        : 'bg-[#221e17] text-[#ede6d8] border border-[#3a352c] group-hover:border-[#c9a227] group-hover:text-[#c9a227]'
-                    }`}
-                  >
-                    {isSelected ? 'Currently Applied' : 'Select This Typography'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {/* Hero Section */}
       <section className="py-12 sm:py-16 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_80%_10%,rgba(178,58,46,0.1),transparent_65%),#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10">
           
           <div className="lg:col-span-6 space-y-4 sm:space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]">
@@ -571,7 +315,7 @@ export function LandingView({
               <span>TraceXMail Forensic Core v2.4</span>
             </div>
 
-            <h1 className={`${currentFont.headingClass} text-[30px] xs:text-[36px] sm:text-[44px] font-medium leading-[1.15] text-[#ede6d8] tracking-tight`}>
+            <h1 className="font-['Source_Serif_4',serif] font-semibold text-[30px] xs:text-[36px] sm:text-[44px] leading-[1.15] text-[#ede6d8] tracking-tight">
               Every phishing email leaves a trail. We follow it to the source.
             </h1>
             
@@ -673,7 +417,7 @@ export function LandingView({
 
       {/* Real-Time Live Telemetry Ribbon Section */}
       <section id="telemetry-feed" className="py-6 border-b border-[#3a352c] bg-[#181511]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <LiveDynamicTelemetryRibbon
             onSelectCase={onSelectCase}
             onOpenConsole={onOpenConsole}
@@ -685,18 +429,18 @@ export function LandingView({
 
       {/* Dedicated Section: Attack Vector Taxonomy, Forensic Countermeasures & Architectural Differences */}
       <section id="challenges-solution" className="py-16 sm:py-24 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* Section Header */}
-          <div className="max-w-[760px] mb-12">
+          <div className="max-w-4xl mb-12">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
-              THREAT VECTOR ANALYSIS &amp; FORENSIC COUNTERMEASURES
+              SECURITY CHALLENGES &amp; OUR SOLUTIONS
             </div>
-            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[38px] font-medium text-[#ede6d8] leading-tight`}>
-              Critical Limitations in Legacy Filtering &amp; The Deterministic Forensic Standard
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[38px] text-[#ede6d8] leading-tight">
+              Why Regular Spam Filters Fail &amp; How TraceXMail Solves It
             </h2>
             <p className="text-[#b9af9c] mt-3 text-[16px] leading-relaxed font-sans">
-              Heuristic scanners compute non-deterministic statistical probabilities on surface content. TraceXMail conducts backward hop traversal, validates RFC cryptographic signatures, and establishes an auditable chain of custody.
+              Traditional filters only scan basic words and links. TraceXMail follows the email's physical server route, validates real digital signatures, and delivers verifiable proof.
             </p>
           </div>
 
@@ -705,12 +449,12 @@ export function LandingView({
             <div className="flex items-center justify-between gap-4 mb-6">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#b23a2e]" />
-                <h3 className={`${currentFont.headingClass} text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]`}>
-                  Forensic Deconstruction: Common Adversary Attack Vectors
+                <h3 className="font-['Source_Serif_4',serif] font-semibold text-[20px] sm:text-[22px] text-[#ede6d8]">
+                  Common Phishing Tricks &amp; How We Stop Them
                 </h3>
               </div>
               <span className="text-xs font-mono text-[#8e8574] hidden sm:inline">
-                Select attack vector to inspect deterministic countermeasure
+                Click a threat type below to see how TraceXMail exposes it
               </span>
             </div>
 
@@ -719,33 +463,33 @@ export function LandingView({
               {[
                 {
                   id: 0,
-                  badge: 'VECTOR #1',
-                  name: 'Executive Impersonation (BEC)',
-                  sub: 'Display name & return-path spoofing',
+                  badge: 'THREAT #1',
+                  name: 'Fake Boss or Executive Email (BEC)',
+                  sub: 'Pretending to be someone from your company',
                   icon: AlertOctagon,
                   color: '#b23a2e'
                 },
                 {
                   id: 1,
-                  badge: 'VECTOR #2',
-                  name: 'Synthetic MTA Route Injection',
-                  sub: 'Forged Received header fabrication',
+                  badge: 'THREAT #2',
+                  name: 'Fake Server Routing Headers',
+                  sub: 'Injecting fake Microsoft/Google hops',
                   icon: Network,
                   color: '#c9a227'
                 },
                 {
                   id: 2,
-                  badge: 'VECTOR #3',
-                  name: 'Black-Box Heuristic Ambiguity',
-                  sub: 'Unverifiable ML risk scoring',
+                  badge: 'THREAT #3',
+                  name: 'Unclear AI Risk Scores',
+                  sub: 'Black-box guess without evidence',
                   icon: Cpu,
                   color: '#60a5fa'
                 },
                 {
                   id: 3,
-                  badge: 'VECTOR #4',
-                  name: 'Offshore Anonymized Transit',
-                  sub: 'Tor exit nodes & bulletproof ASNs',
+                  badge: 'THREAT #4',
+                  name: 'Hidden Offshore & Tor Servers',
+                  sub: 'Anonymous relays hiding true location',
                   icon: Globe,
                   color: '#a855f7'
                 }
@@ -787,32 +531,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <AlertOctagon className="w-3.5 h-3.5" />
-                      Adversary Technique: Display Name Deception
+                      The Trick: Forged Sender Name
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      RFC 5322 Visual Display Name Forgery
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Fake Sender Name Disguising Unauthorized Server
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Adversaries forge the high-visibility Friendly From header while originating from unrelated third-party mail infrastructure. Standard MUA clients highlight the trusted identity while suppressing the unaligned envelope return-path.
+                      Attackers change the friendly display name to &quot;CEO&quot; or &quot;PayPal&quot; while sending from an unrelated, untrusted server. Regular email programs show the trusted name and hide the real origin.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ Legacy Scanner Defect: Evaluates string matching on display names without enforcing cryptographic DMARC identifier alignment.
+                      ⚠ Why Standard Filters Miss It: They only check the name text without validating real domain ownership.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      TraceXMail Countermeasure
+                      TraceXMail Solution
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Cryptographic Domain Alignment &amp; RFC Authentication Matrix
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Full Digital Signature &amp; SPF/DKIM Verification
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail bypasses superficial headers to validate connecting socket IP authorizations against published DNS TXT netblocks (SPF) and verifies 2048-bit RSA/Ed25519 digital signatures (DKIM) under strict DMARC alignment criteria.
+                      TraceXMail checks the sending server's IP address against the real domain's published security rules (SPF) and verifies cryptographic digital signatures (DKIM &amp; DMARC).
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ Deterministic Finding: SPF Softfail + DMARC Disalignment: Origin IP 185.220.101.5 is NOT authorized by domain netblock.
+                      ✓ Clear Result: SPF Failed &amp; Signature Invalid: Origin server is NOT authorized to send emails for this domain.
                     </div>
                   </div>
                 </div>
@@ -823,32 +567,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Network className="w-3.5 h-3.5" />
-                      Adversary Technique: Synthetic Route Injection
+                      The Trick: Injected Fake Server Hops
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Fabrication of Intermediate MTA Received Headers
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Inserting Fake Microsoft or Google Server Records
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Attackers inject fabricated `Received:` trace fields into the raw message payload, simulating legitimate transit through Microsoft 365 or Google Workspace relays to deceive linear header parsers.
+                      Attackers write fake &quot;Received from Microsoft 365&quot; lines inside the email code to fool basic header scanners into believing the message passed through legitimate corporate systems.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ Legacy Scanner Defect: Parses trace headers sequentially top-down without validating TCP socket handshake provenance.
+                      ⚠ Why Standard Filters Miss It: They read headers from top to bottom without checking if the servers actually talked to each other.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      TraceXMail Countermeasure
+                      TraceXMail Solution
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Reverse Hop Traversal &amp; Boundary Handshake Isolation
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Reverse Route Tracing From Your Ingestion Server
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail executes backward hop traversal starting from the perimeter MX server, verifying bidirectional TLS handshakes and isolating the exact TCP socket boundary where external unauthenticated transmission occurred.
+                      TraceXMail walks backwards from your actual verified server hop by hop, identifying where real handshakes stop and where forged lines were inserted.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ Deterministic Finding: Discards 3 synthetic Microsoft M365 trace records; isolates authenticated origin socket in Sofia, Bulgaria.
+                      ✓ Clear Result: Discarded fake Microsoft hops; pinpointed real origin server connection in Sofia, Bulgaria.
                     </div>
                   </div>
                 </div>
@@ -859,32 +603,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Cpu className="w-3.5 h-3.5" />
-                      Legacy Defect: Black-Box Confidence Ambiguity
+                      The Problem: Mysterious Risk Scores
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Unverifiable Statistical Threat Probabilities
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Arbitrary Numbers Without Evidence You Can Defend
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Opaque heuristic engines generate arbitrary probability figures without forensic provenance, leaving incident response teams without verifiable evidence during executive briefings or regulatory audits.
+                      Many modern security tools give a vague score like &quot;Risk: 82%&quot; without explaining why. When executives or auditors ask for proof, analysts have no evidence to show.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ Legacy Scanner Defect: Outputs unexplainable risk scores lacking deterministic root-cause analysis or reproducible telemetry.
+                      ⚠ Why Standard Filters Fail: Black-box algorithms provide no clear audit trail for incident response.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      TraceXMail Countermeasure
+                      TraceXMail Solution
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Deterministic Signal Breakdown &amp; NIST SP 800-86 Custody Seals
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Exact Signal Breakdown With Tamper-Proof Seals
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail provides a granular breakdown of verified forensic signals (DNS TXT records, X.509 certificates, Shannon entropy) anchored by an immutable SHA-256 evidence digest.
+                      TraceXMail provides a point-by-point breakdown of physical evidence (IP hops, DNS records, digital keys) sealed with a permanent SHA-256 fingerprint ready for management or law enforcement.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ Deterministic Finding: Atomic signal ledger with RFC 5322 timelines and court-admissible SHA-256 evidence digest.
+                      ✓ Clear Result: Transparent proof with verifiable timestamps and cryptographic evidence dossier.
                     </div>
                   </div>
                 </div>
@@ -895,32 +639,32 @@ export function LandingView({
                   <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
                       <Globe className="w-3.5 h-3.5" />
-                      Adversary Technique: Bulletproof Anonymized Transit
+                      The Trick: Anonymous Offshore Proxies
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Tor Onion Routing &amp; Non-Cooperative Autonomous Systems
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Hiding Real Locations Behind Tor and Bulletproof Servers
                     </h4>
                     <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
-                      Threat actors route SMTP traffic through multi-layered onion networks and bulletproof hosting providers operating in non-compliant jurisdictions to conceal origin infrastructure.
+                      Criminals route emails through anonymizing Tor nodes and offshore hosting providers that ignore legal requests, masking their true geographic location.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
-                      ⚠ Legacy Scanner Defect: Classifies connection endpoints without autonomous system reputation scoring or exit-node intelligence.
+                      ⚠ Why Standard Filters Miss It: They don't check network routing registries or known proxy exit lists.
                     </div>
                   </div>
 
                   <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
                     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
                       <ShieldCheck className="w-3.5 h-3.5" />
-                      TraceXMail Countermeasure
+                      TraceXMail Solution
                     </div>
-                    <h4 className={`${currentFont.headingClass} text-[20px] font-semibold text-[#ede6d8]`}>
-                      Global BGP Routing &amp; Autonomous System (ASN) Attribution
+                    <h4 className="font-['Source_Serif_4',serif] font-semibold text-[20px] text-[#ede6d8]">
+                      Autonomous System &amp; Exit Node Attribution
                     </h4>
                     <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
-                      TraceXMail queries authoritative BGP routing registries, MaxMind GeoLite2 databases, and active Tor consensus directories to flag proxy exit relays and bulletproof hosting infrastructure (such as AlexHost Moldova AS57523).
+                      TraceXMail cross-references global BGP routing databases and Tor exit lists to flag bulletproof servers and visualize the full transmission path on an interactive 3D globe.
                     </p>
                     <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
-                      ✓ Deterministic Finding: Origin socket mapped to Tor Exit Node (AS200548) with real-time transit telemetry on 3D globe.
+                      ✓ Clear Result: Matched origin socket to Tor Exit Node (AS200548) with real-time transit telemetry.
                     </div>
                   </div>
                 </div>
@@ -931,9 +675,9 @@ export function LandingView({
           {/* Part 2: Forensic Architecture Comparison Matrix */}
           <div>
             <div className="flex items-center gap-2 mb-6">
-              <span className="w-2 h-2 rounded-full bg-[#c9a227]" />
-              <h3 className={`${currentFont.headingClass} text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]`}>
-                Comparative Forensic Capability Matrix
+              <span className="w-2.5 h-2.5 rounded-full bg-[#c9a227]" />
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[20px] sm:text-[22px] text-[#ede6d8]">
+                How TraceXMail Compares to Other Security Tools
               </h3>
             </div>
 
@@ -941,36 +685,36 @@ export function LandingView({
               <table className="w-full text-left text-[13.5px] border-collapse min-w-[700px]">
                 <thead>
                   <tr className="border-b border-[#3a352c] bg-[#14120f] font-mono text-[11px] text-[#8e8574] uppercase tracking-wider">
-                    <th className="py-3 px-4 font-semibold">Forensic Dimension</th>
-                    <th className="py-3 px-4 font-semibold">Standard Gateway Filters</th>
-                    <th className="py-3 px-4 font-semibold">Signature AV Scanners</th>
+                    <th className="py-3 px-4 font-semibold">Security Feature</th>
+                    <th className="py-3 px-4 font-semibold">Standard Email Filters</th>
+                    <th className="py-3 px-4 font-semibold">Basic Antivirus Scanners</th>
                     <th className="py-3 px-4 font-semibold text-[#c9a227] bg-[#241f17]">TraceXMail Forensic Core</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#3a352c]/60">
                   <tr className="hover:bg-[#221e18] transition-colors">
-                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">How it decides</td>
-                    <td className="py-3.5 px-4 text-[#b9af9c]">Keywords and spam patterns</td>
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">How it detects threats</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Keywords and basic spam words</td>
                     <td className="py-3.5 px-4 text-[#b9af9c]">Known virus signatures only</td>
-                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Physical network hops + digital signature validation</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Physical server hops + cryptographic key verification</td>
                   </tr>
                   <tr className="hover:bg-[#221e18] transition-colors">
-                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Finding who sent it</td>
-                    <td className="py-3.5 px-4 text-[#b9af9c]">Assumes the visible name is real</td>
-                    <td className="py-3.5 px-4 text-[#b9af9c]">Looks only at links in the message</td>
-                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Traces backward from your server to find the real origin IP</td>
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Finding true sender</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Trusts the display name on the screen</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Scans links inside email body</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Traces backward from your server to pinpoint real origin IP</td>
                   </tr>
                   <tr className="hover:bg-[#221e18] transition-colors">
                     <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Verifying legitimacy</td>
                     <td className="py-3.5 px-4 text-[#b9af9c]">Basic Pass/Fail checkbox</td>
                     <td className="py-3.5 px-4 text-[#b9af9c]">None (ignores email routing)</td>
-                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Full 2048-bit cryptographic key match (SPF, DKIM, DMARC)</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Full cryptographic match (SPF, DKIM, DMARC &amp; ARC)</td>
                   </tr>
                   <tr className="hover:bg-[#221e18] transition-colors">
-                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Proof for managers &amp; law</td>
-                    <td className="py-3.5 px-4 text-[#b9af9c]">Temporary logs, deleted quickly</td>
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Evidence for reports &amp; law</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Temporary logs deleted in 30 days</td>
                     <td className="py-3.5 px-4 text-[#b9af9c]">Uploads files to public websites</td>
-                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Permanent SHA-256 tamper-proof legal evidence dossier</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Permanent tamper-proof SHA-256 legal evidence dossier</td>
                   </tr>
                 </tbody>
               </table>
@@ -988,7 +732,7 @@ export function LandingView({
 
       {/* Corpus Proof & Detection Output */}
       <section id="corpus-proof" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
@@ -1086,7 +830,7 @@ export function LandingView({
 
       {/* From Inbox to Verdict: Six Stages */}
       <section id="how-it-works" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[700px] mb-12">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Standard Operating Procedure
@@ -1165,7 +909,7 @@ export function LandingView({
 
       {/* What Your Analysts Actually Open (Workstation Mockup) */}
       <section id="workstation" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[700px] mb-8">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Production Workstation
@@ -1240,12 +984,12 @@ export function LandingView({
 
       {/* What's Actually Doing the Work: Exhibits A-D */}
       <section id="exhibits" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[700px] mb-12">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Core Engineering
             </div>
-            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[36px] font-medium text-[#ede6d8]`}>
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] text-[#ede6d8]">
               Four Pillars of the Forensic Reconstruction Engine
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px] leading-relaxed">
@@ -1256,7 +1000,7 @@ export function LandingView({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT A</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Cryptographic Evidence Vault</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Cryptographic Evidence Vault</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Every forensic finding is hashed via SHA-256 and timestamped the moment analysis executes. Immutability guarantees prevent post-hoc report tampering.
               </p>
@@ -1264,7 +1008,7 @@ export function LandingView({
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT B</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Trust-Boundary Origin Resolver</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Trust-Boundary Origin Resolver</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Reconstructs transmission backwards from verified destination MTAs, isolating untrusted perimeter hops while discarding attacker-forged Received headers.
               </p>
@@ -1272,7 +1016,7 @@ export function LandingView({
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT C</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>NIST-Aligned Attribution Classifier</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">NIST-Aligned Attribution Classifier</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Strict epistemological categorization separates verified forensic Facts, contextual Findings, and threat actor Hypotheses into distinct audit tiers.
               </p>
@@ -1280,7 +1024,7 @@ export function LandingView({
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT D</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Cross-Vector Campaign Correlation</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Cross-Vector Campaign Correlation</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Correlates concurrent phishing waves sharing bulletproof autonomous systems, identical DKIM selectors, and matching payload entropy profiles.
               </p>
@@ -1293,7 +1037,7 @@ export function LandingView({
 
       {/* UNKNOWN IS A VALID RESULT - EXACT REPLICA OF IMAGE 1 */}
       <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 lg:gap-20">
             
             {/* Left Circular Badge - Matching Image 1 */}
@@ -1311,7 +1055,7 @@ export function LandingView({
 
             {/* Right Copy - Matching Image 1 */}
             <div className="space-y-4 max-w-[680px]">
-              <h2 className={`${currentFont.headingClass} text-[32px] sm:text-[42px] font-medium text-[#ede6d8] leading-[1.15]`}>
+              <h2 className="font-['Source_Serif_4',serif] font-semibold text-[32px] sm:text-[42px] text-[#ede6d8] leading-[1.15]">
                 Deterministic Integrity: We Refuse Manufactured Confidence
               </h2>
               <p className="text-[#b9af9c] text-[16px] sm:text-[17px] leading-relaxed">
@@ -1325,12 +1069,12 @@ export function LandingView({
 
       {/* Role-Based Clearance */}
       <section className="py-16 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[650px] mb-10">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Access Governance
             </div>
-            <h2 className={`${currentFont.headingClass} text-[26px] sm:text-[32px] font-medium text-[#ede6d8]`}>
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[26px] sm:text-[32px] text-[#ede6d8]">
               Role-Based Access Control &amp; Privacy Safeguards
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
@@ -1341,7 +1085,7 @@ export function LandingView({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#c9a227]">CLEARANCE · ADMIN</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Admin</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Admin</h3>
               <p className="text-[#b9af9c] text-[14px]">
                 Manages organizational certificates, user provisioning, and authorization policies for unmasked forensic raw header inspection.
               </p>
@@ -1349,7 +1093,7 @@ export function LandingView({
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#22c55e]">CLEARANCE · ANALYST</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Analyst</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Analyst</h3>
               <p className="text-[#b9af9c] text-[14px]">
                 Full investigative telemetry access: executes reverse hop reconstruction, validates DMARC matrix, and generates forensic dossiers.
               </p>
@@ -1357,7 +1101,7 @@ export function LandingView({
 
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
               <span className="text-xs font-mono text-[#7fb2e8]">CLEARANCE · READ-ONLY</span>
-              <h3 className={`${currentFont.headingClass} text-[18px] text-[#ede6d8]`}>Auditor</h3>
+              <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Auditor</h3>
               <p className="text-[#b9af9c] text-[14px]">
                 Enforces compliance review with automated PII masking, RFC verification logs, and immutable SHA-256 chain of custody reports.
               </p>
@@ -1368,12 +1112,12 @@ export function LandingView({
 
       {/* Core Engineering & Research Team - REDESIGNED */}
       <section id="team" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[700px] mb-12">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Core Engineering &amp; Research
             </div>
-            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[34px] font-medium text-[#ede6d8]`}>
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[34px] text-[#ede6d8]">
               Forensic Core Engineering &amp; Threat Intelligence Research
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
@@ -1431,12 +1175,12 @@ export function LandingView({
 
       {/* Pricing Section */}
       <section id="pricing" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[650px] mb-10">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Operational Deployment
             </div>
-            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[34px] font-medium text-[#ede6d8]`}>
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[34px] text-[#ede6d8]">
               Deployment Tiers &amp; SOC Access
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
@@ -1448,7 +1192,7 @@ export function LandingView({
             <div className="bg-[#1d1a15] border border-[#b23a2e] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
                 <span className="text-xs font-mono text-[#ff8d7d] font-bold">PILOT ACCESS</span>
-                <div className={`${currentFont.headingClass} text-[32px] font-bold text-[#ede6d8] mt-1`}>No Cost Evaluation</div>
+                <div className="font-['Source_Serif_4',serif] font-semibold text-[32px] font-bold text-[#ede6d8] mt-1">No Cost Evaluation</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For security teams evaluating TraceXMail during the pilot phase</p>
               </div>
               <ul className="space-y-2 text-sm text-[#ede6d8]">
@@ -1476,7 +1220,7 @@ export function LandingView({
             <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
                 <span className="text-xs font-mono text-[#c9a227] font-bold">ENTERPRISE</span>
-                <div className={`${currentFont.headingClass} text-[32px] font-bold text-[#ede6d8] mt-1`}>Custom Ingress &amp; SLAs</div>
+                <div className="font-['Source_Serif_4',serif] font-semibold text-[32px] font-bold text-[#ede6d8] mt-1">Custom Ingress &amp; SLAs</div>
                 <p className="text-[#b9af9c] text-sm mt-1">For organizations needing custom deployment, SLAs, or on-prem hosting</p>
               </div>
               <ul className="space-y-2 text-sm text-[#ede6d8]">
@@ -1506,12 +1250,12 @@ export function LandingView({
 
       {/* FAQ Section */}
       <section id="faq" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-[720px] mb-10">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
               Technical Documentation &amp; FAQ
             </div>
-            <h2 className={`${currentFont.headingClass} text-[28px] sm:text-[36px] font-medium text-[#ede6d8]`}>
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] text-[#ede6d8]">
               Forensic Architecture &amp; Protocol Verification FAQ
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
@@ -1632,7 +1376,7 @@ export function LandingView({
 
       {/* Final Call to Action */}
       <section className="py-20 bg-[radial-gradient(ellipse_800px_400px_at_50%_100%,rgba(178,58,46,0.12),transparent_70%)]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[38px] lg:text-[42px] font-medium text-[#ede6d8] max-w-[22ch]">
             Stop guessing where an email threat came from.
           </h2>
@@ -1660,7 +1404,7 @@ export function LandingView({
 
       {/* Footer */}
       <footer id="landing-footer" className="border-t border-[#3a352c] bg-[#100e0c]/90 backdrop-blur-sm py-10">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[13.5px] text-[#b9af9c]">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[13.5px] text-[#b9af9c]">
           <div className="flex items-center gap-2.5">
             <TraceXLogo size="xs" />
             <span className="font-medium tracking-tight text-[#ede6d8]">TraceXMail</span>
@@ -1717,7 +1461,7 @@ export function LandingView({
         aria-label="Mobile Quick Access"
         className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#14120f]/95 backdrop-blur-md border-t border-[#3a352c] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_24px_rgba(0,0,0,0.6)]"
       >
-        <div className="w-full max-w-[1180px] mx-auto px-1">
+        <div className="w-full mx-auto px-1">
           <button
             onClick={onOpenConsole}
             className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-4 rounded-[3px] font-semibold text-[14.5px] border border-[#b23a2e] shadow-lg text-center cursor-pointer transition-colors active:scale-[0.99] flex items-center justify-center gap-2"

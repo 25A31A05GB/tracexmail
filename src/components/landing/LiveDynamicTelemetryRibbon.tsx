@@ -247,7 +247,7 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
     <div className={`w-full bg-[#110f0c] border-y border-[#3a352c] relative overflow-hidden ${className}`}>
       
       {/* Top Ticker Metric Bar */}
-      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
         
         {/* Left Live Status Signal */}
         <div className="flex items-center gap-3 shrink-0 flex-wrap justify-center sm:justify-start">
@@ -301,7 +301,7 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
 
       {/* Bottom Live Evidence Stream Ticker Ribbon */}
       <div className="bg-[#0b0a08] border-t border-[#3a352c]/50 py-2 overflow-x-auto no-scrollbar">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 min-w-max text-[11px] font-['IBM_Plex_Mono',monospace]">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-4 min-w-max text-[11px] font-['IBM_Plex_Mono',monospace]">
           <span className="text-[#c9a227] font-bold uppercase tracking-wider flex items-center gap-1 shrink-0">
             <Radio className="w-3 h-3 animate-pulse text-[#c9a227]" />
             <span>Recent Email Log:</span>

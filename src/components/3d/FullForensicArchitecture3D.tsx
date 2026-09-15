@@ -552,7 +552,7 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
 
   return (
     <section id="full-architecture-3d" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#12100d]">
-      <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Top 4 Stage Selector Tabs - Matching Image 2 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
