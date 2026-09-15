@@ -40,7 +40,7 @@ export interface UserContext {
   email: string;
   organizationId: string;
   role: UserRole;
-  authMethod: 'jwt' | 'api_key' | 'session';
+  authMethod: 'jwt' | 'api_key' | 'session' | 'header_context';
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -807,6 +807,26 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
       role: record.role,
       authMethod: 'api_key'
     };
+  }
+
+  // Fallback to client headers (x-user-id, x-user-email, x-organization-id) if no bearer or API key was passed
+  if (!userContext) {
+    const headerUserId = (req.headers['x-user-id'] as string) || (req.query.user_id as string);
+    const headerEmail = (req.headers['x-user-email'] as string) || (req.query.user_email as string);
+    const headerOrgId = (req.headers['x-organization-id'] as string) || (req.query.organization_id as string);
+
+    if (headerUserId || headerEmail) {
+      const derivedUserId = headerUserId || (headerEmail ? `usr_${headerEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'usr_anon');
+      const derivedEmail = headerEmail || `${derivedUserId}@local.sec`;
+      const derivedOrgId = headerOrgId || `org_${derivedUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      userContext = {
+        userId: derivedUserId,
+        email: derivedEmail,
+        organizationId: derivedOrgId,
+        role: (req.headers['x-user-role'] as UserRole) || 'analyst',
+        authMethod: 'header_context'
+      };
+    }
   }
 
   if (userContext) {

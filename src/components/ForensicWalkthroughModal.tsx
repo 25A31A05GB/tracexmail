@@ -5,31 +5,20 @@ import {
   ShieldCheck, 
   Activity, 
   Terminal, 
-  FileText, 
   MapPin, 
-  Network, 
   Lock, 
   CheckCircle2, 
-  AlertTriangle, 
   ArrowRight, 
   ArrowLeft, 
   X, 
   Upload, 
-  Search, 
-  Layers, 
-  Scale, 
-  FileDown, 
-  Compass, 
-  Zap, 
-  Cpu, 
-  Fingerprint, 
   Eye, 
+  Zap, 
   Sparkles,
-  HelpCircle,
-  Database,
-  ExternalLink,
-  ChevronRight,
-  Server
+  Play,
+  FileCode2,
+  Compass,
+  MousePointerClick
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { NavTab } from './Sidebar';
@@ -50,26 +39,24 @@ interface WalkthroughStep {
   id: string;
   stepNumber: number;
   badge: string;
-  badgeColor: string;
   title: string;
   subtitle: string;
-  description: string;
-  coreHighlights: Array<{
-    title: string;
-    detail: string;
+  practicalWhatIsIt: string;
+  practicalHowToUse: string;
+  highlights: {
+    feature: string;
+    actionableDetail: string;
     icon: any;
-    tag?: string;
-  }>;
-  quickAction?: {
+  }[];
+  primaryAction: {
     label: string;
     icon: any;
     onClick: () => void;
-    secondaryLabel?: string;
-    secondaryAction?: () => void;
   };
-  forensicSecretTip: string;
-  codePreviewTitle: string;
-  codePreviewSnippet: string;
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 export function ForensicWalkthroughModal({
@@ -82,504 +69,271 @@ export function ForensicWalkthroughModal({
   onSelectAnalysis
 }: ForensicWalkthroughModalProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [dontShowAgain, setDontShowAgain] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      // Check if user previously marked don't show
-      try {
-        const saved = localStorage.getItem('tracexmail_walkthrough_completed');
-        if (saved === 'true') {
-          setDontShowAgain(true);
-        }
-      } catch {}
-    }
-  }, [isOpen]);
-
-  const handleClose = () => {
-    if (dontShowAgain) {
-      try {
-        localStorage.setItem('tracexmail_walkthrough_completed', 'true');
-      } catch {}
-    }
-    onClose();
-  };
+  if (!isOpen) return null;
 
   const steps: WalkthroughStep[] = [
     {
-      id: 'dashboard',
+      id: 'ingestion',
       stepNumber: 1,
-      badge: 'ENCLAVE ARCHITECTURE • STEP 1/4',
-      badgeColor: 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)] border-[rgba(201,162,39,0.35)]',
-      title: 'SOC Dashboard & Real-Time Threat Intelligence',
-      subtitle: 'Your centralized command center for zero-trust email telemetry.',
-      description: 'The TraceXMail dashboard aggregates active threat scores, regional incident heatmaps, campaign clusters, and real-time WebSocket incident notifications across your organization.',
-      coreHighlights: [
+      badge: 'PRACTICAL STEP 1 • HOW TO INGEST',
+      title: 'Analyze Email Files & Paste Headers',
+      subtitle: 'Upload any .EML file or paste email text for instant forensic breakdown.',
+      practicalWhatIsIt: 'The Ingestion Pipeline turns suspicious emails into verified security reports in seconds without storing your data.',
+      practicalHowToUse: 'Click "+ New Analysis" in the top bar → Drag and drop an email file or paste header text → Watch real-time execution.',
+      highlights: [
         {
-          title: 'Threat Score Telemetry (0 - 100)',
-          detail: 'Composite score evaluated across SPF/DKIM/DMARC alignment, domain age, BGP ASNs, and header tampering.',
-          icon: Activity,
-          tag: 'Risk Matrix'
+          feature: '.EML & .MSG Drag & Drop',
+          actionableDetail: 'Upload email files directly from Outlook, Gmail, or Apple Mail.',
+          icon: Upload
         },
         {
-          title: 'Real-Time Alert Feed & WebSockets',
-          detail: 'Live detection events broadcast with audio cues and instant incident triage toasts.',
-          icon: Zap,
-          tag: 'Sub-Second'
+          feature: 'Paste Raw Headers',
+          actionableDetail: 'Paste email headers to trace origin IPs and SPF/DKIM keys.',
+          icon: FileCode2
         },
         {
-          title: 'Pre-Loaded Forensic Threat Presets',
-          detail: 'Explore authentic real-world cases: CEO wire fraud, credential harvesting, malware droppers, and verified receipts.',
-          icon: ShieldAlert,
-          tag: 'Case Vault'
+          feature: '100% Zero-Retention',
+          actionableDetail: 'Analyzed entirely in memory with no third-party data tracking.',
+          icon: Lock
         }
       ],
-      quickAction: {
-        label: 'Explore SOC Dashboard',
-        icon: ArrowRight,
+      primaryAction: {
+        label: 'Try Demo Email File',
+        icon: Play,
         onClick: () => {
-          if (onNavigateToTab) onNavigateToTab('dashboard');
-          handleClose();
-        },
-        secondaryLabel: 'Load Wire Fraud Case',
-        secondaryAction: () => {
           if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0]);
           if (onNavigateToTab) onNavigateToTab('overview');
-          handleClose();
+          onClose();
         }
       },
-      forensicSecretTip: 'Pro-Tip: Click the Case Selector dropdown at the top-left of the header anytime to switch between live case files.',
-      codePreviewTitle: 'Live Telemetry Engine Protocol',
-      codePreviewSnippet: `[DASHBOARD_INIT] SOC Enclave Clearance: ACTIVE
-[TELEMETRY] WebSocket Live Feed: CONNECTED (Port 3000)
-[STATS] Total Analyzed: 142 | Malicious: 88 | Clean: 54
-[ALERT] Spike Detected: Offshore ASN AS200548 (Bulgaria)
-[STATUS] Real-Time Threat Heatmap Synchronized`
-    },
-    {
-      id: 'ingestion',
-      stepNumber: 2,
-      badge: 'HEADER DECOMPOSITION • STEP 2/4',
-      badgeColor: 'text-[var(--rose-400)] bg-[rgba(178,58,46,0.15)] border-[rgba(178,58,46,0.35)]',
-      title: 'Ingestion Pipeline & Multi-Stage Forensic Parsing',
-      subtitle: 'Deconstructing raw RFC822 headers down to cryptographic foundations.',
-      description: 'Ingest raw .EML files, .MSG packages, or paste raw email header text. TraceXMail strips deceptive display names, extracts all Received: transport nodes, and validates authoritative DNS records.',
-      coreHighlights: [
-        {
-          title: 'Drag-and-Drop .EML / .MSG Ingestion',
-          detail: 'Instant client-side RFC5322 parsing with 100% zero-retention privacy mode.',
-          icon: Upload,
-          tag: 'RFC822'
-        },
-        {
-          title: 'Display Name vs Return-Path Unmasking',
-          detail: 'Exposes how attackers spoof "CEO Direct" while routing bounce envelopes to offshore bulletproof relays.',
-          icon: Eye,
-          tag: 'Anti-Spoof'
-        },
-        {
-          title: 'DNS TXT & Cryptographic Key Validation',
-          detail: 'Evaluates 2048-bit RSA DKIM selectors, SPF IP designation, and DMARC p=reject enforcement.',
-          icon: Lock,
-          tag: 'SPF/DKIM'
-        }
-      ],
-      quickAction: {
-        label: 'Open Ingestion Pipeline',
-        icon: Upload,
+      secondaryAction: {
+        label: 'Open Header Ingestion View',
         onClick: () => {
           if (onNavigateToTab) onNavigateToTab('ingest');
-          handleClose();
-        },
-        secondaryLabel: 'Paste Raw Headers Modal',
-        secondaryAction: () => {
-          if (onOpenNewModal) onOpenNewModal();
-          handleClose();
+          onClose();
         }
-      },
-      forensicSecretTip: 'Pro-Tip: You can press "+ New Analysis" in the top-right header anytime to paste headers or upload an email file.',
-      codePreviewTitle: 'Stage 2 Ingestion Telemetry Stream',
-      codePreviewSnippet: `[MIME_DECOMPOSE] Extracting 4 Received: transport nodes...
-[CHECK_1] From: "CEO Office" <ceo@company.com>
-[CHECK_2] Return-Path: <spoof@bulletproof-relay.bg>
-[VERDICT] 100% Display Envelope Mismatch Detected
-[DNS_TXT] SPF IP 185.220.101.42 -> FAIL (Not in SPF record)
-[DKIM]    RSA Signature Body Hash -> FAIL (Unsigned)`
+      }
+    },
+    {
+      id: 'overview',
+      stepNumber: 2,
+      badge: 'PRACTICAL STEP 2 • HOW TO READ VERDICTS',
+      title: 'Read Plain English & Technical Verdicts',
+      subtitle: 'Know instantly if an email is safe or dangerous before clicking links.',
+      practicalWhatIsIt: 'The Case Dossier converts complex mail headers into clear safety cards for non-technical users and full forensic logs for analysts.',
+      practicalHowToUse: 'Look at the Threat Score (0-100) and Plain English summary card. Switch between Simple and Technical view in the top header anytime.',
+      highlights: [
+        {
+          feature: 'Plain-English Safety Card',
+          actionableDetail: 'Answers "Is this safe?" with clear red/green indicators.',
+          icon: ShieldCheck
+        },
+        {
+          feature: 'Spoofed Header Detection',
+          actionableDetail: 'Exposes when attackers pretend to be CEOs or bank reps.',
+          icon: Eye
+        },
+        {
+          feature: '1-Click Quarantine Actions',
+          actionableDetail: 'Generate incident reports or isolate malicious messages.',
+          icon: Zap
+        }
+      ],
+      primaryAction: {
+        label: 'View Wire Fraud Case File',
+        icon: ArrowRight,
+        onClick: () => {
+          if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0]);
+          if (onNavigateToTab) onNavigateToTab('overview');
+          onClose();
+        }
+      }
     },
     {
       id: 'traceroute',
       stepNumber: 3,
-      badge: 'BGP HOP TRACKER • STEP 3/4',
-      badgeColor: 'text-[var(--slate)] bg-[rgba(127,163,186,0.15)] border-[rgba(127,163,186,0.35)]',
-      title: 'Hop Traceroute & Geographic Network Mapping',
-      subtitle: 'Following the digital transmission chain backwards across the globe.',
-      description: 'Every Mail Transfer Agent (MTA) stamps an immutable IP and timestamp. TraceXMail reverses the chain chronologically, measuring inter-hop network delays, detecting injected fake headers, and plotting physical origins on interactive Leaflet maps.',
-      coreHighlights: [
+      badge: 'PRACTICAL STEP 3 • HOW TO TRACE ROUTE',
+      title: 'Trace Origin Server Hops & GeoIP',
+      subtitle: 'See exactly where an email originated on a global interactive map.',
+      practicalWhatIsIt: 'Hop Traceroute analyzes every intermediate mail server (MTA) an email passed through from sender to inbox.',
+      practicalHowToUse: 'Open "Hop Traceroute" (Hops) in the sidebar to see the origin country, ISP, and suspect intermediate relay servers.',
+      highlights: [
         {
-          title: 'Chronological Hop Reversal (Top-to-Bottom)',
-          detail: 'Detects suspect injectors and anonymizing VPN/Tor proxies by analyzing inter-hop latency spikes.',
-          icon: Network,
-          tag: 'Delta-T'
+          feature: 'Origin IP Geolocation',
+          actionableDetail: 'Pinpoints the exact country and server network that sent the email.',
+          icon: MapPin
         },
         {
-          title: 'Interactive World Map with Great-Circle Arcs',
-          detail: 'Visualize physical email transmission routes from Sofia to Frankfurt to New York.',
-          icon: MapPin,
-          tag: 'Geo IP'
-        },
-        {
-          title: 'ASN & Threat Infrastructure Attribution',
-          detail: 'Cross-references Autonomous System Numbers with known bulletproof hosting providers.',
-          icon: Server,
-          tag: 'BGP ASN'
+          feature: 'Relay Server Chain',
+          actionableDetail: 'Flags suspicious offshore relays or unauthorized sending IPs.',
+          icon: ShieldAlert
         }
       ],
-      quickAction: {
-        label: 'View Hop Traceroute',
-        icon: Network,
+      primaryAction: {
+        label: 'Open Hop Traceroute View',
+        icon: ArrowRight,
         onClick: () => {
           if (onNavigateToTab) onNavigateToTab('hops');
-          handleClose();
-        },
-        secondaryLabel: 'Open Geographic Map',
-        secondaryAction: () => {
-          if (onNavigateToTab) onNavigateToTab('map');
-          handleClose();
+          onClose();
         }
-      },
-      forensicSecretTip: 'Pro-Tip: Visit the "Hop Traceroute" tab to inspect step-by-step latency deltas and server hostnames for any active case.',
-      codePreviewTitle: 'Hop 01 Reverse Geolocation Output',
-      codePreviewSnippet: `[HOP 01] 185.220.101.42 -> Sofia, Bulgaria (AS200548)
-[HOP 02] 194.156.98.12  -> Reykjavik, Iceland (AS49981) [+1.4s]
-[HOP 03] 84.17.44.19    -> Frankfurt, Germany (AS13335)  [+0.8s]
-[HOP 04] 104.244.42.1   -> New York, USA (Destination)   [+0.3s]
-[FLAG]   Origin Hop #1 Identified as Offshore Ingestion Point`
+      }
     },
     {
-      id: 'reports',
+      id: 'dashboard',
       stepNumber: 4,
-      badge: 'EVIDENCE VAULT • STEP 4/4',
-      badgeColor: 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)] border-[rgba(72,169,117,0.35)]',
-      title: 'Court-Admissible Dossiers & Privacy Controls',
-      subtitle: 'Exporting SHA-256 sealed reports formatted for legal and executive review.',
-      description: 'Generate comprehensive forensic incident dossiers with one click. Export multi-page printable PDFs, cryptographic PNG evidence cards, or configure GDPR/HIPAA recipient PII masking to protect sensitive employee identities.',
-      coreHighlights: [
+      badge: 'PRACTICAL STEP 4 • HOW TO MONITOR',
+      title: 'SOC Dashboard & Active Threat Feeds',
+      subtitle: 'Monitor organizational incidents and real-time security stats.',
+      practicalWhatIsIt: 'The Dashboard displays overall security statistics, active threat campaigns, and live incident updates.',
+      practicalHowToUse: 'Use the Dashboard to review threat trends, filter cases by severity, and switch between logged-in accounts.',
+      highlights: [
         {
-          title: 'Deterministic SHA-256 Evidence Seal',
-          detail: 'Cryptographic hash guarantees evidence integrity for cyber insurance, HR, or law enforcement.',
-          icon: Fingerprint,
-          tag: 'Chain of Custody'
+          feature: 'Live Incident Statistics',
+          actionableDetail: 'Tracks total analyzed emails, phishing attempts, and clean messages.',
+          icon: Activity
         },
         {
-          title: 'One-Click PDF / PNG Dossier Export',
-          detail: 'Download formatted incident reports complete with header deconstructions, hop logs, and threat verdicts.',
-          icon: FileDown,
-          tag: 'Court-Ready'
-        },
-        {
-          title: 'GDPR & HIPAA PII Sanitization',
-          detail: 'Automatically redact recipient names, private mailboxes, and corporate subdomains before exporting.',
-          icon: Scale,
-          tag: 'Compliance'
+          feature: 'User-Specific Isolation',
+          actionableDetail: 'Each logged-in account views its own private security records.',
+          icon: Shield
         }
       ],
-      quickAction: {
-        label: 'Open Forensic Report Modal',
-        icon: FileText,
+      primaryAction: {
+        label: 'Explore SOC Dashboard',
+        icon: ArrowRight,
         onClick: () => {
-          if (onOpenReportModal) onOpenReportModal();
-          handleClose();
-        },
-        secondaryLabel: 'Configure Privacy & PII',
-        secondaryAction: () => {
-          if (onOpenPrivacyModal) onOpenPrivacyModal();
-          handleClose();
+          if (onNavigateToTab) onNavigateToTab('dashboard');
+          onClose();
         }
-      },
-      forensicSecretTip: 'Pro-Tip: Click "Export as PDF" or "Export Forensic Report" in the top bar to generate your branded incident dossier.',
-      codePreviewTitle: 'Evidence Seal Attestation Header',
-      codePreviewSnippet: `[DOSSIER_GEN] Exporting Case CASE-2291...
-[INTEGRITY]  SHA-256: 7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1f...
-[COMPLIANCE] PII Masking: ACTIVE (Recipients Redacted)
-[SIGNATURE]  Enclave Operator: SOC-ANALYST-STEEL
-[STATUS]     Court-Admissible Evidence Sealed & Ready for PDF Export`
+      }
     }
   ];
 
   const currentStep = steps[currentStepIndex];
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 overflow-y-auto font-sans">
-      {/* Dark Forensic Backdrop */}
-      <div 
-        onClick={handleClose}
-        className="fixed inset-0 bg-[#080706]/90 backdrop-blur-md transition-opacity"
-      />
-
-      {/* Main Walkthrough Modal Card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="relative w-full max-w-4xl bg-[#14120f] border-2 border-[#3a352c] rounded-md shadow-[0_25px_60px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[92vh] z-10 text-[#ede6d8]"
-      >
-        {/* Top Header Bar */}
-        <div className="bg-[#100e0c] px-5 py-3.5 border-b border-[#3a352c] flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full border border-[var(--thread)] relative flex items-center justify-center shrink-0">
-              <div className="w-2.5 h-2.5 rounded-full bg-[var(--thread)] animate-pulse" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-display text-sm font-bold text-[#ede6d8]">
-                  TraceXMail Enclave Onboarding &amp; Forensic Guide
-                </span>
-                <span className="px-2 py-0.2 rounded-sm bg-[rgba(201,162,39,0.15)] text-[var(--stamp)] border border-[rgba(201,162,39,0.3)] font-mono text-[10px] font-bold">
-                  GET STARTED
-                </span>
-              </div>
-              <span className="text-[11px] text-[#8a8070] font-sans">
-                Master core workflows: Dashboard, Ingestion, Hop Tracing &amp; Forensic Reports.
-              </span>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150 select-none">
+      <div className="relative w-full max-w-2xl bg-[#12100d] border border-[#2b251d] rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.9)] p-5 sm:p-7 text-[#ede6dc] font-sans my-6">
+        
+        {/* Top Navigation & Close Header */}
+        <div className="flex items-center justify-between gap-3 pb-4 border-b border-[#29231a]">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded bg-amber-400/20 border border-amber-400/40 text-amber-400 font-mono text-[10px] font-bold uppercase tracking-wider">
+              {currentStep.badge}
+            </span>
+            <span className="text-xs text-slate-400 font-mono">
+              {currentStepIndex + 1} of {steps.length}
+            </span>
           </div>
 
           <button
-            onClick={handleClose}
-            className="w-8 h-8 rounded-sm bg-[#1a1712] border border-[#3a352c] hover:border-[#6e6454] flex items-center justify-center text-[#8a8070] hover:text-[#ede6d8] transition-colors cursor-pointer"
-            title="Close Walkthrough"
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1f1a14] transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 4 Step Progression Header Bar */}
-        <div className="bg-[#181410] border-b border-[#3a352c] px-4 py-2 flex items-center justify-between gap-2 overflow-x-auto shrink-0">
-          <div className="flex items-center gap-2 min-w-max">
-            {steps.map((st, idx) => {
-              const isCurrent = idx === currentStepIndex;
-              const isPast = idx < currentStepIndex;
-              return (
-                <button
-                  key={st.id}
-                  onClick={() => setCurrentStepIndex(idx)}
-                  className={`px-3 py-1.5 rounded-[2px] font-mono text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                    isCurrent
-                      ? 'bg-[#2b251d] text-[#ede6d8] border border-[var(--thread)] font-bold shadow-xs'
-                      : isPast
-                        ? 'bg-[#14120f] text-[var(--forensic-green)] border border-[#2e2a22] hover:border-[#4a4438]'
-                        : 'bg-[#12100d] text-[#8a8070] border border-[#28241d] hover:text-[#ede6d8]'
-                  }`}
-                >
-                  <span className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-bold ${
-                    isCurrent 
-                      ? 'bg-[var(--thread)] text-[#ede6d8]' 
-                      : isPast 
-                        ? 'bg-[rgba(72,169,117,0.2)] text-[var(--forensic-green)] border border-[var(--forensic-green)]' 
-                        : 'bg-[#24201a] text-[#8a8070]'
-                  }`}>
-                    {isPast ? '✓' : idx + 1}
-                  </span>
-                  <span>{st.id.toUpperCase()}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <span className="font-mono text-xs text-[#8a8070] hidden sm:inline">
-            Step {currentStepIndex + 1} of {steps.length}
-          </span>
-        </div>
-
-        {/* Scrollable Body Content */}
-        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
+        {/* Step Body */}
+        <div className="space-y-5 pt-4">
           
-          {/* Main Step Headline */}
           <div>
-            <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-sm font-mono text-[11px] font-bold uppercase tracking-wider mb-2 border ${currentStep.badgeColor}`}>
-              <Compass className="w-3.5 h-3.5" />
-              <span>{currentStep.badge}</span>
-            </div>
-            
-            <h2 className="font-display text-xl sm:text-2xl font-bold text-[#ede6d8] leading-tight">
+            <h3 className="font-display font-bold text-lg sm:text-xl text-white">
               {currentStep.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-[#8a8070] font-sans mt-1">
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
               {currentStep.subtitle}
             </p>
           </div>
 
-          {/* 2-Column Split: Highlights & Interactive Code Preview */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            
-            {/* Left: 3 Core Highlights (7 cols) */}
-            <div className="lg:col-span-7 space-y-3">
-              <span className="text-[11px] font-mono uppercase font-bold text-[#8a8070] tracking-wider block">
-                Key Operational Capabilities:
+          {/* Practical "What It Is" & "How To Use" Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-xl bg-[#1a1510] border border-amber-400/30 text-xs space-y-1">
+              <span className="text-[10px] font-mono uppercase text-amber-400 font-bold block">
+                💡 WHAT IT IS
               </span>
+              <p className="text-slate-200 leading-relaxed font-sans">
+                {currentStep.practicalWhatIsIt}
+              </p>
+            </div>
 
-              <div className="space-y-2.5">
-                {currentStep.coreHighlights.map((hl, hIdx) => {
-                  const Icon = hl.icon;
-                  return (
-                    <div
-                      key={hIdx}
-                      className="bg-[#181410] border border-[#2e2a22] hover:border-[#4a4438] p-3 rounded-sm transition-all flex items-start gap-3"
-                    >
-                      <div className="w-8 h-8 rounded-sm bg-[#12100d] border border-[#3a352c] flex items-center justify-center text-[var(--slate)] shrink-0 mt-0.5">
-                        <Icon className="w-4 h-4 text-[var(--slate)]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <h4 className="font-display font-semibold text-xs sm:text-sm text-[#ede6d8] truncate">
-                            {hl.title}
-                          </h4>
-                          {hl.tag && (
-                            <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-[#100e0c] border border-[#3a352c] text-[#b9af9c] shrink-0">
-                              {hl.tag}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-[#b9af9c] leading-relaxed">
-                          {hl.detail}
-                        </p>
-                      </div>
+            <div className="p-3.5 rounded-xl bg-[#151c28] border border-blue-400/30 text-xs space-y-1">
+              <span className="text-[10px] font-mono uppercase text-blue-400 font-bold block">
+                🛠️ HOW TO USE IT PRACTICALLY
+              </span>
+              <p className="text-slate-200 leading-relaxed font-sans">
+                {currentStep.practicalHowToUse}
+              </p>
+            </div>
+          </div>
+
+          {/* Highlights List */}
+          <div className="space-y-2">
+            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+              Key Practical Features:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {currentStep.highlights.map((h, i) => {
+                const Icon = h.icon;
+                return (
+                  <div key={i} className="p-2.5 rounded-lg bg-[#16130f] border border-[#29231a] text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{h.feature}</span>
                     </div>
-                  );
-                })}
-              </div>
-
-              {/* Forensic Secret Tip Box */}
-              <div className="p-3 bg-[#1c1813] border border-[#3a352c] rounded-sm text-xs text-[#ede6d8] flex items-start gap-2.5">
-                <Zap className="w-4 h-4 text-[var(--stamp)] shrink-0 mt-0.5" />
-                <div className="text-xs leading-relaxed text-[#b9af9c]">
-                  {currentStep.forensicSecretTip}
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Simulated Console Execution Output (5 cols) */}
-            <div className="lg:col-span-5 space-y-3">
-              <div className="bg-[#100e0c] border border-[#3a352c] rounded-sm p-3.5 font-mono text-xs shadow-inner">
-                <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#24201a] text-[11px] text-[#8a8070]">
-                  <span className="flex items-center gap-1.5 text-[#ede6d8] font-bold">
-                    <Terminal className="w-3.5 h-3.5 text-[var(--thread)]" />
-                    <span>{currentStep.codePreviewTitle}</span>
-                  </span>
-                  <span className="text-[10px] text-[var(--forensic-green)] font-bold">LIVE TELEMETRY</span>
-                </div>
-
-                <pre className="text-[11.5px] leading-relaxed text-[#b9af9c] whitespace-pre-wrap overflow-x-auto selection:bg-[var(--thread)]">
-                  {currentStep.codePreviewSnippet}
-                </pre>
-              </div>
-
-              {/* Quick Jump Action Card */}
-              {currentStep.quickAction && (
-                <div className="bg-[#181410] border border-[#3a352c] rounded-sm p-3 space-y-2">
-                  <span className="text-[10.5px] font-mono text-[#8a8070] uppercase font-bold block">
-                    Try this feature right now:
-                  </span>
-                  
-                  <button
-                    onClick={currentStep.quickAction.onClick}
-                    className="w-full btn-primary text-xs font-semibold py-2 px-3 flex items-center justify-center gap-2 cursor-pointer shadow-md"
-                  >
-                    <span>{currentStep.quickAction.label}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-
-                  {currentStep.quickAction.secondaryAction && currentStep.quickAction.secondaryLabel && (
-                    <button
-                      onClick={currentStep.quickAction.secondaryAction}
-                      className="w-full btn-secondary text-xs font-medium py-1.5 px-3 flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>{currentStep.quickAction.secondaryLabel}</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-          </div>
-
-          {/* Clearance Level Guide Strip (Enclave Role-Based Summary) */}
-          <div className="bg-[#100e0c] border border-[#2e2a22] rounded-sm p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            <div className="flex items-start gap-2">
-              <div className="w-2 h-2 rounded-full bg-[var(--stamp)] mt-1 shrink-0" />
-              <div>
-                <strong className="text-[var(--stamp)] font-mono text-[11px] block">GOLD (ADMIN)</strong>
-                <span className="text-[#8a8070] text-[11px]">API credentials, team management, and organization settings.</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-2 h-2 rounded-full bg-[var(--slate)] mt-1 shrink-0" />
-              <div>
-                <strong className="text-[var(--slate)] font-mono text-[11px] block">STEEL (ANALYST)</strong>
-                <span className="text-[#8a8070] text-[11px]">Header decomposition, hop tracing, and dossier exports.</span>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#ede6d8] mt-1 shrink-0" />
-              <div>
-                <strong className="text-[#ede6d8] font-mono text-[11px] block">SILVER (AUDITOR)</strong>
-                <span className="text-[#8a8070] text-[11px]">Read-only audits with automatic recipient PII masking.</span>
-              </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {h.actionableDetail}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
         </div>
 
-        {/* Modal Bottom Footer Navigation */}
-        <div className="bg-[#100e0c] px-5 py-3 border-t border-[#3a352c] flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-          
-          {/* Don't show again checkbox */}
-          <label className="flex items-center gap-2 text-xs text-[#8a8070] cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={dontShowAgain}
-              onChange={(e) => setDontShowAgain(e.target.checked)}
-              className="rounded border-[#3a352c] bg-[#1a1712] text-[var(--thread)] focus:ring-0 cursor-pointer"
-            />
-            <span>Don&apos;t show this walkthrough automatically on login</span>
-          </label>
+        {/* Footer Navigation Controls */}
+        <div className="mt-7 pt-4 border-t border-[#29231a] flex items-center justify-between gap-3">
+          <button
+            onClick={() => setCurrentStepIndex(prev => Math.max(0, prev - 1))}
+            disabled={currentStepIndex === 0}
+            className="px-3.5 py-2 rounded-xl border border-[#29231a] bg-[#16130f] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Previous</span>
+          </button>
 
-          {/* Stepper buttons */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            {currentStepIndex > 0 && (
+          <div className="flex items-center gap-2 ml-auto">
+            {currentStep.secondaryAction && (
               <button
-                onClick={() => setCurrentStepIndex(prev => prev - 1)}
-                className="btn-secondary text-xs font-semibold py-1.5 px-3.5 flex items-center gap-1.5 cursor-pointer"
+                onClick={currentStep.secondaryAction.onClick}
+                className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#1f1a14] transition-colors cursor-pointer hidden sm:block"
               >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Previous</span>
+                {currentStep.secondaryAction.label}
               </button>
             )}
 
-            {currentStepIndex < steps.length - 1 ? (
+            <button
+              onClick={currentStep.primaryAction.onClick}
+              className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+            >
+              <span>{currentStep.primaryAction.label}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+
+            {currentStepIndex < steps.length - 1 && (
               <button
-                onClick={() => setCurrentStepIndex(prev => prev + 1)}
-                className="btn-primary text-xs font-semibold py-1.5 px-4 flex items-center gap-1.5 cursor-pointer"
+                onClick={() => setCurrentStepIndex(prev => Math.min(steps.length - 1, prev + 1))}
+                className="px-3 py-2 rounded-xl bg-[#262018] hover:bg-[#332b20] border border-[#3d3428] text-amber-400 text-xs font-bold transition-all cursor-pointer"
               >
-                <span>Next Feature</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button
-                onClick={handleClose}
-                className="btn-primary text-xs font-semibold py-1.5 px-5 flex items-center gap-1.5 cursor-pointer bg-gradient-to-r from-[var(--thread)] to-[var(--stamp)] text-white"
-              >
-                <span>Complete Walkthrough &amp; Enter SOC</span>
-                <CheckCircle2 className="w-4 h-4" />
+                Next Step
               </button>
             )}
           </div>
         </div>
 
-      </motion.div>
+      </div>
     </div>
   );
 }

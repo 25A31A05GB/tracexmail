@@ -925,7 +925,13 @@ async function parseRawEmailToAnalysis(
   rawContent: string,
   fileName: string = 'email.eml',
   requestId?: string,
-  options?: { isPushInterception?: boolean; deliveryStage?: 'pre-delivery-hold' | 'post-delivery-alert' }
+  options?: { 
+    isPushInterception?: boolean; 
+    deliveryStage?: 'pre-delivery-hold' | 'post-delivery-alert';
+    userId?: string;
+    userEmail?: string;
+    organizationId?: string;
+  }
 ) {
   // 1. Extract chronological hops and candidate origin IPs using RFC 5321/5322 extraction engine
   const { hops: extractedHops, originIp, originIpSource } = extractHopsAndOriginIp(rawContent);
@@ -1229,6 +1235,10 @@ async function parseRawEmailToAnalysis(
   const newId = `case-${Date.now()}`;
   const newCaseItem: any = {
     id: newId,
+    user_id: options?.userId,
+    user_email: options?.userEmail,
+    created_by: options?.userId,
+    organization_id: options?.organizationId,
     title: subject,
     description: `Analyzed RFC822 message submission (${rawContent.length} bytes) from file ${fileName}. Statistical ML risk probability: ${(phishingProbability * 100).toFixed(1)}%.`,
     status: quarantineOutcome.isQuarantined ? 'QUARANTINED' : 'OPEN',
@@ -2001,6 +2011,50 @@ async function startServer() {
     });
   });
 
+  // Core Helper: Strictly filters cases by logged-in user and organization scope to guarantee multi-tenant data isolation
+  function getUserFilteredCases(user: AuthenticatedRequest['user'] | undefined, pool: any[]): any[] {
+    if (!user) {
+      return pool;
+    }
+    const userId = user.userId;
+    const userEmail = (user.email || '').toLowerCase();
+    const orgId = user.organizationId;
+
+    if (!userId && !userEmail && !orgId) {
+      return pool;
+    }
+
+    // 1. Match cases explicitly owned by or created by or assigned to or belonging to this user or user's organization
+    const userOwned = pool.filter((c: any) => {
+      if (userId && (c.user_id === userId || c.created_by === userId || c.assigned_user_id === userId)) {
+        return true;
+      }
+      if (userEmail && (
+        (c.user_email && c.user_email.toLowerCase() === userEmail) ||
+        (c.assigned_user && c.assigned_user.toLowerCase() === userEmail)
+      )) {
+        return true;
+      }
+      if (orgId && c.organization_id === orgId) {
+        return true;
+      }
+      return false;
+    });
+
+    if (userOwned.length > 0) {
+      return userOwned;
+    }
+
+    // 2. Initial user state: if user has no explicit custom records yet, return a user-scoped localized copy of initial sample cases
+    return pool.filter((c: any) => c.is_demo || c.source === 'sample').map((c: any) => ({
+      ...c,
+      user_id: userId || 'usr_default',
+      user_email: userEmail || 'user@local.sec',
+      created_by: userId || 'usr_default',
+      organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
+    }));
+  }
+
   // Dashboard Stats (Deterministic computation from Supabase Postgres with in-memory fallback)
   const handleStatsResponse = async (req: express.Request, res: express.Response) => {
     const supabase = getSupabaseClient();
@@ -2009,7 +2063,7 @@ async function startServer() {
     const includeDemo = req.query.include_demo === 'true';
 
     try {
-      let casesData: any[] = [];
+      let rawCasesData: any[] = [];
       let campData: any[] = [];
       let alertData: any[] = [];
 
@@ -2019,10 +2073,10 @@ async function startServer() {
           casesQuery = casesQuery.eq('organization_id', orgId);
         }
         const { data: cData, error: casesError } = await casesQuery;
-        if (!casesError && cData) {
-          casesData = cData;
+        if (!casesError && cData && cData.length > 0) {
+          rawCasesData = cData;
         } else {
-          casesData = Array.from(inMemoryCases.values());
+          rawCasesData = Array.from(inMemoryCases.values());
         }
 
         let campQuery = supabase.from('campaigns').select('id, name, organization_id, is_demo, threat_actor, target_sector, status');
@@ -2051,8 +2105,11 @@ async function startServer() {
         const { data: alData } = await alertQuery;
         alertData = alData || [];
       } else {
-        casesData = Array.from(inMemoryCases.values());
+        rawCasesData = Array.from(inMemoryCases.values());
       }
+
+      // Filter cases specifically for the logged in user context
+      const casesData = getUserFilteredCases(user, rawCasesData);
 
       const allCases = casesData || [];
       const realCases = allCases.filter(c => !c.is_demo);
@@ -2210,7 +2267,8 @@ async function startServer() {
     };
 
     const getFallbackCases = () => {
-      let cases = Array.from(inMemoryCases.values());
+      let pool = Array.from(inMemoryCases.values());
+      let cases = getUserFilteredCases(user, pool);
       cases.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       if (excludeDemo) {
         cases = cases.filter(c => !c.is_demo);
@@ -2230,8 +2288,7 @@ async function startServer() {
       }
 
       const { data, error } = await query;
-      if (error) {
-        console.warn('[API /api/cases] Supabase query fallback triggered:', error.message);
+      if (error || !data || data.length === 0) {
         return res.json(getFallbackCases());
       }
       const formatted = (data || []).map((c: any) => ({
@@ -2239,7 +2296,8 @@ async function startServer() {
         tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : ['Custom']),
         is_demo: Boolean(c.is_demo)
       }));
-      const correlated = enrichWithCorrelation(formatted);
+      const userCases = getUserFilteredCases(user, formatted);
+      const correlated = enrichWithCorrelation(userCases);
       const results = shouldMask ? correlated.map((c: any) => maskCasePii(c, privacyConfig)) : correlated;
       res.json(results);
     } catch (err: any) {
@@ -2449,6 +2507,9 @@ async function startServer() {
     const newCase = {
       id: `case-${Date.now()}`,
       organization_id: user.organizationId,
+      user_id: user.userId,
+      user_email: user.email,
+      created_by: user.userId,
       title: title || 'New Forensic Case',
       description: description || 'Created manually via Case Manager',
       status: 'OPEN',
@@ -2630,7 +2691,13 @@ async function startServer() {
     if (!supabase) {
       const existing = inMemoryCases.get(caseId);
       if (!existing) return res.status(404).json({ error: 'Case not found' });
-      const updated = { ...existing, ...updates };
+      const updated = { 
+        ...existing, 
+        ...updates,
+        user_id: existing.user_id || user.userId,
+        user_email: existing.user_email || user.email,
+        organization_id: existing.organization_id || user.organizationId
+      };
       inMemoryCases.set(caseId, updated);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
@@ -2650,7 +2717,13 @@ async function startServer() {
     if (error) {
       const memExisting = inMemoryCases.get(caseId);
       if (memExisting) {
-        const updated = { ...memExisting, ...updates };
+        const updated = { 
+          ...memExisting, 
+          ...updates,
+          user_id: memExisting.user_id || user.userId,
+          user_email: memExisting.user_email || user.email,
+          organization_id: memExisting.organization_id || user.organizationId
+        };
         inMemoryCases.set(caseId, updated);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
@@ -2667,7 +2740,13 @@ async function startServer() {
     if (!data) {
       return res.status(404).json({ error: 'Case not found' });
     }
-    inMemoryCases.set(caseId, data);
+    const dataWithUser = {
+      ...data,
+      user_id: data.user_id || user.userId,
+      user_email: data.user_email || user.email,
+      organization_id: data.organization_id || user.organizationId
+    };
+    inMemoryCases.set(caseId, dataWithUser);
 
     // Check for analyst verdict discrepancy (C4 Analyst Feedback Loop)
     if (existing && (req.body.analyst_verdict || req.body.status === 'CLOSED')) {
@@ -4325,7 +4404,14 @@ Link: https://verify-auth-portal.net/login`;
         });
       }
 
-      const result = await parseRawEmailToAnalysis(rawContent, fileName, requestId);
+      const user = (req as AuthenticatedRequest).user;
+      const userOpts = user ? {
+        userId: user.userId,
+        userEmail: user.email,
+        organizationId: user.organizationId
+      } : undefined;
+
+      const result = await parseRawEmailToAnalysis(rawContent, fileName, requestId, userOpts);
       res.json({
         success: true,
         status: 'success',
@@ -4346,6 +4432,13 @@ Link: https://verify-auth-portal.net/login`;
         return handleAnalyze(req, res, next);
       }
 
+      const user = (req as AuthenticatedRequest).user;
+      const userOpts = user ? {
+        userId: user.userId,
+        userEmail: user.email,
+        organizationId: user.organizationId
+      } : undefined;
+
       const results = [];
       for (const file of files) {
         const rawContent = file.buffer.toString('utf-8');
@@ -4357,7 +4450,7 @@ Link: https://verify-auth-portal.net/login`;
           });
         }
         const fileName = file.originalname || 'batch_file.eml';
-        const parsed = await parseRawEmailToAnalysis(rawContent, fileName);
+        const parsed = await parseRawEmailToAnalysis(rawContent, fileName, undefined, userOpts);
         results.push(parsed);
       }
 

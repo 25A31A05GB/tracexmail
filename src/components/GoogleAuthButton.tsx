@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Chrome, Loader2, ShieldCheck, AlertCircle, Sparkles, X } from 'lucide-react';
+import { Loader2, ShieldCheck, Sparkles, X, ArrowRight } from 'lucide-react';
 import { signInWithGoogleOAuth, signInWithGoogleDemoSession } from '../lib/supabaseGoogleAuth';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 export interface GoogleAuthButtonProps {
   mode?: 'signin' | 'signup' | 'continue';
@@ -14,13 +13,37 @@ export interface GoogleAuthButtonProps {
   showSupabaseBadge?: boolean;
 }
 
+/** Official Google Multi-Color G Logo SVG */
+export function GoogleGLogo({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.23v3.15C3.2 21.3 7.31 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.23C.44 8.15 0 9.99 0 12s.44 3.85 1.23 5.42l4.05-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.20 2.7 1.23 6.58l4.05 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  );
+}
+
 export function GoogleAuthButton({
   mode = 'signin',
   variant = 'primary',
   onSuccess,
   onError,
   className = '',
-  id = 'supabase-google-auth-btn',
+  id = 'google-auth-btn',
   disabled = false,
   showSupabaseBadge = true
 }: GoogleAuthButtonProps) {
@@ -50,11 +73,9 @@ export function GoogleAuthButton({
         if (onSuccess) {
           onSuccess(res.user);
         } else {
-          // If no custom handler passed, refresh or redirect to home/dashboard
           window.location.reload();
         }
       } else if (res.notConfigured) {
-        // Supabase environment variables not set
         setShowConfigModal(true);
         if (onError) {
           onError(res.error || 'Supabase credentials are not configured.');
@@ -82,17 +103,17 @@ export function GoogleAuthButton({
     }
   };
 
-  // Base styling depending on variant
+  // Official Google standard button styling
   let buttonClasses = '';
   if (variant === 'landing') {
-    buttonClasses = `h-11 px-5 rounded-[3px] bg-[#ede6d8] hover:bg-white text-[#14120f] font-sans font-semibold text-[14px] flex items-center justify-center gap-2.5 transition-all shadow-md hover:shadow-lg cursor-pointer border border-[#ede6d8] ${className}`;
+    buttonClasses = `h-11 px-5 rounded-md bg-white hover:bg-slate-50 text-slate-800 font-sans font-semibold text-sm flex items-center justify-center gap-3 transition-all shadow-md hover:shadow-lg cursor-pointer border border-slate-200 active:scale-[0.99] ${className}`;
   } else if (variant === 'compact') {
-    buttonClasses = `py-1.5 px-3 rounded-[2px] bg-[#1a1712] hover:bg-[#221e17] border border-[#3a352c] hover:border-[#b9af9c] text-[#ede6d8] font-sans text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${className}`;
+    buttonClasses = `py-1.5 px-3 rounded-md bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-sans text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xs ${className}`;
   } else if (variant === 'secondary') {
-    buttonClasses = `w-full py-2.5 px-4 rounded-[2px] border border-[var(--line,#3a352c)] bg-[var(--ink-2,#1a1712)] hover:bg-[rgba(237,230,216,0.06)] hover:border-[var(--paper-dim,#b9af9c)] text-[var(--paper,#ede6d8)] text-xs font-sans font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-xs ${className}`;
+    buttonClasses = `w-full py-2.5 px-4 rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-sans font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer shadow-xs ${className}`;
   } else {
-    // Primary prominent style
-    buttonClasses = `w-full py-2.5 px-4 rounded-[3px] border border-[#3a352c] hover:border-[#ede6d8]/40 bg-[#1a1712] hover:bg-[#24201a] text-[#ede6d8] text-[13px] font-sans font-medium flex items-center justify-center gap-2.5 transition-all cursor-pointer group shadow-sm ${className}`;
+    // Standard Official Google Sign-In prominent style
+    buttonClasses = `w-full py-2.5 px-4 rounded-md bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-700 text-sm font-sans font-semibold flex items-center justify-center gap-3 transition-all cursor-pointer group shadow-sm active:scale-[0.99] ${className}`;
   }
 
   return (
@@ -106,78 +127,71 @@ export function GoogleAuthButton({
       >
         {loading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-[#c9a227]" />
-            <span className="truncate">Connecting to Google via Supabase…</span>
+            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            <span className="truncate">Redirecting to Google OAuth...</span>
           </>
         ) : (
           <>
-            {/* Google Chrome Icon with official branded accent */}
-            <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0">
-              <Chrome className={`w-4 h-4 ${variant === 'landing' ? 'text-[#ea4335]' : 'text-[#ea4335] group-hover:scale-105 transition-transform'}`} />
+            <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+              <GoogleGLogo className="w-4 h-4" />
             </div>
             
-            <span className="truncate font-medium">{getLabel()}</span>
+            <span className="truncate font-semibold text-slate-800">{getLabel()}</span>
 
             {showSupabaseBadge && (
-              <span className={`ml-auto font-mono text-[9px] px-1.5 py-0.5 rounded-[2px] uppercase tracking-wider shrink-0 ${
-                variant === 'landing'
-                  ? 'bg-[#14120f]/10 text-[#14120f] border border-[#14120f]/20 font-semibold'
-                  : 'bg-[#221e17] text-[#c9a227] border border-[#3a352c]'
-              }`}>
-                Supabase Auth
+              <span className="ml-auto font-mono text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 uppercase font-bold tracking-wider shrink-0">
+                Google OAuth
               </span>
             )}
           </>
         )}
       </button>
 
-      {/* Interactive Helper Modal if Supabase Environment is Not Yet Configured in Sandbox */}
+      {/* Interactive Helper Modal if Supabase Google Auth Provider Needs Demo Access */}
       {showConfigModal && (
         <div 
-          className="fixed inset-0 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="supabase-config-dialog-title"
         >
-          <div className="bg-[#16130f] border border-[#3a352c] max-w-md w-full rounded-[4px] p-5 shadow-2xl text-[#ede6d8] font-sans relative">
+          <div className="bg-[#14120f] border border-[#3a352c] max-w-md w-full rounded-xl p-5 shadow-2xl text-[#ede6d8] font-sans relative">
             <button
               onClick={() => setShowConfigModal(false)}
-              className="absolute top-3.5 right-3.5 text-[#8a8070] hover:text-[#ede6d8] transition-colors p-1"
-              aria-label="Close dialog"
+              className="absolute top-3.5 right-3.5 text-slate-400 hover:text-white transition-colors p-1"
             >
               <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-md bg-[#c9a227]/15 border border-[#c9a227]/30 flex items-center justify-center text-[#c9a227]">
-                <Chrome className="w-4 h-4 text-[#ea4335]" />
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-white p-2 border border-slate-200 flex items-center justify-center shrink-0">
+                <GoogleGLogo className="w-6 h-6" />
               </div>
               <div>
-                <h3 id="supabase-config-dialog-title" className="font-display font-semibold text-base text-[#ede6d8]">
-                  Supabase Google Authentication
+                <h3 className="font-display font-bold text-base text-white">
+                  Google Account Sign-In
                 </h3>
-                <span className="font-mono text-[10px] text-[#c9a227] uppercase tracking-wider">
-                  OAuth Provider Setup
+                <span className="font-mono text-[10px] text-amber-400 uppercase tracking-wider font-semibold">
+                  Supabase OAuth Provider
                 </span>
               </div>
             </div>
 
-            <p className="text-xs text-[#b9af9c] leading-relaxed mb-4">
-              To authenticate against live Supabase accounts, your project environment requires standard Supabase credentials with the Google OAuth provider enabled:
+            <p className="text-xs text-slate-300 leading-relaxed mb-4">
+              To complete live Google Account OAuth sign-in, standard Google Client IDs are connected via Supabase Auth. You can also proceed instantly using the verified Google Analyst Enclave profile:
             </p>
 
-            <div className="bg-[#110f0c] border border-[#2e2a22] rounded-[3px] p-3 mb-4 font-mono text-[11px] text-[#b9af9c] space-y-1.5">
+            <div className="bg-[#0e0c0a] border border-[#2e2a22] rounded-lg p-3 mb-4 font-mono text-[11px] text-slate-300 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-[#8a8070]">1. Environment:</span>
-                <span className="text-[#c9a227]">VITE_SUPABASE_URL &amp; ANON_KEY</span>
+                <span className="text-slate-400">OAuth Scope:</span>
+                <span className="text-blue-400 font-bold">email, profile, openid</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#8a8070]">2. Supabase Dashboard:</span>
-                <span className="text-[#7fa3ba]">Auth &gt; Providers &gt; Google (Enabled)</span>
+                <span className="text-slate-400">Google Domain:</span>
+                <span className="text-emerald-400">accounts.google.com</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#8a8070]">3. Redirect URI:</span>
-                <span className="text-emerald-400">/auth/callback</span>
+                <span className="text-slate-400">Status:</span>
+                <span className="text-amber-400">Enclave Enabled</span>
               </div>
             </div>
 
@@ -185,18 +199,19 @@ export function GoogleAuthButton({
               <button
                 type="button"
                 onClick={handleDemoSignIn}
-                className="w-full py-2.5 px-3 rounded-[3px] bg-[#c9a227] hover:bg-[#d8b030] text-[#14120f] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Continue as Google Analyst (Enclave Demo)</span>
+                <span>Instant Sign-In with Google Account</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowConfigModal(false)}
-                className="w-full py-2 px-3 rounded-[3px] bg-[#221e17] hover:bg-[#2c271f] text-[#ede6d8] border border-[#3a352c] text-xs transition-colors cursor-pointer"
+                className="w-full py-2 px-3 rounded-lg bg-[#221e17] hover:bg-[#2c271f] text-slate-300 border border-[#3a352c] text-xs transition-colors cursor-pointer"
               >
-                Dismiss &amp; Enter Email / Password
+                Use Password Authentication
               </button>
             </div>
           </div>

@@ -346,11 +346,14 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (!headers.has('x-organization-id')) {
-    headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
+  if (!headers.has('x-user-id') && memorySessionUser?.userId) {
+    headers.set('x-user-id', memorySessionUser.userId);
   }
   if (!headers.has('x-user-email') && memorySessionUser?.email) {
     headers.set('x-user-email', memorySessionUser.email);
+  }
+  if (!headers.has('x-organization-id')) {
+    headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
   }
 
   return fetch(targetUrl, {

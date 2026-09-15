@@ -77,6 +77,7 @@ export function IngestionPipelineView({
     fallbackAvailable: boolean;
   } | null>(null);
 
+  const [pipelineStartTime, setPipelineStartTime] = useState<number | undefined>(undefined);
   const pendingAnalysisRef = useRef<EmailAnalysis | null>(null);
   const scanAnimationFinishedRef = useRef<boolean>(false);
 
@@ -142,12 +143,14 @@ export function IngestionPipelineView({
     setIsScanning(true);
     setIsPendingBackend(true);
     setElapsedMs(0);
+    const startNow = performance.now();
+    setPipelineStartTime(startNow);
     setBackendStage('1/4 Transmitting payload to /api/v1/analyze endpoint...');
 
     addLog(`[INGEST] Loaded payload '${name}' (${content.length} bytes). Starting multi-stage telemetry scan...`);
 
     // Live execution timer interval
-    const startTime = performance.now();
+    const startTime = startNow;
     const timerInterval = setInterval(() => {
       const currentElapsed = Math.round(performance.now() - startTime);
       setElapsedMs(currentElapsed);
@@ -347,6 +350,7 @@ export function IngestionPipelineView({
           filename={fileName}
           rawSnippet={rawText}
           analysis={pendingAnalysis}
+          startTimeMs={pipelineStartTime}
           onComplete={handleScanAnimationComplete}
         />
       )}

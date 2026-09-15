@@ -188,7 +188,10 @@ export function useSession(): UseSessionReturn {
 
     const role: UserRole = (prof?.role as UserRole) || (currentUser.email === 'arfathof@gmail.com' || currentUser.user_metadata?.role === 'admin' ? 'admin' : ((currentUser.user_metadata?.role as UserRole) || 'analyst'));
     
-    const organizationId = prof?.organization_id || 'org_acme_soc_01';
+    const defaultUserOrg = `org_${currentUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const organizationId = prof?.organization_id && prof.organization_id !== 'org_acme_soc_01'
+      ? prof.organization_id
+      : defaultUserOrg;
 
     const sessionUser: SessionUser = {
       userId: currentUser.id,
@@ -380,9 +383,11 @@ export function useSession(): UseSessionReturn {
     const orgName = options.orgName || (options.accountType === 'personal' ? 'Personal Sandbox' : 'Acme Cyber Defense SOC');
     const accountType: AccountType = options.accountType || (newRole === 'admin' ? 'organization' : 'organization');
 
+    const userOrgId = `org_${userId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
     const localProf: UserProfile = {
       id: userId,
-      organization_id: accountType === 'personal' ? 'org_personal_user' : 'org_acme_soc_01',
+      organization_id: userOrgId,
       role: newRole,
       full_name: fullName,
       email,
@@ -425,7 +430,7 @@ export function useSession(): UseSessionReturn {
     const sessionUser: SessionUser = {
       userId,
       email,
-      organizationId: accountType === 'personal' ? 'org_personal_user' : 'org_acme_soc_01',
+      organizationId: userOrgId,
       role: newRole,
       label: fullName,
       authMethod: 'enclave_token'

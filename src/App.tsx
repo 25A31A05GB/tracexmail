@@ -210,20 +210,15 @@ export default function App() {
 
     async function fetchLatestSupabaseCase() {
       try {
-        if (isSupabaseConfigured) {
-          const { data, error } = await supabase
-            .from('cases')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (!error && data && data.length > 0 && isMounted) {
-            const mapped = mapBackendCaseToAnalysis(data[0]);
+        const cases = await forensicApi.getCases({ exclude_demo: false });
+        if (cases && cases.length > 0 && isMounted) {
+          const mapped = mapBackendCaseToAnalysis(cases[0]);
+          if (mapped) {
             setCurrentAnalysis(mapped);
           }
         }
       } catch (err) {
-        console.debug('[App] Supabase case sync fallback:', err);
+        console.debug('[App] Case sync fallback:', err);
       }
     }
 

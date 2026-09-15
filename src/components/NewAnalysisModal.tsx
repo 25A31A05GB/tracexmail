@@ -33,6 +33,7 @@ export function NewAnalysisModal({
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
+  const [pipelineStartTime, setPipelineStartTime] = useState<number | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingAnalysisRef = useRef<EmailAnalysis | null>(null);
   const scanAnimationFinishedRef = useRef<boolean>(false);
@@ -43,6 +44,7 @@ export function NewAnalysisModal({
     setError(null);
     setFileName(name);
     setIsScanning(true);
+    setPipelineStartTime(performance.now());
 
     try {
       let parsedResult: EmailAnalysis | null = null;
@@ -144,6 +146,7 @@ export function NewAnalysisModal({
           filename={fileName}
           rawSnippet={pastedRaw}
           analysis={pendingAnalysis}
+          startTimeMs={pipelineStartTime}
           onComplete={handleScanAnimationComplete}
         />
       )}
