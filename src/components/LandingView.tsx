@@ -1,15 +1,60 @@
 import React, { useState } from 'react';
-import { Menu, X, Terminal, ArrowUpRight, Layers, Globe, ShieldAlert, CheckCircle2, ArrowRight, Upload, Zap, FileSearch, Route, ShieldCheck, Sparkles, Box } from 'lucide-react';
+import {
+  Menu,
+  X,
+  Terminal,
+  ArrowUpRight,
+  Layers,
+  ShieldAlert,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Upload,
+  Zap,
+  Route,
+  ShieldCheck,
+  Sparkles,
+  Mail,
+  Server,
+  Network,
+  Shield,
+  Lock,
+  Activity,
+  Box,
+  Eye,
+  FileSearch,
+  ExternalLink,
+  Users,
+  Compass,
+  AlertTriangle,
+  Scale,
+  FileText,
+  Binary,
+  Fingerprint,
+  Globe,
+  Cpu,
+  AlertOctagon,
+  Type,
+  Check
+} from 'lucide-react';
 import { SAMPLE_ANALYSES } from '../data/samples';
 import { EmailAnalysis } from '../types';
 import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
-import { HeroForensicNexus3D } from './landing/HeroForensicNexus3D';
-import { ForensicRouteDissector } from './landing/ForensicRouteDissector';
-import { HeaderXRayInspector } from './landing/HeaderXRayInspector';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
-import { GlobalDeconstructionEngine } from './landing/GlobalDeconstructionEngine';
-import { CompleteProject3DShowcase } from './3d';
+import { FullForensicArchitecture3D } from './3d/FullForensicArchitecture3D';
+
+export type LandingFontPreset = 
+  | 'ibm' 
+  | 'plus-jakarta' 
+  | 'sora' 
+  | 'jetbrains' 
+  | 'serif'
+  | 'outfit'
+  | 'manrope'
+  | 'dm-sans'
+  | 'space-grotesk'
+  | 'playfair';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -26,7 +71,94 @@ export function LandingView({
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
-  const [heroMode, setHeroMode] = useState<'3d' | 'board'>('board');
+  const [activeChallengeIdx, setActiveChallengeIdx] = useState<number>(0);
+  const [selectedFont, setSelectedFont] = useState<LandingFontPreset>('ibm');
+  const [fontMenuOpen, setFontMenuOpen] = useState<boolean>(false);
+
+  const fontOptions: { id: LandingFontPreset; name: string; headingClass: string; bodyClass: string; desc: string; category: string }[] = [
+    {
+      id: 'ibm',
+      name: 'IBM Plex & Fraunces (Forensic Default)',
+      headingClass: 'font-[\'Fraunces\',serif]',
+      bodyClass: 'font-[\'IBM_Plex_Sans\',-apple-system,sans-serif]',
+      desc: 'Editorial serif headings + technical IBM body',
+      category: 'Forensics & Legal'
+    },
+    {
+      id: 'plus-jakarta',
+      name: 'Plus Jakarta Sans (Modern Clean SaaS)',
+      headingClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif] font-bold tracking-tight',
+      bodyClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif]',
+      desc: 'Crisp geometric modern look (like Linear/Stripe)',
+      category: 'Modern SaaS'
+    },
+    {
+      id: 'sora',
+      name: 'Sora & Inter (Cyber Security / SOC)',
+      headingClass: 'font-[\'Sora\',sans-serif] font-bold tracking-tight',
+      bodyClass: 'font-[\'Inter\',sans-serif]',
+      desc: 'High-tech tactical SOC analyst aesthetic',
+      category: 'Cyber Security'
+    },
+    {
+      id: 'outfit',
+      name: 'Outfit & Urbanist (Ultra Modern Minimalist)',
+      headingClass: 'font-[\'Outfit\',sans-serif] font-semibold tracking-tight',
+      bodyClass: 'font-[\'Urbanist\',sans-serif]',
+      desc: 'Sophisticated clean geometry with great negative space',
+      category: 'Minimalist'
+    },
+    {
+      id: 'manrope',
+      name: 'Manrope & Inter (Fintech & Enterprise)',
+      headingClass: 'font-[\'Manrope\',sans-serif] font-bold tracking-tight',
+      bodyClass: 'font-[\'Inter\',sans-serif]',
+      desc: 'Corporate enterprise security standard',
+      category: 'Enterprise'
+    },
+    {
+      id: 'dm-sans',
+      name: 'DM Sans (Editorial Product)',
+      headingClass: 'font-[\'DM_Sans\',sans-serif] font-bold tracking-tight',
+      bodyClass: 'font-[\'DM_Sans\',sans-serif]',
+      desc: 'Warm neutral modern sans, highly legible at all sizes',
+      category: 'Modern SaaS'
+    },
+    {
+      id: 'space-grotesk',
+      name: 'Space Grotesk & Plex (Tech Brutalism)',
+      headingClass: 'font-[\'Space_Grotesk\',sans-serif] font-bold',
+      bodyClass: 'font-[\'IBM_Plex_Sans\',sans-serif]',
+      desc: 'Sharp technical angles with cyber telemetry vibe',
+      category: 'Cyber Security'
+    },
+    {
+      id: 'jetbrains',
+      name: 'JetBrains Mono (Technical Command Center)',
+      headingClass: 'font-[\'JetBrains_Mono\',monospace] font-bold',
+      bodyClass: 'font-[\'JetBrains_Mono\',monospace]',
+      desc: 'Full monospace hacker and terminal telemetry feel',
+      category: 'Developer & SOC'
+    },
+    {
+      id: 'serif',
+      name: 'Source Serif 4 (Academic NIST Standard)',
+      headingClass: 'font-[\'Source_Serif_4\',serif] font-semibold',
+      bodyClass: 'font-[\'IBM_Plex_Sans\',sans-serif]',
+      desc: 'Court-admissible NIST investigation layout',
+      category: 'Forensics & Legal'
+    },
+    {
+      id: 'playfair',
+      name: 'Playfair & Plus Jakarta (Luxury Security)',
+      headingClass: 'font-[\'Playfair_Display\',serif] font-bold italic',
+      bodyClass: 'font-[\'Plus_Jakarta_Sans\',sans-serif]',
+      desc: 'High-end luxury editorial with modern clean body',
+      category: 'Editorial Luxury'
+    }
+  ];
+
+  const currentFont = fontOptions.find(f => f.id === selectedFont) || fontOptions[0];
 
   const sampleCases = [
     {
@@ -48,9 +180,9 @@ export function LandingView({
       index: 1,
       name: SAMPLE_ANALYSES[1]?.name || 'Nazario Phish: CitiBank Wire Transfer Authorization',
       corpus: 'Nazario Corpus',
-      verdict: SAMPLE_ANALYSES[1]?.verdict || 'CRITICAL BEC / MALWARE',
-      threatScore: SAMPLE_ANALYSES[1]?.riskScore ?? 95,
-      subject: SAMPLE_ANALYSES[1]?.headers?.subject || 'Action Required: Pending Wire Transfer of $48,200.00',
+      verdict: SAMPLE_ANALYSES[1]?.verdict || 'MALICIOUS PHISH',
+      threatScore: SAMPLE_ANALYSES[1]?.riskScore ?? 99,
+      subject: SAMPLE_ANALYSES[1]?.headers?.subject || 'Action Required: Pending Wire Transfer of $48,200.00 Ref #CT-88902',
       signals: [
         'SPF softfail with bulletproof relay origin (194.26.29.112, AlexHost Moldova)',
         'Disguised .pdf.exe attachment harboring AsyncRAT binary executable payload',
@@ -62,15 +194,54 @@ export function LandingView({
       index: 2,
       name: SAMPLE_ANALYSES[2]?.name || 'Legitimate: GitHub Security Alert',
       corpus: 'Enterprise Traffic',
-      verdict: SAMPLE_ANALYSES[2]?.verdict || 'CLEAN',
-      threatScore: SAMPLE_ANALYSES[2]?.riskScore ?? 4,
-      subject: SAMPLE_ANALYSES[2]?.headers?.subject || '[GitHub] A personal access token has been generated',
+      verdict: SAMPLE_ANALYSES[2]?.verdict || 'LEGITIMATE',
+      threatScore: SAMPLE_ANALYSES[2]?.riskScore ?? 2,
+      subject: SAMPLE_ANALYSES[2]?.headers?.subject || '[GitHub] A personal access token has been generated on your account',
       signals: [
         'Cryptographic SPF Pass (192.30.252.204) + valid 2048-bit RSA DKIM Pass',
         'Full DMARC alignment verified against authentic GitHub CIDR block',
       ],
       originHint: 'GitHub CIDR • AS36459',
     },
+  ];
+
+  const teamMembers = [
+    {
+      agentId: 'AGENT-01',
+      name: 'Jayaram Sappa',
+      role: 'System Design',
+      dotColor: 'bg-[#b23a2e]',
+    },
+    {
+      agentId: 'AGENT-02',
+      name: 'Vennela Obilisetti',
+      role: 'Threat Intelligence',
+      dotColor: 'bg-[#c9a227]',
+    },
+    {
+      agentId: 'AGENT-03',
+      name: 'Katari Pavan Sai Krishna',
+      role: 'Machine Learning',
+      dotColor: 'bg-[#60a5fa]',
+    },
+    {
+      agentId: 'AGENT-04',
+      name: 'Eeli Hema Venkata Lalitha',
+      role: 'Digital Forensics',
+      dotColor: 'bg-[#b23a2e]',
+    },
+    {
+      agentId: 'AGENT-05',
+      name: 'Sairam Saladi',
+      role: 'Database & Storage',
+      dotColor: 'bg-[#c9a227]',
+    },
+    {
+      agentId: 'AGENT-06',
+      name: 'Penugonda Mounika',
+      role: 'Frontend Engineering',
+      dotColor: 'bg-[#60a5fa]',
+    }
   ];
 
   const scrollToSection = (id: string) => {
@@ -93,67 +264,118 @@ export function LandingView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',-apple-system,BlinkMacSystemFont,sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
+    <div className={`w-full min-h-screen bg-[#14120f] text-[#ede6d8] ${currentFont.bodyClass} text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0`}>
       
-      <div id="top" />
-
-      {/* Navigation */}
+      {/* Top Header Navigation */}
       <nav className="sticky top-0 z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core - Click to open Console" />
-            <span className="font-['Fraunces',serif] text-[18px] sm:text-[19px] font-semibold text-[#ede6d8]">
+          <div className="flex items-center gap-3">
+            <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core" />
+            <span className="font-['Fraunces',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8]">
               TraceXMail
             </span>
-            <span className="hidden sm:inline-block font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] tracking-wide ml-1">
-              CASE-XM-01
-            </span>
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] bg-[#1f1a14] border border-[#3a352c] text-[11px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+              <span>CASE-XM-01</span>
+            </div>
           </div>
 
-          <div className="hidden lg:flex items-center gap-8 text-[14.5px]">
-            <button onClick={() => scrollToSection('project-3d-showcase')} className="text-[#ede6d8] hover:text-[#ff8d7d] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5 font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
+          {/* Desktop Nav Items */}
+          <div className="hidden lg:flex items-center gap-6 text-[13.5px]">
+            <button onClick={() => scrollToSection('telemetry-feed')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Live Feed
+            </button>
+            <button onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Why TraceXMail
+            </button>
+            <button onClick={() => scrollToSection('full-architecture-3d')} className="text-[#ede6d8] hover:text-[#c9a227] font-semibold transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227]" />
               <span>3D Architecture</span>
             </button>
-            <button onClick={() => scrollToSection('evidence-chain')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1.5">
-              <Route className="w-3.5 h-3.5 text-[#c9a227]" />
-              <span>Evidence Route</span>
+            <button onClick={() => scrollToSection('corpus-proof')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Corpus Proof
             </button>
-            <button onClick={() => scrollToSection('pipeline')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              How it works
+            <button onClick={() => scrollToSection('how-it-works')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              SOP Workflow
             </button>
-            <button onClick={() => scrollToSection('case-studies')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              Case studies
-            </button>
-            <button onClick={() => scrollToSection('product')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              Product
+            <button onClick={() => scrollToSection('workstation')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Workstation
             </button>
             <button onClick={() => scrollToSection('exhibits')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              Under the hood
+              Engineering
             </button>
-            <button onClick={() => scrollToSection('roles')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              For your team
-            </button>
-            <button onClick={() => scrollToSection('pricing')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
-              Pricing
+            <button onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+              Team
             </button>
             <button onClick={() => scrollToSection('faq')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               FAQ
             </button>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3.5">
+            {/* Interactive Font Selector Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setFontMenuOpen(!fontMenuOpen)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[3px] bg-[#1a1712] border border-[#3a352c] text-[#c9a227] hover:border-[#c9a227] text-xs font-mono transition-colors cursor-pointer"
+                title="Change landing page typography style"
+              >
+                <Type className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline font-semibold">Font:</span>
+                <span className="text-[#ede6d8] truncate max-w-[100px] sm:max-w-[140px]">{currentFont.name.split(' ')[0]}</span>
+              </button>
+
+              {fontMenuOpen && (
+                <div className="absolute right-0 mt-2 w-72 sm:w-84 bg-[#16130f] border border-[#3a352c] rounded-[4px] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 max-h-[480px] overflow-y-auto">
+                  <div className="px-2 py-1.5 border-b border-[#3a352c]/60 text-[11px] font-mono text-[#8e8574] uppercase tracking-wider flex items-center justify-between sticky top-0 bg-[#16130f] z-10">
+                    <span>Select Page Typography</span>
+                    <span className="text-[#c9a227] font-bold">10 Presets</span>
+                  </div>
+                  <div className="py-1 space-y-1">
+                    {fontOptions.map((opt) => {
+                      const isSelected = selectedFont === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => {
+                            setSelectedFont(opt.id);
+                            setFontMenuOpen(false);
+                          }}
+                          className={`w-full text-left p-2 rounded-[3px] transition-colors cursor-pointer flex items-start justify-between ${
+                            isSelected
+                              ? 'bg-[#221e17] border border-[#c9a227]/60 text-[#ede6d8]'
+                              : 'hover:bg-[#1d1914] text-[#b9af9c] hover:text-[#ede6d8] border border-transparent'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-semibold text-xs text-[#ede6d8] flex items-center gap-1.5">
+                              <span>{opt.name}</span>
+                            </div>
+                            <div className="text-[11px] text-[#8e8574] mt-0.5 font-mono">
+                              {opt.desc}
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-[#c9a227] shrink-0 mt-0.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={onOpenConsole}
-              className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] sm:text-[14.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
+              className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
             >
               Sign in
             </button>
             <button
               onClick={onOpenConsole}
-              className="hidden sm:inline-block bg-[#ede6d8] hover:bg-white text-[#14120f] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-colors cursor-pointer shadow-sm"
+              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
             >
-              Open Console (Free)
+              <span>Open Console (Free)</span>
+              <ArrowRight className="w-3.5 h-3.5 hidden sm:inline" />
             </button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -167,284 +389,625 @@ export function LandingView({
 
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-4 flex flex-col gap-2">
+          <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-3 flex flex-col gap-2">
             <button
-              onClick={() => { scrollToSection('project-3d-showcase'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-semibold flex items-center gap-2 text-[#c9a227]"
+              onClick={() => { scrollToSection('telemetry-feed'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              <Sparkles className="w-4 h-4 text-[#c9a227]" />
-              <span>3D Architecture</span>
+              Live Telemetry Feed
             </button>
             <button
-              onClick={() => { scrollToSection('evidence-chain'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium flex items-center gap-2 text-[#ff8d7d]"
+              onClick={() => { scrollToSection('challenges-solution'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              <Route className="w-4 h-4 text-[#c9a227]" />
-              <span>Evidence Route</span>
+              Why TraceXMail (Challenges &amp; Solution)
             </button>
             <button
-              onClick={() => { scrollToSection('pipeline'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              onClick={() => { scrollToSection('full-architecture-3d'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] flex items-center gap-2"
             >
-              How it works
+              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227]" />
+              <span>3D Forensic Architecture</span>
             </button>
             <button
-              onClick={() => { scrollToSection('case-studies'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              onClick={() => { scrollToSection('corpus-proof'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              Case studies
+              Corpus Proof
             </button>
             <button
-              onClick={() => { scrollToSection('product'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              onClick={() => { scrollToSection('how-it-works'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              Product
+              SOP Workflow
+            </button>
+            <button
+              onClick={() => { scrollToSection('workstation'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
+            >
+              Analyst Workstation
             </button>
             <button
               onClick={() => { scrollToSection('exhibits'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              Under the hood
+              Core Engineering
             </button>
             <button
-              onClick={() => { scrollToSection('pricing'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              onClick={() => { scrollToSection('team'); setMobileMenuOpen(false); }}
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
-              Pricing
+              Team &amp; Creators
             </button>
             <button
               onClick={() => { scrollToSection('faq'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] font-medium"
+              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
               FAQ
             </button>
-            <div className="pt-3 border-t border-[#3a352c] flex flex-col gap-2">
+            <div className="pt-2 border-t border-[#3a352c]">
               <button
                 onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
                 className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
               >
-                Launch Free Analyst Console
+                Launch Forensic Console
               </button>
             </div>
           </div>
         )}
       </nav>
 
+      {/* Live Typography Showcase & Selection Grid */}
+      <section className="py-12 sm:py-16 border-b border-[#3a352c] bg-[#100e0c]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#1a1712] border border-[#3a352c] text-[#c9a227] font-mono text-[11px] mb-2 uppercase">
+                <Type className="w-3.5 h-3.5" />
+                <span>Live Typography Suite</span>
+              </div>
+              <h2 className={`${currentFont.headingClass} text-[26px] sm:text-[34px] font-medium text-[#ede6d8] leading-tight`}>
+                Choose your reading experience
+              </h2>
+              <p className="text-[#b9af9c] mt-1 text-[14.5px]">
+                Click any option below to instantly change the entire page’s headings, body text, and UI density.
+              </p>
+            </div>
+            <div className="shrink-0 font-mono text-xs text-[#8e8574]">
+              Active: <span className="text-[#c9a227] font-bold">{currentFont.name}</span>
+            </div>
+          </div>
+
+          {/* 5 Live Rendered Font Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {fontOptions.map((opt, idx) => {
+              const isSelected = selectedFont === opt.id;
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => setSelectedFont(opt.id)}
+                  className={`p-5 rounded-[4px] border transition-all cursor-pointer flex flex-col justify-between relative group ${
+                    isSelected
+                      ? 'bg-[#1b1712] border-[#c9a227] ring-1 ring-[#c9a227]/40 shadow-xl'
+                      : 'bg-[#15130f] border-[#3a352c] hover:border-[#8e8574] hover:bg-[#1a1712]'
+                  }`}
+                >
+                  <div>
+                    {/* Header with Option Number, Category, and Select Indicator */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-[2px] bg-[#221e17] border border-[#3a352c] font-mono text-[10.5px] font-bold text-[#c9a227]">
+                          OPTION 0{idx + 1}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-[2px] bg-[#1a1712] border border-[#3a352c]/60 font-mono text-[9.5px] text-[#8e8574]">
+                          {opt.category}
+                        </span>
+                      </div>
+                      <span className={`text-xs font-mono font-semibold flex items-center gap-1 ${
+                        isSelected ? 'text-[#c9a227]' : 'text-[#8e8574] group-hover:text-[#ede6d8]'
+                      }`}>
+                        {isSelected ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>APPLIED</span>
+                          </>
+                        ) : (
+                          <span>CLICK TO APPLY</span>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Font Family Name */}
+                    <h3 className="font-mono text-[13px] font-bold text-[#ede6d8] mb-1">
+                      {opt.name}
+                    </h3>
+                    <p className="text-[12px] font-mono text-[#8e8574] mb-4">
+                      {opt.desc}
+                    </p>
+
+                    {/* Real Rendered Sample Box in that exact font */}
+                    <div className={`bg-[#0d0c0a] border border-[#3a352c]/70 rounded-[3px] p-3.5 mb-3 space-y-2 ${opt.bodyClass}`}>
+                      <div className={`${opt.headingClass} text-[18px] text-[#ede6d8] leading-tight`}>
+                        Every phishing email leaves a trail.
+                      </div>
+                      <div className="text-[13px] text-[#b9af9c] leading-relaxed">
+                        TraceXMail unmasks spoofed display names, isolates malicious MTAs, and seals tamper-proof evidence.
+                      </div>
+                      <div className="font-mono text-[11px] text-[#c9a227] flex items-center justify-between pt-1 border-t border-[#3a352c]/50">
+                        <span>SPF:PASS • DKIM:2048</span>
+                        <span>0.042s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Apply Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFont(opt.id);
+                    }}
+                    className={`w-full py-2 px-3 rounded-[3px] text-xs font-mono font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-[#c9a227] text-[#14120f] font-bold shadow-md'
+                        : 'bg-[#221e17] text-[#ede6d8] border border-[#3a352c] group-hover:border-[#c9a227] group-hover:text-[#c9a227]'
+                    }`}
+                  >
+                    {isSelected ? 'Currently Applied' : 'Select This Typography'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* Hero Section */}
-      <section className="py-14 sm:py-18 lg:py-22 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_78%_8%,rgba(178,58,46,0.07),transparent_60%),#14120f]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center relative z-10">
-          <div className="lg:col-span-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227] mb-4">
+      <section className="py-12 sm:py-16 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_80%_10%,rgba(178,58,46,0.1),transparent_65%),#14120f]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10">
+          
+          <div className="lg:col-span-6 space-y-4 sm:space-y-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]">
               <TraceXLogo size="xs" />
               <span>TraceXMail Forensic Core v2.4</span>
             </div>
 
-            <h1 className="font-['Fraunces',serif] text-[28px] xs:text-[34px] sm:text-[44px] lg:text-[48px] font-medium leading-[1.14] text-[#ede6d8] tracking-tight">
+            <h1 className={`${currentFont.headingClass} text-[30px] xs:text-[36px] sm:text-[44px] font-medium leading-[1.15] text-[#ede6d8] tracking-tight`}>
               Every phishing email leaves a trail. We follow it to the source.
             </h1>
-            <p className="mt-4 sm:mt-5 text-[#b9af9c] text-[15px] sm:text-[16px] leading-relaxed">
+            
+            <p className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
               TraceXMail reconstructs an email's real path: headers, authentication, hops, and infrastructure, turned into evidence your SOC can act on and defend in front of whoever asks how you know.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-3.5 mt-6 sm:mt-7">
+            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 pt-2">
               <button
                 onClick={onOpenConsole}
-                className="w-full sm:w-auto text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3 sm:py-3.5 rounded-[3px] font-semibold text-[14.5px] sm:text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg flex items-center justify-center gap-2 group"
+                className="text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group"
               >
                 <span>Analyze Email Now Free</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
-                onClick={() => scrollToSection('evidence-chain')}
-                className="w-full sm:w-auto text-center px-6 py-3 sm:py-3.5 rounded-[3px] font-medium text-[14.5px] sm:text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => scrollToSection('corpus-proof')}
+                className="text-center px-5 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <Route className="w-4 h-4 text-[#c9a227]" />
-                <span>Inspect Evidence Route</span>
+                <span>Inspect Corpus Proof</span>
               </button>
             </div>
 
-            {/* Quick 1-Click Sample Previews for instant conversion */}
-            <div className="mt-6 p-3 rounded-[4px] bg-[#181510] border border-[#3a352c]">
-              <div className="flex items-center justify-between text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] mb-2">
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-[#c9a227]" />
+            {/* Instant 1-Click Forensic Demonstrations */}
+            <div className="pt-2">
+              <div className="text-[11.5px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-[#c9a227]" />
                   <span>Instant 1-Click Forensic Demonstrations:</span>
                 </span>
-                <span className="text-[#c9a227]">No Signup Required</span>
+                <span className="text-[#22c55e] text-[10.5px]">No Signup Required</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => handleCaseClick(0)}
-                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e]" />
+                  <span className="w-2 h-2 rounded-full bg-[#b23a2e]" />
                   <span>Nazario PayPal Phish (Tor)</span>
                 </button>
                 <button
                   onClick={() => handleCaseClick(1)}
-                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#b23a2e]/20 border border-[#3a352c] hover:border-[#ff8d7d] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e]" />
+                  <span className="w-2 h-2 rounded-full bg-[#b23a2e]" />
                   <span>Executive BEC Fraud</span>
                 </button>
                 <button
                   onClick={() => handleCaseClick(2)}
-                  className="px-2.5 py-1 rounded bg-[#221e17] hover:bg-[#22c55e]/20 border border-[#3a352c] hover:border-[#4ade80] text-[#ede6d8] text-[11px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 rounded bg-[#1e1a14] hover:bg-[#22c55e]/20 border border-[#3a352c] hover:border-[#4ade80] text-[#ede6d8] text-[11.5px] font-['IBM_Plex_Mono',monospace] cursor-pointer transition-colors flex items-center gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                  <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
                   <span>GitHub Clean Notice</span>
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mt-5">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
-                Real SPF/DKIM/DMARC verification
+            {/* Micro proof badges */}
+            <div className="pt-2 flex flex-wrap items-center gap-4 text-[12px] font-mono text-[#8e8574]">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#22c55e]" />
+                <span>Real SPF/DKIM/DMARC verification</span>
               </span>
-              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
-                MaxMind GeoLite2 attribution
+              <span className="flex items-center gap-1">
+                <Network className="w-3.5 h-3.5 text-[#7fb2e8]" />
+                <span>MaxMind GeoLite2 attribution</span>
               </span>
-              <span className="font-['IBM_Plex_Mono',monospace] text-[10px] sm:text-[11px] text-[#b9af9c] border border-[#3a352c] px-2 sm:px-2.5 py-1 rounded-[3px] break-normal">
-                SHA-256 evidence hashing
+              <span className="flex items-center gap-1">
+                <Lock className="w-3.5 h-3.5 text-[#c9a227]" />
+                <span>SHA-256 evidence hashing</span>
               </span>
             </div>
           </div>
 
-          {/* Hero Visual Area: Toggleable 3D Threat Nexus or Evidence Board */}
-          <div className="lg:col-span-6 w-full flex flex-col gap-2.5">
+          {/* Hero Visual Area: Highlighted Evidence Board */}
+          <div className="lg:col-span-6 w-full space-y-2.5">
             <div className="flex items-center justify-between px-1">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#8e8574] uppercase tracking-wider font-semibold">
-                HERO PERSPECTIVE:
-              </span>
-              <div className="flex items-center gap-1 p-0.5 bg-[#181510] border border-[#3a352c] rounded-[4px]">
-                <button
-                  onClick={() => setHeroMode('3d')}
-                  className={`px-3 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    heroMode === '3d'
-                      ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
-                      : 'text-[#8e8574] hover:text-[#ede6d8]'
-                  }`}
-                  title="Switch to interactive 3D Threat Nexus"
-                >
-                  <Box className="w-3.5 h-3.5" />
-                  <span>3D Nexus</span>
-                </button>
-                <button
-                  onClick={() => setHeroMode('board')}
-                  className={`px-3 py-1 rounded-[3px] text-[11px] font-['IBM_Plex_Mono',monospace] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    heroMode === 'board'
-                      ? 'bg-[#b23a2e] text-[#ede6d8] shadow-sm'
-                      : 'text-[#8e8574] hover:text-[#ede6d8]'
-                  }`}
-                  title="Switch to pinned evidence board"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Evidence Board</span>
-                </button>
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[3px] bg-[#1a1712] border border-[#b23a2e]/40 shadow-sm">
+                <span className="w-2 h-2 rounded-full bg-[#b23a2e] animate-pulse" />
+                <span className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#ff8d7d] uppercase tracking-wider font-semibold">
+                  PRIMARY FORENSIC DOSSIER • EVIDENCE BOARD
+                </span>
               </div>
+              <span className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] hidden sm:inline">
+                AUTHENTIC RECONSTRUCTION
+              </span>
             </div>
 
-            {heroMode === '3d' ? (
-              <HeroForensicNexus3D
-                onExploreCase={handleCaseClick}
-                onOpenConsole={onOpenConsole}
-              />
-            ) : (
+            <div className="relative rounded-[6px] p-1 bg-gradient-to-b from-[#3a352c] via-[#241f18] to-[#1a1712] shadow-2xl border border-[#b23a2e]/40">
               <HeroEvidenceBoard
                 onExploreCase={handleCaseClick}
                 onOpenConsole={onOpenConsole}
               />
-            )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Live Dynamic Real-User Telemetry & Evidence Stream Ribbon */}
-      <LiveDynamicTelemetryRibbon
-        onSelectCase={onSelectCase}
-        onOpenConsole={onOpenConsole}
-      />
+      {/* Real-Time Live Telemetry Ribbon Section */}
+      <section id="telemetry-feed" className="py-6 border-b border-[#3a352c] bg-[#181511]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+          <LiveDynamicTelemetryRibbon
+            onSelectCase={onSelectCase}
+            onOpenConsole={onOpenConsole}
+          />
+        </div>
+      </section>
 
-      {/* Global Deconstruction Engine - Real Database Evidence Ingestion Section */}
-      <GlobalDeconstructionEngine
-        onSelectCase={onSelectCase}
-        onOpenConsole={onOpenConsole}
-      />
 
-      {/* Complete Project 3D Interactive Architecture Showcase */}
-      <CompleteProject3DShowcase
-        onOpenConsole={onOpenConsole}
-        onSelectCase={onSelectCase}
-      />
 
-      {/* Problem Section */}
-      <section className="py-16 border-b border-[#3a352c]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
-              The gap attackers count on
+      {/* Dedicated Section: What TraceXMail Solves, The Forensic Solution, and How It's Different */}
+      <section id="challenges-solution" className="py-16 sm:py-24 border-b border-[#3a352c] bg-[#171410]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Section Header */}
+          <div className="max-w-[760px] mb-12">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
+              Challenges &amp; The TraceXMail Way
+            </div>
+            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[38px] font-medium text-[#ede6d8] leading-tight">
+              Why traditional email tools fail — and how we solve it in plain English
             </h2>
-            <p className="text-[#b9af9c] mt-4 text-[15px] leading-relaxed max-w-[42ch]">
-              Spoofing a display name takes an attacker seconds. Proving where an email actually came from, and whether that display name was ever telling the truth, is the part that takes an analyst time nobody has during an active incident.
+            <p className="text-[#b9af9c] mt-3 text-[16px] leading-relaxed">
+              Standard filters guess based on keywords and produce vague risk percentages. TraceXMail follows the physical transmission path and inspects the digital wax seals so anyone can understand exactly how an attack works.
             </p>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start gap-3.5 p-4 bg-[#1d1a15] border border-[#3a352c] rounded-[4px]">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] px-2 py-0.5 rounded bg-[#b23a2e]/15 text-[#b23a2e] shrink-0 mt-0.5 font-bold">
-                WITHOUT TRACING
+          {/* Interactive Challenge vs Solution Switcher */}
+          <div className="mb-16">
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#b23a2e]" />
+                <h3 className="font-['Fraunces',serif] text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]">
+                  Interactive Breakdown: Pick a Real-World Email Attack
+                </h3>
+              </div>
+              <span className="text-xs font-mono text-[#8e8574] hidden sm:inline">
+                Click any card to see how TraceXMail exposes it
               </span>
-              <p className="m-0 text-[14px] text-[#b9af9c] leading-relaxed">
-                A "CEO" wire request looks legitimate until someone manually checks headers, if anyone does at all.
-              </p>
             </div>
 
-            <div className="flex items-start gap-3.5 p-4 bg-[#1d1a15] border border-[#3a352c] rounded-[4px]">
-              <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] px-2 py-0.5 rounded bg-[#c9a227]/15 text-[#c9a227] shrink-0 mt-0.5 font-bold">
-                WITH TRACEXMAIL
-              </span>
-              <p className="m-0 text-[14px] text-[#b9af9c] leading-relaxed">
-                The same email is decomposed, authenticated, and geolocated automatically, with the evidence to back up the verdict.
-              </p>
+            {/* 4 Interactive Selector Tabs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              {[
+                {
+                  id: 0,
+                  badge: 'TRICK #1',
+                  name: 'Fake Boss / Wire Transfer',
+                  sub: 'Display name spoofing',
+                  icon: AlertOctagon,
+                  color: '#b23a2e'
+                },
+                {
+                  id: 1,
+                  badge: 'TRICK #2',
+                  name: 'Fake Server Routes',
+                  sub: 'Forged header injection',
+                  icon: Network,
+                  color: '#c9a227'
+                },
+                {
+                  id: 2,
+                  badge: 'TRICK #3',
+                  name: 'Mysterious "AI Risk" Scores',
+                  sub: 'Black-box numbers with no proof',
+                  icon: Cpu,
+                  color: '#60a5fa'
+                },
+                {
+                  id: 3,
+                  badge: 'TRICK #4',
+                  name: 'Offshore Anonymous Relays',
+                  sub: 'Tor and bulletproof hosts',
+                  icon: Globe,
+                  color: '#a855f7'
+                }
+              ].map((item) => {
+                const isSelected = activeChallengeIdx === item.id;
+                const IconC = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveChallengeIdx(item.id)}
+                    className={`p-3.5 rounded-[4px] border text-left transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#262017] border-[#b23a2e] shadow-lg ring-1 ring-[#b23a2e]/50'
+                        : 'bg-[#1d1a15] border-[#3a352c] hover:border-[#8e8574]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-mono text-[10px] uppercase font-bold text-[#c9a227]">
+                        {item.badge}
+                      </span>
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    </div>
+                    <div className="flex items-center gap-1.5 font-semibold text-[14px] text-[#ede6d8]">
+                      <IconC className="w-3.5 h-3.5 shrink-0" style={{ color: item.color }} />
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                    <div className="text-[11.5px] text-[#8e8574] truncate mt-0.5">
+                      {item.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected Challenge vs Solution Deep Dive Card */}
+            <div className="bg-[#1a1712] border border-[#3a352c] rounded-[6px] p-6 sm:p-8 shadow-xl">
+              {activeChallengeIdx === 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                  <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
+                      <AlertOctagon className="w-3.5 h-3.5" />
+                      The Problem (How Attackers Trick You)
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      &quot;The email said it was from our CEO, but it wasn&apos;t.&quot;
+                    </h4>
+                    <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
+                      Anyone can set the visible &quot;From&quot; name to <em>&quot;Tim Cook &lt;ceo@apple.com&gt;&quot;</em> while sending from an untraceable free webmail server. Regular email apps show the friendly name in bold, tricking finance teams into sending urgent wire transfers.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
+                      ⚠ What standard filters do: Check the display name only, flag nothing suspicious, and let the message land directly in the inbox.
+                    </div>
+                  </div>
+
+                  <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      The TraceXMail Solution
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      We verify the sender&apos;s digital seal against DNS netblocks
+                    </h4>
+                    <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
+                      TraceXMail ignores visual display names and directly checks if the true sending computer was authorized by Apple&apos;s official cryptographic records (SPF &amp; DKIM). If there&apos;s a mismatch, we immediately flag the impersonation.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
+                      ✓ What TraceXMail outputs: &quot;SPF Softfail + DMARC Disalignment: Sender IP 185.220.101.5 is NOT authorized by apple.com.&quot;
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeChallengeIdx === 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                  <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
+                      <Network className="w-3.5 h-3.5" />
+                      The Problem (How Attackers Trick You)
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      &quot;The hacker typed fake Google &amp; Microsoft server lines.&quot;
+                    </h4>
+                    <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
+                      Attackers often write fake intermediate server hops into their email headers claiming the message passed through official Microsoft or Google mail relays. Basic scanners get confused and believe the fake server history.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
+                      ⚠ What standard filters do: Read headers top-to-bottom without checking who actually handed the message to whom.
+                    </div>
+                  </div>
+
+                  <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      The TraceXMail Solution
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      Backward Hop Traversal: We only trust verified server handoffs
+                    </h4>
+                    <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
+                      TraceXMail starts from your own verified mail server and steps backwards one connection at a time. The exact moment an unauthenticated outside computer handed over the message, we stop and lock that IP as the true origin.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
+                      ✓ What TraceXMail outputs: Discards 3 forged Microsoft lines and isolates real origin server in Sofia, Bulgaria.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeChallengeIdx === 2 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                  <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
+                      <Cpu className="w-3.5 h-3.5" />
+                      The Problem (How Attackers Trick You)
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      &quot;Our tool gave it a 78% risk score, but can&apos;t explain why.&quot;
+                    </h4>
+                    <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
+                      Many modern security tools use black-box machine learning that generates a mystery probability number. If a manager, auditor, or legal team asks <em>&quot;How do we know this is a crime?&quot;</em>, no one has concrete evidence to show.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
+                      ⚠ What standard filters do: Output arbitrary confidence numbers without proof or cryptographic audit trails.
+                    </div>
+                  </div>
+
+                  <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      The TraceXMail Solution
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      Court-Ready Proof with SHA-256 Custody Seals
+                    </h4>
+                    <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
+                      TraceXMail provides a transparent, item-by-item breakdown of every technical check (DNS records, server certificates, attachment entropy) and stamps it with an immutable cryptographic hash you can hand to legal counsel or police.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
+                      ✓ What TraceXMail outputs: Deterministic checklist with Evidence IDs, NIST SP 800-86 timestamps, and SHA-256 tamper seal.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeChallengeIdx === 3 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+                  <div className="bg-[#14120f] border border-[#b23a2e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#b23a2e]/20 text-[#ff8d7d] font-mono text-xs font-bold uppercase">
+                      <Globe className="w-3.5 h-3.5" />
+                      The Problem (How Attackers Trick You)
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      &quot;The scammer routed through Tor and offshore proxies.&quot;
+                    </h4>
+                    <p className="text-[#b9af9c] text-[14.5px] leading-relaxed">
+                      Professional criminal syndicates send attacks through anonymized proxy networks and bulletproof hosting providers in countries that ignore takedown notices, hiding their true physical location.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#ff8d7d] border border-[#b23a2e]/30">
+                      ⚠ What standard filters do: Treat all IP addresses equally and fail to recognize anonymized proxy infrastructure.
+                    </div>
+                  </div>
+
+                  <div className="bg-[#14120f] border border-[#22c55e]/40 rounded-[4px] p-6 space-y-4">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#22c55e]/20 text-[#4ade80] font-mono text-xs font-bold uppercase">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      The TraceXMail Solution
+                    </div>
+                    <h4 className="font-['Fraunces',serif] text-[20px] font-semibold text-[#ede6d8]">
+                      Live BGP, Autonomous System &amp; Tor Exit Node Mapping
+                    </h4>
+                    <p className="text-[#ede6d8] text-[14.5px] leading-relaxed">
+                      We query global routing tables and live Tor directories to flag proxy exit nodes, VPN services, and bulletproof hosters (such as AlexHost Moldova) on an interactive 3D map.
+                    </p>
+                    <div className="p-3 bg-[#1d1a15] rounded text-xs font-mono text-[#4ade80] border border-[#22c55e]/30">
+                      ✓ What TraceXMail outputs: Flagged as AS200548 (Tor Exit Relay in Sofia, BG) + Threat Intensity 98/100.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Part 2: Quick Comparison Matrix */}
+          <div>
+            <div className="flex items-center gap-2 mb-6">
+              <span className="w-2 h-2 rounded-full bg-[#c9a227]" />
+              <h3 className="font-['Fraunces',serif] text-[20px] sm:text-[22px] font-semibold text-[#ede6d8]">
+                How TraceXMail Compares to Other Tools
+              </h3>
+            </div>
+
+            <div className="overflow-x-auto border border-[#3a352c] rounded-[4px] bg-[#1d1a15]">
+              <table className="w-full text-left text-[13.5px] border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="border-b border-[#3a352c] bg-[#14120f] font-mono text-[11px] text-[#8e8574] uppercase tracking-wider">
+                    <th className="py-3 px-4 font-semibold">What You Need</th>
+                    <th className="py-3 px-4 font-semibold">Standard Email Filters</th>
+                    <th className="py-3 px-4 font-semibold">Virus Scanners</th>
+                    <th className="py-3 px-4 font-semibold text-[#c9a227] bg-[#241f17]">TraceXMail Forensic Core</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#3a352c]/60">
+                  <tr className="hover:bg-[#221e18] transition-colors">
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">How it decides</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Keywords and spam patterns</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Known virus signatures only</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Physical network hops + digital signature validation</td>
+                  </tr>
+                  <tr className="hover:bg-[#221e18] transition-colors">
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Finding who sent it</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Assumes the visible name is real</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Looks only at links in the message</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Traces backward from your server to find the real origin IP</td>
+                  </tr>
+                  <tr className="hover:bg-[#221e18] transition-colors">
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Verifying legitimacy</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Basic Pass/Fail checkbox</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">None (ignores email routing)</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Full 2048-bit cryptographic key match (SPF, DKIM, DMARC)</td>
+                  </tr>
+                  <tr className="hover:bg-[#221e18] transition-colors">
+                    <td className="py-3.5 px-4 font-medium text-[#ede6d8]">Proof for managers &amp; law</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Temporary logs, deleted quickly</td>
+                    <td className="py-3.5 px-4 text-[#b9af9c]">Uploads files to public websites</td>
+                    <td className="py-3.5 px-4 text-[#4ade80] font-semibold bg-[#241f17]/40">Permanent SHA-256 tamper-proof legal evidence dossier</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </section>
 
-      {/* Proof Band */}
-      <section className="py-10 border-b border-[#3a352c] bg-[#1d1a15] text-center">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-[#b9af9c] text-[14.5px] max-w-[60ch] mx-auto m-0 leading-relaxed">
-            Trained and validated against the <strong className="text-[#ede6d8] font-semibold">Nazario Phishing Corpus</strong> and the <strong className="text-[#ede6d8] font-semibold">Enron Email Corpus</strong>: real attacks and real legitimate mail, not synthetic examples.
-          </p>
-        </div>
-      </section>
+      {/* FULL 3D INTERACTIVE ARCHITECTURE SECTION */}
+      <FullForensicArchitecture3D
+        onOpenConsole={onOpenConsole}
+        onSelectCase={onSelectCase}
+      />
 
-      {/* Case Studies Section (Real Samples) */}
-      <section id="case-studies" className="py-20 border-b border-[#3a352c] bg-[#171410]">
+      {/* Corpus Proof & Detection Output */}
+      <section id="corpus-proof" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-            <div className="max-w-[680px]">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[2px] bg-[#3a352c]/50 border border-[#3a352c] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[11px] mb-3 uppercase tracking-wider">
-                <Terminal className="w-3 h-3 text-[#c9a227]" />
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
                 Corpus Proof &amp; Detection Output
               </div>
-              <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8] leading-[1.2]">
+              <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[34px] font-medium text-[#ede6d8]">
                 See it work on a real sample
               </h2>
-              <p className="text-[#b9af9c] mt-3 text-[15px] max-w-[60ch] leading-relaxed">
+              <p className="text-[#b9af9c] mt-2 text-[15px] max-w-[65ch]">
                 Real detection outputs produced by TraceXMail from historical attack corpora and authentic inbound mail. Not invented marketing copy. Click any sample to inspect the complete forensic chain in the analyst console.
               </p>
             </div>
-            <div className="shrink-0">
-              <button
-                onClick={() => handleCaseClick(0)}
-                className="inline-flex items-center gap-2 font-['IBM_Plex_Mono',monospace] text-[12.5px] text-[#b9af9c] hover:text-[#ede6d8] transition-colors border border-[#3a352c] hover:border-[#b9af9c] px-3.5 py-2 rounded-[3px] bg-[#14120f] cursor-pointer"
-              >
-                <span>Launch primary sample (Nazario #01)</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              onClick={() => handleCaseClick(0)}
+              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-4 py-2 rounded-[3px] text-[13.5px] font-semibold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <span>Launch primary sample (Nazario #01)</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -454,16 +1017,15 @@ export function LandingView({
                 <div
                   key={c.id}
                   onClick={() => handleCaseClick(c.index)}
-                  className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md relative overflow-hidden"
+                  className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md"
                 >
-                  <div className="space-y-4">
-                    {/* Top Meta Bar */}
-                    <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/70 pb-3">
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/70 pb-2.5">
                       <span className="font-['IBM_Plex_Mono',monospace] text-[10.5px] text-[#b9af9c] tracking-wider uppercase font-semibold">
                         {c.corpus}
                       </span>
                       <span
-                        className={`font-['IBM_Plex_Mono',monospace] text-[11px] px-2 py-0.5 rounded-[2px] border font-bold ${
+                        className={`font-['IBM_Plex_Mono',monospace] text-[10.5px] px-2 py-0.5 rounded-[2px] border font-bold ${
                           isMalicious
                             ? 'bg-[#b23a2e]/15 text-[#b23a2e] border-[#b23a2e]/40'
                             : 'bg-[#2e7a4a]/20 text-[#4ade80] border-[#2e7a4a]/40'
@@ -473,9 +1035,8 @@ export function LandingView({
                       </span>
                     </div>
 
-                    {/* Threat Score & Title */}
                     <div>
-                      <div className="flex items-baseline gap-2 mb-1.5">
+                      <div className="flex items-baseline gap-2 mb-1">
                         <span className="font-['Fraunces',serif] text-[24px] font-semibold text-[#ede6d8]">
                           {c.threatScore}
                         </span>
@@ -483,41 +1044,35 @@ export function LandingView({
                           / 100 THREAT SCORE
                         </span>
                       </div>
-                      <h3 className="font-['Fraunces',serif] text-[17px] font-medium text-[#ede6d8] group-hover:text-white transition-colors leading-snug line-clamp-2">
+                      <h3 className="font-['Fraunces',serif] text-[16.5px] font-medium text-[#ede6d8] group-hover:text-white transition-colors leading-snug">
                         {c.name}
                       </h3>
-                      <p className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#b9af9c] mt-1 truncate">
+                      <p className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] mt-1 truncate">
                         Subject: {c.subject}
                       </p>
                     </div>
 
-                    {/* Real Detected Signals */}
-                    <div className="space-y-2 pt-1 border-t border-[#3a352c]/50">
-                      <div className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] uppercase tracking-wider font-semibold">
-                        Detected Forensic Signals:
-                      </div>
-                      <ul className="space-y-1.5 m-0 p-0 list-none">
-                        {c.signals.map((sig, sIdx) => (
-                          <li
-                            key={sIdx}
-                            className="flex items-start gap-2 text-[12.5px] text-[#ede6d8] leading-snug font-['IBM_Plex_Sans',sans-serif]"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] shrink-0 mt-1.5" />
-                            <span>{sig}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="space-y-1.5 pt-2 border-t border-[#3a352c]/50">
+                      <div className="text-[11px] font-mono text-[#8e8574] uppercase">Detected Forensic Signals:</div>
+                      {c.signals.map((sig, sIdx) => (
+                        <div
+                          key={sIdx}
+                          className="flex items-start gap-2 text-[12px] text-[#ede6d8] leading-snug"
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${isMalicious ? 'bg-[#b23a2e]' : 'bg-[#22c55e]'}`} />
+                          <span>{sig}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Card Bottom / Action */}
-                  <div className="pt-5 mt-5 border-t border-[#3a352c]/70 flex items-center justify-between text-[12px] font-['IBM_Plex_Mono',monospace]">
+                  <div className="pt-4 mt-4 border-t border-[#3a352c]/70 flex items-center justify-between text-[11.5px] font-['IBM_Plex_Mono',monospace]">
                     <span className="text-[#8e8574] truncate max-w-[170px]">
                       {c.originHint}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-[#b9af9c] group-hover:text-[#ede6d8] font-medium transition-colors">
+                    <span className="inline-flex items-center gap-1 text-[#b9af9c] group-hover:text-[#ede6d8] transition-colors">
                       Inspect case
-                      <ArrowUpRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                      <ArrowUpRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
@@ -527,93 +1082,80 @@ export function LandingView({
         </div>
       </section>
 
-      {/* Interactive Forensic Route & Hop Dissector */}
-      <ForensicRouteDissector
-        onExploreCase={onOpenConsole}
-        onSelectCase={onSelectCase}
-      />
 
-      {/* 6-Stage Pipeline Section */}
-      <section id="pipeline" className="py-20 border-b border-[#3a352c]">
+
+      {/* From Inbox to Verdict: Six Stages */}
+      <section id="how-it-works" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
+          <div className="max-w-[700px] mb-12">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Standard Operating Procedure
+            </div>
+            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8]">
               From inbox to verdict
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
+            <p className="text-[#b9af9c] mt-2 text-[15px] leading-relaxed">
               Six stages, run on every email in the same order every time, so two analysts looking at the same message reach the same conclusion.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 relative">
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 1
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Ingest
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Ingest</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 An email arrives, uploaded directly or synced live from a connected Gmail inbox.
               </p>
             </div>
 
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 2
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Header forensics
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Header forensics</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Received chains, Message-ID, and Return-Path are parsed and checked for tampering.
               </p>
             </div>
 
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 3
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Authentication
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Authentication</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 SPF, DKIM, DMARC, and ARC verified live against DNS, never assumed.
               </p>
             </div>
 
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 4
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Origin &amp; geolocation
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Origin &amp; geolocation</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 The real sending host and its place on the map, with untrusted hops excluded rather than guessed.
               </p>
             </div>
 
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 5
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Correlation
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Correlation</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Matched against other cases to surface a campaign, not just one message.
               </p>
             </div>
 
-            <div className="relative pr-4">
-              <div className="w-[38px] h-[38px] rounded-full bg-[#14120f] border-[1.5px] border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center mb-4 z-10 relative">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-[#14120f] border-2 border-[#b23a2e] text-[#b23a2e] font-['IBM_Plex_Mono',monospace] text-[13px] font-bold flex items-center justify-center">
                 6
               </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[15.5px] text-[#ede6d8] mb-2">
-                Verdict
-              </h3>
-              <p className="text-[#b9af9c] text-[13.8px] leading-relaxed m-0">
+              <h3 className="font-semibold text-[16px] text-[#ede6d8]">Verdict</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 A forensic report with evidence IDs behind it, ready to hand to anyone who asks.
               </p>
             </div>
@@ -621,421 +1163,266 @@ export function LandingView({
         </div>
       </section>
 
-      {/* Product Section / Interactive Mockup */}
-      <section id="product" className="py-20 border-b border-[#3a352c]">
+      {/* What Your Analysts Actually Open (Workstation Mockup) */}
+      <section id="workstation" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
+          <div className="max-w-[700px] mb-8">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Production Workstation
+            </div>
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               What your analysts actually open
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
+            <p className="text-[#b9af9c] mt-2 text-[15px]">
               The board on the left is the idea. This is the tool: the same cases, the same evidence, laid out for someone working a queue, not admiring a metaphor.
             </p>
           </div>
 
-          <div className="rounded-[8px] overflow-hidden shadow-[0_50px_100px_-40px_rgba(0,0,0,0.8),0_0_0_1px_#3a352c]">
-            <div className="bg-[#0b0d12] px-3.5 py-2.5 flex items-center gap-4 border-b border-[#1c2028]">
-              <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#2a2f38]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#2a2f38]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#2a2f38]" />
+          <div className="bg-[#1a1712] border border-[#3a352c] rounded-[4px] overflow-hidden shadow-2xl">
+            <div className="bg-[#100e0c] px-4 py-2.5 border-b border-[#3a352c] flex items-center justify-between text-xs font-mono text-[#8e8574]">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#b23a2e]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#c9a227]" />
+                <span className="w-2.5 h-2.5 rounded-full bg-[#22c55e]" />
+                <span className="ml-2 text-[#ede6d8]">app.tracexmail.io/cases/case-2291</span>
               </div>
-              <div className="flex-1 bg-[#151920] rounded-[5px] px-3 py-1 font-['IBM_Plex_Mono',monospace] text-[12px] text-[#5b6470]">
-                app.tracexmail.io/cases/case-2291
+              <div className="flex items-center gap-4">
+                <span>Open cases: <strong className="text-[#ede6d8]">14</strong></span>
+                <span>Threat clusters: <strong className="text-[#ede6d8]">3</strong></span>
+                <span>Avg. threat score: <strong className="text-[#ede6d8]">71</strong></span>
               </div>
             </div>
 
-            <div className="bg-[#0f1219] flex min-h-[380px]">
-              <div className="w-14 bg-[#0b0d12] border-r border-[#1c2028] hidden sm:flex flex-col items-center py-4 gap-5">
-                <i className="w-4.5 h-4.5 rounded-[5px] bg-[#3b5b78]" />
-                <i className="w-4.5 h-4.5 rounded-[5px] bg-[#232833]" />
-                <i className="w-4.5 h-4.5 rounded-[5px] bg-[#232833]" />
-                <i className="w-4.5 h-4.5 rounded-[5px] bg-[#232833]" />
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-[#3a352c] text-[#8e8574] bg-[#14120f]">
+                    <th className="py-2.5 px-4">Case</th>
+                    <th className="py-2.5 px-4">Subject</th>
+                    <th className="py-2.5 px-4">Severity</th>
+                    <th className="py-2.5 px-4">Score</th>
+                    <th className="py-2.5 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#3a352c]/50 text-[#ede6d8]">
+                  <tr className="hover:bg-[#221e18] cursor-pointer" onClick={() => handleCaseClick(0)}>
+                    <td className="py-3 px-4 font-bold text-[#c9a227]">CASE-2291</td>
+                    <td className="py-3 px-4 truncate max-w-[280px]">Urgent: Updated Direct Deposit Routing Form Ref #DD-901</td>
+                    <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-[2px] bg-[#b23a2e]/20 text-[#ff8d7d] border border-[#b23a2e]/40 font-bold">CRITICAL</span></td>
+                    <td className="py-3 px-4 text-[#ff8d7d] font-bold">94</td>
+                    <td className="py-3 px-4 text-right text-[#b9af9c] hover:text-[#ede6d8]">Inspect →</td>
+                  </tr>
+                  <tr className="hover:bg-[#221e18] cursor-pointer" onClick={() => handleCaseClick(1)}>
+                    <td className="py-3 px-4 font-bold text-[#c9a227]">CASE-2288</td>
+                    <td className="py-3 px-4 truncate max-w-[280px]">Action Required: Verify Office 365 Password Expiration</td>
+                    <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-[2px] bg-[#b23a2e]/20 text-[#ff8d7d] border border-[#b23a2e]/40 font-bold">HIGH</span></td>
+                    <td className="py-3 px-4 text-[#ff8d7d] font-bold">86</td>
+                    <td className="py-3 px-4 text-right text-[#b9af9c] hover:text-[#ede6d8]">Inspect →</td>
+                  </tr>
+                  <tr className="hover:bg-[#221e18] cursor-pointer" onClick={() => handleCaseClick(2)}>
+                    <td className="py-3 px-4 font-bold text-[#c9a227]">CASE-2281</td>
+                    <td className="py-3 px-4 truncate max-w-[280px]">Your document is waiting for signature via DocuSign Portal</td>
+                    <td className="py-3 px-4"><span className="px-2 py-0.5 rounded-[2px] bg-[#c9a227]/20 text-[#ffd55c] border border-[#c9a227]/40 font-bold">MEDIUM</span></td>
+                    <td className="py-3 px-4 text-[#ffd55c] font-bold">62</td>
+                    <td className="py-3 px-4 text-right text-[#b9af9c] hover:text-[#ede6d8]">Inspect →</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-              <div className="flex-1 p-6">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mb-5">
-                  <div className="bg-[#151a22] border border-[#1f2632] rounded-[6px] p-3.5">
-                    <div className="text-[10.5px] text-[#5b6470] uppercase tracking-wider font-semibold">
-                      Open cases
-                    </div>
-                    <div className="font-['IBM_Plex_Mono',monospace] text-[20px] text-[#e8836f] mt-1 font-bold">
-                      14
-                    </div>
-                  </div>
-                  <div className="bg-[#151a22] border border-[#1f2632] rounded-[6px] p-3.5">
-                    <div className="text-[10.5px] text-[#5b6470] uppercase tracking-wider font-semibold">
-                      Threat clusters
-                    </div>
-                    <div className="font-['IBM_Plex_Mono',monospace] text-[20px] text-[#e7ebf1] mt-1 font-bold">
-                      3
-                    </div>
-                  </div>
-                  <div className="bg-[#151a22] border border-[#1f2632] rounded-[6px] p-3.5">
-                    <div className="text-[10.5px] text-[#5b6470] uppercase tracking-wider font-semibold">
-                      Avg. threat score
-                    </div>
-                    <div className="font-['IBM_Plex_Mono',monospace] text-[20px] text-[#7fb2e8] mt-1 font-bold">
-                      71
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-[#232833] rounded-[6px] overflow-hidden bg-[#12151c]">
-                  <div className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-2.5 text-[10.5px] uppercase tracking-wider text-[#5b6470] font-semibold border-b border-[#232833] bg-[#0f1219]">
-                    <div className="col-span-3 sm:col-span-2">Case</div>
-                    <div className="col-span-6 sm:col-span-7">Subject</div>
-                    <div className="col-span-3 sm:col-span-2">Severity</div>
-                    <div className="hidden sm:block sm:col-span-1 text-right">Score</div>
-                  </div>
-
-                  {/* Row 1 */}
-                  <div
-                    onClick={() => handleCaseClick(0)}
-                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
-                  >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
-                      CASE-2291
-                    </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
-                      Urgent: Updated Direct Deposit Routing
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#e8836f]/15 text-[#e8836f] font-bold">
-                        CRITICAL
-                      </span>
-                    </div>
-                    <div className="hidden sm:block sm:col-span-1 font-['IBM_Plex_Mono',monospace] text-[#9aa3af] text-right font-bold">
-                      94
-                    </div>
-                  </div>
-
-                  {/* Row 2 */}
-                  <div
-                    onClick={() => handleCaseClick(1)}
-                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center border-b border-[#1a1f28] hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
-                  >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
-                      CASE-2288
-                    </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
-                      Action Required: Verify Office 365 Password
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#e6b678]/15 text-[#e6b678] font-bold">
-                        HIGH
-                      </span>
-                    </div>
-                    <div className="hidden sm:block sm:col-span-1 font-['IBM_Plex_Mono',monospace] text-[#9aa3af] text-right font-bold">
-                      86
-                    </div>
-                  </div>
-
-                  {/* Row 3 */}
-                  <div
-                    onClick={() => handleCaseClick(2)}
-                    className="grid grid-cols-12 gap-2 sm:gap-3 px-3 sm:px-3.5 py-3 text-[12px] sm:text-[12.5px] items-center hover:bg-[#1a1e27] cursor-pointer transition-colors min-w-0"
-                  >
-                    <div className="col-span-3 sm:col-span-2 font-['IBM_Plex_Mono',monospace] text-[#7fb2e8] text-[11px] sm:text-[11.5px] font-bold">
-                      CASE-2281
-                    </div>
-                    <div className="col-span-6 sm:col-span-7 text-[#c7cdd6] truncate font-medium min-w-0">
-                      Your document is waiting for signature
-                    </div>
-                    <div className="col-span-3 sm:col-span-2">
-                      <span className="font-['IBM_Plex_Mono',monospace] text-[9.5px] sm:text-[10px] px-2 py-0.5 rounded bg-[#7fb2e8]/15 text-[#7fb2e8] font-bold">
-                        MEDIUM
-                      </span>
-                    </div>
-                    <div className="hidden sm:block sm:col-span-1 font-['IBM_Plex_Mono',monospace] text-[#9aa3af] text-right font-bold">
-                      62
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="p-3 bg-[#14120f] border-t border-[#3a352c] text-xs text-[#8e8574] flex justify-between items-center">
+              <span>Every row links back to the same evidence chain (headers, DNS results, hop-by-hop geolocation) that an analyst can open, not a score they have to trust blind.</span>
+              <button onClick={onOpenConsole} className="text-[#ede6d8] hover:text-[#c9a227] font-semibold">Open Live Console</button>
             </div>
           </div>
-
-          <p className="mt-4 text-[#b9af9c] text-[13.8px] leading-relaxed">
-            Every row links back to the same evidence chain (headers, DNS results, hop-by-hop geolocation) that an analyst can open, not a score they have to trust blind.
-          </p>
         </div>
       </section>
 
-      {/* Exhibits Section */}
-      <section id="exhibits" className="py-20 border-b border-[#3a352c]">
+      {/* What's Actually Doing the Work: Exhibits A-D */}
+      <section id="exhibits" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              What's actually doing the work
+          <div className="max-w-[700px] mb-12">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Core Engineering
+            </div>
+            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8]">
+              What&apos;s actually doing the work
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
-              Four systems most email tools skip, because they're the difference between a plausible guess and evidence that holds up.
+            <p className="text-[#b9af9c] mt-2 text-[15px] leading-relaxed">
+              Four systems most email tools skip, because they&apos;re the difference between a plausible guess and evidence that holds up.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Exhibit A */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
-              <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
-                EXHIBIT A
-              </span>
-              <h3 className="font-['Fraunces',serif] text-[18px] font-semibold text-[#ede6d8] mt-2 mb-3">
-                Evidence Vault
-              </h3>
-              <p className="text-[#b9af9c] text-[14.3px] leading-relaxed m-0">
-                Every finding is hashed and timestamped the moment it's produced. Nothing in a report can be quietly edited after the fact. A changed field means a new record, not an overwrite.
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT A</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Evidence Vault</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
+                Every finding is hashed and timestamped the moment it&apos;s produced. Nothing in a report can be quietly edited after the fact. A changed field means a new record, not an overwrite.
               </p>
             </div>
 
-            {/* Exhibit B */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
-              <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
-                EXHIBIT B
-              </span>
-              <h3 className="font-['Fraunces',serif] text-[18px] font-semibold text-[#ede6d8] mt-2 mb-3">
-                Trust-boundary origin engine
-              </h3>
-              <p className="text-[#b9af9c] text-[14.3px] leading-relaxed m-0">
-                The earliest IP in a header isn't always the attacker's. TraceXMail knows which hops to trust before it names a source.
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT B</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Trust-boundary origin engine</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
+                The earliest IP in a header isn&apos;t always the attacker&apos;s. TraceXMail knows which hops to trust before it names a source.
               </p>
             </div>
 
-            {/* Exhibit C */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
-              <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
-                EXHIBIT C
-              </span>
-              <h3 className="font-['Fraunces',serif] text-[18px] font-semibold text-[#ede6d8] mt-2 mb-3">
-                Attribution engine
-              </h3>
-              <p className="text-[#b9af9c] text-[14.3px] leading-relaxed m-0">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT C</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Attribution engine</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 Every verdict comes with the evidence behind it, labeled as a fact, a finding, or a hypothesis, and never blurred together into one confident-sounding line.
               </p>
             </div>
 
-            {/* Exhibit D */}
-            <div className="bg-[linear-gradient(180deg,#1d1a15,#1a1712)] border border-[#3a352c] rounded-[4px] p-6 sm:p-7 relative shadow-md hover:border-[#b9af9c] transition-all">
-              <span className="absolute -top-2.5 left-6 bg-[#c9a227] text-[#14120f] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-bold px-2 py-0.5 rounded-[2px] shadow-md">
-                EXHIBIT D
-              </span>
-              <h3 className="font-['Fraunces',serif] text-[18px] font-semibold text-[#ede6d8] mt-2 mb-3">
-                Campaign correlation
-              </h3>
-              <p className="text-[#b9af9c] text-[14.3px] leading-relaxed m-0">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+              <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT D</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Campaign correlation</h3>
+              <p className="text-[#b9af9c] text-[14px] leading-relaxed">
                 One email rarely stands alone. Shared infrastructure and timing surface the wider campaign, tiered by how strong the link really is.
               </p>
             </div>
           </div>
-
-          {/* Interactive RFC822 Header X-Ray Inspector */}
-          <div className="mt-14">
-            <HeaderXRayInspector />
-          </div>
         </div>
       </section>
 
-      {/* Honesty Callout */}
-      <section className="py-20 bg-[#26221b] border-b border-[#3a352c]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center gap-8 sm:gap-12">
-          <div className="w-28 h-28 sm:w-36 sm:h-36 md:w-[152px] md:h-[152px] rounded-full text-[#c9a227] flex items-center justify-center text-center font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[12.5px] md:text-[13.5px] font-bold leading-tight p-2.5 rotate-6 shrink-0 shadow-[0_0_0_2px_#c9a227,0_0_0_5px_rgba(201,162,39,0.30)]">
-            UNKNOWN<br />IS A VALID<br />RESULT
-          </div>
 
-          <div>
-            <h2 className="font-['Fraunces',serif] text-[24px] sm:text-[30px] font-medium text-[#ede6d8] mb-4 max-w-[18ch]">
-              We'd rather tell you we don't know.
-            </h2>
-            <p className="text-[#b9af9c] text-[16px] leading-relaxed m-0 max-w-[56ch]">
-              When the evidence doesn't support a verdict, TraceXMail says so, instead of manufacturing confidence your team would have to defend later in front of a client or a regulator without the evidence to back it up.
-            </p>
-          </div>
-        </div>
-      </section>
 
-      {/* Roles Section */}
-      <section id="roles" className="py-20 border-b border-[#3a352c]">
+      {/* UNKNOWN IS A VALID RESULT - EXACT REPLICA OF IMAGE 1 */}
+      <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              Built around who's actually looking at it
+          <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 lg:gap-20">
+            
+            {/* Left Circular Badge - Matching Image 1 */}
+            <div className="shrink-0 flex items-center justify-center">
+              <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] border-[#c9a227] p-1.5 flex items-center justify-center shadow-[0_0_30px_rgba(201,162,39,0.12)]">
+                <div className="w-full h-full rounded-full border border-[#c9a227]/40 bg-[#171410] flex flex-col items-center justify-center text-center p-4">
+                  <span className="font-['IBM_Plex_Mono',monospace] text-[13px] sm:text-[14px] font-bold text-[#c9a227] tracking-wider leading-[1.35] uppercase">
+                    UNKNOWN<br />
+                    IS A VALID<br />
+                    RESULT
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Copy - Matching Image 1 */}
+            <div className="space-y-4 max-w-[680px]">
+              <h2 className="font-['Fraunces',serif] text-[32px] sm:text-[42px] font-medium text-[#ede6d8] leading-[1.15]">
+                We&apos;d rather tell you we<br className="hidden sm:inline" /> don&apos;t know.
+              </h2>
+              <p className="text-[#b9af9c] text-[16px] sm:text-[17px] leading-relaxed">
+                When the evidence doesn&apos;t support a verdict, TraceXMail says so, instead of manufacturing confidence your team would have to defend later in front of a client or a regulator without the evidence to back it up.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Role-Based Clearance */}
+      <section className="py-16 border-b border-[#3a352c] bg-[#171410]">
+        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-[650px] mb-10">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Access Governance
+            </div>
+            <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
+              Built around who&apos;s actually looking at it
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
+            <p className="text-[#b9af9c] mt-2 text-[15px]">
               Access matches the job. Nobody sees more than they need, and nobody with real work to do is left waiting on a request.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Admin */}
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[2px] p-6 hover:bg-[#221e17] transition-colors">
-              <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#b9af9c] mb-2.5 flex items-center gap-2 font-bold">
-                <span className="w-2 h-2 rounded-full bg-[#b23a2e]" />
-                CLEARANCE · ADMIN
-              </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[16.5px] text-[#ede6d8] mb-2">
-                Admin
-              </h3>
-              <p className="text-[#b9af9c] text-[14px] leading-relaxed m-0">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
+              <span className="text-xs font-mono text-[#c9a227]">CLEARANCE · ADMIN</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Admin</h3>
+              <p className="text-[#b9af9c] text-[14px]">
                 Manages the organization, invites the team, and sets who can see unmasked evidence.
               </p>
             </div>
 
-            {/* Analyst */}
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[2px] p-6 hover:bg-[#221e17] transition-colors">
-              <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#b9af9c] mb-2.5 flex items-center gap-2 font-bold">
-                <span className="w-2 h-2 rounded-full bg-[#7fa3ba]" />
-                CLEARANCE · ANALYST
-              </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[16.5px] text-[#ede6d8] mb-2">
-                Analyst
-              </h3>
-              <p className="text-[#b9af9c] text-[14px] leading-relaxed m-0">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
+              <span className="text-xs font-mono text-[#22c55e]">CLEARANCE · ANALYST</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Analyst</h3>
+              <p className="text-[#b9af9c] text-[14px]">
                 Uploads, investigates, and closes cases: the full working view, evidence and all.
               </p>
             </div>
 
-            {/* Read-Only */}
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[2px] p-6 hover:bg-[#221e17] transition-colors">
-              <div className="font-['IBM_Plex_Mono',monospace] text-[11.5px] text-[#b9af9c] mb-2.5 flex items-center gap-2 font-bold">
-                <span className="w-2 h-2 rounded-full bg-[#b9af9c]" />
-                CLEARANCE · READ-ONLY
-              </div>
-              <h3 className="font-['IBM_Plex_Sans',sans-serif] font-semibold text-[16.5px] text-[#ede6d8] mb-2">
-                Auditor
-              </h3>
-              <p className="text-[#b9af9c] text-[14px] leading-relaxed m-0">
-                Sees the same cases with personal data masked by default, and can't alter what's on file.
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-2">
+              <span className="text-xs font-mono text-[#7fb2e8]">CLEARANCE · READ-ONLY</span>
+              <h3 className="font-semibold text-[17px] text-[#ede6d8]">Auditor</h3>
+              <p className="text-[#b9af9c] text-[14px]">
+                Sees the same cases with personal data masked by default, and can&apos;t alter what&apos;s on file.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Team Section */}
-      <section id="team" className="py-20 border-b border-[#3a352c]">
+      {/* Core Engineering & Research Team - REDESIGNED */}
+      <section id="team" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
+          <div className="max-w-[700px] mb-12">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Core Engineering &amp; Research
+            </div>
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              The people behind the case file
+              The people behind the forensic core
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
-              Six of us, each owning one piece of the pipeline, from raw header parsing to the console an analyst actually opens.
+            <p className="text-[#b9af9c] mt-2 text-[15px]">
+              Six engineers and researchers building deterministic email attribution, RFC validation, and forensic evidence pipelines.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Agent 01 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-01
+            {teamMembers.map((member, mIdx) => (
+              <div
+                key={mIdx}
+                className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3 hover:border-[#b9af9c] transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">
+                    {member.agentId}
+                  </span>
+                  <span className={`w-2.5 h-2.5 rounded-full ${member.dotColor}`} />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[17px] text-[#ede6d8]">{member.name}</h3>
+                  <div className="text-[13px] text-[#c9a227] font-mono mt-0.5">{member.role}</div>
+                </div>
               </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Jayaram Sappa
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] shrink-0" />
-                <span>System Design &amp; Backend Engineering</span>
-              </div>
-            </div>
-
-            {/* Agent 02 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-02
-              </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Vennela Obilisetti
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227] shrink-0" />
-                <span>Threat Intelligence</span>
-              </div>
-            </div>
-
-            {/* Agent 03 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-03
-              </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Katari Pavan Sai Krishna
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#7fa3ba] shrink-0" />
-                <span>ML Training</span>
-              </div>
-            </div>
-
-            {/* Agent 04 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-04
-              </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Eeli Hema Venkata Lalitha
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#b23a2e] shrink-0" />
-                <span>Forensics</span>
-              </div>
-            </div>
-
-            {/* Agent 05 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-05
-              </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Sairam Saladi
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227] shrink-0" />
-                <span>Database Integration</span>
-              </div>
-            </div>
-
-            {/* Agent 06 */}
-            <div className="bg-[linear-gradient(180deg,#f2ecdf,#e7dfcd)] border border-black/15 rounded-[2px] p-[18px] text-[#211d17] shadow-md">
-              <div className="bg-[#14120f] text-[#b9af9c] font-['IBM_Plex_Mono',monospace] text-[10.5px] font-semibold px-2 py-0.5 rounded-[2px] inline-block mb-3">
-                AGENT-06
-              </div>
-              <h3 className="font-['Fraunces',serif] font-semibold text-[17px] text-[#211d17] m-0 mb-2">
-                Penugonda Mounika
-              </h3>
-              <div className="flex items-center gap-2 text-[13px] text-[#4a453b]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#7fa3ba] shrink-0" />
-                <span>Frontend Engineering</span>
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
-      </section>
 
-      {/* Why We Built This Section */}
-      <section className="py-20 border-b border-[#3a352c]">
-        <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
+          {/* Why We Built This Quote Cards */}
+          <div className="mt-12 pt-8 border-t border-[#3a352c] space-y-6">
+            <h3 className="text-xs font-mono text-[#8e8574] uppercase tracking-wider font-semibold">
               Why we built this
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6">
-              <p className="text-[#b9af9c] text-[15px] leading-relaxed mb-4 m-0 italic">
-                "Building TraceXMail required constructing a deterministic forensic pipeline that verifies raw RFC822 headers, live SPF/DKIM/DMARC records, and BGP/ASN telemetry without relying on black-box heuristics."
-              </p>
-              <div className="font-['IBM_Plex_Mono',monospace] text-[12px] text-[#7fa3ba]">
-                Jayaram Sappa, System Design &amp; Backend Engineering
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-[#1a1712] p-6 rounded-[4px] border-l-2 border-[#b23a2e] space-y-3">
+                <p className="text-[#ede6d8] italic text-[14.5px] leading-relaxed font-serif">
+                  &quot;Building TraceXMail required constructing a deterministic forensic pipeline that verifies raw RFC822 headers, live SPF/DKIM/DMARC records, and BGP/ASN telemetry without relying on black-box heuristics.&quot;
+                </p>
+                <footer className="text-xs font-mono text-[#22c55e] uppercase">
+                  — JAYARAM SAPPA · SYSTEM ARCHITECTURE &amp; BACKEND
+                </footer>
               </div>
-            </div>
 
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6">
-              <p className="text-[#b9af9c] text-[15px] leading-relaxed mb-4 m-0 italic">
-                "Threat intelligence is only actionable when it identifies origin infrastructure and campaign clusters rather than just flagging domain age."
-              </p>
-              <div className="font-['IBM_Plex_Mono',monospace] text-[12px] text-[#7fa3ba]">
-                Vennela Obilisetti, Threat Intelligence
+              <div className="bg-[#1a1712] p-6 rounded-[4px] border-l-2 border-[#c9a227] space-y-3">
+                <p className="text-[#ede6d8] italic text-[14.5px] leading-relaxed font-serif">
+                  &quot;Threat intelligence is only actionable when it identifies origin infrastructure and campaign clusters rather than just flagging domain age.&quot;
+                </p>
+                <footer className="text-xs font-mono text-[#22c55e] uppercase">
+                  — VENNELA OBILISETTI · THREAT INTELLIGENCE &amp; DETECTION
+                </footer>
               </div>
             </div>
           </div>
@@ -1043,81 +1430,72 @@ export function LandingView({
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-20 border-b border-[#3a352c]">
+      <section id="pricing" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-12">
+          <div className="max-w-[650px] mb-10">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
+              Evaluation &amp; Access
+            </div>
             <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               Pricing
             </h2>
-            <p className="text-[#b9af9c] mt-3 text-[15.5px] max-w-[52ch]">
-              We're in pilot with a small number of security teams right now, so this reflects that stage, not a finished commercial plan.
+            <p className="text-[#b9af9c] mt-2 text-[15px]">
+              We&apos;re in pilot with a small number of security teams right now, so this reflects that stage, not a finished commercial plan.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pilot Access */}
-            <div className="bg-[#1d1a15] border-2 border-[#b23a2e] rounded-[4px] p-7 flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-[850px]">
+            <div className="bg-[#1d1a15] border border-[#b23a2e] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[12px] text-[#b9af9c] mb-2 font-bold">
-                  PILOT ACCESS
-                </div>
-                <div className="font-['Fraunces',serif] text-[32px] text-[#ede6d8] mb-1 font-semibold">
-                  Free
-                </div>
-                <div className="text-[#b9af9c] text-[13.5px] mb-5">
-                  For security teams evaluating TraceXMail during the pilot phase
-                </div>
-
-                <ul className="list-none p-0 m-0 mb-6 space-y-2.5">
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    Full analyst console, no feature gating
-                  </li>
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    Unlimited case uploads during the pilot window
-                  </li>
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    A direct line to the team building it
-                  </li>
-                </ul>
+                <span className="text-xs font-mono text-[#ff8d7d] font-bold">PILOT ACCESS</span>
+                <div className="font-['Fraunces',serif] text-[32px] font-bold text-[#ede6d8] mt-1">Free</div>
+                <p className="text-[#b9af9c] text-sm mt-1">For security teams evaluating TraceXMail during the pilot phase</p>
               </div>
-
+              <ul className="space-y-2 text-sm text-[#ede6d8]">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>Full analyst console, no feature gating</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>Unlimited case uploads during the pilot window</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>A direct line to the team building it</span>
+                </li>
+              </ul>
               <button
-                onClick={onRequestAccess || onOpenConsole}
-                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 px-6 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-colors cursor-pointer text-center"
+                onClick={onOpenConsole}
+                className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 rounded-[3px] font-semibold text-sm transition-colors cursor-pointer"
               >
                 Request pilot access
               </button>
             </div>
 
-            {/* Enterprise */}
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-7 flex flex-col justify-between">
+            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 sm:p-8 space-y-5">
               <div>
-                <div className="font-['IBM_Plex_Mono',monospace] text-[12px] text-[#b9af9c] mb-2 font-bold">
-                  ENTERPRISE
-                </div>
-                <div className="font-['Fraunces',serif] text-[32px] text-[#ede6d8] mb-1 font-semibold">
-                  Let's talk
-                </div>
-                <div className="text-[#b9af9c] text-[13.5px] mb-5">
-                  For organizations needing custom deployment, SLAs, or on-prem hosting
-                </div>
-
-                <ul className="list-none p-0 m-0 mb-6 space-y-2.5">
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    Dedicated onboarding
-                  </li>
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    Custom retention and compliance terms
-                  </li>
-                  <li className="text-[#b9af9c] text-[14px] pl-5 relative before:content-[''] before:absolute before:left-0 before:top-[7px] before:w-1.5 before:h-1.5 before:rounded-full before:bg-[#7fa3ba]">
-                    Priority support
-                  </li>
-                </ul>
+                <span className="text-xs font-mono text-[#c9a227] font-bold">ENTERPRISE</span>
+                <div className="font-['Fraunces',serif] text-[32px] font-bold text-[#ede6d8] mt-1">Let&apos;s talk</div>
+                <p className="text-[#b9af9c] text-sm mt-1">For organizations needing custom deployment, SLAs, or on-prem hosting</p>
               </div>
-
+              <ul className="space-y-2 text-sm text-[#ede6d8]">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>Dedicated onboarding</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>Custom retention and compliance terms</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-[#22c55e]" />
+                  <span>Priority support</span>
+                </li>
+              </ul>
               <button
                 onClick={onRequestAccess || onOpenConsole}
-                className="w-full bg-transparent hover:bg-[#221e17] text-[#ede6d8] py-3 px-6 rounded-[3px] font-medium text-[15px] border border-[#3a352c] hover:border-[#b9af9c] transition-colors cursor-pointer text-center"
+                className="w-full border border-[#3a352c] hover:border-[#b9af9c] text-[#ede6d8] py-3 rounded-[3px] font-semibold text-sm transition-colors cursor-pointer"
               >
                 Talk to us
               </button>
@@ -1127,102 +1505,125 @@ export function LandingView({
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20 border-b border-[#3a352c]">
+      <section id="faq" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-[640px] mb-8">
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
-              Questions we get asked
+          <div className="max-w-[720px] mb-10">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2.5 uppercase font-bold">
+              Frequently Asked Questions
+            </div>
+            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8]">
+              Everything you need to know, explained simply
             </h2>
+            <p className="text-[#b9af9c] mt-2 text-[15px]">
+              Clear answers on how TraceXMail works, why it is safer than regular filters, and how it protects your privacy.
+            </p>
           </div>
 
-          <div className="max-w-[760px] flex flex-col">
-            {/* FAQ 1 */}
-            <div className="border-b border-[#3a352c] py-5">
+          <div className="max-w-[850px] divide-y divide-[#3a352c]">
+            <div className="py-4">
               <button
                 onClick={() => toggleFaq(0)}
-                className="w-full text-left font-semibold text-[15px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0"
+                className="w-full text-left font-semibold text-[16px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0 hover:text-[#c9a227] transition-colors"
               >
-                <span>Do you store the contents of the emails I upload?</span>
-                <span className="font-['IBM_Plex_Mono',monospace] text-[#b9af9c] text-[18px]">
+                <span>How does TraceXMail tell if an email is really from who it says it is?</span>
+                <span className="font-['IBM_Plex_Mono',monospace] text-[#c9a227] text-[18px]">
                   {activeFaq === 0 ? '−' : '+'}
                 </span>
               </button>
               {activeFaq === 0 && (
-                <p className="text-[#b9af9c] text-[14px] mt-3 m-0 max-w-[64ch] leading-relaxed">
-                  Every case is scoped to your organization through row-level security in Postgres, and each finding is hashed and timestamped the moment it's produced, so it can't be silently altered later.
-                </p>
+                <div className="text-[#b9af9c] text-[14.5px] mt-3 space-y-2 leading-relaxed">
+                  <p>
+                    Think of an email like a postal package. Anyone can write &quot;From: CEO&quot; on the outside label with a marker pen. Traditional email apps just read the marker pen writing.
+                  </p>
+                  <p>
+                    TraceXMail instead inspects the actual digital wax seals (cryptographic signatures like SPF and DKIM) and tracks the physical post offices (server hops) the package passed through. If the wax seal was forged or the package originated from an unauthorized server in another country, we catch it instantly.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* FAQ 2 */}
-            <div className="border-b border-[#3a352c] py-5">
+            <div className="py-4">
               <button
                 onClick={() => toggleFaq(1)}
-                className="w-full text-left font-semibold text-[15px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0"
+                className="w-full text-left font-semibold text-[16px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0 hover:text-[#c9a227] transition-colors"
               >
-                <span>Which authentication standards does TraceXMail check?</span>
-                <span className="font-['IBM_Plex_Mono',monospace] text-[#b9af9c] text-[18px]">
+                <span>Do I need to be a cybersecurity expert to understand the results?</span>
+                <span className="font-['IBM_Plex_Mono',monospace] text-[#c9a227] text-[18px]">
                   {activeFaq === 1 ? '−' : '+'}
                 </span>
               </button>
               {activeFaq === 1 && (
-                <p className="text-[#b9af9c] text-[14px] mt-3 m-0 max-w-[64ch] leading-relaxed">
-                  SPF, DKIM, DMARC, and ARC, verified live against DNS rather than assumed from the headers alone.
-                </p>
+                <div className="text-[#b9af9c] text-[14.5px] mt-3 space-y-2 leading-relaxed">
+                  <p>
+                    Not at all. When you analyze an email, TraceXMail gives you a crystal-clear, plain-English summary right at the top (e.g., <em>&quot;Dangerous: Sender claims to be PayPal, but was sent through an anonymous Tor relay in Bulgaria&quot;</em>) alongside an interactive 3D map of the route.
+                  </p>
+                  <p>
+                    If your IT team, auditor, or law enforcement needs deep technical proofs (raw server logs, RFC headers, or SHA-256 evidence seals), everything is available in one click.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* FAQ 3 */}
-            <div className="border-b border-[#3a352c] py-5">
+            <div className="py-4">
               <button
                 onClick={() => toggleFaq(2)}
-                className="w-full text-left font-semibold text-[15px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0"
+                className="w-full text-left font-semibold text-[16px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0 hover:text-[#c9a227] transition-colors"
               >
-                <span>What file formats can I upload?</span>
-                <span className="font-['IBM_Plex_Mono',monospace] text-[#b9af9c] text-[18px]">
+                <span>Is my email data kept private and confidential?</span>
+                <span className="font-['IBM_Plex_Mono',monospace] text-[#c9a227] text-[18px]">
                   {activeFaq === 2 ? '−' : '+'}
                 </span>
               </button>
               {activeFaq === 2 && (
-                <p className="text-[#b9af9c] text-[14px] mt-3 m-0 max-w-[64ch] leading-relaxed">
-                  Standard RFC 822 email files: .eml, .msg, and .txt, either pasted as raw headers or uploaded directly.
-                </p>
+                <div className="text-[#b9af9c] text-[14.5px] mt-3 space-y-2 leading-relaxed">
+                  <p>
+                    Yes, 100%. Unlike online virus scanners that upload your emails to public search databases, TraceXMail processes your email headers securely in temporary memory.
+                  </p>
+                  <p>
+                    Your emails are never shared publicly or used to train third-party models. You retain complete custody of your forensic evidence.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* FAQ 4 */}
-            <div className="border-b border-[#3a352c] py-5">
+            <div className="py-4">
               <button
                 onClick={() => toggleFaq(3)}
-                className="w-full text-left font-semibold text-[15px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0"
+                className="w-full text-left font-semibold text-[16px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0 hover:text-[#c9a227] transition-colors"
               >
-                <span>Do I need a security background to use this?</span>
-                <span className="font-['IBM_Plex_Mono',monospace] text-[#b9af9c] text-[18px]">
+                <span>Why is TraceXMail better than regular spam filters or antivirus?</span>
+                <span className="font-['IBM_Plex_Mono',monospace] text-[#c9a227] text-[18px]">
                   {activeFaq === 3 ? '−' : '+'}
                 </span>
               </button>
               {activeFaq === 3 && (
-                <p className="text-[#b9af9c] text-[14px] mt-3 m-0 max-w-[64ch] leading-relaxed">
-                  No. The interface has a simplified overview for a first read of any case, and a full analyst console one click away for anyone who wants the underlying evidence.
-                </p>
+                <div className="text-[#b9af9c] text-[14.5px] mt-3 space-y-2 leading-relaxed">
+                  <p>
+                    Regular spam filters only look for known suspicious words or malicious links. Clever hackers bypass them by sending clean text that pretends to be a boss or supplier requesting an urgent wire transfer.
+                  </p>
+                  <p>
+                    TraceXMail doesn&apos;t just read the words—it validates the physical infrastructure behind the email, uncovering hidden proxy servers, Tor relays, and lookalike domain tricks that spam filters miss entirely.
+                  </p>
+                </div>
               )}
             </div>
 
-            {/* FAQ 5 */}
-            <div className="border-b border-[#3a352c] py-5">
+            <div className="py-4">
               <button
                 onClick={() => toggleFaq(4)}
-                className="w-full text-left font-semibold text-[15px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0"
+                className="w-full text-left font-semibold text-[16px] text-[#ede6d8] flex justify-between items-center gap-4 bg-transparent border-none cursor-pointer p-0 hover:text-[#c9a227] transition-colors"
               >
-                <span>Who is this built for right now?</span>
-                <span className="font-['IBM_Plex_Mono',monospace] text-[#b9af9c] text-[18px]">
+                <span>How can I test an email right now?</span>
+                <span className="font-['IBM_Plex_Mono',monospace] text-[#c9a227] text-[18px]">
                   {activeFaq === 4 ? '−' : '+'}
                 </span>
               </button>
               {activeFaq === 4 && (
-                <p className="text-[#b9af9c] text-[14px] mt-3 m-0 max-w-[64ch] leading-relaxed">
-                  We're a student team building TraceXMail for Smart India Hackathon problem statement 26106, currently piloting it with a small number of security teams.
-                </p>
+                <div className="text-[#b9af9c] text-[14.5px] mt-3 space-y-2 leading-relaxed">
+                  <p>
+                    You can click &quot;Open Console&quot; anywhere on this page to immediately test with real preloaded phishing cases (like Tor-based PayPal fraud or BEC attacks), or drag and drop your own <code>.eml</code>, <code>.msg</code>, or raw email text to get an instant breakdown.
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -1230,12 +1631,12 @@ export function LandingView({
       </section>
 
       {/* Final Call to Action */}
-      <section className="py-24 bg-[radial-gradient(ellipse_800px_400px_at_50%_100%,rgba(178,58,46,0.1),transparent_70%)]">
+      <section className="py-20 bg-[radial-gradient(ellipse_800px_400px_at_50%_100%,rgba(178,58,46,0.12),transparent_70%)]">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] lg:text-[40px] font-medium text-[#ede6d8] max-w-[20ch]">
+          <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[38px] lg:text-[42px] font-medium text-[#ede6d8] max-w-[22ch]">
             Stop guessing where an email threat came from.
           </h2>
-          <p className="text-[#b9af9c] my-4 text-[16px] max-w-[54ch] leading-relaxed">
+          <p className="text-[#b9af9c] my-4 text-[16px] max-w-[56ch] leading-relaxed">
             Drop your raw .eml file or paste email headers into the console. TraceXMail will reconstruct the cryptographic route, verify BGP hops, and generate forensic evidence in seconds.
           </p>
           <div className="flex flex-wrap items-center gap-3.5 mt-8">
@@ -1247,23 +1648,21 @@ export function LandingView({
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={() => scrollToSection('evidence-chain')}
+              onClick={() => scrollToSection('corpus-proof')}
               className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center gap-2"
             >
               <Route className="w-4 h-4 text-[#c9a227]" />
-              <span>Explore Evidence Chain</span>
+              <span>Explore Evidence Dossiers</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer id="landing-footer" className="border-t border-[#3a352c] bg-[#100e0c]/80 backdrop-blur-sm py-10">
+      <footer id="landing-footer" className="border-t border-[#3a352c] bg-[#100e0c]/90 backdrop-blur-sm py-10">
         <div className="w-full max-w-[1180px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[13.5px] text-[#b9af9c]">
           <div className="flex items-center gap-2.5">
-            <div className="w-4 h-4 rounded-full border border-[#b23a2e] relative shrink-0">
-              <div className="absolute inset-[3px] rounded-full bg-[#b23a2e]" />
-            </div>
+            <TraceXLogo size="xs" />
             <span className="font-medium tracking-tight text-[#ede6d8]">TraceXMail</span>
             <span className="text-[#6e6659] hidden sm:inline">•</span>
             <span className="text-[#8a8070] text-xs">Email Forensic Intelligence Platform</span>
@@ -1306,14 +1705,14 @@ export function LandingView({
               Developer Contact
             </a>
             <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2.5 py-0.5 rounded-[2px] text-[#22c55e] bg-[#22c55e]/10 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
               <span>VERIFIED DOMAIN</span>
             </div>
           </nav>
         </div>
       </footer>
 
-      {/* Mobile Persistent Bottom CTA Bar (visible on mobile viewports below sm breakpoint) */}
+      {/* Mobile Persistent Bottom CTA Bar */}
       <aside
         aria-label="Mobile Quick Access"
         className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#14120f]/95 backdrop-blur-md border-t border-[#3a352c] p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] shadow-[0_-8px_24px_rgba(0,0,0,0.6)]"

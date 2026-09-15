@@ -28,7 +28,7 @@ export function decodeQuotedPrintableToBuffer(input: string, isQHeader = false):
 
 /**
  * Decodes RFC 2047 encoded-words in email headers (e.g. `=?UTF-8?Q?...?=` or `=?UTF-8?B?...?=`).
- * Safely handles plain text strings and decodes multi-word sequences.
+ * Safely handles plain text strings, multi-byte UTF-8 emojis, and multi-word sequences.
  */
 export function decodeHeaderWords(input?: string | null): string {
   if (!input || typeof input !== 'string') return '';
@@ -40,8 +40,22 @@ export function decodeHeaderWords(input?: string | null): string {
       const enc = encoding.toUpperCase();
       if (enc === 'B') {
         const cleaned = data.replace(/\s+/g, '');
-        const decodedStr = Buffer.from(cleaned, 'base64').toString('utf-8');
-        return decodedStr;
+        // 1. Try modern TextDecoder with Uint8Array binary decode (works in browser & node)
+        try {
+          if (typeof atob === 'function') {
+            const binary = atob(cleaned);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i);
+            }
+            return new TextDecoder(charset || 'utf-8').decode(bytes);
+          }
+        } catch {}
+
+        // 2. Node Buffer fallback
+        if (typeof Buffer !== 'undefined') {
+          return Buffer.from(cleaned, 'base64').toString('utf-8');
+        }
       } else if (enc === 'Q') {
         const buf = decodeQuotedPrintableToBuffer(data, true);
         return buf.toString('utf-8');

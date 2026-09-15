@@ -798,11 +798,28 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
     }
   }
 
+  // Cryptographic authentication safety anchor:
+  // If SPF, DKIM, and DMARC pass with zero identity or relay anomalies, classify as Legitimate Clean mail
+  const isCryptographicallyVerifiedClean =
+    spfStatus === 'PASS' &&
+    dkimStatus === 'PASS' &&
+    (dmarcStatus === 'PASS' || dmarcStatus === 'ALIGNED') &&
+    !isTyposquat &&
+    !structuralIdentity.isBrandDisplayMismatch &&
+    !structuralIdentity.isReplyToMismatch &&
+    !torOrAbuseHop;
+
+  if (isCryptographicallyVerifiedClean) {
+    finalClass = 'Legitimate';
+  }
+
+  const calibratedThreatScore = isCryptographicallyVerifiedClean ? Math.min(totalThreatScore, 10) : totalThreatScore;
+
   const severity: ClassificationResult['severity'] =
-    totalThreatScore >= 80 ? 'CRITICAL'
-    : totalThreatScore >= 60 ? 'HIGH'
-    : totalThreatScore >= 35 ? 'MEDIUM'
-    : totalThreatScore >= 15 ? 'LOW'
+    calibratedThreatScore >= 80 ? 'CRITICAL'
+    : calibratedThreatScore >= 60 ? 'HIGH'
+    : calibratedThreatScore >= 35 ? 'MEDIUM'
+    : calibratedThreatScore >= 15 ? 'LOW'
     : 'CLEAN';
 
   // Authoritative top-level verdict strictly reconciled with composite multi-factor severity

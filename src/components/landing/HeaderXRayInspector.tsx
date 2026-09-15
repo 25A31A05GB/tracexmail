@@ -70,7 +70,11 @@ const HEADER_LINES: HeaderLine[] = [
   }
 ];
 
-export function HeaderXRayInspector() {
+interface HeaderXRayInspectorProps {
+  onOpenConsole?: () => void;
+}
+
+export function HeaderXRayInspector({ onOpenConsole }: HeaderXRayInspectorProps = {}) {
   const [selectedHeaderId, setSelectedHeaderId] = useState<string>('from');
   const activeHeader = HEADER_LINES.find(h => h.id === selectedHeaderId) || HEADER_LINES[0];
 

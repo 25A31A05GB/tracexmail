@@ -5,3 +5,4 @@ export { CyberThreatGlobe3D } from './CyberThreatGlobe3D';
 export { CyberMatrixBackground3D } from './CyberMatrixBackground3D';
 export { HeroForensicDeconstructor3D } from './HeroForensicDeconstructor3D';
 export { CompleteProject3DShowcase } from './CompleteProject3DShowcase';
+export { FullForensicArchitecture3D } from './FullForensicArchitecture3D';
