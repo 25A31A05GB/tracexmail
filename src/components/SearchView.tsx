@@ -15,7 +15,6 @@ import {
   FlaskConical
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
-import { SAMPLE_ANALYSES } from '../data/samples';
 import { getStandardizedVerdict } from '../utils/verdict';
 
 interface SearchViewProps {
@@ -39,18 +38,11 @@ export function SearchView({
 
   const dataset = useMemo(() => {
     const list: EmailAnalysis[] = [];
-    if (currentAnalysis && (!(currentAnalysis as any).is_demo || showDemoCases)) {
+    if (currentAnalysis && currentAnalysis.id && currentAnalysis.subject) {
       list.push(currentAnalysis);
     }
-    if (showDemoCases) {
-      SAMPLE_ANALYSES.forEach(s => {
-        if (!list.some(item => item.id === s.id)) {
-          list.push(s);
-        }
-      });
-    }
     return list;
-  }, [showDemoCases, currentAnalysis]);
+  }, [currentAnalysis]);
 
   const filteredResults = useMemo(() => {
     const q = query.toLowerCase().trim();

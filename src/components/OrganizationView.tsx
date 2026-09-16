@@ -163,7 +163,43 @@ export function OrganizationView({ organizationId }: OrganizationViewProps) {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Stacked Cards (< md) */}
+        <div className="block md:hidden divide-y divide-[#1a1e27]">
+          {auditLogs.length === 0 ? (
+            <div className="p-6 text-center text-[#4f5763] text-xs">
+              {loadingLogs ? 'Loading verified audit logs…' : 'No recent audit events recorded.'}
+            </div>
+          ) : (
+            auditLogs.map((log: any, idx: number) => (
+              <div key={log.id || idx} className="p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[#4f5763] text-[11px]">
+                    {log.created_at ? new Date(log.created_at).toLocaleString() : 'Recent'}
+                  </span>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-[#5fae82]/20 text-[#86efac]">
+                    {log.status || 'SUCCESS'}
+                  </span>
+                </div>
+
+                <div className="font-mono text-[#e7ebf1] text-xs font-semibold">
+                  {log.action || 'SECURITY_EVENT'}
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-[#1a1e27]">
+                  <span className="text-[#b9af9c] truncate max-w-[180px]">
+                    {log.user_email || log.user_id || 'system'}
+                  </span>
+                  <span className="font-mono text-[#5b8dd6]">
+                    {log.resource_type || 'case'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#0f1219] text-[#4f5763] font-mono uppercase text-[10.5px] border-b border-[#232833]">
               <tr>

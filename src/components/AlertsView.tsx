@@ -890,92 +890,164 @@ export function AlertsView({
                 No Slack deliveries recorded yet. Analyze an email or click &ldquo;Test Slack Connection&rdquo; to populate logs.
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
-                      <th className="py-2.5 px-3">Time</th>
-                      <th className="py-2.5 px-3">Subject / Trigger</th>
-                      <th className="py-2.5 px-3">Severity</th>
-                      <th className="py-2.5 px-3">Threat Score</th>
-                      <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">HTTP Code</th>
-                      <th className="py-2.5 px-3 text-right">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                    {deliveryLogs.map((log) => {
-                      const isDelivered = log.status === 'DELIVERED';
-                      const isSkipped = log.status === 'SKIPPED_SEVERITY';
-                      const isExpanded = expandedPayloadId === log.id;
+              <div>
+                {/* Mobile View: Stacked Cards (< md) */}
+                <div className="block md:hidden divide-y divide-slate-800/80">
+                  {deliveryLogs.map((log) => {
+                    const isDelivered = log.status === 'DELIVERED';
+                    const isSkipped = log.status === 'SKIPPED_SEVERITY';
+                    const isExpanded = expandedPayloadId === log.id;
 
-                      return (
-                        <React.Fragment key={log.id}>
-                          <tr className="hover:bg-slate-800/30">
-                            <td className="py-3 px-3 font-mono text-slate-400">
-                              {new Date(log.timestamp).toLocaleTimeString()}
-                            </td>
-                            <td className="py-3 px-3 font-semibold text-slate-200 max-w-xs truncate">
-                              {log.subject}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                log.severity === 'CRITICAL' ? 'bg-red-950 text-red-300 border border-red-800' :
-                                log.severity === 'HIGH' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                                'bg-slate-800 text-slate-300'
-                              }`}>
-                                {log.severity}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 font-mono">
-                              {log.threat_score}/100
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
-                                isDelivered ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                                isSkipped ? 'bg-slate-800 text-slate-400' :
-                                'bg-red-950 text-red-300 border border-red-800'
-                              }`}>
-                                {isDelivered ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <AlertTriangle className="w-3 h-3" />}
-                                {log.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 font-mono text-slate-400">
-                              {log.status_code || (isSkipped ? 'N/A' : '500')}
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              <button
-                                onClick={() => setExpandedPayloadId(isExpanded ? null : log.id)}
-                                className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
-                                title="Inspect Block Kit payload"
-                              >
-                                {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                              </button>
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr>
-                              <td colSpan={7} className="p-4 bg-slate-950/80 border-b border-slate-800">
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                                    <span className="flex items-center gap-1.5">
-                                      <Code2 className="w-3.5 h-3.5 text-emerald-400" />
-                                      Block Kit Payload Preview ({log.webhook_url_masked})
-                                    </span>
-                                    {log.error && <span className="text-red-400">{log.error}</span>}
-                                  </div>
-                                  <pre className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-300 overflow-x-auto max-h-48">
-                                    {JSON.stringify(log.payload_preview, null, 2)}
-                                  </pre>
-                                </div>
+                    return (
+                      <div key={log.id} className="p-3 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-slate-400">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            log.severity === 'CRITICAL' ? 'bg-red-950 text-red-300 border border-red-800' :
+                            log.severity === 'HIGH' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                            'bg-slate-800 text-slate-300'
+                          }`}>
+                            {log.severity}
+                          </span>
+                        </div>
+
+                        <div className="font-semibold text-slate-200 text-xs">
+                          {log.subject}
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-slate-400">Score: {log.threat_score}/100</span>
+                            <span className="text-slate-500">•</span>
+                            <span className="font-mono text-slate-400">HTTP {log.status_code || (isSkipped ? 'N/A' : '500')}</span>
+                          </div>
+
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
+                            isDelivered ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                            isSkipped ? 'bg-slate-800 text-slate-400' :
+                            'bg-red-950 text-red-300 border border-red-800'
+                          }`}>
+                            {isDelivered ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <AlertTriangle className="w-3 h-3" />}
+                            {log.status}
+                          </span>
+                        </div>
+
+                        <div className="pt-1">
+                          <button
+                            onClick={() => setExpandedPayloadId(isExpanded ? null : log.id)}
+                            className="w-full py-1 px-2 rounded bg-slate-800 text-slate-300 text-[11px] font-mono flex items-center justify-between"
+                          >
+                            <span>Payload Details</span>
+                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-2 text-xs">
+                            <div className="text-[10px] font-mono text-slate-400 truncate">
+                              Masked Webhook: {log.webhook_url_masked}
+                            </div>
+                            {log.error && <div className="text-[10px] text-red-400">{log.error}</div>}
+                            <pre className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-300 overflow-x-auto max-h-48">
+                              {JSON.stringify(log.payload_preview, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop View: Table (>= md) */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                        <th className="py-2.5 px-3">Time</th>
+                        <th className="py-2.5 px-3">Subject / Trigger</th>
+                        <th className="py-2.5 px-3">Severity</th>
+                        <th className="py-2.5 px-3">Threat Score</th>
+                        <th className="py-2.5 px-3">Status</th>
+                        <th className="py-2.5 px-3">HTTP Code</th>
+                        <th className="py-2.5 px-3 text-right">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                      {deliveryLogs.map((log) => {
+                        const isDelivered = log.status === 'DELIVERED';
+                        const isSkipped = log.status === 'SKIPPED_SEVERITY';
+                        const isExpanded = expandedPayloadId === log.id;
+
+                        return (
+                          <React.Fragment key={log.id}>
+                            <tr className="hover:bg-slate-800/30">
+                              <td className="py-3 px-3 font-mono text-slate-400">
+                                {new Date(log.timestamp).toLocaleTimeString()}
+                              </td>
+                              <td className="py-3 px-3 font-semibold text-slate-200 max-w-xs truncate">
+                                {log.subject}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  log.severity === 'CRITICAL' ? 'bg-red-950 text-red-300 border border-red-800' :
+                                  log.severity === 'HIGH' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
+                                  'bg-slate-800 text-slate-300'
+                                }`}>
+                                  {log.severity}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-mono">
+                                {log.threat_score}/100
+                              </td>
+                              <td className="py-3 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold inline-flex items-center gap-1 ${
+                                  isDelivered ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
+                                  isSkipped ? 'bg-slate-800 text-slate-400' :
+                                  'bg-red-950 text-red-300 border border-red-800'
+                                }`}>
+                                  {isDelivered ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <AlertTriangle className="w-3 h-3" />}
+                                  {log.status}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-slate-400">
+                                {log.status_code || (isSkipped ? 'N/A' : '500')}
+                              </td>
+                              <td className="py-3 px-3 text-right">
+                                <button
+                                  onClick={() => setExpandedPayloadId(isExpanded ? null : log.id)}
+                                  className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                                  title="Inspect Block Kit payload"
+                                >
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                </button>
                               </td>
                             </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={7} className="p-4 bg-slate-950/80 border-b border-slate-800">
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                                      <span className="flex items-center gap-1.5">
+                                        <Code2 className="w-3.5 h-3.5 text-emerald-400" />
+                                        Block Kit Payload Preview ({log.webhook_url_masked})
+                                      </span>
+                                      {log.error && <span className="text-red-400">{log.error}</span>}
+                                    </div>
+                                    <pre className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-300 overflow-x-auto max-h-48">
+                                      {JSON.stringify(log.payload_preview, null, 2)}
+                                    </pre>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

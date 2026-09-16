@@ -553,20 +553,6 @@ export function IngestionPipelineView({
                 <span className="xs:hidden inline">Upload</span>
               </button>
 
-              {/* Secondary Power-User & Integration Methods */}
-              <button
-                onClick={() => setActiveTab('batch')}
-                className={`pb-2 sm:pb-3 px-2 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                  activeTab === 'batch'
-                    ? 'border-[var(--stamp)] text-[var(--paper)] font-bold bg-[rgba(201,162,39,0.08)] rounded-t-sm'
-                    : 'border-transparent text-[#8a8070] hover:text-[var(--paper-dim)]'
-                }`}
-                title="Forensic Benchmark Attack Dataset Presets"
-              >
-                <Cpu className="w-3 h-3 text-[var(--stamp)] shrink-0" />
-                <span>Preset Cases</span>
-              </button>
-
               <button
                 onClick={() => setActiveTab('gmail')}
                 className={`pb-2 sm:pb-3 px-2 sm:px-3 text-xs font-medium border-b-2 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
@@ -592,15 +578,6 @@ export function IngestionPipelineView({
                 <span className="text-[var(--paper-dim)] font-sans text-[11px] sm:text-xs">
                   Paste raw email headers or RFC822 payload:
                 </span>
-                <button
-                  type="button"
-                  onClick={handleLoadSampleHeader}
-                  className="text-[11px] font-mono text-[var(--stamp)] hover:underline flex items-center gap-1 cursor-pointer self-start xs:self-auto py-0.5"
-                  title="Insert realistic benchmark RFC822 attack sample for immediate forensic testing"
-                >
-                  <Sparkles className="w-3 h-3 text-[var(--stamp)] shrink-0" />
-                  <span>Insert Sample Payload</span>
-                </button>
               </div>
 
               <textarea
@@ -664,35 +641,6 @@ export function IngestionPipelineView({
                   accept=".eml,.msg,.txt"
                   className="hidden"
                 />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'batch' && (
-            <div className="space-y-3 pt-2">
-              <p className="text-xs text-[var(--paper-dim)] font-sans">
-                Select one of the pre-loaded threat campaign samples to run through the forensic pipeline:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {SAMPLE_ANALYSES.map((sample) => (
-                  <div
-                    key={sample.id}
-                    onClick={() => {
-                      const rawContent = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\n\n${sample.name}`;
-                      executePipelineWithAnimation(rawContent, `${sample.id}.eml`);
-                    }}
-                    className="p-3.5 rounded-sm bg-[var(--ink)] border border-[var(--line)] hover:border-[var(--thread)] cursor-pointer transition-all space-y-1.5 group hover:bg-[#1f1b15]"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold uppercase text-[var(--thread)] bg-[rgba(178,58,46,0.15)] border border-[rgba(178,58,46,0.3)] px-2 py-0.5 rounded-sm">
-                        {sample.threatVerdict || sample.verdict}
-                      </span>
-                      <span className="text-[10.5px] font-mono text-[var(--paper-muted)]">{sample.id}</span>
-                    </div>
-                    <div className="text-xs font-semibold text-[var(--paper)] truncate group-hover:text-[var(--paper)]">{sample.subject}</div>
-                    <div className="text-[11px] text-[var(--paper-dim)] font-mono truncate">{sample.from}</div>
-                  </div>
-                ))}
               </div>
             </div>
           )}

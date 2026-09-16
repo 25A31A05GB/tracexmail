@@ -478,7 +478,7 @@ export function NonTechnicalEvidenceCard({
 
           <div className="p-4 sm:p-4.5 pt-1 border-t border-[#2B241E]">
             {/* Tech Chips Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 my-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 my-4">
               <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center">
                 <div className="text-[11.5px] text-[#9C9186] mb-1 font-mono">SPF</div>
                 <div className={`text-[14px] font-bold font-mono ${
@@ -497,7 +497,7 @@ export function NonTechnicalEvidenceCard({
                 </div>
               </div>
 
-              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center">
+              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center sm:col-span-2 lg:col-span-1">
                 <div className="text-[11.5px] text-[#9C9186] mb-1 font-mono">DMARC</div>
                 <div className={`text-[14px] font-bold font-mono ${
                   dmarcStatus === 'PASS' ? 'text-[#4ADE80]' : dmarcStatus === 'REJECT' || dmarcStatus === 'FAIL' ? 'text-[#D3564A]' : 'text-[#D3A039]'

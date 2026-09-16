@@ -102,11 +102,11 @@ export function ForensicCaseTwoPanel({
               Hover (?) for definitions
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-1">
             {evidenceCardData.checks.map((c, idx) => (
               <div
                 key={idx}
-                className="rounded border border-[#2A2D34] bg-[#1D2027] p-2.5 text-center flex flex-col justify-between"
+                className={`rounded border border-[#2A2D34] bg-[#1D2027] p-2.5 text-center flex flex-col justify-between ${idx === 2 ? 'sm:col-span-2 lg:col-span-1' : ''}`}
               >
                 <div>
                   <div className="text-[10px] text-[#8C94A0] font-semibold uppercase tracking-wider flex items-center justify-center gap-1">

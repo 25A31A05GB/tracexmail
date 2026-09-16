@@ -362,7 +362,78 @@ export function TeamView() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Mobile View: Stacked Cards (< md) */}
+          <div className="block md:hidden divide-y divide-[var(--line)]">
+            {invites.map((inv) => (
+              <div key={inv.id} className="p-3 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="font-mono text-xs font-medium text-[var(--paper)]">
+                    <div>{inv.email}</div>
+                    {inv.full_name && <div className="text-[10px] text-[var(--paper-dim)]">{inv.full_name}</div>}
+                  </div>
+                  <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-medium shrink-0 ${
+                    inv.role === 'admin' 
+                      ? 'bg-[rgba(201,162,39,0.2)] text-[var(--stamp)]' 
+                      : 'bg-[rgba(127,163,186,0.2)] text-[var(--slate)]'
+                  }`}>
+                    {inv.role.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="font-mono text-xs text-[var(--paper-dim)]">{inv.department || 'SOC Unit'}</span>
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                    inv.status === 'accepted' 
+                      ? 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)]' 
+                      : inv.status === 'revoked'
+                      ? 'text-[var(--thread)] bg-[rgba(178,58,46,0.15)]'
+                      : 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)]'
+                  }`}>
+                    {inv.status.toUpperCase()}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-[var(--paper-muted)] pt-1 border-t border-[var(--line)]">
+                  <span>Expires: {new Date(inv.expires_at).toLocaleDateString()}</span>
+                  {inv.status === 'pending' && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyInviteLink(inv)}
+                        className="inline-flex items-center gap-1 text-[11px] text-[var(--paper-dim)] hover:text-[var(--paper)]"
+                      >
+                        {copiedInviteId === inv.id ? (
+                          <Check className="w-3.5 h-3.5 text-[var(--forensic-green)]" />
+                        ) : (
+                          <LinkIcon className="w-3.5 h-3.5" />
+                        )}
+                        <span>{copiedInviteId === inv.id ? 'Copied' : 'Link'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleResendInvite(inv.id)}
+                        className="inline-flex items-center gap-1 text-[11px] text-[var(--slate)] hover:underline"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Resend</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeInvite(inv.id)}
+                        className="inline-flex items-center gap-1 text-[11px] text-[var(--thread)] hover:underline"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Revoke</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop View: Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[var(--ink)] text-[var(--paper-muted)] font-mono uppercase text-[10px] border-b border-[var(--line)]">
                 <tr>
@@ -472,7 +543,57 @@ export function TeamView() {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Stacked Cards (< md) */}
+        <div className="block md:hidden divide-y divide-[var(--line)]">
+          {team.map((mem) => (
+            <div key={mem.id} className="p-3 space-y-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[var(--ink)] border border-[var(--line)] text-[10px] font-mono flex items-center justify-center text-[var(--paper-dim)]">
+                    {mem.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="font-medium text-[var(--paper)]">{mem.name}</div>
+                    <div className="text-[10px] font-mono text-[var(--slate)] font-bold">
+                      {mem.employeeId || `EMP-${mem.id.substring(0, 4).toUpperCase()}`}
+                    </div>
+                  </div>
+                </div>
+
+                <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-medium ${
+                  mem.role === 'admin' 
+                    ? 'bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[var(--stamp)]/40' 
+                    : mem.role === 'analyst' 
+                      ? 'bg-[rgba(127,163,186,0.2)] text-[var(--slate)] border border-[var(--slate)]/40' 
+                      : 'bg-[rgba(237,230,216,0.1)] text-[var(--paper-dim)] border border-[var(--line)]'
+                }`}>
+                  {mem.role.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="font-mono text-[11px] text-[var(--paper)] truncate">
+                {mem.email}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[var(--line)]">
+                <div className="flex items-center gap-2">
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                    mem.status === 'ACTIVE' 
+                      ? 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)]' 
+                      : 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)]'
+                  }`}>
+                    {mem.status}
+                  </span>
+                  <span className="font-mono text-[var(--paper-muted)]">{mem.lastActive}</span>
+                </div>
+                <span className="text-[10px] font-mono text-[var(--forensic-green)]">● Active</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View: Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[var(--ink)] text-[var(--paper-muted)] font-mono uppercase text-[10.5px] border-b border-[var(--line)]">
               <tr>

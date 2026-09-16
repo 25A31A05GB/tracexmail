@@ -26,7 +26,6 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
-import { SAMPLE_ANALYSES } from '../data/samples';
 import { forensicApi } from '../lib/api';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
@@ -215,52 +214,6 @@ export function ThreatTimelineView({
         });
       }
     });
-
-    // 3. Add matching samples from SAMPLE_ANALYSES (only if demo fixtures enabled)
-    if (showDemoCases) {
-      SAMPLE_ANALYSES.forEach((sample) => {
-        if (seenIds.has(sample.id)) return;
-
-        const sEmail = sample.headers.fromEmail || sample.headers.from;
-        const sDomain = sEmail.includes('@') ? sEmail.split('@')[1].toLowerCase() : sEmail.toLowerCase();
-        const sReturnDomain = sample.headers.returnPath ? (sample.headers.returnPath.match(/@([a-zA-Z0-9.-]+)/) || [])[1] : '';
-
-        const matchesDomain = sDomain.includes(currentDomain) || currentDomain.includes(sDomain) || 
-                              (currentReturnPathDomain && sReturnDomain && sReturnDomain.includes(currentReturnPathDomain));
-        const matchesIp = sample.hops.some(h => h.fromIp === currentOriginIp);
-
-        if (matchesDomain || matchesIp || sample.headers.fromEmail === currentSenderEmail) {
-          seenIds.add(sample.id);
-          const sampleStd = getStandardizedVerdict(sample);
-          list.push({
-            id: sample.id,
-            date: sample.analyzedAt || sample.headers.date,
-            timestampMs: new Date(sample.headers.date || Date.now()).getTime() - 86400000 * 4,
-            caseId: sample.sessionId || `CASE-${sample.id.slice(0, 8)}`,
-            subject: sample.headers.subject,
-            sender: sample.headers.from,
-            senderEmail: sEmail,
-            returnPath: sample.headers.returnPath,
-            replyTo: sample.headers.replyTo,
-            originIp: sample.hops[0]?.fromIp || 'Unavailable',
-            asn: sample.hops[0]?.asn || 'Unmapped ASN',
-            asnOrg: sample.hops[0]?.org || 'Unmapped Provider',
-            location: sample.hops[0]?.city ? `${sample.hops[0].city}, ${sample.hops[0].countryCode || ''}` : 'Relay Location: Unresolved',
-            verdict: sampleStd.verdict,
-            threatScore: sampleStd.score,
-            spfStatus: (sample.auth.spf.status as any) || 'FAIL',
-            dkimStatus: (sample.auth.dkim.status as any) || 'FAIL',
-            dmarcStatus: (sample.auth.dmarc.status as any) || 'REJECT',
-            campaignName: 'Historical Campaign Investigation',
-            attackVector: sampleStd.isMalicious ? 'Credential Phishing' : 'Standard Delivery',
-            iocs: sample.urls.map(u => u.domain),
-            heuristics: (sample.heuristics || []).map(h => h.title),
-            isCurrentAnalysis: false,
-            rawSampleRef: sample
-          });
-        }
-      });
-    }
 
     // 3. Add entries from backend temporal analysis API if present
     backendTimelineEvents.forEach((bEvent, idx) => {

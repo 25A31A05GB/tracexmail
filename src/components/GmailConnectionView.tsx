@@ -2493,53 +2493,98 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               {auditLogs.length === 0 ? (
                 <p className="text-xs text-slate-400 py-3 text-center">No quarantine events recorded yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 text-[11px]">
-                      <tr>
-                        <th className="p-2">Timestamp</th>
-                        <th className="p-2">Subject / Message</th>
-                        <th className="p-2">Sender</th>
-                        <th className="p-2">Risk Score</th>
-                        <th className="p-2">Stage</th>
-                        <th className="p-2">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {auditLogs.map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-900/40">
-                          <td className="p-2 text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                          <td className="p-2 text-slate-200 font-semibold max-w-[220px] truncate" title={log.subject}>{log.subject}</td>
-                          <td className="p-2 text-slate-400 max-w-[180px] truncate" title={log.from}>{log.from}</td>
-                          <td className="p-2">
-                            <span className={`font-bold ${log.threatScore >= 70 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {log.threatScore}/100
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              log.deliveryStage === 'pre-delivery-hold'
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                : 'bg-slate-800 text-slate-400'
-                            }`}>
-                              {log.deliveryStage === 'pre-delivery-hold' ? 'PRE-DELIVERY' : 'POST-DELIVERY'}
-                            </span>
-                          </td>
-                          <td className="p-2">
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              log.action === 'HOLD_QUARANTINED'
-                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                : log.action === 'ALERT_DISPATCHED'
-                                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                : 'bg-emerald-500/20 text-emerald-300'
-                            }`}>
-                              {log.action}
-                            </span>
-                          </td>
+                <div>
+                  {/* Mobile View: Stacked Cards (< md) */}
+                  <div className="block md:hidden divide-y divide-slate-800/80">
+                    {auditLogs.map((log) => (
+                      <div key={log.id} className="p-3 space-y-2 text-xs font-mono">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 text-[11px]">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                          <span className={`font-bold ${log.threatScore >= 70 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {log.threatScore}/100 Risk
+                          </span>
+                        </div>
+
+                        <div className="text-slate-200 font-semibold truncate" title={log.subject}>
+                          {log.subject}
+                        </div>
+
+                        <div className="text-[11px] text-slate-400 truncate">
+                          From: {log.from}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-800/60">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            log.deliveryStage === 'pre-delivery-hold'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            {log.deliveryStage === 'pre-delivery-hold' ? 'PRE-DELIVERY' : 'POST-DELIVERY'}
+                          </span>
+
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            log.action === 'HOLD_QUARANTINED'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : log.action === 'ALERT_DISPATCHED'
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              : 'bg-emerald-500/20 text-emerald-300'
+                          }`}>
+                            {log.action}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop View: Table (>= md) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800 text-[11px]">
+                        <tr>
+                          <th className="p-2">Timestamp</th>
+                          <th className="p-2">Subject / Message</th>
+                          <th className="p-2">Sender</th>
+                          <th className="p-2">Risk Score</th>
+                          <th className="p-2">Stage</th>
+                          <th className="p-2">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {auditLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-slate-900/40">
+                            <td className="p-2 text-slate-400">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                            <td className="p-2 text-slate-200 font-semibold max-w-[220px] truncate" title={log.subject}>{log.subject}</td>
+                            <td className="p-2 text-slate-400 max-w-[180px] truncate" title={log.from}>{log.from}</td>
+                            <td className="p-2">
+                              <span className={`font-bold ${log.threatScore >= 70 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                {log.threatScore}/100
+                              </span>
+                            </td>
+                            <td className="p-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                log.deliveryStage === 'pre-delivery-hold'
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                  : 'bg-slate-800 text-slate-400'
+                              }`}>
+                                {log.deliveryStage === 'pre-delivery-hold' ? 'PRE-DELIVERY' : 'POST-DELIVERY'}
+                              </span>
+                            </td>
+                            <td className="p-2">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                log.action === 'HOLD_QUARANTINED'
+                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                  : log.action === 'ALERT_DISPATCHED'
+                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                  : 'bg-emerald-500/20 text-emerald-300'
+                              }`}>
+                                {log.action}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>

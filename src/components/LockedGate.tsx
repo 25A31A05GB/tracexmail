@@ -52,7 +52,7 @@ export function LockedGate({ onSignIn, onRequestAccess }: LockedGateProps) {
             </div>
           </div>
           <div className="p-7 space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
               <div className="bg-[#12151c] border border-[#232833] rounded-lg p-4">
                 <div className="text-[10.5px] text-[#4f5763] uppercase tracking-wider font-mono">Open Cases</div>
                 <div className="font-mono text-2xl text-[#e7ebf1] mt-1">14</div>
@@ -67,21 +67,21 @@ export function LockedGate({ onSignIn, onRequestAccess }: LockedGateProps) {
               </div>
             </div>
             <div className="bg-[#12151c] border border-[#232833] rounded-lg overflow-hidden">
-              <div className="grid grid-cols-5 gap-3.5 p-3.5 border-b border-[#232833] text-[10.5px] font-mono text-[#4f5763] uppercase">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 p-3.5 border-b border-[#232833] text-[10.5px] font-mono text-[#4f5763] uppercase">
                 <div>Case</div>
                 <div>Subject</div>
                 <div>Severity</div>
                 <div>Score</div>
                 <div>Action</div>
               </div>
-              <div className="grid grid-cols-5 gap-3.5 p-3.5 border-b border-[#1a1e27] text-xs text-[#7d8794]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 p-3.5 border-b border-[#1a1e27] text-xs text-[#7d8794]">
                 <div className="font-mono text-[#5b8dd6]">CASE-2291</div>
                 <div>Urgent: Updated Direct Deposit Routing</div>
                 <div><span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#c25a4a]/20 text-[#c25a4a]">CRITICAL</span></div>
                 <div>94</div>
                 <div className="text-[#4f5763]">Restricted</div>
               </div>
-              <div className="grid grid-cols-5 gap-3.5 p-3.5 text-xs text-[#7d8794]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 p-3.5 text-xs text-[#7d8794]">
                 <div className="font-mono text-[#5b8dd6]">CASE-2288</div>
                 <div>Action Required: Verify Office 365 Password</div>
                 <div><span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[#c9a227]/20 text-[#c9a227]">HIGH</span></div>

@@ -267,7 +267,7 @@ export function CasesView({
       console.warn('Error fetching cases from backend:', err);
       if (!isSilent) {
         setFetchError(err?.message || 'Failed to connect to backend database');
-        setCases(showDemoCases ? SAMPLE_ANALYSES : []);
+        setCases([]);
       }
     } finally {
       if (!isSilent) {
@@ -915,9 +915,178 @@ export function CasesView({
         </div>
       </div>
 
-      {/* Cases Table */}
+      {/* Cases Mobile Stacked Cards + Desktop Table */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Stacked Cards (< md) */}
+        <div className="block md:hidden divide-y divide-slate-800/80">
+          {filteredCases.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 font-mono">
+              <div className="max-w-md mx-auto space-y-3">
+                <AlertCircle className="w-8 h-8 mx-auto text-slate-500" />
+                <div className="text-sm font-semibold text-slate-300">
+                  {showDemoCases ? 'No matching forensic cases found' : 'No analyst cases ingested yet'}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {showDemoCases
+                    ? 'Try adjusting your search query or severity filter.'
+                    : 'Live cases view currently excludes demo fixtures. Upload an RFC 822 EML file to begin live ingestion.'}
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={onOpenNewModal}
+                    className="w-full justify-center px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Ingest Email
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <AnimatePresence initial={false} mode="popLayout">
+              {filteredCases.map((c, i) => {
+                const title = c.title || c.name || c.headers?.subject || c.subject || 'Untitled Forensic Case';
+                const desc = c.analyst_notes || c.description || c.headers?.from || c.from || 'Standard message analysis';
+                const stdVerdict = getStandardizedVerdict(c);
+                const threatScore = stdVerdict.score;
+                const severity = (c.severity || c.threat || stdVerdict.severity || 'HIGH').toUpperCase();
+                const status = (c.status || 'open').toLowerCase();
+                const totalLinked = c.total_emails ?? (c.members?.length || c.email_ids?.length || 1);
+                const suggestedCount = c.suggested_members?.length || 0;
+                const isNewWsCase = Boolean(recentWebSocketCaseIds[c.id] || (lastCreatedCaseId && lastCreatedCaseId === c.id));
+
+                return (
+                  <motion.div
+                    key={c.id || i}
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    className={`p-4 space-y-3 font-mono text-xs ${isNewWsCase ? 'bg-emerald-950/20 ring-1 ring-emerald-500/40' : ''}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-1.5 font-bold text-blue-400">
+                          <Layers className="w-3.5 h-3.5 text-blue-500" />
+                          <span>{c.id || `TXM-CASE-${i + 1}`}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {isNewWsCase && (
+                            <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/60 rounded text-[9px]">
+                              LIVE WS INGEST
+                            </span>
+                          )}
+                          {c.is_demo ? (
+                            <span className="px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/80 rounded text-[9px]">
+                              CORPUS / DEMO
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 rounded text-[9px]">
+                              LIVE INGEST
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                          severity.includes('CRIT') || severity.includes('PHISH')
+                            ? 'bg-rose-950/80 border-rose-600 text-rose-300'
+                            : severity.includes('HIGH') || severity.includes('SUSP')
+                            ? 'bg-amber-950/80 border-amber-600 text-amber-300'
+                            : 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                        }`}
+                      >
+                        {severity}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="font-semibold text-slate-200 line-clamp-2">{title}</div>
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{desc}</div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1 text-[11px]">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Threat:</span>
+                        <div className="w-14 h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${stdVerdict.colors.bar}`}
+                            style={{ width: `${Math.min(threatScore, 100)}%` }}
+                          />
+                        </div>
+                        <span className="font-bold text-slate-200">{threatScore}/100</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 bg-slate-800 text-slate-200 rounded font-semibold border border-slate-700 text-[10px]">
+                          {totalLinked} {totalLinked === 1 ? 'email' : 'emails'}
+                        </span>
+                        {suggestedCount > 0 && (
+                          <span className="px-1.5 py-0.5 bg-amber-950/80 border border-amber-600/60 text-amber-300 rounded text-[9px] flex items-center gap-0.5">
+                            <Sparkles className="w-2 h-2" />
+                            +{suggestedCount}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                      <select
+                        value={status}
+                        onChange={(e) => handleQuickStatusChange(c, e.target.value)}
+                        className={`px-2 py-1 rounded text-[10px] uppercase font-semibold border cursor-pointer focus:outline-none ${
+                          status === 'open'
+                            ? 'bg-blue-950/80 border-blue-600 text-blue-300'
+                            : status === 'investigating' || status === 'in_progress'
+                            ? 'bg-purple-950/80 border-purple-600 text-purple-300'
+                            : status === 'escalated'
+                            ? 'bg-rose-950/80 border-rose-600 text-rose-300'
+                            : status === 'resolved'
+                            ? 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        <option value="open">OPEN</option>
+                        <option value="investigating">INVESTIGATING</option>
+                        <option value="escalated">ESCALATED</option>
+                        <option value="resolved">RESOLVED</option>
+                        <option value="quarantined">QUARANTINED</option>
+                      </select>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handlePreviewEvidence(c)}
+                          title="Inspect Evidence Card"
+                          className="px-2 py-1 bg-amber-950/80 text-amber-300 border border-amber-700/60 rounded text-[11px] font-semibold flex items-center gap-1"
+                        >
+                          <Tag className="w-3 h-3" />
+                          <span>Evidence</span>
+                        </button>
+                        <button
+                          onClick={() => handleInspectCase(c)}
+                          className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded text-[11px] font-semibold flex items-center gap-1"
+                        >
+                          <span>Inspect</span>
+                          <ArrowUpRight className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteCase(e, c)}
+                          className="p-1 bg-slate-800/80 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 rounded text-[11px]"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          )}
+        </div>
+
+        {/* Desktop View: Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-slate-950/80 border-b border-slate-800 text-slate-400 uppercase tracking-wider text-[10px]">
               <tr>

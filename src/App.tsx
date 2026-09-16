@@ -12,7 +12,7 @@ import { TeamView } from './components/TeamView';
 import { AccountSettingsView } from './components/AccountSettingsView';
 import { AlertToast } from './components/AlertToast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { SAMPLE_ANALYSES } from './data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from './data/samples';
 import { EmailAnalysis } from './types';
 import { useWebSocketAlerts, WebSocketAlert } from './hooks/useWebSocketAlerts';
 import { 
@@ -179,7 +179,7 @@ export default function App() {
       if (authSub) authSub.unsubscribe();
     };
   }, []);
-  const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
+  const [currentAnalysis, setCurrentAnalysis] = useState<EmailAnalysis>(EMPTY_ANALYSIS);
   const [activeTab, setActiveTab] = useState<NavTab>('ingest');
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [upgradeTargetFeature, setUpgradeTargetFeature] = useState<string>('Enterprise SOC Suite');
@@ -597,7 +597,7 @@ export default function App() {
       setCasesRefreshSignal(prev => prev + 1);
       return;
     }
-    setCurrentAnalysis(SAMPLE_ANALYSES[0]);
+    setCurrentAnalysis(EMPTY_ANALYSIS);
     setActiveTab('overview');
   };
 
