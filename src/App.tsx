@@ -54,13 +54,13 @@ const InvestigationObjectiveModal = lazyWithRetry(() => import('./components/Inv
 const CommandPaletteModal = lazyWithRetry(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })), 'CommandPaletteModal');
 const KeyboardShortcutsModal = lazyWithRetry(() => import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal })), 'KeyboardShortcutsModal');
 
-// Code-split authentication flows
-const LoginView = lazyWithRetry(() => import('./components/LoginView').then(m => ({ default: m.LoginView })), 'LoginView');
-const SignupView = lazyWithRetry(() => import('./components/SignupView').then(m => ({ default: m.SignupView })), 'SignupView');
-const ForgotPasswordView = lazyWithRetry(() => import('./components/ForgotPasswordView').then(m => ({ default: m.ForgotPasswordView })), 'ForgotPasswordView');
-const ResetPasswordView = lazyWithRetry(() => import('./components/ResetPasswordView').then(m => ({ default: m.ResetPasswordView })), 'ResetPasswordView');
-const AcceptInviteView = lazyWithRetry(() => import('./components/AcceptInviteView').then(m => ({ default: m.AcceptInviteView })), 'AcceptInviteView');
-const MagicLinkVerifyView = lazyWithRetry(() => import('./components/MagicLinkVerifyView').then(m => ({ default: m.MagicLinkVerifyView })), 'MagicLinkVerifyView');
+// Authentication and onboarding views directly imported to guarantee single-instance React runtime stability
+import { LoginView } from './components/LoginView';
+import { SignupView } from './components/SignupView';
+import { ForgotPasswordView } from './components/ForgotPasswordView';
+import { ResetPasswordView } from './components/ResetPasswordView';
+import { AcceptInviteView } from './components/AcceptInviteView';
+import { MagicLinkVerifyView } from './components/MagicLinkVerifyView';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
 
 function ViewSuspenseLoader() {

@@ -30,7 +30,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
       msg.includes('Failed to fetch dynamically imported module') ||
       msg.includes('Importing a module script failed') ||
       msg.includes('error loading dynamically imported module') ||
-      msg.includes('dynamically imported module');
+      msg.includes('dynamically imported module') ||
+      msg.includes("Cannot read properties of null (reading 'useState')") ||
+      msg.includes("Cannot read property 'useState' of null") ||
+      msg.includes('Invalid hook call');
 
     return { hasError: true, error, isChunkError: isChunk };
   }
@@ -42,7 +45,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
       msg.includes('Failed to fetch dynamically imported module') ||
       msg.includes('Importing a module script failed') ||
       msg.includes('error loading dynamically imported module') ||
-      msg.includes('dynamically imported module');
+      msg.includes('dynamically imported module') ||
+      msg.includes("Cannot read properties of null (reading 'useState')") ||
+      msg.includes("Cannot read property 'useState' of null") ||
+      msg.includes('Invalid hook call');
 
     this.setState({ errorInfo, isChunkError: isChunk });
     console.error(

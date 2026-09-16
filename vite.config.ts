@@ -8,6 +8,27 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  resolve: {
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      'lucide-react',
+      'motion/react',
+      'axios',
+      '@supabase/supabase-js',
+      'js-sha256',
+      'recharts',
+      'leaflet',
+      'html2canvas',
+      'jspdf'
+    ],
+  },
   build: {
     sourcemap: true,
     rollupOptions: {

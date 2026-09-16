@@ -40,7 +40,6 @@ import { EmailAnalysis } from '../types';
 import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
-import { FullForensicArchitecture3D } from './3d/FullForensicArchitecture3D';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -186,10 +185,6 @@ export function LandingView({
             <button onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               Why TraceXMail
             </button>
-            <button onClick={() => scrollToSection('full-architecture-3d')} className="text-[#ede6d8] hover:text-[#c9a227] font-semibold transition-colors bg-transparent border-none cursor-pointer flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227]" />
-              <span>3D Architecture</span>
-            </button>
             <button onClick={() => scrollToSection('corpus-proof')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
               Corpus Proof
             </button>
@@ -245,13 +240,6 @@ export function LandingView({
               className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
             >
               Why TraceXMail (Challenges &amp; Solution)
-            </button>
-            <button
-              onClick={() => { scrollToSection('full-architecture-3d'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px] flex items-center gap-2"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227]" />
-              <span>3D Forensic Architecture</span>
             </button>
             <button
               onClick={() => { scrollToSection('corpus-proof'); setMobileMenuOpen(false); }}
@@ -436,11 +424,6 @@ export function LandingView({
         </div>
       </section>
 
-      {/* FULL 3D INTERACTIVE ARCHITECTURE SECTION */}
-      <FullForensicArchitecture3D
-        onOpenConsole={onOpenConsole}
-        onSelectCase={onSelectCase}
-      />
 
       {/* Corpus Proof & Detection Output */}
       <section id="corpus-proof" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#171410]">
