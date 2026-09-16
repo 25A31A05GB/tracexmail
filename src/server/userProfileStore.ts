@@ -201,7 +201,9 @@ export async function resolveUserProfile(authUser: {
     : (metaRole === 'admin' || metaRole === 'analyst' || metaRole === 'read_only')
       ? metaRole
       : 'analyst';
-  const resolvedOrgId = authUser.user_metadata?.organization_id || DEFAULT_ORG_ID;
+  const defaultUserOrg = 'org_' + (userId.replace(/[^a-zA-Z0-9]/g, '_') || cleanEmail.replace(/[^a-zA-Z0-9]/g, '_'));
+  const rawMetaOrg = authUser.user_metadata?.organization_id;
+  const resolvedOrgId = (rawMetaOrg && rawMetaOrg !== 'org_acme_soc_01') ? rawMetaOrg : defaultUserOrg;
 
   const resolvedProfile: StoredUserProfile = {
     id: userId,

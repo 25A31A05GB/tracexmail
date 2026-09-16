@@ -2398,7 +2398,7 @@
 31.14.21.0/24|RO|ripencc
 31.14.22.0/23|RO|ripencc
 31.14.24.0/24|ES|ripencc
-31.14.25.0/24|VG|ripencc
+31.14.25.0/24|RO|ripencc
 31.14.26.0/24|US|ripencc
 31.14.27.0/24|KZ|ripencc
 31.14.28.0/24|IT|ripencc
@@ -3923,7 +3923,7 @@
 37.77.132.0/22|RU|ripencc
 37.77.136.0/21|IT|ripencc
 37.77.144.0/24|US|ripencc
-37.77.145.0/24|CZ|ripencc
+37.77.145.0/24|GB|ripencc
 37.77.146.0/24|SC|ripencc
 37.77.147.0/24|SC|ripencc
 37.77.148.0/24|SC|ripencc

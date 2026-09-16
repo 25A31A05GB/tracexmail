@@ -34,7 +34,7 @@ import { SAMPLE_ANALYSES } from '../data/samples';
 import { useWebSocketAlerts } from '../hooks/useWebSocketAlerts';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
-import { UserRole } from '../hooks/useSession';
+import { UserRole, useSession } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { EvidenceTagCard } from './EvidenceTagCard';
 
@@ -57,6 +57,8 @@ export function CasesView({
   onToggleDemoCases,
   role = 'analyst'
 }: CasesViewProps) {
+  const { session } = useSession();
+  const currentUser = session?.user;
   const isReadOnly = role === 'read_only';
   const [cases, setCases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -253,30 +255,16 @@ export function CasesView({
         exclude_demo: !showDemoCases,
         mask_pii: maskPii ? true : undefined
       });
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const sorted = [...data].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
         setCases(sorted);
         if (!isSilent) setLoading(false);
         return;
       }
 
-      if (isSupabaseConfigured) {
-        const { data: dbData, error } = await supabase
-          .from('cases')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (!error && dbData && (dbData.length > 0 || !showDemoCases)) {
-          const sorted = [...dbData].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-          setCases(sorted);
-          if (!isSilent) setLoading(false);
-          return;
-        }
-      }
-
-      setCases(Array.isArray(data) ? data : []);
+      setCases([]);
     } catch (err: any) {
-      console.warn('Error fetching cases from backend/supabase:', err);
+      console.warn('Error fetching cases from backend:', err);
       if (!isSilent) {
         setFetchError(err?.message || 'Failed to connect to backend database');
         setCases(showDemoCases ? SAMPLE_ANALYSES : []);
@@ -291,7 +279,15 @@ export function CasesView({
   // Immediate optimistic update on real-time WebSocket case events
   useEffect(() => {
     if (!lastCaseUpdate) return;
-    const { type, case: caseData, caseId } = lastCaseUpdate;
+    const { type, case: caseData, caseId, userId, userEmail, organizationId } = lastCaseUpdate;
+
+    // Check if event belongs to this user/org or is public demo
+    if (userId && currentUser?.id && userId !== currentUser.id) {
+      return; // Ignore other users' private case events
+    }
+    if (userEmail && currentUser?.email && userEmail !== currentUser.email && !userId) {
+      return;
+    }
 
     if (type === 'CASE_CREATED' && caseData && caseData.id) {
       setRecentWebSocketCaseIds(prev => ({ ...prev, [caseData.id]: Date.now() }));
@@ -317,7 +313,7 @@ export function CasesView({
 
     // Follow-up background sync
     fetchCases(true);
-  }, [lastCaseUpdate]);
+  }, [lastCaseUpdate, currentUser?.id, currentUser?.email]);
 
   useEffect(() => {
     if (lastCreatedCaseId) {
@@ -325,10 +321,18 @@ export function CasesView({
     }
   }, [lastCreatedCaseId]);
 
-  // Trigger refetch on mount, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert
+  // Trigger refetch on mount, user session change, explicit refresh signal, showDemoCases toggle, maskPii toggle, or new WebSocket alert
   useEffect(() => {
     fetchCases(false);
-  }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii]);
+  }, [alerts, lastCreatedCaseId, refreshSignal, showDemoCases, maskPii, currentUser?.id, currentUser?.email]);
+
+  // Real-time polling safety loop (every 5 seconds) to ensure cases update seamlessly
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchCases(true);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [showDemoCases, maskPii, currentUser?.id, currentUser?.email]);
 
   // Window event listener for cross-component real-time triggers (Gmail sync, direct ingest)
   useEffect(() => {
@@ -487,6 +491,7 @@ export function CasesView({
       ? Math.max(...selectedSampleList.map(s => getStandardizedVerdict(s).score))
       : 0;
 
+    const userOrgId = (session as any)?.organizationId || (currentUser?.id ? `org_${currentUser.id}` : 'org_default');
     try {
       const payload = {
         name: caseTitle,
@@ -496,7 +501,11 @@ export function CasesView({
         status: newCaseStatus,
         severity: newCaseSeverity,
         threat_score: computedThreatScore,
-        organization_id: 'org_acme_soc_01'
+        organization_id: userOrgId,
+        user_id: currentUser?.id,
+        user_email: currentUser?.email,
+        created_by: currentUser?.id || currentUser?.email || 'analyst',
+        assigned_user: currentUser?.email || 'Lead Analyst'
       };
 
       if (isSupabaseConfigured) {
@@ -505,7 +514,10 @@ export function CasesView({
             .from('cases')
             .insert([{
               id: `case-${Date.now()}`,
-              organization_id: 'org_acme_soc_01',
+              organization_id: userOrgId,
+              user_id: currentUser?.id,
+              user_email: currentUser?.email,
+              created_by: currentUser?.id,
               title: payload.title,
               description: payload.analyst_notes || 'Forensic investigation case initialized.',
               status: payload.status.toUpperCase(),
@@ -513,7 +525,7 @@ export function CasesView({
               threat_score: computedThreatScore,
               created_at: new Date().toISOString(),
               tags: ['Forensic'],
-              assigned_user: 'Lead Analyst',
+              assigned_user: currentUser?.email || 'Lead Analyst',
               source: 'manual'
             }])
             .select()

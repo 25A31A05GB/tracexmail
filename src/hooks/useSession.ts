@@ -108,7 +108,7 @@ export function useSession(): UseSessionReturn {
         const defaultRole = (currentUser.email === 'arfathof@gmail.com' || currentUser.user_metadata?.role === 'admin')
           ? 'admin'
           : (currentUser.user_metadata?.role || 'analyst');
-        const defaultOrg = currentUser.user_metadata?.organization_id || 'org_acme_soc_01';
+        const defaultOrg = currentUser.user_metadata?.organization_id || `org_${currentUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const newProfile: Partial<UserProfile> = {
           id: currentUser.id,
           email: currentUser.email || '',

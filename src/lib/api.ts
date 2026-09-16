@@ -181,7 +181,8 @@ export async function initializeSession(): Promise<{ token: string | null; user:
 
     // Fetch user profile from Supabase profiles table
     let role = 'analyst';
-    let organizationId = DEFAULT_ORG_ID;
+    const defaultUserOrg = 'org_' + (userId.replace(/[^a-zA-Z0-9]/g, '_') || email.replace(/[^a-zA-Z0-9]/g, '_'));
+    let organizationId = defaultUserOrg;
 
     try {
       const { data: profile, error: profileErr } = await supabase
@@ -192,7 +193,9 @@ export async function initializeSession(): Promise<{ token: string | null; user:
 
       if (!profileErr && profile) {
         if (profile.role) role = profile.role;
-        if (profile.organization_id) organizationId = profile.organization_id;
+        if (profile.organization_id && profile.organization_id !== 'org_acme_soc_01') {
+          organizationId = profile.organization_id;
+        }
       } else {
         // Fallback: Check users table if profiles table is unavailable
         try {
@@ -203,7 +206,9 @@ export async function initializeSession(): Promise<{ token: string | null; user:
             .maybeSingle();
           if (userRow) {
             if (userRow.role) role = userRow.role;
-            if (userRow.organization_id) organizationId = userRow.organization_id;
+            if (userRow.organization_id && userRow.organization_id !== 'org_acme_soc_01') {
+              organizationId = userRow.organization_id;
+            }
           }
         } catch {}
 
@@ -213,7 +218,7 @@ export async function initializeSession(): Promise<{ token: string | null; user:
         } else if (session.user.user_metadata?.role) {
           role = session.user.user_metadata.role;
         }
-        if (session.user.user_metadata?.organization_id) {
+        if (session.user.user_metadata?.organization_id && session.user.user_metadata.organization_id !== 'org_acme_soc_01') {
           organizationId = session.user.user_metadata.organization_id;
         }
       }
@@ -288,9 +293,15 @@ apiClient.interceptors.request.use(async (config) => {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
 
-  if (!config.headers.has('x-organization-id')) {
-    config.headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
+  if (memorySessionUser?.userId) {
+    config.headers.set('x-user-id', memorySessionUser.userId);
   }
+  if (memorySessionUser?.email) {
+    config.headers.set('x-user-email', memorySessionUser.email);
+  }
+
+  const effectiveOrg = memorySessionUser?.organizationId || (memorySessionUser?.userId ? `org_${memorySessionUser.userId.replace(/[^a-zA-Z0-9]/g, '_')}` : DEFAULT_ORG_ID);
+  config.headers.set('x-organization-id', effectiveOrg);
 
   return config;
 });
@@ -346,9 +357,6 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (!headers.has('x-user-id') && memorySessionUser?.userId) {
-    headers.set('x-user-id', memorySessionUser.userId);
-  }
   if (!headers.has('x-user-email') && memorySessionUser?.email) {
     headers.set('x-user-email', memorySessionUser.email);
   }
@@ -356,11 +364,48 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
     headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
   }
 
-  return fetch(targetUrl, {
-    ...init,
-    credentials: init?.credentials || 'include',
-    headers
-  });
+  try {
+    return await fetch(targetUrl, {
+      ...init,
+      credentials: init?.credentials || 'include',
+      headers
+    });
+  } catch (err: any) {
+    // If external or custom API_URL failed with a network error (Failed to fetch), retry direct relative path
+    if (typeof input === 'string' && input.startsWith('/api') && targetUrl !== input) {
+      console.warn(`[apiFetch] Primary fetch to ${targetUrl} failed (${err?.message}), falling back to direct relative endpoint ${input}`);
+      try {
+        return await fetch(input, {
+          ...init,
+          headers
+        });
+      } catch (fallbackErr) {
+        // Continue to credentials fallback
+      }
+    }
+
+    // If credentials: 'include' was rejected by browser strict third-party cookie/CORS policy, retry with same-origin credentials
+    if (!init?.credentials || init?.credentials === 'include') {
+      try {
+        return await fetch(targetUrl, {
+          ...init,
+          credentials: 'same-origin',
+          headers
+        });
+      } catch (credErr) {
+        // If relative endpoint also exists, try relative without credentials
+        if (typeof input === 'string' && input.startsWith('/api')) {
+          try {
+            return await fetch(input, {
+              ...init,
+              headers
+            });
+          } catch {}
+        }
+      }
+    }
+    throw err;
+  }
 }
 
 export interface HealthResponse {

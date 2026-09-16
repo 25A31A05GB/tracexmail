@@ -16,7 +16,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'analyst' | 'admin' | 'read_only'>('analyst');
-  const [organizationId, setOrganizationId] = useState('org_acme_soc_01');
+  const [organizationId, setOrganizationId] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -106,6 +106,10 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
 
     try {
       if (mode === 'signup') {
+        const customOrg = organizationId.trim();
+        const fallbackOrg = 'org_' + email.trim().replace(/[^a-zA-Z0-9]/g, '_');
+        const assignedOrg = (customOrg && customOrg !== 'org_acme_soc_01') ? customOrg : fallbackOrg;
+
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
@@ -113,7 +117,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
             data: {
               full_name: fullName.trim() || undefined,
               role,
-              organization_id: organizationId.trim() || 'org_acme_soc_01'
+              organization_id: assignedOrg
             }
           }
         });
@@ -123,6 +127,10 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
         }
 
         if (authData.user) {
+          const finalOrg = (customOrg && customOrg !== 'org_acme_soc_01')
+            ? customOrg
+            : `org_${authData.user.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
           // Attempt to insert profile record
           try {
             await supabase.from('profiles').upsert([
@@ -130,7 +138,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                 id: authData.user.id,
                 email: email.trim(),
                 role,
-                organization_id: organizationId.trim() || 'org_acme_soc_01',
+                organization_id: finalOrg,
                 full_name: fullName.trim() || null
               }
             ]);

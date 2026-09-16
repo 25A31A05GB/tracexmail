@@ -63,6 +63,7 @@ import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { Interactive3DTiltCard, CyberMatrixBackground3D } from './3d';
+import { useSession } from '../hooks/useSession';
 
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
@@ -281,6 +282,9 @@ const getHeatColor = (z: number, severity: string) => {
 };
 
 export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthrough, viewMode = 'simple' }: DashboardViewProps) {
+  const { session } = useSession();
+  const currentUser = session?.user;
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [casesList, setCasesList] = useState<EmailAnalysis[]>([]);
@@ -352,25 +356,8 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
         if (!selectedAnalysisId || selectedAnalysisId === SAMPLE_ANALYSES[0]?.id) {
           setSelectedAnalysisId(parsed[0].id);
         }
-      }
-
-      if (isSupabaseConfigured) {
-        try {
-          const { count, error } = await supabase
-            .from('cases')
-            .select('*', { count: 'exact', head: true });
-          if (!error && typeof count === 'number' && statsData) {
-            setStats(prev => prev ? {
-              ...prev,
-              summary: {
-                ...prev.summary,
-                total_cases: Math.max(prev.summary?.total_cases || 0, count)
-              }
-            } : statsData);
-          }
-        } catch (e) {
-          console.debug('[DashboardView] Supabase cases count query fallback:', e);
-        }
+      } else if (Array.isArray(rawCases) && rawCases.length === 0) {
+        setCasesList([]);
       }
     } catch (err) {
       console.error('Failed to load dashboard data', err);
@@ -379,18 +366,18 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
     }
   };
 
-  // Trigger refetch on mount and whenever a new WebSocket alert message arrives
+  // Trigger refetch on mount and whenever user session changes or WebSocket alert arrives
   useEffect(() => {
     fetchDashboardData();
-  }, [alerts]);
+  }, [alerts, currentUser?.id, currentUser?.email]);
 
-  // Periodic safety net polling interval (30s)
+  // Periodic real-time safety net polling interval (6s)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchDashboardData();
-    }, 30000);
+    }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentUser?.id, currentUser?.email]);
 
   // Compute 30 days email verdict data from real backend trends or case records
   const verdict30DayData = useMemo(() => {

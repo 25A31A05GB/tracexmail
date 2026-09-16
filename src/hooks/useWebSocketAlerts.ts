@@ -25,6 +25,9 @@ export interface CaseUpdateEvent {
   case?: any;
   note?: any;
   triage_action?: string;
+  userId?: string;
+  userEmail?: string;
+  organizationId?: string;
   timestamp: string;
 }
 

@@ -143,6 +143,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [renewingWatch, setRenewingWatch] = useState<boolean>(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [blockedAuthUrl, setBlockedAuthUrl] = useState<string | null>(null);
+  const [startingOAuth, setStartingOAuth] = useState<boolean>(false);
 
   // Real-time Progress Indicator & WebSocket Sync state
   const [syncProgress, setSyncProgress] = useState<number>(0);
@@ -196,31 +198,158 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   const pushWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/gmail/pubsub/push` : '/api/gmail/pubsub/push';
 
-  // Ingestion Analysis Queue State
+  // Ingestion Analysis Queue State & Exponential Backoff Polling
   const [ingestionQueue, setIngestionQueue] = useState<any[]>([]);
   const [loadingQueue, setLoadingQueue] = useState<boolean>(false);
+  const [queueRetryState, setQueueRetryState] = useState<{
+    isRetrying: boolean;
+    retryCount: number;
+    nextRetryDelayMs: number;
+    error: string | null;
+  }>({
+    isRetrying: false,
+    retryCount: 0,
+    nextRetryDelayMs: 0,
+    error: null
+  });
 
-  const fetchQueue = async () => {
-    try {
-      setLoadingQueue(true);
-      const res = await apiFetch('/api/gmail/ingestion-queue');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.queue) {
-          setIngestionQueue(data.queue);
-        }
+  const consecutiveFailuresRef = useRef<number>(0);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isFetchingQueueRef = useRef<boolean>(false);
+  const isComponentMountedRef = useRef<boolean>(true);
+
+  // Configuration for ingestion queue polling
+  const BASE_QUEUE_POLL_MS = 4000;
+  const MAX_QUEUE_BACKOFF_MS = 60000; // Cap backoff at 60s
+  const BACKOFF_MULTIPLIER = 2;
+  const JITTER_FACTOR = 0.2; // 0-20% randomization to prevent thundering herd
+
+  const calculateBackoffDelay = (failures: number, retryAfterSec?: number | null): number => {
+    if (typeof retryAfterSec === 'number' && retryAfterSec > 0) {
+      return Math.min(retryAfterSec * 1000, MAX_QUEUE_BACKOFF_MS);
+    }
+    // Exponential formula: base * 2^(failures - 1)
+    const exponential = BASE_QUEUE_POLL_MS * Math.pow(BACKOFF_MULTIPLIER, Math.max(0, failures - 1));
+    const capped = Math.min(exponential, MAX_QUEUE_BACKOFF_MS);
+    const jitter = capped * JITTER_FACTOR * Math.random();
+    return Math.round(capped + jitter);
+  };
+
+  const scheduleNextQueuePoll = (delayMs: number) => {
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+    if (!isComponentMountedRef.current) return;
+    pollTimeoutRef.current = setTimeout(() => {
+      fetchQueue(false);
+    }, delayMs);
+  };
+
+  const fetchQueue = async (isManual = false) => {
+    if (isFetchingQueueRef.current && !isManual) return;
+
+    if (isManual) {
+      consecutiveFailuresRef.current = 0;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
-    } catch (err) {
-      console.warn('[GmailConnectionView] Error fetching queue:', err);
+    }
+
+    isFetchingQueueRef.current = true;
+    setLoadingQueue(true);
+
+    try {
+      const res = await apiFetch('/api/gmail/ingestion-queue');
+
+      if (res.status === 429) {
+        // Rate limited: read Retry-After header if supplied
+        consecutiveFailuresRef.current += 1;
+        const retryAfterHeader = res.headers.get('Retry-After');
+        const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+        const delay = calculateBackoffDelay(consecutiveFailuresRef.current, retryAfterSec);
+
+        setQueueRetryState({
+          isRetrying: true,
+          retryCount: consecutiveFailuresRef.current,
+          nextRetryDelayMs: delay,
+          error: 'Rate limited (HTTP 429)'
+        });
+
+        console.warn(
+          `[GmailConnectionView] Ingestion queue rate-limited (HTTP 429). Retrying in ${Math.round(delay / 1000)}s (backoff attempt #${consecutiveFailuresRef.current}).`
+        );
+        scheduleNextQueuePoll(delay);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const data = await res.json();
+      if (data && Array.isArray(data.queue)) {
+        setIngestionQueue(data.queue);
+      }
+
+      if (consecutiveFailuresRef.current > 0) {
+        console.info('[GmailConnectionView] Ingestion queue polling successfully recovered from backoff.');
+      }
+
+      consecutiveFailuresRef.current = 0;
+      setQueueRetryState({
+        isRetrying: false,
+        retryCount: 0,
+        nextRetryDelayMs: 0,
+        error: null
+      });
+
+      // Healthy interval
+      scheduleNextQueuePoll(BASE_QUEUE_POLL_MS);
+    } catch (err: any) {
+      consecutiveFailuresRef.current += 1;
+      const delay = calculateBackoffDelay(consecutiveFailuresRef.current);
+      const errMsg = err?.message || 'Network fetch failure';
+
+      setQueueRetryState({
+        isRetrying: true,
+        retryCount: consecutiveFailuresRef.current,
+        nextRetryDelayMs: delay,
+        error: errMsg
+      });
+
+      console.warn(
+        `[GmailConnectionView] Ingestion queue fetch error (${errMsg}). Backing off for ${Math.round(delay / 1000)}s (failure #${consecutiveFailuresRef.current})`
+      );
+      scheduleNextQueuePoll(delay);
     } finally {
+      isFetchingQueueRef.current = false;
       setLoadingQueue(false);
     }
   };
 
   useEffect(() => {
-    fetchQueue();
-    const interval = setInterval(fetchQueue, 4000);
-    return () => clearInterval(interval);
+    isComponentMountedRef.current = true;
+    fetchQueue(false);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isComponentMountedRef.current) {
+        // Resume queue checking immediately when user returns to the tab
+        fetchQueue(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isComponentMountedRef.current = false;
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   // Subscribe to gmailPubSub state changes
@@ -492,29 +621,73 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   };
 
   const handleConnectGmail = async () => {
+    if (startingOAuth) return;
+    setStartingOAuth(true);
+    setErrorMsg(null);
+    setSyncResult(null);
+    setBlockedAuthUrl(null);
+
+    let authUrl = '';
+
     try {
-      setErrorMsg('');
-      setSyncResult('');
-
-      const res = await apiFetch('/api/gmail/oauth/start');
-
-      const data = await res.json();
-      if (!res.ok || !data?.url) {
-        throw new Error(data?.detail || data?.message || `Failed to start Gmail OAuth (${res.status})`);
+      // 1. Primary: Request OAuth authorization URL from backend
+      try {
+        const res = await apiFetch('/api/gmail/oauth/start');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.url) {
+            authUrl = data.url;
+          }
+        }
+      } catch (apiErr: any) {
+        console.warn('[GmailOAuth] apiFetch failed, trying direct relative fetch:', apiErr);
       }
 
+      // 2. Direct relative fetch fallback without custom preflight headers
+      if (!authUrl) {
+        try {
+          const directRes = await fetch('/api/gmail/oauth/start');
+          if (directRes.ok) {
+            const data = await directRes.json();
+            if (data?.url) {
+              authUrl = data.url;
+            }
+          }
+        } catch (directErr) {
+          console.warn('[GmailOAuth] Direct relative fetch failed:', directErr);
+        }
+      }
+
+      // 3. Client-side resilience fallback: construct provider OAuth URL directly
+      if (!authUrl) {
+        const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
+        const baseUrl = window.location.origin;
+        const redirectUri = `${baseUrl}/api/v1/gmail/callback`;
+        const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
+        authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
+      }
+
+      // 4. Open Google authorization popup directly
       const popup = window.open(
-        data.url,
+        authUrl,
         'TraceXMailGmailOAuth',
         'width=600,height=700,resizable=yes,scrollbars=yes'
       );
 
       if (!popup) {
-        throw new Error('OAuth popup was blocked. Please allow popups for TraceXMail.');
+        setBlockedAuthUrl(authUrl);
+        setErrorMsg('OAuth popup window was blocked by your browser. Please use the button below to authorize Gmail.');
       }
     } catch (err: any) {
-      console.error('[GmailOAuth] Failed to start OAuth flow:', err);
-      setErrorMsg('Error starting Gmail OAuth flow: ' + (err?.message || String(err)));
+      console.error('[GmailOAuth] Unexpected error starting OAuth:', err);
+      const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
+      const redirectUri = `${window.location.origin}/api/v1/gmail/callback`;
+      const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
+      const fallbackUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
+      setBlockedAuthUrl(fallbackUrl);
+      setErrorMsg('Could not open popup automatically. Please use the button below to authorize Gmail directly.');
+    } finally {
+      setStartingOAuth(false);
     }
   };
 
@@ -965,10 +1138,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         ) : (
           <button
             onClick={handleConnectGmail}
-            className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
+            disabled={startingOAuth}
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
           >
-            <Zap className="w-4 h-4 fill-current" />
-            <span>Connect Gmail Account</span>
+            {startingOAuth ? (
+              <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
+            ) : (
+              <Zap className="w-4 h-4 fill-current" />
+            )}
+            <span>{startingOAuth ? 'Connecting to Google...' : 'Connect Gmail Account'}</span>
           </button>
         )}
       </div>
@@ -1058,6 +1236,27 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         </div>
       )}
 
+      {blockedAuthUrl && (
+        <div className="p-4 bg-amber-950/30 border border-amber-500/40 rounded-xl text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <ExternalLink className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-300">Complete Google Sign-In</p>
+              <p className="text-amber-200/80 text-[11px]">If your browser blocked the authorization popup, click below to open the official Google OAuth consent screen directly.</p>
+            </div>
+          </div>
+          <a
+            href={blockedAuthUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold rounded-lg text-xs transition-colors shrink-0 flex items-center gap-1.5 shadow-sm"
+          >
+            <span>Open Google Sign-in</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      )}
+
       {errorMsg && (
         <div className="p-4 bg-red-950/30 border border-red-900/40 rounded-xl text-red-200 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -1095,12 +1294,21 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               <Layers className="w-4 h-4" />
             </div>
             <div>
-              <div className="text-sm font-semibold text-white flex items-center gap-2">
+              <div className="text-sm font-semibold text-white flex items-center flex-wrap gap-2">
                 <span>Automated Ingestion &amp; Forensic Analysis Queue</span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   LIVE QUEUE DETECTOR
                 </span>
+                {queueRetryState.isRetrying && (
+                  <span
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/70 text-amber-300 border border-amber-800/60 flex items-center gap-1.5"
+                    title={queueRetryState.error || 'Transient connection delay, exponential backoff active'}
+                  >
+                    <Clock className="w-3 h-3 text-amber-400 animate-pulse" />
+                    <span>Retrying in {Math.ceil(queueRetryState.nextRetryDelayMs / 1000)}s (Backoff #{queueRetryState.retryCount})</span>
+                  </span>
+                )}
               </div>
               <div className="text-xs text-slate-400">
                 New emails detected by Gmail sync are automatically queued for immediate forensic analysis upon arrival
@@ -1108,7 +1316,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             </div>
           </div>
           <button
-            onClick={fetchQueue}
+            onClick={() => fetchQueue(true)}
             className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${loadingQueue ? 'animate-spin' : ''}`} />
@@ -1118,8 +1326,20 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
         {ingestionQueue.length === 0 ? (
           <div className="p-4 bg-[#1c1813] border border-[#2a251e] rounded-lg text-center text-xs text-stone-400 flex flex-col items-center justify-center gap-1.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 opacity-70" />
-            <span>Analysis queue is clear. Incoming Gmail sync emails will automatically queue here upon detection.</span>
+            {queueRetryState.isRetrying ? (
+              <>
+                <Clock className="w-5 h-5 text-amber-400 opacity-80" />
+                <span className="text-amber-200/90 font-medium">Temporary sync pause — backing off to protect connection</span>
+                <span className="text-stone-400 text-[11px]">
+                  Retry attempt #{queueRetryState.retryCount} scheduled in {Math.ceil(queueRetryState.nextRetryDelayMs / 1000)}s ({queueRetryState.error || 'Rate limit or network delay'}). Click "Refresh Queue" to reconnect now.
+                </span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 opacity-70" />
+                <span>Analysis queue is clear. Incoming Gmail sync emails will automatically queue here upon detection.</span>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1">

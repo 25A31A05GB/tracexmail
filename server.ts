@@ -920,6 +920,14 @@ export const inMemoryCases = new Map<string, any>([
   }]
 ]);
 
+// Pristine baseline template cases (immutable snapshot so other users' edits never corrupt default template status)
+export const BASELINE_SAMPLE_CASES = new Map<string, any>(
+  Array.from(inMemoryCases.entries()).map(([k, v]) => [k, { ...v }])
+);
+
+// Map of user-specific isolated cases and per-user case modifications
+export const userScopedCasesStore = new Map<string, any>();
+
 // Real Forensic Analysis Engine (Dynamic Geolocation, True IP Extraction, Authentic DNS/RDAP)
 async function parseRawEmailToAnalysis(
   rawContent: string,
@@ -1855,12 +1863,17 @@ async function startServer() {
     'X-API-Key',
     'x-api-key',
     'X-Requested-With',
+    'x-requested-with',
     'X-Goog-PubSub-Token',
     'apikey',
     'x-organization-id',
     'X-Organization-Id',
+    'x-user-id',
+    'X-User-Id',
     'x-user-email',
     'X-User-Email',
+    'x-client-info',
+    'X-Client-Info',
     'Accept',
     'Cache-Control',
     'Pragma',
@@ -1869,25 +1882,6 @@ async function startServer() {
 
   const corsOptionsDelegate = (req: express.Request, callback: (err: Error | null, options?: CorsOptions) => void) => {
     const requestOrigin = req.header('Origin');
-
-    let isAllowedOrigin = false;
-    if (!requestOrigin) {
-      isAllowedOrigin = true;
-    } else if (
-      allowedOriginsList.includes(requestOrigin) ||
-      requestOrigin.endsWith('.vercel.app') ||
-      requestOrigin.endsWith('.run.app') ||
-      requestOrigin.endsWith('.onrender.com') ||
-      requestOrigin.endsWith('.pages.dev') ||
-      requestOrigin.includes('localhost') ||
-      requestOrigin.includes('127.0.0.1')
-    ) {
-      isAllowedOrigin = true;
-    }
-
-    if (!isAllowedOrigin) {
-      return callback(null, { origin: false });
-    }
 
     // Dynamically include any requested headers from Access-Control-Request-Headers alongside standard headers
     const reqHeaders = req.header('access-control-request-headers');
@@ -1907,29 +1901,27 @@ async function startServer() {
   };
 
   // Explicit CORS middleware guaranteeing Access-Control-* headers on EVERY response
-  // (Crucial for Vercel frontend https://tracexmail.vercel.app communicating with Render backend)
+  // Covers Google AI Studio iframes, Cloud Run, Vercel frontend, Render backend, and local development
   app.use((req, res, next) => {
     const origin = req.header('Origin');
-    if (origin) {
-      const clean = origin.trim().replace(/\/+$/, '');
-      const isAllowed =
-        allowedOriginsList.includes(clean) ||
-        clean === 'https://tracexmail.vercel.app' ||
-        clean.endsWith('.vercel.app') ||
-        clean.endsWith('.onrender.com') ||
-        clean.endsWith('.run.app') ||
-        clean.endsWith('.pages.dev') ||
-        clean.includes('localhost') ||
-        clean.includes('127.0.0.1');
+    const reqHeaders = req.header('access-control-request-headers');
 
-      if (isAllowed) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-        res.setHeader('Access-Control-Allow-Credentials', 'true');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, x-api-key, X-Requested-With, X-Goog-PubSub-Token, apikey, x-organization-id, X-Organization-Id, x-user-email, X-User-Email, Accept, Cache-Control, Pragma, Origin');
-        res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
-      }
+    if (origin && origin !== 'null') {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
     }
+
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+
+    if (reqHeaders) {
+      res.setHeader('Access-Control-Allow-Headers', reqHeaders);
+    } else {
+      res.setHeader('Access-Control-Allow-Headers', standardAllowedHeaders.join(', '));
+    }
+
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
 
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
@@ -2012,30 +2004,54 @@ async function startServer() {
   });
 
   // Core Helper: Strictly filters cases by logged-in user and organization scope to guarantee multi-tenant data isolation
-  function getUserFilteredCases(user: AuthenticatedRequest['user'] | undefined, pool: any[]): any[] {
+  function getUserFilteredCases(
+    user: AuthenticatedRequest['user'] | undefined, 
+    pool: any[], 
+    allowDemo: boolean = true
+  ): any[] {
     if (!user) {
-      return pool;
+      return allowDemo ? Array.from(BASELINE_SAMPLE_CASES.values()).map(c => ({ ...c })) : [];
     }
     const userId = user.userId;
-    const userEmail = (user.email || '').toLowerCase();
+    const userEmail = (user.email || '').toLowerCase().trim();
     const orgId = user.organizationId;
 
-    if (!userId && !userEmail && !orgId) {
-      return pool;
-    }
+    // Combine pool with user-scoped memory store entries
+    const combinedPool = [...pool];
+    userScopedCasesStore.forEach((caseItem, key) => {
+      const isOwner = (userId && caseItem.user_id === userId) ||
+        (userEmail && caseItem.user_email?.toLowerCase().trim() === userEmail) ||
+        key.endsWith(`__${userId}`) ||
+        key.endsWith(`__${userEmail}`);
 
-    // 1. Match cases explicitly owned by or created by or assigned to or belonging to this user or user's organization
-    const userOwned = pool.filter((c: any) => {
+      if (isOwner) {
+        const existingIdx = combinedPool.findIndex(p => p.id === caseItem.id);
+        if (existingIdx >= 0) {
+          combinedPool[existingIdx] = caseItem;
+        } else {
+          combinedPool.push(caseItem);
+        }
+      }
+    });
+
+    // 1. Strictly match cases belonging to THIS user
+    const userOwned = combinedPool.filter((c: any) => {
+      // If the case explicitly belongs to another user, reject
+      if (c.user_id && userId && c.user_id !== userId) return false;
+      if (c.created_by && userId && c.created_by !== userId) return false;
+      if (c.user_email && userEmail && c.user_email.toLowerCase().trim() !== userEmail && !c.is_demo) return false;
+
+      // Positive match for this user
       if (userId && (c.user_id === userId || c.created_by === userId || c.assigned_user_id === userId)) {
         return true;
       }
       if (userEmail && (
-        (c.user_email && c.user_email.toLowerCase() === userEmail) ||
-        (c.assigned_user && c.assigned_user.toLowerCase() === userEmail)
+        (c.user_email && c.user_email.toLowerCase().trim() === userEmail) ||
+        (c.assigned_user && c.assigned_user.toLowerCase().trim() === userEmail)
       )) {
         return true;
       }
-      if (orgId && c.organization_id === orgId) {
+      if (orgId && orgId !== 'org_acme_soc_01' && c.organization_id === orgId) {
         return true;
       }
       return false;
@@ -2045,17 +2061,23 @@ async function startServer() {
       return userOwned;
     }
 
-    // 2. Initial user state: if user has no explicit custom records yet, return a user-scoped localized copy of initial sample cases
-    return pool.filter((c: any) => c.is_demo || c.source === 'sample').map((c: any) => ({
-      ...c,
-      user_id: userId || 'usr_default',
-      user_email: userEmail || 'user@local.sec',
-      created_by: userId || 'usr_default',
-      organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
-    }));
+    // 2. Initial user state: if user has no explicit custom records yet, return pristine baseline sample cases
+    // initialized specifically for this user with fresh OPEN status so other users' edits never leak.
+    if (allowDemo) {
+      return Array.from(BASELINE_SAMPLE_CASES.values()).map((c: any) => ({
+        ...c,
+        status: c.status || 'OPEN',
+        user_id: userId || 'usr_default',
+        user_email: userEmail || 'user@local.sec',
+        created_by: userId || 'usr_default',
+        organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
+      }));
+    }
+
+    return [];
   }
 
-  // Dashboard Stats (Deterministic computation from Supabase Postgres with in-memory fallback)
+  // Dashboard Stats (Deterministic computation strictly scoped to authenticated user records)
   const handleStatsResponse = async (req: express.Request, res: express.Response) => {
     const supabase = getSupabaseClient();
     const user = (req as AuthenticatedRequest).user;
@@ -2069,9 +2091,27 @@ async function startServer() {
 
       if (supabase) {
         let casesQuery = supabase.from('cases').select('*');
-        if (orgId) {
+        if (user?.userId || user?.email) {
+          const userFilters: string[] = [];
+          if (user.userId) {
+            userFilters.push(`user_id.eq.${user.userId}`, `created_by.eq.${user.userId}`);
+          }
+          if (user.email) {
+            userFilters.push(`user_email.eq.${user.email}`, `assigned_user.eq.${user.email}`);
+          }
+          if (orgId && orgId !== 'org_acme_soc_01') {
+            userFilters.push(`organization_id.eq.${orgId}`);
+          }
+          if (includeDemo) {
+            userFilters.push('is_demo.eq.true');
+          }
+          if (userFilters.length > 0) {
+            casesQuery = casesQuery.or(userFilters.join(','));
+          }
+        } else if (orgId && orgId !== 'org_acme_soc_01') {
           casesQuery = casesQuery.eq('organization_id', orgId);
         }
+
         const { data: cData, error: casesError } = await casesQuery;
         if (!casesError && cData && cData.length > 0) {
           rawCasesData = cData;
@@ -2109,7 +2149,7 @@ async function startServer() {
       }
 
       // Filter cases specifically for the logged in user context
-      const casesData = getUserFilteredCases(user, rawCasesData);
+      const casesData = getUserFilteredCases(user, rawCasesData, includeDemo);
 
       const allCases = casesData || [];
       const realCases = allCases.filter(c => !c.is_demo);
@@ -2268,7 +2308,7 @@ async function startServer() {
 
     const getFallbackCases = () => {
       let pool = Array.from(inMemoryCases.values());
-      let cases = getUserFilteredCases(user, pool);
+      let cases = getUserFilteredCases(user, pool, !excludeDemo);
       cases.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
       if (excludeDemo) {
         cases = cases.filter(c => !c.is_demo);
@@ -2283,7 +2323,24 @@ async function startServer() {
 
     try {
       let query = supabase.from('cases').select('*').order('created_at', { ascending: false });
-      if (orgId) {
+      if (user?.userId || user?.email) {
+        const userFilters: string[] = [];
+        if (user.userId) {
+          userFilters.push(`user_id.eq.${user.userId}`, `created_by.eq.${user.userId}`);
+        }
+        if (user.email) {
+          userFilters.push(`user_email.eq.${user.email}`, `assigned_user.eq.${user.email}`);
+        }
+        if (orgId && orgId !== 'org_acme_soc_01') {
+          userFilters.push(`organization_id.eq.${orgId}`);
+        }
+        if (!excludeDemo) {
+          userFilters.push('is_demo.eq.true');
+        }
+        if (userFilters.length > 0) {
+          query = query.or(userFilters.join(','));
+        }
+      } else if (orgId && orgId !== 'org_acme_soc_01') {
         query = query.eq('organization_id', orgId);
       }
 
@@ -2296,7 +2353,7 @@ async function startServer() {
         tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : ['Custom']),
         is_demo: Boolean(c.is_demo)
       }));
-      const userCases = getUserFilteredCases(user, formatted);
+      const userCases = getUserFilteredCases(user, formatted, !excludeDemo);
       const correlated = enrichWithCorrelation(userCases);
       const results = shouldMask ? correlated.map((c: any) => maskCasePii(c, privacyConfig)) : correlated;
       res.json(results);
@@ -2523,11 +2580,15 @@ async function startServer() {
 
     if (!supabase) {
       inMemoryCases.set(newCase.id, newCase);
+      userScopedCasesStore.set(newCase.id, newCase);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_CREATED',
           case: newCase,
           caseId: newCase.id,
+          userId: user.userId,
+          userEmail: user.email,
+          organizationId: user.organizationId,
           timestamp: new Date().toISOString()
         });
       }
@@ -2540,11 +2601,15 @@ async function startServer() {
         // A failed insert means the case only exists in memory and will be lost on restart
         console.error('[Supabase] Failed to insert case in DB (case only exists in in-memory storage and will be lost on restart):', error);
         inMemoryCases.set(newCase.id, newCase);
+        userScopedCasesStore.set(newCase.id, newCase);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_CREATED',
             case: newCase,
             caseId: newCase.id,
+            userId: user.userId,
+            userEmail: user.email,
+            organizationId: user.organizationId,
             timestamp: new Date().toISOString()
           });
         }
@@ -2552,6 +2617,7 @@ async function startServer() {
       }
 
       inMemoryCases.set(data.id, data);
+      userScopedCasesStore.set(data.id, data);
 
       await logAuditAction({
         organization_id: user.organizationId,
@@ -2688,22 +2754,29 @@ async function startServer() {
     delete updates.id;
     updates.updated_at = new Date().toISOString();
 
+    const userKey = `${caseId}__${user.userId || user.email}`;
+
     if (!supabase) {
-      const existing = inMemoryCases.get(caseId);
+      const existing = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (!existing) return res.status(404).json({ error: 'Case not found' });
       const updated = { 
         ...existing, 
         ...updates,
-        user_id: existing.user_id || user.userId,
-        user_email: existing.user_email || user.email,
-        organization_id: existing.organization_id || user.organizationId
+        user_id: user.userId,
+        user_email: user.email,
+        organizationId: user.organizationId
       };
+      userScopedCasesStore.set(userKey, updated);
+      userScopedCasesStore.set(caseId, updated);
       inMemoryCases.set(caseId, updated);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_UPDATED',
           case: updated,
           caseId,
+          userId: user.userId,
+          userEmail: user.email,
+          organizationId: user.organizationId,
           timestamp: new Date().toISOString()
         });
       }
@@ -2713,23 +2786,32 @@ async function startServer() {
     // Fetch existing case for discrepancy comparison
     const { data: existing } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
 
-    const { data, error } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
+    const { data, error } = await supabase.from('cases').update({
+      ...updates,
+      user_id: user.userId,
+      user_email: user.email
+    }).eq('id', caseId).select().maybeSingle();
     if (error) {
-      const memExisting = inMemoryCases.get(caseId);
+      const memExisting = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (memExisting) {
         const updated = { 
           ...memExisting, 
           ...updates,
-          user_id: memExisting.user_id || user.userId,
-          user_email: memExisting.user_email || user.email,
-          organization_id: memExisting.organization_id || user.organizationId
+          user_id: user.userId,
+          user_email: user.email,
+          organization_id: user.organizationId
         };
+        userScopedCasesStore.set(userKey, updated);
+        userScopedCasesStore.set(caseId, updated);
         inMemoryCases.set(caseId, updated);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_UPDATED',
             case: updated,
             caseId,
+            userId: user.userId,
+            userEmail: user.email,
+            organizationId: user.organizationId,
             timestamp: new Date().toISOString()
           });
         }
@@ -2746,6 +2828,8 @@ async function startServer() {
       user_email: data.user_email || user.email,
       organization_id: data.organization_id || user.organizationId
     };
+    userScopedCasesStore.set(userKey, dataWithUser);
+    userScopedCasesStore.set(caseId, dataWithUser);
     inMemoryCases.set(caseId, dataWithUser);
 
     // Check for analyst verdict discrepancy (C4 Analyst Feedback Loop)
@@ -2801,6 +2885,7 @@ async function startServer() {
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
     const { status, severity, tags, assigned_user, analyst_notes, analyst_verdict } = req.body;
+    const userKey = `${caseId}__${user.userId || user.email}`;
 
     const updates: any = {
       updated_at: new Date().toISOString()
@@ -2813,15 +2898,26 @@ async function startServer() {
     if (analyst_verdict) updates.analyst_verdict = normalizeVerdictLabel(analyst_verdict);
 
     if (!supabase) {
-      const existing = inMemoryCases.get(caseId);
+      const existing = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (!existing) return res.status(404).json({ error: 'Case not found' });
-      const updated = { ...existing, ...updates };
+      const updated = { 
+        ...existing, 
+        ...updates,
+        user_id: user.userId,
+        user_email: user.email,
+        organization_id: user.organizationId
+      };
+      userScopedCasesStore.set(userKey, updated);
+      userScopedCasesStore.set(caseId, updated);
       inMemoryCases.set(caseId, updated);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_UPDATED',
           case: updated,
           caseId,
+          userId: user.userId,
+          userEmail: user.email,
+          organizationId: user.organizationId,
           triage_action: status || 'UPDATED',
           timestamp: new Date().toISOString()
         });
@@ -2829,17 +2925,32 @@ async function startServer() {
       return res.json(updated);
     }
 
-    const { data: updatedCase, error } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
+    const { data: updatedCase, error } = await supabase.from('cases').update({
+      ...updates,
+      user_id: user.userId,
+      user_email: user.email
+    }).eq('id', caseId).select().maybeSingle();
     if (error) {
-      const existing = inMemoryCases.get(caseId);
+      const existing = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (existing) {
-        const updated = { ...existing, ...updates };
+        const updated = { 
+          ...existing, 
+          ...updates,
+          user_id: user.userId,
+          user_email: user.email,
+          organization_id: user.organizationId
+        };
+        userScopedCasesStore.set(userKey, updated);
+        userScopedCasesStore.set(caseId, updated);
         inMemoryCases.set(caseId, updated);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_UPDATED',
             case: updated,
             caseId,
+            userId: user.userId,
+            userEmail: user.email,
+            organizationId: user.organizationId,
             triage_action: status || 'UPDATED',
             timestamp: new Date().toISOString()
           });
@@ -2851,7 +2962,15 @@ async function startServer() {
     if (!updatedCase) {
       return res.status(404).json({ error: 'Case not found' });
     }
-    inMemoryCases.set(caseId, updatedCase);
+    const dataWithUser = {
+      ...updatedCase,
+      user_id: updatedCase.user_id || user.userId,
+      user_email: updatedCase.user_email || user.email,
+      organization_id: updatedCase.organization_id || user.organizationId
+    };
+    userScopedCasesStore.set(userKey, dataWithUser);
+    userScopedCasesStore.set(caseId, dataWithUser);
+    inMemoryCases.set(caseId, dataWithUser);
 
     await logAuditAction({
       organization_id: user.organizationId,
@@ -2869,14 +2988,17 @@ async function startServer() {
     if (typeof broadcastWebSocketEvent === 'function') {
       broadcastWebSocketEvent({
         type: 'CASE_UPDATED',
-        case: updatedCase,
+        case: dataWithUser,
         caseId,
+        userId: user.userId,
+        userEmail: user.email,
+        organizationId: user.organizationId,
         triage_action: status || 'UPDATED',
         timestamp: new Date().toISOString()
       });
     }
 
-    res.json(updatedCase);
+    res.json(dataWithUser);
   });
 
   // Explicit Case Closure with Analyst Verdict (C4)
@@ -2885,6 +3007,7 @@ async function startServer() {
     const user = (req as AuthenticatedRequest).user!;
     const { caseId } = req.params;
     const { analyst_verdict, analyst_notes, close_reason, resolution_type = 'RESOLVED' } = req.body;
+    const userKey = `${caseId}__${user.userId || user.email}`;
 
     const updates: any = {
       status: 'CLOSED',
@@ -2895,15 +3018,26 @@ async function startServer() {
     if (analyst_verdict) updates.analyst_verdict = normalizeVerdictLabel(analyst_verdict);
 
     if (!supabase) {
-      const existing = inMemoryCases.get(caseId);
+      const existing = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (!existing) return res.status(404).json({ error: 'Case not found' });
-      const updated = { ...existing, ...updates };
+      const updated = { 
+        ...existing, 
+        ...updates,
+        user_id: user.userId,
+        user_email: user.email,
+        organization_id: user.organizationId
+      };
+      userScopedCasesStore.set(userKey, updated);
+      userScopedCasesStore.set(caseId, updated);
       inMemoryCases.set(caseId, updated);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_CLOSED',
           case: updated,
           caseId,
+          userId: user.userId,
+          userEmail: user.email,
+          organizationId: user.organizationId,
           timestamp: new Date().toISOString()
         });
       }
@@ -2912,15 +3046,26 @@ async function startServer() {
 
     const { data: existing, error: findError } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
     if (findError || !existing) {
-      const memExisting = inMemoryCases.get(caseId);
+      const memExisting = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
       if (memExisting) {
-        const updated = { ...memExisting, ...updates };
+        const updated = { 
+          ...memExisting, 
+          ...updates,
+          user_id: user.userId,
+          user_email: user.email,
+          organization_id: user.organizationId
+        };
+        userScopedCasesStore.set(userKey, updated);
+        userScopedCasesStore.set(caseId, updated);
         inMemoryCases.set(caseId, updated);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_CLOSED',
             case: updated,
             caseId,
+            userId: user.userId,
+            userEmail: user.email,
+            organizationId: user.organizationId,
             timestamp: new Date().toISOString()
           });
         }
@@ -2929,11 +3074,35 @@ async function startServer() {
       return res.status(404).json({ error: 'Case not found' });
     }
 
-    const { data: updatedCase, error: updateError } = await supabase.from('cases').update(updates).eq('id', caseId).select().maybeSingle();
+    const { data: updatedCase, error: updateError } = await supabase.from('cases').update({
+      ...updates,
+      user_id: user.userId,
+      user_email: user.email
+    }).eq('id', caseId).select().maybeSingle();
     if (updateError) {
       return res.status(500).json({ error: `Failed to close case: ${updateError.message}` });
     }
-    inMemoryCases.set(caseId, updatedCase);
+    const dataWithUser = {
+      ...updatedCase,
+      user_id: updatedCase.user_id || user.userId,
+      user_email: updatedCase.user_email || user.email,
+      organization_id: updatedCase.organization_id || user.organizationId
+    };
+    userScopedCasesStore.set(userKey, dataWithUser);
+    userScopedCasesStore.set(caseId, dataWithUser);
+    inMemoryCases.set(caseId, dataWithUser);
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'CASE_CLOSED',
+        case: dataWithUser,
+        caseId,
+        userId: user.userId,
+        userEmail: user.email,
+        organizationId: user.organizationId,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     // Record discrepancy in classifier feedback loop
     const correction = recordCorrectionIfDiscrepancy(existing, {
