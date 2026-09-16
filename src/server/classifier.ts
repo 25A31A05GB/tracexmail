@@ -331,7 +331,27 @@ export class MachineLearningClassifier {
     domainIntelligence?: ClassifierInput['domainIntelligence'];
     hops?: ClassifierInput['hops'];
   }): string[] {
-    return extractForensicTokens(input);
+    const rawTokens = extractForensicTokens(input);
+    const tokens: string[] = [];
+
+    const fromDomain = (input.fromDomain || '').toLowerCase();
+    if (fromDomain) {
+      tokens.push(`domain:${fromDomain}`);
+    }
+
+    for (const t of rawTokens) {
+      if (t.startsWith('__c3_') || t.startsWith('__c4_') || t.startsWith('feat_') || t.startsWith('domain_')) {
+        tokens.push(t);
+      } else if (t.includes('_')) {
+        tokens.push(`bigram:${t}`);
+        tokens.push(t);
+      } else {
+        tokens.push(`word:${t}`);
+        tokens.push(t);
+      }
+    }
+
+    return tokens;
   }
 
   /**
@@ -521,8 +541,8 @@ export class MachineLearningClassifier {
       e[1] /= norm;
     }
 
-    const primary = this.model.primaryClassifier || this.model.metadata?.primaryClassifier || 'centroid_cosine';
-    const scoreResult = primary === 'logistic_regression' && this.model.weights && this.model.bias
+    const primary = this.model.weights && this.model.bias ? 'logistic_regression' : (this.model.primaryClassifier || this.model.metadata?.primaryClassifier || 'centroid_cosine');
+    const scoreResult = (this.model.weights && this.model.bias)
       ? this.scoreLogisticRegression(entries)
       : this.scoreCentroidCosine(entries);
 

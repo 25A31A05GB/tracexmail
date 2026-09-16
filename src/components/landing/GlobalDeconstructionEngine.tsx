@@ -30,7 +30,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { EmailAnalysis } from '../../types';
 import { mapBackendCaseToAnalysis } from '../../utils/parser';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 
 interface GlobalDeconstructionEngineProps {
   onSelectCase?: (analysis: EmailAnalysis) => void;
@@ -137,7 +137,7 @@ export const GlobalDeconstructionEngine: React.FC<GlobalDeconstructionEngineProp
         onSelectCase(mapped);
       }
     } catch {
-      const sample = SAMPLE_ANALYSES[0];
+      const sample = SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
       if (onSelectCase) onSelectCase(sample);
     }
     if (onOpenConsole) {

@@ -16,7 +16,7 @@ import {
   Zap,
   Activity
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis } from '../../types';
 
 interface Full3DArchitectureProps {
@@ -485,7 +485,7 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
   }, [activeStage, activeTargetId]);
 
   const handleLaunchTarget = () => {
-    const sample = SAMPLE_ANALYSES[currentTarget.sampleIndex] || SAMPLE_ANALYSES[0];
+    const sample = SAMPLE_ANALYSES[currentTarget.sampleIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
     if (onSelectCase) {
       onSelectCase(sample);
     }

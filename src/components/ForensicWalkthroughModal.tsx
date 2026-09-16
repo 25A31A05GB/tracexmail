@@ -23,7 +23,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { NavTab } from './Sidebar';
 import { EmailAnalysis } from '../types';
-import { SAMPLE_ANALYSES } from '../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../data/samples';
 
 interface ForensicWalkthroughModalProps {
   isOpen: boolean;
@@ -102,7 +102,7 @@ export function ForensicWalkthroughModal({
         label: 'Try Demo Email File',
         icon: Play,
         onClick: () => {
-          if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0]);
+          if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS);
           if (onNavigateToTab) onNavigateToTab('overview');
           onClose();
         }
@@ -144,7 +144,7 @@ export function ForensicWalkthroughModal({
         label: 'View Wire Fraud Case File',
         icon: ArrowRight,
         onClick: () => {
-          if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0]);
+          if (onSelectAnalysis) onSelectAnalysis(SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS);
           if (onNavigateToTab) onNavigateToTab('overview');
           onClose();
         }

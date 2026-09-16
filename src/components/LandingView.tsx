@@ -35,7 +35,7 @@ import {
   Cpu,
   AlertOctagon
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../data/samples';
 import { EmailAnalysis } from '../types';
 import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
@@ -149,7 +149,7 @@ export function LandingView({
   };
 
   const handleCaseClick = (index: number) => {
-    const sample = SAMPLE_ANALYSES[index] || SAMPLE_ANALYSES[0];
+    const sample = SAMPLE_ANALYSES[index] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
     if (onSelectCase) {
       onSelectCase(sample);
     }

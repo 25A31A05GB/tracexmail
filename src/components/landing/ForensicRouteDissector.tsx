@@ -18,7 +18,7 @@ import {
   FileSearch,
   Globe
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis, EmailHop } from '../../types';
 import { mapBackendCaseToAnalysis } from '../../utils/parser';
 
@@ -47,7 +47,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
   className = ''
 }) => {
   const [selectedCaseId, setSelectedCaseId] = useState<string>('sample-0');
-  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0]);
+  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS);
   const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
   const [dbCases, setDbCases] = useState<any[]>([]);
 
@@ -65,7 +65,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
 
   const handleSelectSample = (idx: number) => {
     setSelectedCaseId(`sample-${idx}`);
-    const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0];
+    const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
     setActiveAnalysis(sample);
     setSelectedStationIndex(0);
     if (onSelectCase) onSelectCase(sample);
@@ -81,7 +81,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
         if (onSelectCase) onSelectCase(mapped);
       }
     } catch {
-      const sample = SAMPLE_ANALYSES[0];
+      const sample = SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
       setActiveAnalysis(sample);
       if (onSelectCase) onSelectCase(sample);
     }

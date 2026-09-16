@@ -24,7 +24,7 @@ import {
   Database
 } from 'lucide-react';
 import { EmailAnalysis } from '../../types';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { mapBackendCaseToAnalysis } from '../../utils/parser';
 
 export type NodeType = 'USER' | 'ATTACKER' | 'CHECKPOINT' | 'RELAY';
@@ -165,7 +165,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
   const containerRef = useRef<HTMLDivElement>(null);
   const [dbCases, setDbCases] = useState<any[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState<string>('sample-0');
-  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(currentAnalysis || SAMPLE_ANALYSES[0]);
+  const [activeAnalysis, setActiveAnalysis] = useState<EmailAnalysis>(currentAnalysis || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS);
   const [selectedNode, setSelectedNode] = useState<Dynamic3DNode | null>(null);
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const [explanationMode, setExplanationMode] = useState<'simple' | 'technical'>('simple');
@@ -186,7 +186,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
   // Update active analysis when sample preset or real database case is clicked
   const handleSelectPreset = (idx: number) => {
     setSelectedCaseId(`sample-${idx}`);
-    const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0];
+    const sample = SAMPLE_ANALYSES[idx] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
     setActiveAnalysis(sample);
     if (onSelectCase) {
       onSelectCase(sample);
@@ -204,7 +204,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
         }
       }
     } catch {
-      const sample = SAMPLE_ANALYSES[0];
+      const sample = SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
       setActiveAnalysis(sample);
       if (onSelectCase) onSelectCase(sample);
     }

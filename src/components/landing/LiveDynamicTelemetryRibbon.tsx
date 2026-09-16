@@ -15,7 +15,7 @@ import {
   Cpu,
   RefreshCw
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis } from '../../types';
 import { mapBackendCaseToAnalysis } from '../../utils/parser';
 import { getWebSocketUrl } from '../../utils/wsUrl';
@@ -230,11 +230,11 @@ export const LiveDynamicTelemetryRibbon: React.FC<LiveDynamicTelemetryRibbonProp
           onSelectCase(analysis);
         }
       } catch {
-        const sample = SAMPLE_ANALYSES[eventItem.sampleIndex] || SAMPLE_ANALYSES[0];
+        const sample = SAMPLE_ANALYSES[eventItem.sampleIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
         if (onSelectCase) onSelectCase(sample);
       }
     } else {
-      const sample = SAMPLE_ANALYSES[eventItem.sampleIndex] || SAMPLE_ANALYSES[0];
+      const sample = SAMPLE_ANALYSES[eventItem.sampleIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
       if (onSelectCase) onSelectCase(sample);
     }
 

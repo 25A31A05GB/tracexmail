@@ -752,7 +752,7 @@ export default function App() {
           <LandingView
             onOpenConsole={() => setAuthView('login')}
             onOpenTrace={() => {
-              setCurrentAnalysis(SAMPLE_ANALYSES[0]);
+              setCurrentAnalysis(SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS);
               setAuthView('login');
             }}
             onRequestAccess={() => setAuthView('signup')}

@@ -56,7 +56,7 @@ import {
 import { forensicApi, DashboardStats, HealthResponse } from '../lib/api';
 import { EmailAnalysis } from '../types';
 import { useWebSocketAlerts } from '../hooks/useWebSocketAlerts';
-import { SAMPLE_ANALYSES } from '../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../data/samples';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { NetworkIntelligenceCard } from './NetworkIntelligenceCard';
 import { BulkThreatComparisonSummary } from './BulkThreatComparisonSummary';
@@ -292,7 +292,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   const [chartType, setChartType] = useState<'AREA' | 'BAR' | 'PIE'>('AREA');
   const [selectedGeoCategory, setSelectedGeoCategory] = useState<'ALL' | 'BEC' | 'HARVESTING' | 'MALWARE' | 'EXPLOIT'>('ALL');
   const [selectedRegion, setSelectedRegion] = useState<RegionThreat | null>(REGIONAL_THREATS_DATA[0]);
-  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string>(SAMPLE_ANALYSES[0]?.id || 'sample-paypal-phish');
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string>(SAMPLE_ANALYSES[0]?.id || EMPTY_ANALYSIS.id);
   const [isForensicConsoleExpanded, setIsForensicConsoleExpanded] = useState<boolean>(viewMode === 'analyst');
 
   useEffect(() => {
@@ -317,11 +317,13 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
   };
 
   const displayCases = useMemo(() => {
-    return casesList.length > 0 ? casesList : SAMPLE_ANALYSES;
+    if (casesList.length > 0) return casesList;
+    if (SAMPLE_ANALYSES.length > 0) return SAMPLE_ANALYSES;
+    return [EMPTY_ANALYSIS];
   }, [casesList]);
 
   const activeFocusAnalysis = useMemo(() => {
-    return displayCases.find(a => a.id === selectedAnalysisId) || displayCases[0] || SAMPLE_ANALYSES[0];
+    return displayCases.find(a => a.id === selectedAnalysisId) || displayCases[0] || EMPTY_ANALYSIS;
   }, [displayCases, selectedAnalysisId]);
 
   // Real-Time WebSocket Alerts Hook
@@ -2134,7 +2136,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 key={alt.id || i} 
                 onClick={() => {
                   if (alt.case_id) {
-                    const match = SAMPLE_ANALYSES.find(s => s.id === alt.case_id);
+                    const match = displayCases.find(s => s.id === alt.case_id) || casesList.find(s => s.id === alt.case_id);
                     if (match && onSelectAnalysis) {
                       onSelectAnalysis(match);
                       onNavigateToTab?.('overview');

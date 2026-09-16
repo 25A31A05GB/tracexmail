@@ -21,7 +21,7 @@ import {
 import { CyberThreatGlobe3D } from '../3d/CyberThreatGlobe3D';
 import { CyberThreatCore3D } from '../3d/CyberThreatCore3D';
 import { EmailAnalysis, EmailHop } from '../../types';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 
 interface Interactive3DForensicSandboxProps {
   onOpenConsole: () => void;
@@ -428,7 +428,7 @@ export const Interactive3DForensicSandbox: React.FC<Interactive3DForensicSandbox
   }, [activeTab, activeLayerIndex, explosionFactor, selectedPresetIndex]);
 
   const handleLaunchCase = () => {
-    const sample = SAMPLE_ANALYSES[currentPreset.sampleIndex] || SAMPLE_ANALYSES[0];
+    const sample = SAMPLE_ANALYSES[currentPreset.sampleIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
     if (onSelectCase) {
       onSelectCase(sample);
     }

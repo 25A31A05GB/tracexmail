@@ -19,7 +19,7 @@ import {
   Cpu,
   Fingerprint
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis, EmailHop } from '../../types';
 
 interface CompleteProject3DShowcaseProps {
@@ -94,7 +94,7 @@ export const CompleteProject3DShowcase: React.FC<CompleteProject3DShowcaseProps>
   const [simStep, setSimStep] = useState<number>(0);
 
   const mountRef = useRef<HTMLDivElement>(null);
-  const currentCase = SAMPLE_ANALYSES[selectedCaseIdx] || SAMPLE_ANALYSES[0];
+  const currentCase = SAMPLE_ANALYSES[selectedCaseIdx] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
   const isMalicious = (currentCase.riskScore ?? 80) >= 70;
 
   // 3D Three.js Visualizer Engine

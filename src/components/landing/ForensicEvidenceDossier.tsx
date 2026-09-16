@@ -14,7 +14,7 @@ import {
   XCircle,
   Hash
 } from 'lucide-react';
-import { SAMPLE_ANALYSES } from '../../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis } from '../../types';
 
 interface ForensicEvidenceDossierProps {
@@ -27,7 +27,7 @@ export const ForensicEvidenceDossier: React.FC<ForensicEvidenceDossierProps> = (
   className = ''
 }) => {
   const [activeCaseIndex, setActiveCaseIndex] = useState<number>(0);
-  const currentCase = SAMPLE_ANALYSES[activeCaseIndex] || SAMPLE_ANALYSES[0];
+  const currentCase = SAMPLE_ANALYSES[activeCaseIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
 
   const cases = [
     {

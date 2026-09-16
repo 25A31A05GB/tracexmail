@@ -31,7 +31,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
-import { SAMPLE_ANALYSES } from '../data/samples';
+import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../data/samples';
 import { parseRawEml, mapBackendCaseToAnalysis } from '../utils/parser';
 import { apiFetch } from '../lib/api';
 import { ForensicScanAnimationModal } from './ForensicScanAnimationModal';
@@ -111,10 +111,10 @@ export function IngestionPipelineView({
   };
 
   const handleLoadSampleHeader = () => {
-    const sample = SAMPLE_ANALYSES[0];
-    const headerStr = sample.rawHeaders || `From: ${sample.headers.from}\nTo: ${sample.headers.to}\nSubject: ${sample.headers.subject}\nDate: ${sample.headers.date}\nMessage-ID: ${sample.headers.messageId}\nAuthentication-Results: spf=pass dkim=pass dmarc=pass\nReceived: from relay.network.net by gateway.corp.net with ESMTP id 9823419; ${sample.headers.date}\n\n${sample.name}`;
+    const sample = SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
+    const headerStr = sample.rawHeaders || `From: ${sample.headers?.from || 'sender@domain.com'}\nTo: ${sample.headers?.to || 'recipient@domain.com'}\nSubject: ${sample.headers?.subject || 'Security Verification Notification'}\nDate: ${sample.headers?.date || new Date().toUTCString()}\nMessage-ID: ${sample.headers?.messageId || '<sample-header-01@domain.com>'}\nAuthentication-Results: spf=pass dkim=pass dmarc=pass\nReceived: from relay.network.net by gateway.corp.net with ESMTP id 9823419; ${sample.headers?.date || new Date().toUTCString()}\n\n${sample.name || 'Sample Analysis Email'}`;
     setRawText(headerStr);
-    setFileName(`${sample.id}.eml`);
+    setFileName(`${sample.id || 'sample-email'}.eml`);
     addLog(`[ACTION] Loaded benchmark RFC822 sample '${sample.id}' into editor.`);
   };
 
