@@ -233,7 +233,7 @@ export function mapBackendCaseToAnalysis(
     }
   }
 
-  // Also fold in data.all_headers or data.raw_headers if they exist as separate properties
+  // Fold in raw_headers / all_headers
   if (data.all_headers && typeof data.all_headers === 'object' && !Array.isArray(data.all_headers)) {
     allHeadersMap = { ...allHeadersMap, ...data.all_headers };
   }
@@ -241,19 +241,81 @@ export function mapBackendCaseToAnalysis(
     allHeadersMap = { ...allHeadersMap, ...data.raw_headers };
   }
 
-  const subject = data.subject || data.headers?.subject || data.title || data.name || getHeaderCaseInsensitive(allHeadersMap, 'Subject') || '(No Subject)';
-  const rawFrom = data.from || data.headers?.from || data.from_addr || data.headers?.fromEmail || getHeaderCaseInsensitive(allHeadersMap, 'From');
+  // Extract raw headers from raw content string if present
+  const effectiveRawString = rawContent || data.raw_email || data.rawEml || '';
+  if (effectiveRawString && effectiveRawString.length > 20) {
+    try {
+      const parsedRaw = parseRawEml(effectiveRawString, fileName);
+      if (parsedRaw.headers?.allHeaders) {
+        allHeadersMap = { ...parsedRaw.headers.allHeaders, ...allHeadersMap };
+      }
+    } catch {
+      // non-blocking
+    }
+  }
+
+  const rawSubject = data.subject ||
+                     data.headers?.subject ||
+                     getHeaderCaseInsensitive(allHeadersMap, 'Subject') ||
+                     data.title ||
+                     (data.name && !data.name.endsWith('.eml') && !data.name.endsWith('.txt') ? data.name : undefined);
+  const subject = decodeHeaderWords(rawSubject) || '(No Subject)';
+
+  const rawFrom = data.from ||
+                  data.headers?.from ||
+                  data.from_addr ||
+                  data.headers?.fromEmail ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'From') ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'Sender') ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'Resent-From') ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'Return-Path');
+  const decodedFrom = decodeHeaderWords(rawFrom);
   const fromDomainFallback = data.from_domain || (data.domainIntelligence?.domain);
-  const from = rawFrom || (fromDomainFallback ? `security@${fromDomainFallback}` : 'unknown@sender.corp');
-  const to = data.to || data.headers?.to || getHeaderCaseInsensitive(allHeadersMap, 'To') || 'recipient@domain.com';
-  const replyTo = data.reply_to || data.replyTo || data.headers?.replyTo || data.headers?.reply_to || getHeaderCaseInsensitive(allHeadersMap, 'Reply-To') || from;
-  const returnPath = data.return_path || data.returnPath || data.headers?.returnPath || data.headers?.return_path || getHeaderCaseInsensitive(allHeadersMap, 'Return-Path') || from;
-  const date = data.date || data.headers?.date || data.created_at || getHeaderCaseInsensitive(allHeadersMap, 'Date') || new Date().toUTCString();
-  const messageId = data.message_id || data.messageId || data.headers?.messageId || getHeaderCaseInsensitive(allHeadersMap, 'Message-ID') || `<${Date.now()}@tracexmail.local>`;
+  const from = decodedFrom || (fromDomainFallback ? fromDomainFallback : '(Unknown Sender)');
+
+  const rawTo = data.to ||
+                data.headers?.to ||
+                getHeaderCaseInsensitive(allHeadersMap, 'To') ||
+                getHeaderCaseInsensitive(allHeadersMap, 'Delivered-To') ||
+                getHeaderCaseInsensitive(allHeadersMap, 'X-Original-To') ||
+                getHeaderCaseInsensitive(allHeadersMap, 'Envelope-To');
+  const to = decodeHeaderWords(rawTo) || '(Undisclosed Recipients)';
+
+  const rawReplyTo = data.reply_to ||
+                     data.replyTo ||
+                     data.headers?.replyTo ||
+                     data.headers?.reply_to ||
+                     getHeaderCaseInsensitive(allHeadersMap, 'Reply-To');
+  const replyTo = decodeHeaderWords(rawReplyTo) || from;
+
+  const rawReturnPath = data.return_path ||
+                        data.returnPath ||
+                        data.headers?.returnPath ||
+                        data.headers?.return_path ||
+                        getHeaderCaseInsensitive(allHeadersMap, 'Return-Path') ||
+                        getHeaderCaseInsensitive(allHeadersMap, 'X-Return-Path') ||
+                        getHeaderCaseInsensitive(allHeadersMap, 'Envelope-From');
+  const returnPath = decodeHeaderWords(rawReturnPath) || from;
+
+  const rawDate = data.date ||
+                  data.headers?.date ||
+                  data.created_at ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'Date') ||
+                  getHeaderCaseInsensitive(allHeadersMap, 'Resent-Date');
+  const date = rawDate ? decodeHeaderWords(rawDate) : new Date().toUTCString();
+
+  const rawMessageId = data.message_id ||
+                       data.messageId ||
+                       data.headers?.messageId ||
+                       getHeaderCaseInsensitive(allHeadersMap, 'Message-ID') ||
+                       getHeaderCaseInsensitive(allHeadersMap, 'Message-Id') ||
+                       getHeaderCaseInsensitive(allHeadersMap, 'Resent-Message-ID');
+  const messageId = rawMessageId ? decodeHeaderWords(rawMessageId) : `<${Date.now()}@tracexmail.local>`;
 
   const fromEmailMatch = from.match(/<([^>]+)>/) || from.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  const fromEmail = data.from_addr || data.fromEmail || (fromEmailMatch ? fromEmailMatch[1] : from);
-  const fromName = data.from_name || data.fromName || (from.includes('<') ? from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() : fromEmail);
+  const fromEmail = data.from_addr || data.fromEmail || (fromEmailMatch ? fromEmailMatch[1] : (from.includes('@') ? from : ''));
+  const extractedName = from.includes('<') ? from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() : '';
+  const fromName = data.from_name || data.fromName || extractedName || fromEmail || 'Unknown Sender';
 
   // Hops
   const rawHops = Array.isArray(data.hops) ? data.hops : [];
@@ -656,7 +718,7 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     }
 
     if (!inBody) {
-      if (/^[A-Za-z0-9-_]+:/.test(line)) {
+      if (/^[^\s:]+:/.test(line)) {
         if (currentKey) {
           addHeaderToMap(currentKey, currentValue);
         }
@@ -664,6 +726,8 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
         currentKey = line.slice(0, colonIdx).trim();
         currentValue = line.slice(colonIdx + 1).trim();
       } else if (/^\s+/.test(line) && currentKey) {
+        currentValue += ' ' + line.trim();
+      } else if (currentKey) {
         currentValue += ' ' + line.trim();
       }
     } else {
@@ -678,21 +742,42 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
 
   const rawSubject = getHeaderCaseInsensitive(headerMap, 'Subject') || '(No Subject)';
   const subject = decodeHeaderWords(rawSubject);
-  const rawFrom = getHeaderCaseInsensitive(headerMap, 'From');
-  const from = decodeHeaderWords(rawFrom) || 'unknown@sender.corp';
-  const rawTo = getHeaderCaseInsensitive(headerMap, 'To');
-  const to = decodeHeaderWords(rawTo) || 'recipient@domain.com';
+
+  const rawFrom = getHeaderCaseInsensitive(headerMap, 'From') ||
+                  getHeaderCaseInsensitive(headerMap, 'Sender') ||
+                  getHeaderCaseInsensitive(headerMap, 'Resent-From') ||
+                  getHeaderCaseInsensitive(headerMap, 'Return-Path');
+  const from = decodeHeaderWords(rawFrom) || '(Unknown Sender)';
+
+  const rawTo = getHeaderCaseInsensitive(headerMap, 'To') ||
+                getHeaderCaseInsensitive(headerMap, 'Delivered-To') ||
+                getHeaderCaseInsensitive(headerMap, 'X-Original-To') ||
+                getHeaderCaseInsensitive(headerMap, 'Envelope-To') ||
+                getHeaderCaseInsensitive(headerMap, 'Cc');
+  const to = decodeHeaderWords(rawTo) || '(Undisclosed Recipients)';
+
   const rawReplyTo = getHeaderCaseInsensitive(headerMap, 'Reply-To');
   const replyTo = decodeHeaderWords(rawReplyTo) || from;
-  const rawReturnPath = getHeaderCaseInsensitive(headerMap, 'Return-Path');
+
+  const rawReturnPath = getHeaderCaseInsensitive(headerMap, 'Return-Path') ||
+                        getHeaderCaseInsensitive(headerMap, 'X-Return-Path') ||
+                        getHeaderCaseInsensitive(headerMap, 'Envelope-From');
   const returnPath = decodeHeaderWords(rawReturnPath) || from;
-  const date = getHeaderCaseInsensitive(headerMap, 'Date') || new Date().toUTCString();
-  const messageId = getHeaderCaseInsensitive(headerMap, 'Message-ID') || getHeaderCaseInsensitive(headerMap, 'Message-Id') || `<${Date.now()}@trace.xmail>`;
+
+  const rawDate = getHeaderCaseInsensitive(headerMap, 'Date') ||
+                  getHeaderCaseInsensitive(headerMap, 'Resent-Date');
+  const date = rawDate ? decodeHeaderWords(rawDate) : new Date().toUTCString();
+
+  const rawMessageId = getHeaderCaseInsensitive(headerMap, 'Message-ID') ||
+                       getHeaderCaseInsensitive(headerMap, 'Message-Id') ||
+                       getHeaderCaseInsensitive(headerMap, 'Resent-Message-ID');
+  const messageId = rawMessageId ? decodeHeaderWords(rawMessageId) : `<${Date.now()}@trace.xmail>`;
 
   // Extract from email
   const fromEmailMatch = from.match(/<([^>]+)>/) || from.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  const fromEmail = fromEmailMatch ? fromEmailMatch[1] : from;
-  const fromName = from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() || fromEmail;
+  const fromEmail = fromEmailMatch ? fromEmailMatch[1] : (from.includes('@') ? from : '');
+  const extractedName = from.includes('<') ? from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() : '';
+  const fromName = extractedName || fromEmail || 'Unknown Sender';
 
   // Extract URLs from body & headers
   const urlRegex = /(https?:\/\/[^\s<>"']+)/gi;

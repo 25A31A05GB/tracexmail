@@ -35,7 +35,10 @@ export function decodeHeaderWords(input?: string | null): string {
   const trimmed = input.trim();
   if (!trimmed.includes('=?')) return trimmed;
 
-  return trimmed.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/g, (_match, charset, encoding, data) => {
+  // RFC 2047 Sec 6.2: Any linear-white-space separating two adjacent encoded-words is ignored
+  const sanitized = trimmed.replace(/(\?=\r?\n?\s+=\?)/g, '?==?');
+
+  return sanitized.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/g, (_match, charset, encoding, data) => {
     try {
       const enc = encoding.toUpperCase();
       if (enc === 'B') {

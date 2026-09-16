@@ -56,7 +56,7 @@ import { isBotnetC2 } from './src/server/intelligence/botnetC2';
 import { classifyInfra } from './src/server/intelligence/vpnHostingList';
 import { getRegisteredCountry } from './src/server/intelligence/rirCountryCheck';
 import { parseAuthenticationHeaders } from './src/utils/authParser';
-import { parseMimeStructure } from './src/utils/mimeDecoder';
+import { parseMimeStructure, decodeHeaderWords } from './src/utils/mimeDecoder';
 import { parse as parseHtml } from 'node-html-parser';
 import { GoogleGenAI } from '@google/genai';
 import { authenticate } from 'mailauth';
@@ -782,7 +782,7 @@ async function parseRawEmailToAnalysis(
       }
       continue; // Skip leading blank lines before headers
     }
-    if (/^[A-Za-z0-9-_]+:/.test(line)) {
+    if (/^[^\s:]+:/.test(line)) {
       if (currentHeader) {
         allHeaders[currentHeader] = currentValue;
       }
@@ -791,14 +791,23 @@ async function parseRawEmailToAnalysis(
       currentValue = line.substring(colonIdx + 1).trim();
 
       const lower = currentHeader.toLowerCase();
-      if (lower === 'subject') subject = currentValue;
-      else if (lower === 'from') from = currentValue;
-      else if (lower === 'to') to = currentValue;
-      else if (lower === 'reply-to') replyTo = currentValue;
-      else if (lower === 'return-path') returnPath = currentValue;
-      else if (lower === 'date') date = currentValue;
-      else if (lower === 'message-id') messageId = currentValue;
+      const decodedVal = decodeHeaderWords(currentValue);
+      if (lower === 'subject') subject = decodedVal;
+      else if (lower === 'from') from = decodedVal;
+      else if (lower === 'to') to = decodedVal;
+      else if (lower === 'reply-to') replyTo = decodedVal;
+      else if (lower === 'return-path') returnPath = decodedVal;
+      else if (lower === 'date') date = decodedVal;
+      else if (lower === 'message-id') messageId = decodedVal;
+      else if (!from || from === 'unknown@sender.corp') {
+        if (lower === 'sender' || lower === 'resent-from' || lower === 'x-sender') from = decodedVal;
+      }
+      if (!to || to === 'recipient@enterprise.corp') {
+        if (lower === 'delivered-to' || lower === 'x-original-to' || lower === 'envelope-to' || lower === 'cc') to = decodedVal;
+      }
     } else if (/^\s+/.test(line) && currentHeader) {
+      currentValue += ' ' + line.trim();
+    } else if (currentHeader) {
       currentValue += ' ' + line.trim();
     }
   }
