@@ -710,10 +710,15 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
   // -------------------------------------------------------------
   // Component 4: Machine Learning Content Risk (Max 20 pts)
   // -------------------------------------------------------------
-  const maliciousProbability = (mlOutput.probabilities.Phishing || 0) +
-    (mlOutput.probabilities['Fraud-related'] || 0) +
-    0.6 * (mlOutput.probabilities.Impersonated || 0) +
-    0.3 * (mlOutput.probabilities.Suspicious || 0);
+  let maliciousProbability = 0;
+  if (mlOutput.predictedClass !== 'Legitimate') {
+    maliciousProbability = (mlOutput.probabilities.Phishing || 0) +
+      (mlOutput.probabilities['Fraud-related'] || 0) +
+      0.6 * (mlOutput.probabilities.Impersonated || 0) +
+      0.3 * (mlOutput.probabilities.Suspicious || 0);
+  } else if ((mlOutput.probabilities.Legitimate || 0) < 0.50) {
+    maliciousProbability = Math.max(0, 0.50 - (mlOutput.probabilities.Legitimate || 0));
+  }
 
   const mlScore = Math.min(20, Math.round(maliciousProbability * 20));
   const mlReasons: string[] = [

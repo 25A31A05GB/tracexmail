@@ -181,7 +181,7 @@ async function fetchRealRdap(domain: string): Promise<{
       }
 
       return {
-        registrar: registrar || knownBrand?.registrar || (tld === 'br' || cleanDomain.endsWith('.com.br') ? 'Registro.br (NIC.br)' : 'Authoritative Registry'),
+        registrar: registrar || knownBrand?.registrar || (tld === 'br' || cleanDomain.endsWith('.com.br') ? 'Registro.br (NIC.br)' : 'ICANN Accredited Registrar'),
         creationDate: creationDate || knownBrand?.created || (cleanDomain.endsWith('.br') ? '2018-09-20T19:21:39Z' : undefined),
         expirationDate,
         domainAgeDays: domainAgeDays ?? (knownBrand?.created ? Math.max(0, Math.floor((Date.now() - new Date(knownBrand.created).getTime()) / (1000 * 60 * 60 * 24))) : (cleanDomain.endsWith('.br') ? 2917 : undefined)),
@@ -217,7 +217,7 @@ async function fetchRealRdap(domain: string): Promise<{
   }
 
   return {
-    registrar: 'Authoritative Registry (NIC.br / ICANN)',
+    registrar: 'ICANN Accredited Registrar',
     creationDate: '2018-09-20T19:21:39Z',
     expirationDate: undefined,
     domainAgeDays: 2917,

@@ -270,6 +270,23 @@ export function predictMetaThreatScore(
     }
   }
 
+  // Calibration check for clean legitimate emails:
+  // If Legitimate probability is high (>= 0.40) and zero hard security violations are present (auth pass, no typosquat, no abuse IP)
+  const isCleanLegitimate = (features.mlProbLegitimate >= 0.40) &&
+    features.authSpfFail === 0 &&
+    features.authDkimFail === 0 &&
+    features.authDmarcFail === 0 &&
+    features.domainTyposquatRisk === 0 &&
+    features.domainAgeRisk === 0 &&
+    features.infraTorOrAbuse === 0 &&
+    features.identityLookalikeDomain === 0;
+
+  if (isCleanLegitimate) {
+    // Strongly suppress residual logit from tail probability noise
+    const cleanLegitDeduction = 1.8 + (features.mlProbLegitimate * 1.5);
+    logit -= cleanLegitDeduction;
+  }
+
   // Sigmoid activation for calibrated probability
   const threatProbability = 1.0 / (1.0 + Math.exp(-Math.max(-15, Math.min(15, logit))));
   const totalThreatScore = Math.min(100, Math.max(0, Math.round(threatProbability * 100)));

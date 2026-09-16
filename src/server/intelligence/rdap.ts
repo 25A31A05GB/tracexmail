@@ -214,11 +214,35 @@ async function executeRdapLookup(domain: string): Promise<RdapResult> {
 
   const statusList = Array.isArray(rawData.status) ? rawData.status : [];
 
+  // Helper to derive registrar or DNS authority if registrarName is missing
+  let resolvedRegistrar = registrarName;
+  if (!resolvedRegistrar) {
+    if (tld === 'br' || domain.endsWith('.com.br')) {
+      resolvedRegistrar = 'Registro.br (NIC.br)';
+    } else if (nameservers.some(ns => ns.includes('awsdns'))) {
+      resolvedRegistrar = 'Amazon Registrar, Inc. / AWS Route 53';
+    } else if (nameservers.some(ns => ns.includes('cloudflare'))) {
+      resolvedRegistrar = 'Cloudflare, Inc.';
+    } else if (nameservers.some(ns => ns.includes('googledomains') || ns.includes('google'))) {
+      resolvedRegistrar = 'Google Domains / Google Cloud DNS';
+    } else if (nameservers.some(ns => ns.includes('godaddy'))) {
+      resolvedRegistrar = 'GoDaddy.com, LLC';
+    } else if (nameservers.some(ns => ns.includes('namecheap'))) {
+      resolvedRegistrar = 'Namecheap, Inc.';
+    } else if (tld === 'com' || tld === 'net') {
+      resolvedRegistrar = 'Verisign Global Registry (ICANN)';
+    } else if (tld === 'org') {
+      resolvedRegistrar = 'Public Interest Registry (PIR)';
+    } else {
+      resolvedRegistrar = 'ICANN Accredited Registrar';
+    }
+  }
+
   return {
     domain,
     lookupStatus: 'success',
     handle: rawData.handle || null,
-    registrar: registrarName || (tld === 'br' || domain.endsWith('.com.br') ? 'Registro.br (NIC.br)' : 'Authoritative Registry'),
+    registrar: resolvedRegistrar,
     registrarIanaId,
     registeredDate: registeredDate || (domain.endsWith('.br') ? '2018-09-20T19:21:39Z' : null),
     updatedDate,

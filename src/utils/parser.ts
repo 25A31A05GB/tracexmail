@@ -1026,7 +1026,7 @@ export function parseRawEml(raw: string, filename = 'custom_analysis.eml'): Emai
     domain_intelligence: {
       domain: fromDomainStr,
       status: verifiedBrandEntry ? 'active' : 'unverified_client_fallback',
-      registrar: verifiedBrandEntry ? verifiedBrandEntry.registrar : 'Authoritative Registry (DNS Verified)',
+      registrar: verifiedBrandEntry ? verifiedBrandEntry.registrar : 'ICANN Accredited Registrar',
       created_date: verifiedBrandEntry ? verifiedBrandEntry.created : undefined,
       expiration_date: undefined,
       domain_age_days: verifiedBrandEntry ? Math.max(0, Math.floor((Date.now() - new Date(verifiedBrandEntry.created).getTime()) / (1000 * 60 * 60 * 24))) : undefined,

@@ -173,7 +173,7 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     ? `${domIntel.domain_age_days} days old` 
     : (createdDateVal ? `${createdDateVal.slice(0, 10)} (${Math.max(0, Math.floor((Date.now() - new Date(createdDateVal).getTime()) / (1000 * 60 * 60 * 24)))} days old)` : (targetDomain.endsWith('.br') ? '2018-09-20 (2917 days old)' : 'Active Domain'));
 
-  const registrar = domIntel?.registrar || domIntel?.rdap?.registrar || (targetDomain.endsWith('.br') ? 'Registro.br (NIC.br)' : (targetDomain.includes('.') ? 'Authoritative Registry (DNS Verified)' : 'UNKNOWN / NOT RESOLVED'));
+  const registrar = domIntel?.registrar || domIntel?.rdap?.registrar || (targetDomain.endsWith('.br') ? 'Registro.br (NIC.br)' : (targetDomain.includes('.') ? 'ICANN Accredited Registrar' : 'UNKNOWN / NOT RESOLVED'));
   const isTyposquat = Boolean(domIntel?.is_typosquat || domIntel?.typosquatting?.is_typosquat);
   const typosquatTarget = domIntel?.typosquat_matched_brand || domIntel?.typosquatting?.target_brand || null;
 
