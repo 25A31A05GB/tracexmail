@@ -3,8 +3,30 @@ import { rdapCache } from './cache';
 import { createProvenanceMetadata } from './provenance';
 import { IntelligenceLookupStatus, RdapResult } from './types';
 
+export function extractApexDomain(domainInput: string): string {
+  if (!domainInput) return '';
+  let clean = domainInput.trim().toLowerCase();
+  if (clean.includes('@')) {
+    clean = clean.split('@').pop() || clean;
+  }
+  clean = clean.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
+  const parts = clean.split('.');
+  if (parts.length <= 2) return clean;
+
+  const multiPartTlds = ['co.uk', 'com.br', 'org.uk', 'gov.uk', 'co.in', 'com.au', 'net.au', 'org.au', 'gov.in', 'ac.uk', 'co.jp', 'edu.au', 'net.in'];
+  const lastTwo = parts.slice(-2).join('.');
+  if (multiPartTlds.includes(lastTwo) && parts.length >= 3) {
+    return parts.slice(-3).join('.');
+  }
+
+  return parts.slice(-2).join('.');
+}
+
 export async function resolveRdap(domain: string): Promise<RdapResult> {
-  const cleanDomain = domain.toLowerCase().trim().replace(/^\.+|\.+$/g, '');
+  let cleanDomain = domain.toLowerCase().trim().replace(/^\.+|\.+$/g, '');
+  if (cleanDomain.includes('@')) {
+    cleanDomain = cleanDomain.split('@').pop() || cleanDomain;
+  }
 
   if (!cleanDomain || cleanDomain.includes('/') || cleanDomain.includes(' ')) {
     return {
@@ -40,7 +62,18 @@ export async function resolveRdap(domain: string): Promise<RdapResult> {
   }
 
   return rdapCache.getOrFetch(cacheKey, async () => {
-    return await executeRdapLookup(cleanDomain);
+    let result = await executeRdapLookup(cleanDomain);
+    const apex = extractApexDomain(cleanDomain);
+    if ((result.lookupStatus !== 'success' || !result.registrar) && apex && apex !== cleanDomain) {
+      const apexResult = await executeRdapLookup(apex);
+      if (apexResult.lookupStatus === 'success') {
+        result = {
+          ...apexResult,
+          domain: cleanDomain // keep original queried domain
+        };
+      }
+    }
+    return result;
   }).then(r => r.value);
 }
 

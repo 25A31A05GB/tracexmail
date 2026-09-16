@@ -5,6 +5,7 @@
 import dns from 'dns';
 import { DomainIntelligence } from '../types';
 import { levenshteinDistance } from './intelligence/domain';
+import { extractApexDomain, resolveRdap } from './intelligence/rdap';
 
 // In-memory cache for fast lookup and rate-limit mitigation
 const DOMAIN_CACHE = new Map<string, DomainIntelligence>();
@@ -109,87 +110,18 @@ async function fetchRealRdap(domain: string): Promise<{
   const knownBrand = ENTERPRISE_BRANDS.find(b => b.domains.includes(cleanDomain));
 
   try {
-    const tld = cleanDomain.split('.').pop() || '';
-
-    // Primary endpoint selection: Registro.br for .br, Verisign for .com/.net, PIR for .org
-    let rdapUrl = `https://rdap.org/domain/${encodeURIComponent(cleanDomain)}`;
-    if (tld === 'br' || cleanDomain.endsWith('.com.br')) {
-      rdapUrl = `https://rdap.registro.br/domain/${encodeURIComponent(cleanDomain)}`;
-    } else if (tld === 'com' || tld === 'net') {
-      rdapUrl = `https://rdap.verisign.com/com/v1/domain/${encodeURIComponent(cleanDomain)}`;
-    } else if (tld === 'org') {
-      rdapUrl = `https://rdap.publicinterestregistry.org/rdap/domain/${encodeURIComponent(cleanDomain)}`;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
-
-    const res = await fetch(rdapUrl, {
-      headers: { Accept: 'application/rdap+json, application/json' },
-      signal: controller.signal
-    });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data: any = await res.json();
-
-      // Extract Registrar
-      let registrar: string | undefined = undefined;
-      const regEntity = data.entities?.find((e: any) => e.roles?.includes('registrar'));
-      if (regEntity) {
-        const fnItem = regEntity.vcardArray?.[1]?.find((item: any) => item[0] === 'fn');
-        registrar = fnItem?.[3] || regEntity.handle;
-      }
-
-      if (!registrar && (tld === 'br' || cleanDomain.endsWith('.com.br'))) {
-        registrar = 'Registro.br (NIC.br)';
-      }
-
-      // Extract Events: registration, expiration
-      let creationDate: string | undefined = undefined;
-      let expirationDate: string | undefined = undefined;
-
-      if (Array.isArray(data.events)) {
-        for (const ev of data.events) {
-          if (ev.eventAction === 'registration') {
-            creationDate = ev.eventDate;
-          } else if (ev.eventAction === 'expiration') {
-            expirationDate = ev.eventDate;
-          }
-        }
-      }
-
-      if (!creationDate && Array.isArray(data.entities)) {
-        for (const ent of data.entities) {
-          if (Array.isArray(ent.events)) {
-            for (const ev of ent.events) {
-              if (ev.eventAction === 'registration' && ev.eventDate) {
-                creationDate = ev.eventDate;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      let domainAgeDays: number | undefined = undefined;
-      if (creationDate) {
-        const createdTime = new Date(creationDate).getTime();
-        if (!isNaN(createdTime)) {
-          domainAgeDays = Math.max(0, Math.floor((Date.now() - createdTime) / (1000 * 60 * 60 * 24)));
-        }
-      }
-
+    const rdapRes = await resolveRdap(cleanDomain);
+    if (rdapRes && rdapRes.lookupStatus === 'success') {
       return {
-        registrar: registrar || knownBrand?.registrar || (tld === 'br' || cleanDomain.endsWith('.com.br') ? 'Registro.br (NIC.br)' : 'ICANN Accredited Registrar'),
-        creationDate: creationDate || knownBrand?.created || (cleanDomain.endsWith('.br') ? '2018-09-20T19:21:39Z' : undefined),
-        expirationDate,
-        domainAgeDays: domainAgeDays ?? (knownBrand?.created ? Math.max(0, Math.floor((Date.now() - new Date(knownBrand.created).getTime()) / (1000 * 60 * 60 * 24))) : (cleanDomain.endsWith('.br') ? 2917 : undefined)),
-        status: Array.isArray(data.status) ? data.status.join(', ') : data.status
+        registrar: rdapRes.registrar || knownBrand?.registrar || 'ICANN Accredited Registrar',
+        creationDate: rdapRes.registeredDate || knownBrand?.created || undefined,
+        expirationDate: rdapRes.expirationDate || undefined,
+        domainAgeDays: rdapRes.domainAgeDays ?? (knownBrand?.created ? Math.max(0, Math.floor((Date.now() - new Date(knownBrand.created).getTime()) / (1000 * 60 * 60 * 24))) : undefined),
+        status: Array.isArray(rdapRes.status) ? rdapRes.status.join(', ') : rdapRes.status || 'active'
       };
     }
   } catch {
-    // Non-blocking fallback to known brand or ccTLD registry
+    // Non-blocking fallback
   }
 
   // Fallback for .br domains or known brands
@@ -218,9 +150,9 @@ async function fetchRealRdap(domain: string): Promise<{
 
   return {
     registrar: 'ICANN Accredited Registrar',
-    creationDate: '2018-09-20T19:21:39Z',
+    creationDate: undefined,
     expirationDate: undefined,
-    domainAgeDays: 2917,
+    domainAgeDays: undefined,
     status: 'active'
   };
 }
@@ -318,6 +250,58 @@ export async function resolveDomainIntelligence(rawDomain?: string): Promise<Dom
 
   // Wait for all DNS lookups to settle (timeout safety)
   await Promise.allSettled(dnsPromises);
+
+  // Apex domain fallback for subdomains (e.g. mail.internshala.com -> internshala.com)
+  const apexDomain = extractApexDomain(domain);
+  if (apexDomain && apexDomain !== domain) {
+    const apexPromises: Array<Promise<any>> = [];
+
+    if (mxRecords.length === 0) {
+      apexPromises.push(
+        dns.promises.resolveMx(apexDomain).then(records => {
+          records.sort((a, b) => a.priority - b.priority);
+          mxRecords = records.map(r => ({
+            priority: r.priority,
+            host: r.exchange,
+            status: typoInfo.isTyposquat ? 'UNAUTHENTICATED' : 'VERIFIED'
+          }));
+          mxStrings = records.map(r => `${r.priority} ${r.exchange}`);
+        }).catch(() => {})
+      );
+    }
+
+    if (!spfRecord) {
+      apexPromises.push(
+        dns.promises.resolveTxt(apexDomain).then(records => {
+          for (const chunk of records) {
+            const txtStr = chunk.join('');
+            if (txtStr.startsWith('v=spf1')) {
+              spfRecord = txtStr;
+              break;
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    if (!dmarcRecord) {
+      apexPromises.push(
+        dns.promises.resolveTxt(`_dmarc.${apexDomain}`).then(records => {
+          for (const chunk of records) {
+            const txtStr = chunk.join('');
+            if (txtStr.startsWith('v=DMARC1')) {
+              dmarcRecord = txtStr;
+              break;
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    if (apexPromises.length > 0) {
+      await Promise.allSettled(apexPromises);
+    }
+  }
 
   // Parse SPF details
   let spfQualifier = 'NONE';
