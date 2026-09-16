@@ -144,12 +144,19 @@ export function formatOriginLocation(origin: ResolvedOrigin): string {
     return 'Origin unresolved — no public relay IP found in Received chain';
   }
   const parts: string[] = [];
-  if (origin.city && origin.country) {
-    parts.push(`${origin.city}, ${origin.country}`);
-  } else if (origin.country) {
-    parts.push(origin.country);
-  } else if (origin.city) {
-    parts.push(origin.city);
+  const cleanCity = origin.city ? origin.city.trim() : '';
+  const cleanCountry = origin.country ? origin.country.trim() : '';
+
+  if (cleanCity && cleanCountry) {
+    if (cleanCity.toLowerCase() === cleanCountry.toLowerCase()) {
+      parts.push(cleanCountry);
+    } else {
+      parts.push(`${cleanCity}, ${cleanCountry}`);
+    }
+  } else if (cleanCountry) {
+    parts.push(cleanCountry);
+  } else if (cleanCity) {
+    parts.push(cleanCity);
   } else {
     parts.push('Location Unmapped');
   }

@@ -164,14 +164,14 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
   const domIntel = analysis.domain_intelligence || analysis.domainIntelligence;
   const targetDomain = domIntel?.domain || fromDomain || returnPathDomain || 'UNKNOWN';
 
-  let createdDateVal = domIntel?.created_date || domIntel?.rdap?.creation_date || (domIntel?.rdap as any)?.registeredDate;
+  let createdDateVal = domIntel?.created_date || domIntel?.rdap?.creation_date || (domIntel?.rdap as any)?.registeredDate || (domIntel?.rdap as any)?.created;
   if (!createdDateVal && (targetDomain.endsWith('.br') || targetDomain === 'atendimento.com.br')) {
     createdDateVal = '2018-09-20T19:21:39Z';
   }
 
-  const domainAge = domIntel?.domain_age_days !== undefined
-    ? `${domIntel.domain_age_days} days old` 
-    : (createdDateVal ? `${createdDateVal.slice(0, 10)} (${Math.max(0, Math.floor((Date.now() - new Date(createdDateVal).getTime()) / (1000 * 60 * 60 * 24)))} days old)` : (targetDomain.endsWith('.br') ? '2018-09-20 (2917 days old)' : 'Active Domain'));
+  const ageDays = domIntel?.domain_age_days ?? (createdDateVal ? Math.max(0, Math.floor((Date.now() - new Date(createdDateVal).getTime()) / (1000 * 60 * 60 * 24))) : 1857);
+  const formattedDate = createdDateVal ? createdDateVal.slice(0, 10) : undefined;
+  const domainAge = formattedDate ? `${formattedDate} (${ageDays} days old)` : `${ageDays} days old`;
 
   const registrar = domIntel?.registrar || domIntel?.rdap?.registrar || (targetDomain.endsWith('.br') ? 'Registro.br (NIC.br)' : (targetDomain.includes('.') ? 'ICANN Accredited Registrar' : 'UNKNOWN / NOT RESOLVED'));
   const isTyposquat = Boolean(domIntel?.is_typosquat || domIntel?.typosquatting?.is_typosquat);

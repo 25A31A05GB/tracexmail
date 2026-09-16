@@ -173,11 +173,12 @@ async function executeRdapLookup(domain: string): Promise<RdapResult> {
 
   if (Array.isArray(rawData.events)) {
     for (const ev of rawData.events) {
-      if (ev.eventAction === 'registration') {
+      const act = (ev.eventAction || '').toLowerCase().trim();
+      if (act === 'registration' || act === 'created' || act === 'create' || act === 'registration date') {
         registeredDate = ev.eventDate || null;
-      } else if (ev.eventAction === 'last changed' || ev.eventAction === 'last update') {
+      } else if (act === 'last changed' || act === 'last update' || act === 'updated' || act === 'update' || act === 'last-update') {
         updatedDate = ev.eventDate || null;
-      } else if (ev.eventAction === 'expiration') {
+      } else if (act === 'expiration' || act === 'expiry' || act === 'expire' || act === 'expiration date') {
         expirationDate = ev.eventDate || null;
       }
     }
@@ -188,7 +189,8 @@ async function executeRdapLookup(domain: string): Promise<RdapResult> {
     for (const ent of rawData.entities) {
       if (Array.isArray(ent.events)) {
         for (const ev of ent.events) {
-          if (ev.eventAction === 'registration' && ev.eventDate) {
+          const act = (ev.eventAction || '').toLowerCase().trim();
+          if ((act === 'registration' || act === 'created' || act === 'create' || act === 'registration date') && ev.eventDate) {
             registeredDate = ev.eventDate;
             break;
           }
