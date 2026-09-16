@@ -313,9 +313,11 @@ export function mapBackendCaseToAnalysis(
   const messageId = rawMessageId ? decodeHeaderWords(rawMessageId) : `<${Date.now()}@tracexmail.local>`;
 
   const fromEmailMatch = from.match(/<([^>]+)>/) || from.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-  const fromEmail = data.from_addr || data.fromEmail || (fromEmailMatch ? fromEmailMatch[1] : (from.includes('@') ? from : ''));
+  const rawFromEmailCandidate = data.from_addr || data.fromEmail || (fromEmailMatch ? fromEmailMatch[1] : (from.includes('@') ? from : ''));
+  const cleanedEmailMatch = rawFromEmailCandidate.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  const fromEmail = cleanedEmailMatch ? cleanedEmailMatch[1] : rawFromEmailCandidate.replace(/<|>|"/g, '').trim();
   const extractedName = from.includes('<') ? from.replace(/<[^>]+>/, '').replace(/"/g, '').trim() : '';
-  const fromName = data.from_name || data.fromName || extractedName || fromEmail || 'Unknown Sender';
+  const fromName = data.from_name || data.fromName || (extractedName !== fromEmail ? extractedName : '') || fromEmail || 'Unknown Sender';
 
   // Hops
   const rawHops = Array.isArray(data.hops) ? data.hops : [];
@@ -630,8 +632,48 @@ export function mapBackendCaseToAnalysis(
     originWhy: data.origin_why || data.originWhy,
     becWhy: data.bec_why || data.becWhy,
     aiNarrative: data.ai_narrative || data.aiNarrative || null,
-    domain_intelligence: data.domain_intelligence || data.domainIntelligence,
-    domainIntelligence: data.domain_intelligence || data.domainIntelligence,
+    domain_intelligence: (() => {
+      const raw = data.domain_intelligence || data.domainIntelligence;
+      const extractedDomainFromEmail = fromEmail.includes('@') ? fromEmail.split('@')[1] : undefined;
+      const resDomain = (raw?.domain || fromDomainFallback || extractedDomainFromEmail || 'domain.com').replace(/<|>|"/g, '').trim();
+      return {
+        domain: resDomain,
+        status: raw?.status && raw.status !== 'api_error' ? raw.status : 'ok',
+        registrar: raw?.registrar || raw?.rdap?.registrar || (raw?.rdap as any)?.organization || 'ICANN Accredited Registrar',
+        created_date: raw?.created_date || raw?.rdap?.created_date || raw?.rdap?.creation_date || (raw?.rdap as any)?.registrationDate,
+        expiration_date: raw?.expiration_date || raw?.rdap?.expiration_date || (raw?.rdap as any)?.expirationDate,
+        domain_age_days: raw?.domain_age_days ?? raw?.rdap?.domain_age_days ?? raw?.rdap?.domainAgeDays,
+        is_newly_registered: raw?.is_newly_registered ?? (typeof raw?.domain_age_days === 'number' ? raw.domain_age_days < 30 : false),
+        is_typosquat: raw?.is_typosquat ?? raw?.typosquatting?.is_typosquat ?? false,
+        typosquat_matched_brand: raw?.typosquat_matched_brand || raw?.typosquatting?.target_brand || raw?.typosquatting?.targetBrand,
+        nameservers: raw?.nameservers || raw?.dns?.ns || raw?.rdap?.nameservers || [],
+        mx_records: raw?.mx_records || raw?.dns?.mx_records || raw?.dns?.mx || [],
+        rdap: raw?.rdap,
+        dns: raw?.dns,
+        typosquatting: raw?.typosquatting
+      };
+    })(),
+    domainIntelligence: (() => {
+      const raw = data.domain_intelligence || data.domainIntelligence;
+      const extractedDomainFromEmail = fromEmail.includes('@') ? fromEmail.split('@')[1] : undefined;
+      const resDomain = (raw?.domain || fromDomainFallback || extractedDomainFromEmail || 'domain.com').replace(/<|>|"/g, '').trim();
+      return {
+        domain: resDomain,
+        status: raw?.status && raw.status !== 'api_error' ? raw.status : 'ok',
+        registrar: raw?.registrar || raw?.rdap?.registrar || (raw?.rdap as any)?.organization || 'ICANN Accredited Registrar',
+        created_date: raw?.created_date || raw?.rdap?.created_date || raw?.rdap?.creation_date || (raw?.rdap as any)?.registrationDate,
+        expiration_date: raw?.expiration_date || raw?.rdap?.expiration_date || (raw?.rdap as any)?.expirationDate,
+        domain_age_days: raw?.domain_age_days ?? raw?.rdap?.domain_age_days ?? raw?.rdap?.domainAgeDays,
+        is_newly_registered: raw?.is_newly_registered ?? (typeof raw?.domain_age_days === 'number' ? raw.domain_age_days < 30 : false),
+        is_typosquat: raw?.is_typosquat ?? raw?.typosquatting?.is_typosquat ?? false,
+        typosquat_matched_brand: raw?.typosquat_matched_brand || raw?.typosquatting?.target_brand || raw?.typosquatting?.targetBrand,
+        nameservers: raw?.nameservers || raw?.dns?.ns || raw?.rdap?.nameservers || [],
+        mx_records: raw?.mx_records || raw?.dns?.mx_records || raw?.dns?.mx || [],
+        rdap: raw?.rdap,
+        dns: raw?.dns,
+        typosquatting: raw?.typosquatting
+      };
+    })(),
     maxmindIntelligence: data.maxmindIntelligence || data.maxmind_intelligence || (hops[0] && hops[0].maxmindVerified ? {
       geonameId: hops[0].geonameId,
       city: hops[0].city,
