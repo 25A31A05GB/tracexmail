@@ -218,6 +218,33 @@ export function useWebSocketAlerts() {
               window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
             }
           }
+          if (data && data.type === 'GMAIL_EMAIL_ANALYZED') {
+            if (data.caseId) {
+              setLastCreatedCaseId(data.caseId);
+            }
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('CASE_CREATED', { detail: data }));
+              window.dispatchEvent(new CustomEvent('CASE_EVENT', { detail: data }));
+              window.dispatchEvent(new CustomEvent('GMAIL_EMAIL_ANALYZED', { detail: data }));
+              window.dispatchEvent(new CustomEvent('GMAIL_SYNC_COMPLETE', { detail: data }));
+            }
+            const emailAlert: WebSocketAlert = {
+              id: `ingest_${Date.now()}`,
+              case_id: data.caseId,
+              timestamp: data.timestamp || new Date().toISOString(),
+              severity: data.quarantined ? 'HIGH' : data.threatScore >= 50 ? 'MEDIUM' : 'INFO',
+              title: data.quarantined
+                ? 'Gmail Ingest: High-Risk Threat Intercepted'
+                : 'Gmail Email Analyzed & Added to Cases',
+              description: `Analyzed inbound email "${data.subject || 'RFC822 Message'}". Threat score: ${data.threatScore}/100. Status: ${data.quarantined ? 'QUARANTINED' : 'AUDITED'}.`,
+              source: 'gmail-ingest-worker',
+              read: false,
+              threat_score: data.threatScore || 0,
+              category: 'GMAIL_INGEST',
+              subject: data.subject
+            };
+            addAlert(emailAlert);
+          }
           if (data && data.type === 'GMAIL_SYNC_COMPLETE') {
             if (data.latest_case_id) {
               setLastCreatedCaseId(data.latest_case_id);

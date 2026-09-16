@@ -352,11 +352,13 @@ export function CasesView({
     window.addEventListener('CASE_CREATED', handleLiveEvent);
     window.addEventListener('CASE_EVENT', handleLiveEvent);
     window.addEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+    window.addEventListener('GMAIL_EMAIL_ANALYZED', handleLiveEvent);
 
     return () => {
       window.removeEventListener('CASE_CREATED', handleLiveEvent);
       window.removeEventListener('CASE_EVENT', handleLiveEvent);
       window.removeEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+      window.removeEventListener('GMAIL_EMAIL_ANALYZED', handleLiveEvent);
     };
   }, []);
 

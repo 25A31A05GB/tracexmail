@@ -371,6 +371,25 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
     fetchDashboardData();
   }, [alerts, currentUser?.id, currentUser?.email]);
 
+  // Window event listeners for immediate real-time sync when emails are ingested or cases created
+  useEffect(() => {
+    const handleLiveEvent = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener('CASE_CREATED', handleLiveEvent);
+    window.addEventListener('CASE_EVENT', handleLiveEvent);
+    window.addEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+    window.addEventListener('GMAIL_EMAIL_ANALYZED', handleLiveEvent);
+
+    return () => {
+      window.removeEventListener('CASE_CREATED', handleLiveEvent);
+      window.removeEventListener('CASE_EVENT', handleLiveEvent);
+      window.removeEventListener('GMAIL_SYNC_COMPLETE', handleLiveEvent);
+      window.removeEventListener('GMAIL_EMAIL_ANALYZED', handleLiveEvent);
+    };
+  }, [currentUser?.id, currentUser?.email]);
+
   // Periodic real-time safety net polling interval (6s)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -542,7 +561,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
           </div>
 
           {/* Compact KPI Row with 3D Interactive Tilt */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Interactive3DTiltCard maxTilt={5} scaleOnHover={1.02} glareOpacity={0.2} className="rounded-xl h-full">
               <div 
                 onClick={() => onNavigateToTab?.('cases')}
@@ -1147,7 +1166,7 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
             </div>
 
             {/* Core 5-Module Analyst Deck */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               
               {/* 1. FRAUD SCORE & VERDICT */}
               <motion.div

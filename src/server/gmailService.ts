@@ -206,6 +206,8 @@ export interface IngestionQueueItem {
   status: 'QUEUED' | 'ANALYZING' | 'COMPLETED' | 'FAILED';
   rawEml?: string;
   emailAddress?: string;
+  userId?: string;
+  organizationId?: string;
   subject?: string;
   from?: string;
   to?: string;

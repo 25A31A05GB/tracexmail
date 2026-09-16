@@ -102,7 +102,7 @@ export function ForensicCaseTwoPanel({
               Hover (?) for definitions
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-2.5 mb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-1">
             {evidenceCardData.checks.map((c, idx) => (
               <div
                 key={idx}

@@ -52,7 +52,7 @@ export function LockedGate({ onSignIn, onRequestAccess }: LockedGateProps) {
             </div>
           </div>
           <div className="p-7 space-y-5">
-            <div className="grid grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
               <div className="bg-[#12151c] border border-[#232833] rounded-lg p-4">
                 <div className="text-[10.5px] text-[#4f5763] uppercase tracking-wider font-mono">Open Cases</div>
                 <div className="font-mono text-2xl text-[#e7ebf1] mt-1">14</div>

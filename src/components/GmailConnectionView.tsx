@@ -37,7 +37,9 @@ import {
   Terminal,
   ShieldX,
   Layers,
-  Loader2
+  Loader2,
+  Square,
+  Play
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
@@ -201,6 +203,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   // Ingestion Analysis Queue State & Exponential Backoff Polling
   const [ingestionQueue, setIngestionQueue] = useState<any[]>([]);
   const [loadingQueue, setLoadingQueue] = useState<boolean>(false);
+  const [isPollingStopped, setIsPollingStopped] = useState<boolean>(false);
+  const isPollingStoppedRef = useRef<boolean>(false);
   const [queueRetryState, setQueueRetryState] = useState<{
     isRetrying: boolean;
     retryCount: number;
@@ -215,14 +219,49 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   const consecutiveFailuresRef = useRef<number>(0);
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isFetchingQueueRef = useRef<boolean>(false);
   const isComponentMountedRef = useRef<boolean>(true);
 
-  // Configuration for ingestion queue polling
+  // Configuration for ingestion queue polling with exponential backoff & full jitter
   const BASE_QUEUE_POLL_MS = 4000;
   const MAX_QUEUE_BACKOFF_MS = 60000; // Cap backoff at 60s
   const BACKOFF_MULTIPLIER = 2;
-  const JITTER_FACTOR = 0.2; // 0-20% randomization to prevent thundering herd
+  const JITTER_FACTOR = 0.25; // 0-25% randomization to eliminate thundering herd
+
+  const stopCountdown = () => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  };
+
+  const startCountdown = (delayMs: number) => {
+    stopCountdown();
+    let remaining = delayMs;
+    countdownIntervalRef.current = setInterval(() => {
+      remaining -= 1000;
+      if (remaining <= 0) {
+        stopCountdown();
+      } else {
+        setQueueRetryState(prev => prev.isRetrying ? { ...prev, nextRetryDelayMs: Math.max(0, remaining) } : prev);
+      }
+    }, 1000);
+  };
+
+  const parseRetryAfterHeader = (headerVal: string | null): number | null => {
+    if (!headerVal) return null;
+    const asInt = parseInt(headerVal, 10);
+    if (!isNaN(asInt) && asInt > 0) {
+      return asInt;
+    }
+    // Parse HTTP-Date format (RFC 7231 / RFC 9110)
+    const asDate = Date.parse(headerVal);
+    if (!isNaN(asDate) && asDate > Date.now()) {
+      return Math.round((asDate - Date.now()) / 1000);
+    }
+    return null;
+  };
 
   const calculateBackoffDelay = (failures: number, retryAfterSec?: number | null): number => {
     if (typeof retryAfterSec === 'number' && retryAfterSec > 0) {
@@ -235,12 +274,78 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     return Math.round(capped + jitter);
   };
 
+  /**
+   * Exponential backoff fetch wrapper for critical Gmail ingestion & sync endpoints
+   * Gracefully absorbs intermittent 503 (Service Unavailable) and 429 (Too Many Requests)
+   */
+  const fetchWithExponentialBackoff = async (
+    url: string,
+    options?: RequestInit,
+    maxRetries = 3,
+    baseDelayMs = 1200
+  ): Promise<Response> => {
+    let attempt = 0;
+    while (true) {
+      try {
+        const response = await apiFetch(url, options);
+        if ((response.status === 429 || response.status === 503 || response.status === 502 || response.status === 504) && attempt < maxRetries) {
+          attempt++;
+          const retryAfterHeader = response.headers.get('Retry-After');
+          const retryAfterSec = parseRetryAfterHeader(retryAfterHeader);
+          let delayMs = retryAfterSec ? retryAfterSec * 1000 : baseDelayMs * Math.pow(BACKOFF_MULTIPLIER, attempt - 1);
+          delayMs = Math.min(delayMs, MAX_QUEUE_BACKOFF_MS);
+          const jitter = delayMs * JITTER_FACTOR * Math.random();
+          const totalDelay = Math.round(delayMs + jitter);
+          const errLabel = response.status === 429 ? 'Rate limited (HTTP 429)' : response.status === 503 ? 'Service unavailable (HTTP 503)' : `Gateway status ${response.status}`;
+          console.warn(`[GmailConnectionView] Intermittent ${errLabel} on ${url}. Retrying with exponential backoff in ${totalDelay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise(r => setTimeout(r, totalDelay));
+          continue;
+        }
+        return response;
+      } catch (networkErr: any) {
+        if (attempt < maxRetries) {
+          attempt++;
+          const delayMs = Math.min(baseDelayMs * Math.pow(BACKOFF_MULTIPLIER, attempt - 1), MAX_QUEUE_BACKOFF_MS);
+          const jitter = delayMs * JITTER_FACTOR * Math.random();
+          const totalDelay = Math.round(delayMs + jitter);
+          console.warn(`[GmailConnectionView] Network error on ${url}. Retrying with backoff in ${totalDelay}ms (attempt ${attempt}/${maxRetries}):`, networkErr);
+          await new Promise(r => setTimeout(r, totalDelay));
+          continue;
+        }
+        throw networkErr;
+      }
+    }
+  };
+
+  const stopQueuePolling = () => {
+    isPollingStoppedRef.current = true;
+    setIsPollingStopped(true);
+    stopCountdown();
+    if (pollTimeoutRef.current) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+    setQueueRetryState({
+      isRetrying: false,
+      retryCount: 0,
+      nextRetryDelayMs: 0,
+      error: null
+    });
+  };
+
+  const resumeQueuePolling = () => {
+    isPollingStoppedRef.current = false;
+    setIsPollingStopped(false);
+    consecutiveFailuresRef.current = 0;
+    fetchQueue(true);
+  };
+
   const scheduleNextQueuePoll = (delayMs: number) => {
     if (pollTimeoutRef.current) {
       clearTimeout(pollTimeoutRef.current);
       pollTimeoutRef.current = null;
     }
-    if (!isComponentMountedRef.current) return;
+    if (!isComponentMountedRef.current || isPollingStoppedRef.current) return;
     pollTimeoutRef.current = setTimeout(() => {
       fetchQueue(false);
     }, delayMs);
@@ -248,13 +353,21 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   const fetchQueue = async (isManual = false) => {
     if (isFetchingQueueRef.current && !isManual) return;
+    if (isPollingStoppedRef.current && !isManual) return;
 
     if (isManual) {
       consecutiveFailuresRef.current = 0;
+      stopCountdown();
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
         pollTimeoutRef.current = null;
       }
+      setQueueRetryState({
+        isRetrying: false,
+        retryCount: 0,
+        nextRetryDelayMs: 0,
+        error: null
+      });
     }
 
     isFetchingQueueRef.current = true;
@@ -263,24 +376,33 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     try {
       const res = await apiFetch('/api/gmail/ingestion-queue');
 
-      if (res.status === 429) {
-        // Rate limited: read Retry-After header if supplied
+      // Robust interception for intermittent 429 (Rate Limit), 503 (Service Unavailable), or gateway drops
+      if (res.status === 429 || res.status === 503 || res.status === 502 || res.status === 504) {
         consecutiveFailuresRef.current += 1;
         const retryAfterHeader = res.headers.get('Retry-After');
-        const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+        const retryAfterSec = parseRetryAfterHeader(retryAfterHeader);
         const delay = calculateBackoffDelay(consecutiveFailuresRef.current, retryAfterSec);
 
-        setQueueRetryState({
-          isRetrying: true,
-          retryCount: consecutiveFailuresRef.current,
-          nextRetryDelayMs: delay,
-          error: 'Rate limited (HTTP 429)'
-        });
+        const errorLabel = res.status === 429
+          ? 'Rate limited (HTTP 429)'
+          : res.status === 503
+          ? 'Service temporarily unavailable (HTTP 503)'
+          : `Gateway issue (HTTP ${res.status})`;
 
-        console.warn(
-          `[GmailConnectionView] Ingestion queue rate-limited (HTTP 429). Retrying in ${Math.round(delay / 1000)}s (backoff attempt #${consecutiveFailuresRef.current}).`
-        );
-        scheduleNextQueuePoll(delay);
+        if (!isPollingStoppedRef.current) {
+          setQueueRetryState({
+            isRetrying: true,
+            retryCount: consecutiveFailuresRef.current,
+            nextRetryDelayMs: delay,
+            error: errorLabel
+          });
+          startCountdown(delay);
+
+          console.warn(
+            `[GmailConnectionView] Ingestion queue ${errorLabel}. Retrying in ${Math.round(delay / 1000)}s (exponential backoff attempt #${consecutiveFailuresRef.current}).`
+          );
+          scheduleNextQueuePoll(delay);
+        }
         return;
       }
 
@@ -297,6 +419,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         console.info('[GmailConnectionView] Ingestion queue polling successfully recovered from backoff.');
       }
 
+      stopCountdown();
       consecutiveFailuresRef.current = 0;
       setQueueRetryState({
         isRetrying: false,
@@ -306,23 +429,28 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       });
 
       // Healthy interval
-      scheduleNextQueuePoll(BASE_QUEUE_POLL_MS);
+      if (!isPollingStoppedRef.current) {
+        scheduleNextQueuePoll(BASE_QUEUE_POLL_MS);
+      }
     } catch (err: any) {
       consecutiveFailuresRef.current += 1;
       const delay = calculateBackoffDelay(consecutiveFailuresRef.current);
       const errMsg = err?.message || 'Network fetch failure';
 
-      setQueueRetryState({
-        isRetrying: true,
-        retryCount: consecutiveFailuresRef.current,
-        nextRetryDelayMs: delay,
-        error: errMsg
-      });
+      if (!isPollingStoppedRef.current) {
+        setQueueRetryState({
+          isRetrying: true,
+          retryCount: consecutiveFailuresRef.current,
+          nextRetryDelayMs: delay,
+          error: errMsg
+        });
+        startCountdown(delay);
 
-      console.warn(
-        `[GmailConnectionView] Ingestion queue fetch error (${errMsg}). Backing off for ${Math.round(delay / 1000)}s (failure #${consecutiveFailuresRef.current})`
-      );
-      scheduleNextQueuePoll(delay);
+        console.warn(
+          `[GmailConnectionView] Ingestion queue fetch error (${errMsg}). Backing off for ${Math.round(delay / 1000)}s (failure #${consecutiveFailuresRef.current})`
+        );
+        scheduleNextQueuePoll(delay);
+      }
     } finally {
       isFetchingQueueRef.current = false;
       setLoadingQueue(false);
@@ -334,7 +462,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     fetchQueue(false);
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isComponentMountedRef.current) {
+      if (document.visibilityState === 'visible' && isComponentMountedRef.current && !isPollingStoppedRef.current) {
         // Resume queue checking immediately when user returns to the tab
         fetchQueue(true);
       }
@@ -344,6 +472,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
     return () => {
       isComponentMountedRef.current = false;
+      stopCountdown();
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current);
         pollTimeoutRef.current = null;
@@ -369,7 +498,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       if (selectedCategoryFilter !== 'all') q.set('category', selectedCategoryFilter);
       if (emailSearchQuery.trim()) q.set('search', emailSearchQuery.trim());
 
-      const res = await apiFetch(`/api/gmail/synced-emails?${q.toString()}`);
+      const res = await fetchWithExponentialBackoff(`/api/gmail/synced-emails?${q.toString()}`, undefined, 3, 1000);
       if (res.ok) {
         const data = await res.json();
         if (data.synced_emails) {
@@ -400,19 +529,19 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const fetchStatus = async () => {
     setLoading(true);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    const timeout = setTimeout(() => controller.abort(), 12000);
 
     try {
       const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
       const url = targetEmail
         ? `/api/gmail/status?user_email=${encodeURIComponent(targetEmail)}`
         : `/api/gmail/status`;
-      const res = await apiFetch(url, {
+      const res = await fetchWithExponentialBackoff(url, {
         signal: controller.signal,
         headers: targetEmail ? {
           'x-user-email': targetEmail
         } : {}
-      });
+      }, 3, 1000);
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
@@ -721,7 +850,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
     try {
       const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
-      const res = await apiFetch('/api/gmail/poll-now', {
+      const res = await fetchWithExponentialBackoff('/api/gmail/poll-now', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -730,7 +859,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         body: JSON.stringify({
           user_email: targetEmail
         })
-      });
+      }, 2, 1500);
 
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
 
@@ -738,6 +867,13 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         setSyncing(false);
         const errData = await res.json().catch(() => ({}));
         setErrorMsg(errData.error || 'Rate limit reached. Please wait before triggering another sync cycle.');
+        return;
+      }
+
+      if (res.status === 503) {
+        setSyncing(false);
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || 'Gmail service is temporarily busy (503). Retrying automatically via ingestion queue.');
         return;
       }
 
@@ -989,19 +1125,29 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   const [disconnecting, setDisconnecting] = useState<boolean>(false);
 
-  const handleDisconnect = async () => {
-    if (!confirm('Are you sure you want to disconnect this Gmail account and terminate all real-time ingestion loops?')) return;
+  const handleDisconnect = async (options?: { force?: boolean; skipConfirm?: boolean }) => {
+    const isForce = Boolean(options?.force);
+    const skipConfirm = Boolean(options?.skipConfirm);
+    if (!skipConfirm && !confirm('Are you sure you want to disconnect this Gmail account and terminate all real-time ingestion loops?')) return;
+    
+    // Stop all background queue polling loops immediately
+    stopQueuePolling();
+    
     setDisconnecting(true);
     setErrorMsg(null);
     try {
-      const res = await apiFetch('/api/gmail/disconnect', { method: 'POST' });
+      const res = await apiFetch('/api/gmail/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: isForce })
+      });
       if (res.status === 429) {
         const errData = await res.json().catch(() => ({}));
         setErrorMsg(errData.error || 'Strict rate limit active. Please wait a moment before trying to disconnect again.');
         return;
       }
       if (res.ok) {
-        // Immediately reset local connection and watch states
+        // Immediately reset local connection, queue, and watch states
         setStatus({
           is_connected: false,
           oauth_configured: true,
@@ -1024,6 +1170,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             last_quarantine_at: null
           }
         });
+        setIngestionQueue([]);
         setDirectTokenSuccess(null);
         setDirectAccessToken('');
         setPubSubState(prev => ({
@@ -1033,7 +1180,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           expiration: null,
           subscription: ''
         }));
-        setSyncResult('Gmail live connection disconnected and background sync stopped.');
+        setSyncResult('Gmail live connection disconnected and all background sync loops stopped.');
         window.dispatchEvent(new CustomEvent('GMAIL_DISCONNECTED'));
         fetchStatus();
       } else {
@@ -1126,7 +1273,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               <span>{simulating ? 'Testing...' : 'Simulate Test Threat'}</span>
             </button>
             <button
-              onClick={handleDisconnect}
+              onClick={() => handleDisconnect({ force: false, skipConfirm: false })}
               disabled={syncing || disconnecting}
               className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
               title="Disconnect Gmail integration and stop real-time ingestion"
@@ -1300,7 +1447,23 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   LIVE QUEUE DETECTOR
                 </span>
-                {queueRetryState.isRetrying && (
+                {loadingQueue ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-950/80 text-blue-300 border border-blue-600/60 font-bold flex items-center gap-1.5 shadow-sm animate-pulse">
+                    <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />
+                    <span>Syncing...</span>
+                  </span>
+                ) : isPollingStopped ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-stone-800 text-stone-400 border border-stone-700 font-bold flex items-center gap-1">
+                    <Square className="w-2.5 h-2.5 text-stone-400 fill-current" />
+                    <span>POLLING STOPPED</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-800/50 font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Active Sync</span>
+                  </span>
+                )}
+                {queueRetryState.isRetrying && !isPollingStopped && (
                   <span
                     className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/70 text-amber-300 border border-amber-800/60 flex items-center gap-1.5"
                     title={queueRetryState.error || 'Transient connection delay, exponential backoff active'}
@@ -1315,18 +1478,60 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               </div>
             </div>
           </div>
-          <button
-            onClick={() => fetchQueue(true)}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${loadingQueue ? 'animate-spin' : ''}`} />
-            <span>Refresh Queue</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isPollingStopped ? (
+              <button
+                onClick={resumeQueuePolling}
+                className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Resume automated background queue polling"
+              >
+                <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
+                <span>Resume Polling</span>
+              </button>
+            ) : (
+              <button
+                onClick={stopQueuePolling}
+                className="px-2.5 py-1.5 rounded-lg bg-stone-900 hover:bg-amber-950/60 hover:text-amber-300 border border-stone-700 hover:border-amber-700/50 text-stone-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Strong Stop: Immediately freeze background polling intervals and retry timers"
+              >
+                <Square className="w-3 h-3 text-amber-400 fill-current" />
+                <span>Stop Polling</span>
+              </button>
+            )}
+            <button
+              onClick={() => fetchQueue(true)}
+              disabled={loadingQueue}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+              title="Manually trigger immediate queue check"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${loadingQueue ? 'animate-spin' : ''}`} />
+              <span>{loadingQueue ? 'Syncing...' : 'Refresh Queue'}</span>
+            </button>
+            {status?.is_connected && (
+              <button
+                onClick={() => handleDisconnect({ force: true, skipConfirm: false })}
+                disabled={disconnecting}
+                className="px-2.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 text-red-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                title="Quickly disconnect email and terminate all active ingestion loops and watch triggers"
+              >
+                {disconnecting ? <Loader2 className="w-3 h-3 animate-spin text-red-400" /> : <LogOut className="w-3 h-3" />}
+                <span>Quick Disconnect</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {ingestionQueue.length === 0 ? (
           <div className="p-4 bg-[#1c1813] border border-[#2a251e] rounded-lg text-center text-xs text-stone-400 flex flex-col items-center justify-center gap-1.5">
-            {queueRetryState.isRetrying ? (
+            {isPollingStopped ? (
+              <>
+                <Square className="w-5 h-5 text-stone-400 opacity-80" />
+                <span className="text-stone-300 font-medium">Background queue polling is paused</span>
+                <span className="text-stone-500 text-[11px]">
+                  Automated background requests are stopped. Click "Resume Polling" or "Refresh Queue" anytime to reactivate synchronization.
+                </span>
+              </>
+            ) : queueRetryState.isRetrying ? (
               <>
                 <Clock className="w-5 h-5 text-amber-400 opacity-80" />
                 <span className="text-amber-200/90 font-medium">Temporary sync pause — backing off to protect connection</span>

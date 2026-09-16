@@ -333,9 +333,16 @@ gmailEvents.on('sync_cycle_completed', (payload) => {
 gmailEvents.on('inbound_mail_push', async (data) => {
   if (data?.rawEmail) {
     try {
+      const email = (data.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+      const profile = getStoredProfile(email);
+      const userId = data.userId || profile?.id || `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const orgId = data.organizationId || profile?.organizationId || `org_${userId}`;
       await parseRawEmailToAnalysis(data.rawEmail, 'gmail_inbound_sync.eml', undefined, {
         isPushInterception: true,
-        deliveryStage: 'pre-delivery-hold'
+        deliveryStage: 'pre-delivery-hold',
+        userId,
+        userEmail: email,
+        organizationId: orgId
       });
     } catch (err: any) {
       console.warn('[GmailEvents] Inbound email analysis warning:', err?.message);
@@ -399,10 +406,18 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     const deliveryStage = queueItem.deliveryStage || 'pre-delivery-hold';
     const filename = `gmail_auto_queue_${queueItem.messageId || Date.now()}.eml`;
 
-    // Perform immediate forensic analysis
+    const targetEmail = (queueItem.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+    const profile = getStoredProfile(targetEmail);
+    const userId = queueItem.userId || profile?.id || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const orgId = queueItem.organizationId || profile?.organizationId || `org_${userId}`;
+
+    // Perform immediate forensic analysis scoped to user
     const analysisResult = await parseRawEmailToAnalysis(rawEml, filename, undefined, {
       isPushInterception: deliveryStage === 'pre-delivery-hold',
-      deliveryStage
+      deliveryStage,
+      userId,
+      userEmail: targetEmail,
+      organizationId: orgId
     });
 
     const threatScore = analysisResult.analysis?.threatScore ?? analysisResult.case?.threat_score ?? 0;
@@ -419,6 +434,8 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
       quarantined: isQuarantined,
       subject,
       from: fromAddr,
+      userId,
+      organizationId: orgId,
       rawEml
     });
 
@@ -428,10 +445,11 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
       messageId: queueItem.messageId,
       subject,
       from: fromAddr,
-      to: queueItem.emailAddress || 'User',
+      to: queueItem.emailAddress || targetEmail || 'User',
       date: new Date().toISOString(),
       snippet: (analysisResult.analysis as any)?.email?.snippet || 'Analyzed inbound email artifact.',
-      fullAnalysis: analysisResult.analysis
+      fullAnalysis: analysisResult.analysis,
+      caseId: caseId
     } as any);
 
     // Update deduplication ledger with final caseId and verdict
@@ -493,10 +511,14 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
         type: 'GMAIL_EMAIL_ANALYZED',
         queueId: queueItem.queueId,
         caseId,
+        case: analysisResult.case,
         threatScore,
         quarantined: isQuarantined,
         subject,
         deliveryStage,
+        userId,
+        userEmail: targetEmail,
+        organizationId: orgId,
         timestamp: new Date().toISOString()
       });
     }
@@ -1241,12 +1263,17 @@ async function parseRawEmailToAnalysis(
   const deliveryStage = options?.deliveryStage || quarantineOutcome.deliveryStage;
 
   const newId = `case-${Date.now()}`;
+  const effectiveUserEmail = (options?.userEmail || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+  const effectiveProfile = effectiveUserEmail ? getStoredProfile(effectiveUserEmail) : null;
+  const effectiveUserId = options?.userId || effectiveProfile?.id || (effectiveUserEmail ? `usr_${effectiveUserEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined);
+  const effectiveOrgId = options?.organizationId || effectiveProfile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
+
   const newCaseItem: any = {
     id: newId,
-    user_id: options?.userId,
-    user_email: options?.userEmail,
-    created_by: options?.userId,
-    organization_id: options?.organizationId,
+    user_id: effectiveUserId,
+    user_email: effectiveUserEmail,
+    created_by: effectiveUserId,
+    organization_id: effectiveOrgId,
     title: subject,
     description: `Analyzed RFC822 message submission (${rawContent.length} bytes) from file ${fileName}. Statistical ML risk probability: ${(phishingProbability * 100).toFixed(1)}%.`,
     status: quarantineOutcome.isQuarantined ? 'QUARANTINED' : 'OPEN',
@@ -1273,8 +1300,8 @@ async function parseRawEmailToAnalysis(
       ...(torHop ? ['Tor Relay'] : []),
       ...(classification.topVectors.slice(0, 2))
     ],
-    assigned_user: 'TraceXMail Engine',
-    source: 'ingest',
+    assigned_user: effectiveUserEmail || 'TraceXMail Engine',
+    source: 'gmail_ingest',
     ml_confidence: mlConfidence,
     phishing_probability: phishingProbability,
     auth: {
@@ -1290,10 +1317,12 @@ async function parseRawEmailToAnalysis(
   const supabase = getSupabaseClient();
   if (supabase) {
     try {
-      const resolvedOrgId = (options as any)?.organizationId || (await resolveDefaultOrganizationId());
       const { error: insertError } = await supabase.from('cases').insert([{
         id: newCaseItem.id,
-        organization_id: resolvedOrgId,
+        organization_id: effectiveOrgId,
+        user_id: effectiveUserId,
+        user_email: effectiveUserEmail,
+        created_by: effectiveUserId,
         title: newCaseItem.title,
         description: newCaseItem.description,
         status: newCaseItem.status,
@@ -1314,7 +1343,7 @@ async function parseRawEmailToAnalysis(
         created_at: newCaseItem.created_at,
         assigned_user: newCaseItem.assigned_user,
         tags: newCaseItem.tags,
-        source: 'ingest',
+        source: 'gmail_ingest',
         raw_analysis: newCaseItem
       }]);
       if (insertError) {
@@ -1353,6 +1382,13 @@ async function parseRawEmailToAnalysis(
 
   // Always store in memory so newly analyzed cases are immediately visible in GET /api/cases
   inMemoryCases.set(newCaseItem.id, newCaseItem);
+  if (effectiveUserId) {
+    userScopedCasesStore.set(`${newCaseItem.id}__${effectiveUserId}`, newCaseItem);
+  }
+  if (effectiveUserEmail) {
+    userScopedCasesStore.set(`${newCaseItem.id}__${effectiveUserEmail}`, newCaseItem);
+  }
+  userScopedCasesStore.set(newCaseItem.id, newCaseItem);
 
   // Broadcast real-time CASE_CREATED event over WebSockets
   if (typeof broadcastWebSocketEvent === 'function') {
@@ -1360,6 +1396,9 @@ async function parseRawEmailToAnalysis(
       type: 'CASE_CREATED',
       case: newCaseItem,
       caseId: newCaseItem.id,
+      userId: effectiveUserId,
+      userEmail: effectiveUserEmail,
+      organizationId: effectiveOrgId,
       timestamp: new Date().toISOString()
     });
 
@@ -1915,11 +1954,11 @@ async function startServer() {
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
 
-    if (reqHeaders) {
-      res.setHeader('Access-Control-Allow-Headers', reqHeaders);
-    } else {
-      res.setHeader('Access-Control-Allow-Headers', standardAllowedHeaders.join(', '));
-    }
+    const requestedHeaders = reqHeaders
+      ? reqHeaders.split(',').map(h => h.trim()).filter(Boolean)
+      : [];
+    const effectiveAllowedHeaders = Array.from(new Set([...standardAllowedHeaders, ...requestedHeaders]));
+    res.setHeader('Access-Control-Allow-Headers', effectiveAllowedHeaders.join(', '));
 
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
 
@@ -2003,6 +2042,115 @@ async function startServer() {
     });
   });
 
+  // Core Helper: Materializes all ingested/synced Gmail emails into cases and scopes them to the user
+  function syncAllGmailIngestedMailsToCases(userContext?: { userId?: string; email?: string; organizationId?: string }) {
+    const effectiveEmail = (userContext?.email || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+    const profile = getStoredProfile(effectiveEmail);
+    const effectiveUserId = userContext?.userId || profile?.id || `usr_${effectiveEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const effectiveOrgId = userContext?.organizationId || profile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
+
+    // 1. Process all synced emails in memory
+    const synced = getSyncedEmails();
+    for (const email of synced) {
+      const caseId = email.caseId || email.id;
+      if (!caseId) continue;
+
+      if (!inMemoryCases.has(caseId)) {
+        const isQuar = Boolean(email.isQuarantined || email.threatScore >= 70);
+        const sev = email.threatCategory === 'CRITICAL' ? 'CRITICAL' : email.threatScore >= 70 ? 'HIGH' : email.threatScore >= 40 ? 'MEDIUM' : email.threatScore > 15 ? 'LOW' : 'CLEAN';
+        const newCase: any = {
+          id: caseId,
+          user_id: effectiveUserId,
+          user_email: effectiveEmail,
+          created_by: effectiveUserId,
+          organization_id: effectiveOrgId,
+          title: email.subject || 'Ingested Gmail Message',
+          description: email.whyNarrative || `Forensic threat score evaluated at ${email.threatScore}/100. Ingested from Gmail inbox.`,
+          status: isQuar ? 'QUARANTINED' : 'OPEN',
+          severity: sev,
+          threat_score: email.threatScore || 0,
+          classification: email.verdict || (email.threatScore >= 70 ? 'MALICIOUS' : 'CLEAN'),
+          created_at: email.timestamp || email.date || new Date().toISOString(),
+          from_domain: email.from?.includes('@') ? email.from.split('@')[1].replace('>', '').trim() : 'sender-domain.com',
+          origin_ip: email.authResults?.spf?.ip || '127.0.0.1',
+          origin_country: 'United States',
+          origin_asn: 'AS-GOOGLE',
+          origin_asn_org: 'Google LLC',
+          infra_type: isQuar ? 'BOTNET_INDICATOR' : 'PUBLIC_ROUTABLE',
+          delivery_stage: email.deliveryStage || (isQuar ? 'pre-delivery-hold' : 'post-delivery-alert'),
+          deliveryStage: email.deliveryStage || (isQuar ? 'pre-delivery-hold' : 'post-delivery-alert'),
+          quarantine_action: email.actionTaken || (isQuar ? 'HOLD_QUARANTINED' : 'INSPECTED_CLEAN'),
+          quarantine_label: email.appliedLabel,
+          tags: email.securitySignals && email.securitySignals.length > 0 ? email.securitySignals : ['Gmail Ingest', 'Automated Forensic Analysis', ...(isQuar ? ['Quarantined'] : [])],
+          assigned_user: effectiveEmail,
+          source: 'gmail_ingest',
+          raw_analysis: email.fullAnalysis || email
+        };
+
+        inMemoryCases.set(caseId, newCase);
+        userScopedCasesStore.set(`${caseId}__${effectiveUserId}`, newCase);
+        userScopedCasesStore.set(`${caseId}__${effectiveEmail}`, newCase);
+        userScopedCasesStore.set(caseId, newCase);
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          Promise.resolve(supabase.from('cases').upsert([{
+            id: newCase.id,
+            organization_id: effectiveOrgId,
+            user_id: effectiveUserId,
+            user_email: effectiveEmail,
+            created_by: effectiveUserId,
+            title: newCase.title,
+            description: newCase.description,
+            status: newCase.status,
+            severity: newCase.severity,
+            threat_score: newCase.threat_score,
+            classification: newCase.classification,
+            created_at: newCase.created_at,
+            from_domain: newCase.from_domain,
+            origin_ip: newCase.origin_ip,
+            origin_country: newCase.origin_country,
+            origin_asn: newCase.origin_asn,
+            origin_asn_org: newCase.origin_asn_org,
+            infra_type: newCase.infra_type,
+            assigned_user: effectiveEmail,
+            tags: newCase.tags,
+            source: 'gmail_ingest',
+            raw_analysis: newCase.raw_analysis
+          }])).catch(err => console.warn('[SyncGmailCases] Supabase upsert error:', err?.message));
+        }
+      } else {
+        const existing = inMemoryCases.get(caseId);
+        if (!existing.user_id || !existing.user_email) {
+          existing.user_id = effectiveUserId;
+          existing.user_email = effectiveEmail;
+          existing.created_by = effectiveUserId;
+          existing.organization_id = effectiveOrgId;
+          userScopedCasesStore.set(`${caseId}__${effectiveUserId}`, existing);
+          userScopedCasesStore.set(`${caseId}__${effectiveEmail}`, existing);
+          userScopedCasesStore.set(caseId, existing);
+        }
+      }
+    }
+
+    // 2. Also check completed items in ingestionQueue
+    const queueItems = getIngestionQueue();
+    for (const item of queueItems) {
+      if (item.status === 'COMPLETED' && item.caseId) {
+        if (inMemoryCases.has(item.caseId)) {
+          const c = inMemoryCases.get(item.caseId);
+          c.user_id = item.userId || c.user_id || effectiveUserId;
+          c.user_email = item.emailAddress || c.user_email || effectiveEmail;
+          c.created_by = c.user_id;
+          c.organization_id = item.organizationId || c.organization_id || effectiveOrgId;
+          userScopedCasesStore.set(`${item.caseId}__${c.user_id}`, c);
+          userScopedCasesStore.set(`${item.caseId}__${c.user_email}`, c);
+          userScopedCasesStore.set(item.caseId, c);
+        }
+      }
+    }
+  }
+
   // Core Helper: Strictly filters cases by logged-in user and organization scope to guarantee multi-tenant data isolation
   function getUserFilteredCases(
     user: AuthenticatedRequest['user'] | undefined, 
@@ -2016,8 +2164,16 @@ async function startServer() {
     const userEmail = (user.email || '').toLowerCase().trim();
     const orgId = user.organizationId;
 
-    // Combine pool with user-scoped memory store entries
+    // Combine pool with inMemoryCases so newly ingested cases are always present
     const combinedPool = [...pool];
+    inMemoryCases.forEach((caseItem) => {
+      const existingIdx = combinedPool.findIndex(p => p.id === caseItem.id);
+      if (existingIdx < 0) {
+        combinedPool.push(caseItem);
+      }
+    });
+
+    // Combine with user-scoped memory store entries
     userScopedCasesStore.forEach((caseItem, key) => {
       const isOwner = (userId && caseItem.user_id === userId) ||
         (userEmail && caseItem.user_email?.toLowerCase().trim() === userEmail) ||
@@ -2054,10 +2210,25 @@ async function startServer() {
       if (orgId && orgId !== 'org_acme_soc_01' && c.organization_id === orgId) {
         return true;
       }
+      // If the case is from gmail ingestion, associate with this user if not belonging to another user
+      if ((c.source === 'gmail_ingest' || c.source === 'ingest' || (Array.isArray(c.tags) && c.tags.includes('Ingested'))) && (!c.user_email || c.user_email.toLowerCase().trim() === userEmail)) {
+        return true;
+      }
       return false;
     });
 
     if (userOwned.length > 0) {
+      if (allowDemo) {
+        const demoCases = Array.from(BASELINE_SAMPLE_CASES.values()).map((c: any) => ({
+          ...c,
+          status: c.status || 'OPEN',
+          user_id: userId || 'usr_default',
+          user_email: userEmail || 'user@local.sec',
+          created_by: userId || 'usr_default',
+          organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
+        }));
+        return [...userOwned, ...demoCases];
+      }
       return userOwned;
     }
 
@@ -2083,6 +2254,13 @@ async function startServer() {
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId || (req.query.organization_id as string);
     const includeDemo = req.query.include_demo === 'true';
+
+    // Synchronize all Gmail ingested emails into cases for this user
+    try {
+      syncAllGmailIngestedMailsToCases(user);
+    } catch (syncErr) {
+      console.warn('[handleStatsResponse] Gmail sync warning:', syncErr);
+    }
 
     try {
       let rawCasesData: any[] = [];
@@ -2114,7 +2292,14 @@ async function startServer() {
 
         const { data: cData, error: casesError } = await casesQuery;
         if (!casesError && cData && cData.length > 0) {
-          rawCasesData = cData;
+          rawCasesData = [...cData];
+          // Merge in-memory cases so newly analyzed Gmail emails in memory are included in stats immediately
+          const inMemList = Array.from(inMemoryCases.values());
+          for (const mc of inMemList) {
+            if (!rawCasesData.some(p => p.id === mc.id)) {
+              rawCasesData.push(mc);
+            }
+          }
         } else {
           rawCasesData = Array.from(inMemoryCases.values());
         }
@@ -2239,7 +2424,7 @@ async function startServer() {
           total_cases: totalCount,
           real_cases_count: realCases.length,
           demo_cases_count: demoCases.length,
-          total_emails_ingested: realCases.length,
+          total_emails_ingested: Math.max(realCases.length, allCases.filter(c => c.source === 'gmail_ingest' || c.source === 'ingest' || (Array.isArray(c.tags) && c.tags.includes('Ingested'))).length),
           active_campaigns: (campData || []).length,
           active_alerts: (alertData || []).length,
           high_threat_count: criticalCount + highCount,
@@ -2280,6 +2465,13 @@ async function startServer() {
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId || (req.query.organization_id as string) || 'org-default';
     const privacyConfig = await getOrgPrivacyConfig(orgId);
+
+    // Ensure all Gmail ingested/synced emails are materialized into cases for this user
+    try {
+      syncAllGmailIngestedMailsToCases(user);
+    } catch (syncErr) {
+      console.warn('[GET /api/cases] Gmail sync warning:', syncErr);
+    }
 
     const userRole = user?.role || 'read_only';
     const isViewerOrAuditor = ['read_only', 'viewer', 'auditor'].includes(userRole);
@@ -2353,7 +2545,21 @@ async function startServer() {
         tags: Array.isArray(c.tags) ? c.tags : (typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : ['Custom']),
         is_demo: Boolean(c.is_demo)
       }));
-      const userCases = getUserFilteredCases(user, formatted, !excludeDemo);
+
+      // Merge inMemoryCases so newly analyzed Gmail emails in memory are included immediately
+      const inMemList = Array.from(inMemoryCases.values());
+      const mergedPool = [...formatted];
+      for (const mc of inMemList) {
+        if (!mergedPool.some(p => p.id === mc.id)) {
+          mergedPool.push(mc);
+        }
+      }
+
+      let userCases = getUserFilteredCases(user, mergedPool, !excludeDemo);
+      userCases.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      if (excludeDemo) {
+        userCases = userCases.filter(c => !c.is_demo);
+      }
       const correlated = enrichWithCorrelation(userCases);
       const results = shouldMask ? correlated.map((c: any) => maskCasePii(c, privacyConfig)) : correlated;
       res.json(results);
