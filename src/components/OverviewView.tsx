@@ -104,15 +104,25 @@ export function AICaseSummary({ analysis, className = '' }: AICaseSummaryProps) 
       // Non-blocking background fetch attempt if analysis has an ID
       let isMounted = true;
       const attemptFetchNarrative = async () => {
-        if (!analysis?.id) return;
+        if (!analysis?.id && !analysis?.headers?.subject && !analysis?.subject) return;
         try {
           setIsLoading(true);
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3500);
+          const timeout = setTimeout(() => controller.abort(), 15000);
 
-          const res = await fetch(`/api/v1/cases/${analysis.id}/ai-narrative`, {
+          let res = await fetch(`/api/v1/cases/${analysis.id || 'current'}/ai-narrative`, {
             signal: controller.signal
           }).catch(() => null);
+
+          // Fallback POST if GET didn't return narrative
+          if (!res || !res.ok) {
+            res = await fetch(`/api/v1/cases/${analysis.id || 'current'}/ai-narrative`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(analysis),
+              signal: controller.signal
+            }).catch(() => null);
+          }
 
           clearTimeout(timeout);
 
@@ -518,15 +528,15 @@ export function OverviewView({
     const domain = (rawIntel?.domain ? rawIntel.domain : detectedDomain).replace(/<|>|"/g, '').trim();
     const isPhish = stdVerdict.isMalicious;
 
-    const registrar = rawIntel?.registrar || rawIntel?.rdap?.registrar || (rawIntel?.rdap as any)?.organization || 'ICANN Accredited Registrar';
-    const createdDate = rawIntel?.created_date || rawIntel?.rdap?.creation_date || rawIntel?.rdap?.created_date || (rawIntel?.rdap as any)?.registrationDate;
-    const expirationDate = rawIntel?.expiration_date || rawIntel?.rdap?.expiration_date || (rawIntel?.rdap as any)?.expirationDate;
-    const domainAgeDays = rawIntel?.domain_age_days ?? rawIntel?.rdap?.domain_age_days ?? rawIntel?.rdap?.domainAgeDays;
+    const registrar = rawIntel?.registrar || (rawIntel?.rdap as any)?.registrar || (rawIntel?.rdap as any)?.organization || 'ICANN Accredited Registrar';
+    const createdDate = rawIntel?.created_date || (rawIntel?.rdap as any)?.creation_date || (rawIntel?.rdap as any)?.created_date || (rawIntel?.rdap as any)?.registrationDate;
+    const expirationDate = rawIntel?.expiration_date || (rawIntel?.rdap as any)?.expiration_date || (rawIntel?.rdap as any)?.expirationDate;
+    const domainAgeDays = rawIntel?.domain_age_days ?? (rawIntel?.rdap as any)?.domain_age_days ?? (rawIntel?.rdap as any)?.domainAgeDays;
     const isNewlyRegistered = rawIntel?.is_newly_registered ?? (typeof domainAgeDays === 'number' ? domainAgeDays < 30 : false);
-    const isTyposquat = rawIntel?.is_typosquat ?? rawIntel?.typosquatting?.is_typosquat ?? false;
-    const typosquatBrand = rawIntel?.typosquat_matched_brand || rawIntel?.typosquatting?.target_brand || rawIntel?.typosquatting?.targetBrand;
+    const isTyposquat = rawIntel?.is_typosquat ?? (rawIntel?.typosquatting as any)?.is_typosquat ?? false;
+    const typosquatBrand = rawIntel?.typosquat_matched_brand || (rawIntel?.typosquatting as any)?.target_brand || (rawIntel?.typosquatting as any)?.targetBrand;
 
-    const nsList = rawIntel?.nameservers || rawIntel?.dns?.ns || rawIntel?.rdap?.nameservers || [];
+    const nsList = rawIntel?.nameservers || rawIntel?.dns?.ns || (rawIntel?.rdap as any)?.nameservers || [];
     const mxList = rawIntel?.mx_records || rawIntel?.dns?.mx_records || rawIntel?.dns?.mx || [];
 
     const spfRecord = rawIntel?.dns?.spf || analysis.auth?.spf?.record;
@@ -546,6 +556,9 @@ export function OverviewView({
       typosquat_matched_brand: typosquatBrand,
       nameservers: nsList,
       mx_records: mxList,
+      spf_record: spfRecord,
+      dmarc_record: rawIntel?.dns?.dmarc || analysis.auth?.dmarc?.policy,
+      flags: rawIntel?.risk_flags || [],
       rdap: rawIntel?.rdap || {
         registrar,
         creation_date: createdDate,

@@ -160,7 +160,8 @@ async function callGroqForensics(text: string, metadata?: { from?: string; subje
 
   const raw = response.data?.choices?.[0]?.message?.content;
   if (!raw) throw new Error('Empty response from Groq');
-  return JSON.parse(raw);
+  const sanitized = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+  return JSON.parse(sanitized);
 }
 
 /**
@@ -295,7 +296,14 @@ async function callGeminiForensics(
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set');
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build'
+      }
+    }
+  });
   const metaContext = metadata
     ? `From: ${metadata.from || 'Unknown'}\nSubject: ${metadata.subject || '(No Subject)'}\n\n`
     : '';

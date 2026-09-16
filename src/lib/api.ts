@@ -942,6 +942,53 @@ export const forensicApi = {
     const mbps = Number(((bits / durationSec) / (1024 * 1024)).toFixed(2));
     return { durationMs: Math.round(durationMs), bytes, mbps };
   },
+
+  // AI Narrative & LLM Intelligence Integration
+  getAiNarrative: async (caseId: string, caseData?: any): Promise<{
+    ai_narrative?: {
+      narrative: string;
+      model: string;
+      source: string;
+      disclaimer: string;
+    };
+    narrative?: string;
+    model?: string;
+    source?: string;
+    disclaimer?: string;
+  }> => {
+    const targetId = caseId || 'current';
+    try {
+      if (caseData) {
+        const res = await apiClient.post(`/v1/cases/${targetId}/ai-narrative`, caseData);
+        return res.data;
+      }
+      const res = await apiClient.get(`/v1/cases/${targetId}/ai-narrative`);
+      return res.data;
+    } catch (err) {
+      if (caseData) {
+        const fallbackRes = await apiClient.post(`/v1/cases/${targetId}/ai-narrative`, caseData);
+        return fallbackRes.data;
+      }
+      throw err;
+    }
+  },
+
+  getAiProviderStatus: (): {
+    geminiConfigured: boolean;
+    groqConfigured: boolean;
+    activeProvider: string;
+  } => {
+    const geminiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : undefined);
+    const groqKey = (import.meta as any).env?.VITE_GROQ_API_KEY || (typeof process !== 'undefined' ? process.env?.GROQ_API_KEY : undefined);
+    const geminiConfigured = Boolean(geminiKey && geminiKey.trim().length > 0);
+    const groqConfigured = Boolean(groqKey && groqKey.trim().length > 0);
+
+    return {
+      geminiConfigured,
+      groqConfigured,
+      activeProvider: geminiConfigured ? 'Gemini AI (Google GenAI)' : groqConfigured ? 'Groq Llama-3.3' : 'TraceXMail Core Telemetry Engine'
+    };
+  }
 };
 
 export interface NetworkInfoData {
