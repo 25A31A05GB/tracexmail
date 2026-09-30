@@ -174,7 +174,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
   // Fetch real database cases on mount
   useEffect(() => {
     fetch('/api/cases')
-      .then(r => r.json())
+      .then(r => (r.ok ? r.json() : []))
       .then(casesList => {
         if (Array.isArray(casesList) && casesList.length > 0) {
           setDbCases(casesList);
@@ -431,12 +431,15 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
 
     // Animation Loop
     let animationId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
+    let lastTime = performance.now();
 
     const animate = () => {
       animationId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) * 0.001, 0.1);
+      lastTime = now;
+      const elapsed = (now - startTime) * 0.001;
 
       if (autoRotate) {
         controls.autoRotate = true;

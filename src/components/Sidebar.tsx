@@ -805,44 +805,58 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Public legal links (Only when expanded) */}
+        {/* Public legal links & dynamic copyright (Only when expanded) */}
         {!isDesktopCollapsed && (
-          <div className="px-3 pb-3 flex flex-wrap items-center justify-center gap-2 text-[10px] font-mono text-[#8a8070]">
-            <a
-              href="/privacy"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-[#ede6d8]"
-            >
-              PRIVACY
-            </a>
-            <span className="text-[#3a352c]">•</span>
-            <a
-              href="/terms"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-[#ede6d8]"
-            >
-              TERMS
-            </a>
-            <span className="text-[#3a352c]">•</span>
-            <a
-              href="/cookies"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-[#ede6d8]"
-            >
-              COOKIES
-            </a>
-            <span className="text-[#3a352c]">•</span>
-            <a
-              href="/contact"
-              target="_blank"
-              rel="noreferrer"
-              className="transition-colors hover:text-[#ede6d8]"
-            >
-              CONTACT
-            </a>
+          <div className="px-3 pb-3 flex flex-col items-center gap-1.5 text-[10px] font-mono text-[#8a8070]">
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-[#ede6d8]"
+              >
+                PRIVACY
+              </a>
+              <span className="text-[#3a352c]">•</span>
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-[#ede6d8]"
+              >
+                TERMS
+              </a>
+              <span className="text-[#3a352c]">•</span>
+              <a
+                href="/cookies"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-[#ede6d8]"
+              >
+                COOKIES
+              </a>
+              <span className="text-[#3a352c]">•</span>
+              <a
+                href="/security"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-[#ede6d8]"
+              >
+                SECURITY
+              </a>
+              <span className="text-[#3a352c]">•</span>
+              <a
+                href="/contact"
+                target="_blank"
+                rel="noreferrer"
+                className="transition-colors hover:text-[#ede6d8]"
+              >
+                CONTACT
+              </a>
+            </div>
+            <div className="text-[9px] text-[#6b6254] select-none text-center">
+              &copy; {new Date().getFullYear()} TraceXMail. All rights reserved.
+            </div>
           </div>
         )}
       </aside>

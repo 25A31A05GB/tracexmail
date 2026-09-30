@@ -36,7 +36,15 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
 
   const handleSendResetEmail = async (e?: FormEvent) => {
     if (e) e.preventDefault();
-    if (!email || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!cleanEmail) {
+      setErrorMsg('Please enter your work email address.');
+      return;
+    }
+
+    if (!emailRegex.test(cleanEmail)) {
       setErrorMsg('Please enter a valid work email address.');
       return;
     }
@@ -45,13 +53,11 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const cleanEmail = email.trim().toLowerCase();
-
     try {
       const redirectUrl = getResetPasswordRedirectUrl();
       logSupabaseAuthEvent('ResetPasswordRequest:Start', { email: cleanEmail, redirectUrl });
 
-      // 1. Supabase secondary/best-effort reset dispatch
+      // 1. Supabase native password reset dispatch
       if (isSupabaseConfigured && supabase) {
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: redirectUrl
@@ -69,23 +75,30 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
         body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to dispatch password recovery link.');
+        console.warn('[ForgotPassword] Server recovery link notice:', data);
       }
 
-      // 3. Also notify /api/auth/reset-password for parity
+      // 3. Parity endpoint
       await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, redirectTo: redirectUrl })
       }).catch(() => {});
 
-      setSuccessMsg(`A secure recovery magic link has been dispatched to ${cleanEmail}.`);
+      // Non-enumerating generic confirmation
+      setSuccessMsg("If an account exists for this email, you'll receive instructions to reset your password.");
       setStep('sent');
     } catch (err: any) {
       console.warn('[ForgotPassword] Reset request notice:', err);
-      setErrorMsg(err.message || 'Unable to process recovery request. Please verify your email address.');
+      // Still show generic confirmation to prevent timing/enumeration leakage unless network offline
+      if (err.name === 'TypeError' || (err.message && err.message.toLowerCase().includes('fetch'))) {
+        setErrorMsg('Unable to connect. Please check your internet connection and try again.');
+      } else {
+        setSuccessMsg("If an account exists for this email, you'll receive instructions to reset your password.");
+        setStep('sent');
+      }
     } finally {
       setLoading(false);
     }

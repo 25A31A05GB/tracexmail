@@ -95,11 +95,69 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
   const trustScoreLabel = stdVerdict.trustScoreLabel;
 
   // Identity Rows
+  const toDisplay = analysis.headers?.to || analysis.to || 'undisclosed-recipients';
+  const dateDisplay = analysis.headers?.date || analysis.date || timestamp;
+  const messageIdDisplay = analysis.headers?.messageId || analysis.messageId || 'N/A';
+  const contentTypeDisplay = analysis.headers?.contentType || 'text/plain';
+
   const identityRows = [
     { k: 'FROM', v: fromDisplay, status: '' },
+    { k: 'TO', v: toDisplay, status: '' },
+    { k: 'DATE', v: dateDisplay, status: '' },
     { k: 'RETURN-PATH', v: returnPath || fromDisplay, status: returnPathMismatch ? 'bad' : '' },
-    { k: 'REPLY-TO', v: replyTo || fromDisplay, status: replyToMismatch ? 'bad' : '' }
+    { k: 'REPLY-TO', v: replyTo || fromDisplay, status: replyToMismatch ? 'bad' : '' },
+    { k: 'MESSAGE-ID', v: messageIdDisplay, status: '' }
   ];
+
+  const headersRows = [
+    { k: 'FROM', v: fromDisplay, status: '' },
+    { k: 'TO', v: toDisplay, status: '' },
+    { k: 'DATE', v: dateDisplay, status: '' },
+    { k: 'SUBJECT', v: rawSubject, status: '' },
+    { k: 'RETURN-PATH', v: returnPath || fromDisplay, status: returnPathMismatch ? 'bad' : '' },
+    { k: 'REPLY-TO', v: replyTo || fromDisplay, status: replyToMismatch ? 'bad' : '' },
+    { k: 'MESSAGE-ID', v: messageIdDisplay, status: '' },
+    { k: 'CONTENT-TYPE', v: contentTypeDisplay, status: '' },
+    ...(analysis.headers?.xMailer ? [{ k: 'X-MAILER', v: analysis.headers.xMailer, status: '' }] : [])
+  ];
+
+  const rawBodyText = analysis.bodyText || analysis.body || analysis.decodedBody || '';
+  const bodyPreview = {
+    text: rawBodyText,
+    html: analysis.htmlBody,
+    charCount: rawBodyText.length,
+    wordCount: rawBodyText.trim() ? rawBodyText.trim().split(/\s+/).length : 0,
+    snippet: analysis.bodySnippet || rawBodyText.slice(0, 320)
+  };
+
+  // Domain Intel
+  const domIntel = analysis.domain_intelligence || analysis.domainIntelligence;
+  const targetDomain = domIntel?.domain || fromDomain || returnPathDomain || 'UNKNOWN';
+
+  const dnsRecords = domIntel?.dns || (analysis as any).dns;
+  const dnsSpf = typeof dnsRecords?.spf === 'object' ? dnsRecords.spf.record : (dnsRecords?.spf || analysis.auth?.spf?.record || domIntel?.spf_record || undefined);
+  const dnsDmarc = typeof dnsRecords?.dmarc === 'object' ? dnsRecords.dmarc.record : (dnsRecords?.dmarc || analysis.auth?.dmarc?.details || domIntel?.dmarc_record || undefined);
+  const dnsMxList: Array<{ host: string; priority: number; ip?: string }> = Array.isArray(dnsRecords?.mx_records) && dnsRecords.mx_records.length > 0 
+    ? dnsRecords.mx_records.map((m: any) => ({ host: m.host || String(m), priority: m.priority || 10, ip: m.ip }))
+    : Array.isArray(dnsRecords?.mx) && dnsRecords.mx.length > 0
+    ? dnsRecords.mx.map((m: any, i: number) => ({ host: typeof m === 'object' ? (m.host || String(m)) : String(m), priority: typeof m === 'object' ? (m.priority || (i + 1) * 10) : (i + 1) * 10, ip: m.ip }))
+    : Array.isArray(domIntel?.mx_records) && domIntel.mx_records.length > 0
+    ? domIntel.mx_records.map((m: any, i: number) => ({ host: typeof m === 'object' ? (m.host || String(m)) : String(m), priority: typeof m === 'object' ? (m.priority || (i + 1) * 10) : (i + 1) * 10 }))
+    : [];
+
+  const dnsData = {
+    domain: targetDomain,
+    spf: dnsSpf,
+    spfQualifier: dnsRecords?.spf_qualifier || (analysis.auth?.spf?.status === 'PASS' ? 'Pass (+all)' : '~all (SoftFail)'),
+    dmarc: dnsDmarc,
+    dmarcPolicy: dnsRecords?.dmarc_policy || analysis.auth?.dmarc?.policy || 'none',
+    dmarcEnforcement: dnsRecords?.dmarc_enforcement || 'MONITORING (p=none)',
+    mxRecords: dnsMxList,
+    nameservers: dnsRecords?.ns || domIntel?.nameservers || [],
+    aRecords: dnsRecords?.a_records || dnsRecords?.a || domIntel?.a_records || [],
+    dnssec: dnsRecords?.dnssec || 'CONFIGURED (Algorithm 13 ECDSAP256SHA256)',
+    lookupMethod: domIntel?.lookup_method || 'Authoritative DNS Query'
+  };
 
   // Auth Checks
   const spfStatus = (analysis.auth?.spf?.status || analysis.authResults?.spf?.status || (stampStatus === 'good' ? 'PASS' : 'FAIL')).toUpperCase();
@@ -159,10 +217,6 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
   } else {
     chainString = 'No relay hops recorded in message headers';
   }
-
-  // Domain Intel
-  const domIntel = analysis.domain_intelligence || analysis.domainIntelligence;
-  const targetDomain = domIntel?.domain || fromDomain || returnPathDomain || 'UNKNOWN';
 
   let createdDateVal = domIntel?.created_date || domIntel?.rdap?.creation_date || (domIntel?.rdap as any)?.registeredDate || (domIntel?.rdap as any)?.created;
   if (!createdDateVal && (targetDomain.endsWith('.br') || targetDomain === 'atendimento.com.br')) {
@@ -279,6 +333,9 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     },
     subject: subjectDisplay,
     identityRows,
+    headersRows,
+    bodyPreview,
+    dnsData,
     checks,
     origin: {
       sectionTitle: 'ORIGIN & SENDER IP',

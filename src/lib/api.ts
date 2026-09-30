@@ -959,7 +959,59 @@ export const forensicApi = {
     const targetId = caseId || 'current';
     try {
       if (caseData) {
-        const res = await apiClient.post(`/v1/cases/${targetId}/ai-narrative`, caseData);
+        // Extract real email header & body fields from parsed email data
+        const subject = caseData.headers?.subject || caseData.subject || caseData.name || '(No Subject)';
+        const from = caseData.headers?.from || caseData.from || '(Unknown Sender)';
+        const fromEmail = caseData.headers?.fromEmail || caseData.fromEmail || caseData.from_email || '';
+        const to = caseData.headers?.to || caseData.to || '(Undisclosed Recipients)';
+        const date = caseData.headers?.date || caseData.date || new Date().toISOString();
+        const bodyText = caseData.bodyText || caseData.body_text || caseData.text || caseData.rawEml || caseData.raw_content || '';
+        const rawEml = caseData.rawEml || caseData.raw_content || caseData.raw_email || '';
+        const headers = caseData.headers?.allHeaders || caseData.headers || {};
+        const hops = Array.isArray(caseData.hops) ? caseData.hops : [];
+        const urls = Array.isArray(caseData.urls) ? caseData.urls : [];
+        const attachments = Array.isArray(caseData.attachments) ? caseData.attachments : [];
+        const auth = caseData.auth || {};
+        const riskScore = caseData.riskScore ?? caseData.threatScore ?? caseData.threat_score ?? 0;
+        const verdict = caseData.verdict || caseData.classification || 'SUSPICIOUS';
+
+        const aiPayload = {
+          case_id: targetId,
+          subject,
+          from,
+          from_email: fromEmail,
+          to,
+          date,
+          body_text: bodyText,
+          raw_eml: rawEml,
+          headers,
+          hops,
+          urls,
+          attachments,
+          auth,
+          risk_score: riskScore,
+          verdict,
+          full_case: caseData
+        };
+
+        // Active debug log outputting the exact payload shape sent to LLM (Groq/Gemini)
+        console.log('[AI API PAYLOAD] Exact payload shape being sent to LLM (Groq/Gemini):', {
+          case_id: aiPayload.case_id,
+          subject: aiPayload.subject,
+          from: aiPayload.from,
+          to: aiPayload.to,
+          date: aiPayload.date,
+          body_text_length: aiPayload.body_text ? aiPayload.body_text.length : 0,
+          raw_eml_length: aiPayload.raw_eml ? aiPayload.raw_eml.length : 0,
+          hops_count: aiPayload.hops.length,
+          urls_count: aiPayload.urls.length,
+          attachments_count: aiPayload.attachments.length,
+          risk_score: aiPayload.risk_score,
+          verdict: aiPayload.verdict,
+          headers_present: Object.keys(aiPayload.headers).length > 0
+        });
+
+        const res = await apiClient.post(`/v1/cases/${targetId}/ai-narrative`, aiPayload);
         return res.data;
       }
       const res = await apiClient.get(`/v1/cases/${targetId}/ai-narrative`);

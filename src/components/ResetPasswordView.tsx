@@ -526,9 +526,10 @@ export function ResetPasswordView({
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-2.5 text-[var(--paper-dim)] hover:text-[var(--paper)] bg-transparent border-0 cursor-pointer p-0"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
               >
-                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-[var(--paper-dim)]" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
               </button>
             </div>
           </div>
@@ -572,14 +573,16 @@ export function ResetPasswordView({
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="••••••••••••••••"
-                className="w-full text-xs font-mono py-2.5 px-3 pr-9 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+                className="w-full text-xs font-mono py-2.5 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+                aria-label="Confirm New Password"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-2.5 top-2.5 text-[var(--paper-dim)] hover:text-[var(--paper)] bg-transparent border-0 cursor-pointer p-0"
+                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
               >
-                {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-[var(--paper-dim)]" />}
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
               </button>
             </div>
           </div>

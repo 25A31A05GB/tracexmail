@@ -164,12 +164,15 @@ export const TraceXLogo3D: React.FC<TraceXLogo3DProps> = ({
 
     // Animation loop
     let animId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
+    let lastTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const elapsed = clock.getElapsedTime();
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) * 0.001, 0.1);
+      lastTime = now;
+      const elapsed = (now - startTime) * 0.001;
       const surge = surgeRef.current;
       const hovered = isHoveredRef.current;
 

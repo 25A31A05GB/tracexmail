@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /cookies
+Allow: /domains
+Allow: /contact
+Allow: /security
+Disallow: /api/
+Disallow: /oauth/
+
+Sitemap: https://tracexmail.vercel.app/sitemap.xml

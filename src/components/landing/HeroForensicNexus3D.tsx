@@ -369,13 +369,16 @@ export const HeroForensicNexus3D: React.FC<HeroForensicNexus3DProps> = ({
 
     // 7. Animation Loop
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
+    let lastTime = performance.now();
     let packetT = 0.5; // Progress 0 to 1 along curve
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
-      const time = clock.getElapsedTime();
+      const now = performance.now();
+      const delta = Math.min((now - lastTime) * 0.001, 0.1);
+      lastTime = now;
+      const time = (now - startTime) * 0.001;
 
       // Rotate individual station meshes on their own axes
       stationMeshes.forEach((st, idx) => {

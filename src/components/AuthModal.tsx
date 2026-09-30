@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2, MailCheck, ArrowRight } from 'lucide-react';
+import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2, MailCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { initializeSession, SessionUser, signOutUser } from '../lib/api';
@@ -15,6 +15,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'analyst' | 'admin' | 'read_only'>('analyst');
   const [organizationId, setOrganizationId] = useState('');
   const [fullName, setFullName] = useState('');
@@ -519,13 +520,22 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-cyan-500"
+                    className="w-full pl-9 pr-10 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-hidden focus:border-cyan-500"
+                    aria-label="Password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-1 focus:ring-cyan-500 rounded bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 

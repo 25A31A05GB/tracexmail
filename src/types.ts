@@ -335,6 +335,11 @@ export interface EmailAnalysis {
   verdict: 'MALICIOUS PHISH' | 'SUSPICIOUS' | 'SPAM' | 'LEGITIMATE' | string;
   mlConfidence: number; // e.g. 0.98
   rawEml: string;
+  body?: string;
+  bodyText?: string;
+  htmlBody?: string;
+  bodySnippet?: string;
+  decodedBody?: string;
   summary: string;
   isDemo?: boolean;
   is_demo?: boolean;
@@ -433,6 +438,31 @@ export interface EvidenceCardData {
     v: string;
     status?: 'bad' | 'warn' | 'good' | string;
   }>;
+  headersRows?: Array<{
+    k: string;
+    v: string;
+    status?: 'bad' | 'warn' | 'good' | string;
+  }>;
+  bodyPreview?: {
+    text: string;
+    html?: string;
+    charCount: number;
+    wordCount: number;
+    snippet: string;
+  };
+  dnsData?: {
+    domain: string;
+    spf?: string;
+    spfQualifier?: string;
+    dmarc?: string;
+    dmarcPolicy?: string;
+    dmarcEnforcement?: string;
+    mxRecords: Array<{ host: string; priority: number; ip?: string }>;
+    nameservers: string[];
+    aRecords: string[];
+    dnssec?: string;
+    lookupMethod?: string;
+  };
   checks: Array<{
     label: string;
     value: string;

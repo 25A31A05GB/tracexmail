@@ -8,7 +8,7 @@ interface LockedGateProps {
 
 export function LockedGate({ onSignIn, onRequestAccess }: LockedGateProps) {
   return (
-    <div className="relative min-h-screen w-screen bg-[#0b0d12] text-[#e7ebf1] overflow-hidden select-none font-sans">
+    <div className="relative min-h-screen w-full bg-[#0b0d12] text-[#e7ebf1] overflow-hidden select-none font-sans">
       {/* Blurred background mockup shell - strictly static and non-interactive */}
       <div 
         className="pointer-events-none select-none filter blur-[7px] brightness-50 saturate-60 scale-[1.02] flex min-h-screen w-full"

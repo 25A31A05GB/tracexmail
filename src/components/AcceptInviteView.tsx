@@ -29,6 +29,7 @@ export function AcceptInviteView({ token, onSuccess, onBackToLogin }: AcceptInvi
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -248,14 +249,16 @@ export function AcceptInviteView({ token, onSuccess, onBackToLogin }: AcceptInvi
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••••••••••"
-                    className="w-full text-xs font-mono py-2 px-3 pr-8 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+                    className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+                    aria-label="Set Master Password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-2.5 text-[var(--paper-dim)] hover:text-[var(--paper)] bg-transparent border-0 cursor-pointer p-0"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-[var(--paper-dim)]" />}
+                    {showPassword ? <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
                   </button>
                 </div>
               </div>
@@ -264,15 +267,26 @@ export function AcceptInviteView({ token, onSuccess, onBackToLogin }: AcceptInvi
                 <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
                   Confirm Password *
                 </label>
-                <input
-                  type="password"
-                  required
-                  minLength={12}
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••••••••••"
-                  className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    minLength={12}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••••••••••"
+                    className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+                    aria-label="Confirm Password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
+                  </button>
+                </div>
               </div>
 
               <button

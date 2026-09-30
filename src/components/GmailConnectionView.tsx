@@ -31,6 +31,7 @@ import {
   Search,
   Filter,
   Eye,
+  EyeOff,
   AlertTriangle,
   FileText,
   ArrowRight,
@@ -179,6 +180,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [showDirectTokenConnect, setShowDirectTokenConnect] = useState<boolean>(false);
   const [directEmail, setDirectEmail] = useState<string>(currentUserEmail || '');
   const [directAccessToken, setDirectAccessToken] = useState<string>('');
+  const [showDirectToken, setShowDirectToken] = useState<boolean>(false);
   const [connectingToken, setConnectingToken] = useState<boolean>(false);
   const [directTokenSuccess, setDirectTokenSuccess] = useState<string | null>(null);
 
@@ -1676,13 +1678,24 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               </div>
               <div>
                 <label className="block text-[11px] font-mono text-slate-400 mb-1">Google OAuth Access Token</label>
-                <input
-                  type="password"
-                  value={directAccessToken}
-                  onChange={(e) => setDirectAccessToken(e.target.value)}
-                  placeholder="ya29.a0AfH6SM..."
-                  className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
-                />
+                <div className="relative">
+                  <input
+                    type={showDirectToken ? 'text' : 'password'}
+                    value={directAccessToken}
+                    onChange={(e) => setDirectAccessToken(e.target.value)}
+                    placeholder="ya29.a0AfH6SM..."
+                    className="w-full bg-[#110e0a] border border-[#3a352c] rounded-md px-3 pr-10 py-1.5 text-xs text-slate-100 font-mono focus:border-amber-500 focus:outline-none"
+                    aria-label="Google OAuth Access Token"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectToken(!showDirectToken)}
+                    aria-label={showDirectToken ? 'Hide token' : 'Show token'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 rounded bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                  >
+                    {showDirectToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-1">

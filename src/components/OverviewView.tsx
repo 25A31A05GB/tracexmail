@@ -35,12 +35,17 @@ import {
   Radio,
   HelpCircle,
   Tag,
-  Printer
+  Printer,
+  Mail,
+  AlignLeft,
+  Code,
+  Search
 } from 'lucide-react';
 import { EmailAnalysis, AINarrative } from '../types';
 import { resolveOrigin } from '../utils/originResolution';
 import { sha256Sync } from '../utils/crypto';
 import { ForensicCaseTwoPanel } from './ForensicCaseTwoPanel';
+import { DnsStatusSection } from './DnsStatusSection';
 import { EvidenceCard, EvidenceTagCard, mapAnalysisToEvidenceCardData } from './EvidenceTagCard';
 import { computeSha256 } from '../utils/crypto';
 import { classifyIp } from '../utils/parser';
@@ -994,6 +999,15 @@ export function OverviewView({
         />
       </div>
 
+      {/* Dynamic DNS Status Section (SPF, DKIM, and DMARC verification with clear success/failure indicators) */}
+      <div className="mb-6">
+        <DnsStatusSection
+          analysis={analysis}
+          onNavigateToHeaders={onNavigateToHeaders}
+          onNavigateToMap={onNavigateToMap}
+        />
+      </div>
+
       {/* Main View Rendering */}
       {overviewMode === 'card' ? (
         <ForensicCaseTwoPanel
@@ -1716,7 +1730,7 @@ export function OverviewView({
             <div className="md:col-span-2">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Subject</div>
               <div className="text-xs font-semibold text-slate-100 bg-slate-900/50 p-2 rounded border border-slate-800 select-all mt-1">
-                {analysis.headers.subject}
+                {analysis.headers.subject || analysis.subject || '(No Subject)'}
               </div>
             </div>
 
@@ -1724,7 +1738,23 @@ export function OverviewView({
             <div>
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Sender (From)</div>
               <div className="text-xs font-mono text-blue-400 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
-                {analysis.headers.from}
+                {analysis.headers.from || analysis.from}
+              </div>
+            </div>
+
+            {/* Recipient */}
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Recipient (To)</div>
+              <div className="text-xs font-mono text-slate-200 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
+                {analysis.headers.to || analysis.to || 'undisclosed-recipients'}
+              </div>
+            </div>
+
+            {/* Sent Date */}
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Sent Date</div>
+              <div className="text-xs font-mono text-slate-300 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
+                {analysis.headers.date || analysis.date || 'N/A'}
               </div>
             </div>
 
@@ -1739,26 +1769,63 @@ export function OverviewView({
                   )}
               </div>
               <div className="text-xs font-mono text-amber-400 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
-                {analysis.headers.returnPath || analysis.headers.fromEmail}
+                {analysis.headers.returnPath || analysis.headers.fromEmail || analysis.returnPath || 'N/A'}
               </div>
             </div>
 
             {/* Reply-To */}
-            {analysis.headers.replyTo && (
+            {Boolean(analysis.headers.replyTo || analysis.replyTo) && (
               <div>
                 <div className="text-[10px] text-slate-400 uppercase font-semibold">Reply-To Address</div>
                 <div className="text-xs font-mono text-slate-300 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
-                  {analysis.headers.replyTo}
+                  {analysis.headers.replyTo || analysis.replyTo}
+                </div>
+              </div>
+            )}
+
+            {/* Content-Type */}
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-semibold">Content-Type</div>
+              <div className="text-xs font-mono text-slate-300 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
+                {analysis.headers.contentType || 'text/plain; charset=utf-8'}
+              </div>
+            </div>
+
+            {/* User-Agent / Mailer */}
+            {Boolean(analysis.headers.userAgent || analysis.headers.xMailer) && (
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">User-Agent / Mailer</div>
+                <div className="text-xs font-mono text-cyan-300 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
+                  {analysis.headers.userAgent || analysis.headers.xMailer}
                 </div>
               </div>
             )}
 
             {/* Message ID */}
-            <div>
+            <div className="md:col-span-2">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Message-ID</div>
-              <div className="text-xs font-mono text-slate-400 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1">
-                {analysis.headers.messageId}
+              <div className="text-xs font-mono text-slate-400 bg-slate-900/50 p-2 rounded border border-slate-800 truncate mt-1 select-all">
+                {analysis.headers.messageId || analysis.messageId || 'N/A'}
               </div>
+            </div>
+          </div>
+
+          {/* Parsed Message Body Payload */}
+          <div className="pt-2 border-t border-slate-800">
+            <div className="text-[10px] text-slate-400 uppercase font-semibold mb-2 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <AlignLeft className="w-3.5 h-3.5 text-amber-400" />
+                <span>Parsed Email Message Body</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {analysis.bodyText ? `${analysis.bodyText.length} characters` : analysis.bodySnippet ? 'Snippet Preview' : 'No Plain Body'}
+              </span>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-lg border border-slate-800 text-xs font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed select-text">
+              {analysis.bodyText || analysis.decodedBody || analysis.bodySnippet || analysis.body || (
+                <span className="text-slate-500 italic">No plain text body content extracted from message envelope.</span>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu,
   X,
@@ -40,6 +40,11 @@ import { EmailAnalysis } from '../types';
 import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
+import { useLenisScroll } from '../hooks/useLenisScroll';
+import { ShaderGradientHero } from './landing/ShaderGradientHero';
+import { RiveInteractiveVisual } from './landing/RiveInteractiveVisual';
+import { UnicornStudioScene } from './landing/UnicornStudioScene';
+import { RevealBlock } from '../hooks/useScrollReveal';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -56,6 +61,7 @@ export function LandingView({
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const { scrollTo } = useLenisScroll({ enabled: true });
 
   const sampleCases = [
     {
@@ -142,10 +148,7 @@ export function LandingView({
   ];
 
   const scrollToSection = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
+    scrollTo(id, -72);
   };
 
   const handleCaseClick = (index: number) => {
@@ -159,6 +162,29 @@ export function LandingView({
   const toggleFaq = (index: number) => {
     setActiveFaq(prev => (prev === index ? null : index));
   };
+
+  // Keyboard accessibility: Close mobile navigation drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileMenuOpen]);
+
+  // Prevent background scrolling when mobile navigation menu is active
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
@@ -179,25 +205,25 @@ export function LandingView({
 
           {/* Desktop Nav Items */}
           <div className="hidden lg:flex items-center gap-6 text-[13.5px]">
-            <button onClick={() => scrollToSection('telemetry-feed')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="telemetry-feed" onClick={() => scrollToSection('telemetry-feed')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Live Feed
             </button>
-            <button onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="challenges-solution" onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Why TraceXMail
             </button>
-            <button onClick={() => scrollToSection('corpus-proof')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="corpus-proof" onClick={() => scrollToSection('corpus-proof')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Corpus Proof
             </button>
-            <button onClick={() => scrollToSection('workstation')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="workstation" onClick={() => scrollToSection('workstation')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Workstation
             </button>
-            <button onClick={() => scrollToSection('exhibits')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="exhibits" onClick={() => scrollToSection('exhibits')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Engineering
             </button>
-            <button onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="team" onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Team
             </button>
-            <button onClick={() => scrollToSection('faq')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer">
+            <button data-scroll-to="faq" onClick={() => scrollToSection('faq')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               FAQ
             </button>
           </div>
@@ -205,86 +231,143 @@ export function LandingView({
           <div className="flex items-center gap-2.5 sm:gap-3.5">
             <button
               onClick={onOpenConsole}
-              className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors"
+              className="text-[#b9af9c] hover:text-[#ede6d8] text-[13.5px] px-2 py-1 bg-transparent border-none cursor-pointer transition-colors link-basement"
             >
               Sign in
             </button>
             <button
               onClick={onOpenConsole}
-              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
+              className="btn-basement bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-[3px] text-[13px] sm:text-[14px] font-semibold transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-[0.98]"
             >
               <span>Open Console (Free)</span>
               <ArrowRight className="w-3.5 h-3.5 hidden sm:inline" />
             </button>
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 text-[#b9af9c] hover:text-[#ede6d8] hover:bg-[#1d1a15] rounded-[3px] transition-colors cursor-pointer"
-              aria-label="Toggle Navigation Menu"
+              className="lg:hidden p-2 text-[#b9af9c] hover:text-[#ede6d8] hover:bg-[#1d1a15] rounded-[3px] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label={mobileMenuOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="landing-mobile-menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Dropdown */}
+        {/* Accessible Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-3 flex flex-col gap-2">
-            <button
-              onClick={() => { scrollToSection('telemetry-feed'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
+          <>
+            {/* Backdrop for outside click to dismiss */}
+            <div 
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 lg:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-hidden="true"
+            />
+            <div 
+              id="landing-mobile-menu"
+              className="relative z-50 lg:hidden bg-[#1a1712] border-b border-[#3a352c] px-4 py-4 flex flex-col gap-1.5 shadow-2xl max-h-[calc(100vh-70px)] overflow-y-auto"
             >
-              Live Telemetry Feed
-            </button>
-            <button
-              onClick={() => { scrollToSection('challenges-solution'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              Why TraceXMail (Challenges &amp; Solution)
-            </button>
-            <button
-              onClick={() => { scrollToSection('corpus-proof'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              Corpus Proof
-            </button>
-            <button
-              onClick={() => { scrollToSection('workstation'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              Analyst Workstation
-            </button>
-            <button
-              onClick={() => { scrollToSection('exhibits'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              Core Engineering
-            </button>
-            <button
-              onClick={() => { scrollToSection('team'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              Team &amp; Creators
-            </button>
-            <button
-              onClick={() => { scrollToSection('faq'); setMobileMenuOpen(false); }}
-              className="text-left text-[#ede6d8] py-2 px-3 rounded hover:bg-[#26221b] text-[14.5px]"
-            >
-              FAQ
-            </button>
-            <div className="pt-2 border-t border-[#3a352c]">
+              <div className="flex items-center justify-between pb-2 mb-1 border-b border-[#2d2820]">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[#8a8070]">Section Navigation</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] p-1 flex items-center gap-1 cursor-pointer"
+                  aria-label="Close menu"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Close</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
-                className="w-full bg-[#b23a2e] text-[#ede6d8] py-2.5 rounded font-semibold text-[14px] text-center cursor-pointer"
+                type="button"
+                data-scroll-to="telemetry-feed"
+                onClick={() => { scrollToSection('telemetry-feed'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
               >
-                Launch Forensic Console
+                Live Telemetry Feed
               </button>
+              <button
+                type="button"
+                data-scroll-to="challenges-solution"
+                onClick={() => { scrollToSection('challenges-solution'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                Why TraceXMail (Challenges &amp; Solution)
+              </button>
+              <button
+                type="button"
+                data-scroll-to="corpus-proof"
+                onClick={() => { scrollToSection('corpus-proof'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                Corpus Proof
+              </button>
+              <button
+                type="button"
+                data-scroll-to="workstation"
+                onClick={() => { scrollToSection('workstation'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                Analyst Workstation
+              </button>
+              <button
+                type="button"
+                data-scroll-to="exhibits"
+                onClick={() => { scrollToSection('exhibits'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                Core Engineering
+              </button>
+              <button
+                type="button"
+                data-scroll-to="team"
+                onClick={() => { scrollToSection('team'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                Team &amp; Creators
+              </button>
+              <button
+                type="button"
+                data-scroll-to="faq"
+                onClick={() => { scrollToSection('faq'); setMobileMenuOpen(false); }}
+                className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
+              >
+                FAQ
+              </button>
+
+              <div className="pt-3 my-1 border-t border-[#3a352c]">
+                <div className="text-[10px] font-mono text-[#8a8070] uppercase tracking-wider mb-2 px-3">Legal &amp; Compliance</div>
+                <div className="grid grid-cols-2 gap-1.5 px-1 pb-2">
+                  <a href="/privacy" className="p-2 rounded bg-[#1f1a14] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] no-underline">Privacy</a>
+                  <a href="/terms" className="p-2 rounded bg-[#1f1a14] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] no-underline">Terms</a>
+                  <a href="/cookies" className="p-2 rounded bg-[#1f1a14] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] no-underline">Cookies</a>
+                  <a href="/security" className="p-2 rounded bg-[#1f1a14] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] no-underline">Security</a>
+                  <a href="/contact" className="p-2 rounded bg-[#1f1a14] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] no-underline col-span-2">Developer Contact</a>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-[#3a352c]">
+                <button
+                  type="button"
+                  onClick={() => { onOpenConsole(); setMobileMenuOpen(false); }}
+                  className="w-full bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] py-3 rounded font-semibold text-[14px] text-center cursor-pointer transition-colors"
+                >
+                  Launch Forensic Console (Free)
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="py-12 sm:py-16 border-b border-[#3a352c] relative bg-[radial-gradient(ellipse_700px_380px_at_80%_10%,rgba(178,58,46,0.1),transparent_65%),#14120f]">
+      {/* Hero Section with Shader Gradient Background */}
+      <section className="py-12 sm:py-16 border-b border-[#3a352c] relative overflow-hidden bg-[#14120f]">
+        {/* GPU-Friendly Organic WebGL Shader-Based Gradient Background */}
+        <ShaderGradientHero />
+
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10">
           
           <div className="lg:col-span-6 space-y-4 sm:space-y-5">
@@ -304,14 +387,14 @@ export function LandingView({
             <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 pt-2">
               <button
                 onClick={onOpenConsole}
-                className="text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group"
+                className="btn-basement text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group active:scale-[0.98]"
               >
                 <span>Analyze Email Now Free</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 onClick={() => scrollToSection('corpus-proof')}
-                className="text-center px-5 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="btn-basement text-center px-5 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
               >
                 <Route className="w-4 h-4 text-[#c9a227]" />
                 <span>Inspect Corpus Proof</span>
@@ -319,8 +402,8 @@ export function LandingView({
             </div>
           </div>
 
-          {/* Hero Visual Area: Highlighted Evidence Board */}
-          <div className="lg:col-span-6 w-full space-y-2.5">
+          {/* Hero Visual Area: Highlighted Evidence Board & Rive Interactive Sentinel */}
+          <div className="lg:col-span-6 w-full space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[3px] bg-[#1a1712] border border-[#b23a2e]/40 shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-[#b23a2e] animate-pulse" />
@@ -339,6 +422,9 @@ export function LandingView({
                 onOpenConsole={onOpenConsole}
               />
             </div>
+
+            {/* Rive Interactive Forensic UI Sentinel Module */}
+            <RiveInteractiveVisual onInteract={() => {}} />
           </div>
         </div>
       </section>
@@ -442,7 +528,7 @@ export function LandingView({
             </div>
             <button
               onClick={() => handleCaseClick(0)}
-              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-4 py-2 rounded-[3px] text-[13.5px] font-semibold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+              className="btn-basement bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-4 py-2 rounded-[3px] text-[13.5px] font-semibold transition-colors cursor-pointer flex items-center gap-1.5 self-start sm:self-auto active:scale-[0.98]"
             >
               <span>Launch primary sample (Nazario #01)</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -456,7 +542,7 @@ export function LandingView({
                 <div
                   key={c.id}
                   onClick={() => handleCaseClick(c.index)}
-                  className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md"
+                  className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md"
                 >
                   <div className="space-y-3.5">
                     <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/70 pb-2.5">
@@ -614,7 +700,7 @@ export function LandingView({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+            <div className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3 cursor-default">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT A</span>
               <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Cryptographic Evidence Vault</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
@@ -622,7 +708,7 @@ export function LandingView({
               </p>
             </div>
 
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+            <div className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3 cursor-default">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT B</span>
               <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Trust-Boundary Origin Resolver</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
@@ -630,7 +716,7 @@ export function LandingView({
               </p>
             </div>
 
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+            <div className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3 cursor-default">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT C</span>
               <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">NIST-Aligned Attribution Classifier</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
@@ -638,7 +724,7 @@ export function LandingView({
               </p>
             </div>
 
-            <div className="bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3">
+            <div className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-6 space-y-3 cursor-default">
               <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#c9a227] font-bold">EXHIBIT D</span>
               <h3 className="font-['Source_Serif_4',serif] font-semibold text-[18px] text-[#ede6d8]">Cross-Vector Campaign Correlation</h3>
               <p className="text-[#b9af9c] text-[14px] leading-relaxed">
@@ -651,10 +737,15 @@ export function LandingView({
 
 
 
-      {/* UNKNOWN IS A VALID RESULT - CENTERED EDITORIAL STATEMENT */}
-      <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f]">
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto flex flex-col items-center text-center space-y-7">
+      {/* UNKNOWN IS A VALID RESULT - CENTERED EDITORIAL STATEMENT with Unicorn Studio Ambient Visual */}
+      <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f] relative overflow-hidden">
+        {/* Unicorn Studio Interactive Cryptographic Scene */}
+        <div className="absolute inset-0 pointer-events-none opacity-45 z-0">
+          <UnicornStudioScene projectId="tracexmail-cryptographic-matrix" />
+        </div>
+
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <RevealBlock className="max-w-3xl mx-auto flex flex-col items-center text-center space-y-7">
             
             {/* Centered Circular Badge */}
             <div className="flex items-center justify-center">
@@ -682,7 +773,7 @@ export function LandingView({
               </p>
             </div>
 
-          </div>
+          </RevealBlock>
         </div>
       </section>
 
@@ -1005,14 +1096,14 @@ export function LandingView({
           <div className="flex flex-wrap items-center gap-3.5 mt-8">
             <button
               onClick={onOpenConsole}
-              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all transform hover:-translate-y-0.5 cursor-pointer shadow-lg flex items-center gap-2 group"
+              className="btn-basement bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all cursor-pointer shadow-lg flex items-center gap-2 group active:scale-[0.98]"
             >
               <span>Analyze Email Free in Console</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
               onClick={() => scrollToSection('corpus-proof')}
-              className="px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center gap-2"
+              className="btn-basement px-6 py-3.5 rounded-[3px] font-medium text-[15px] border border-[#3a352c] text-[#ede6d8] hover:border-[#b9af9c] hover:bg-[#1d1a15] transition-all cursor-pointer flex items-center gap-2 active:scale-[0.98]"
             >
               <Route className="w-4 h-4 text-[#c9a227]" />
               <span>Explore Evidence Dossiers</span>
@@ -1024,48 +1115,59 @@ export function LandingView({
       {/* Footer */}
       <footer id="landing-footer" className="border-t border-[#3a352c] bg-[#100e0c]/90 backdrop-blur-sm py-10">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[13.5px] text-[#b9af9c]">
-          <div className="flex items-center gap-2.5">
-            <TraceXLogo size="xs" />
-            <span className="font-medium tracking-tight text-[#ede6d8]">TraceXMail</span>
+          <div className="flex flex-col sm:flex-row items-center gap-2.5 text-center sm:text-left">
+            <div className="flex items-center gap-2.5">
+              <TraceXLogo size="xs" />
+              <span className="font-medium tracking-tight text-[#ede6d8]">TraceXMail</span>
+            </div>
             <span className="text-[#6e6659] hidden sm:inline">•</span>
-            <span className="text-[#8a8070] text-xs">Email Forensic Intelligence Platform</span>
+            <span className="text-[#8a8070] text-xs">
+              &copy; {new Date().getFullYear()} TraceXMail Forensic Intelligence Platform. All rights reserved.
+            </span>
           </div>
 
           <nav aria-label="Legal and Platform Verification" className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs font-mono">
             <a
               id="footer-link-privacy"
               href="/privacy"
-              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
             >
               Privacy Policy
             </a>
             <a
               id="footer-link-terms"
               href="/terms"
-              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
             >
               Terms of Service
             </a>
             <a
               id="footer-link-cookies"
               href="/cookies"
-              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
             >
               Cookie Policy
             </a>
             <a
               id="footer-link-domains"
               href="/domains"
-              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
             >
               Authorized Domains
             </a>
             <a
               id="footer-link-contact"
               href="/contact"
-              className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
             >
               Developer Contact
+            </a>
+            <a
+              id="footer-link-security"
+              href="/security"
+              className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"
+            >
+              Security Policy
             </a>
             <div className="font-['IBM_Plex_Mono',monospace] text-[11px] border border-[#3a352c] px-2.5 py-0.5 rounded-[2px] text-[#22c55e] bg-[#22c55e]/10 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />

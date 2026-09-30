@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { 
   ShieldCheck, 
@@ -17,16 +17,31 @@ import {
   Clock,
   AlertTriangle
 } from 'lucide-react';
+import { TraceXLogo } from './common/TraceXLogo';
+import { updatePageMetadata, ROUTE_METADATA } from '../utils/seo';
 
 export type LegalPageType = 'privacy' | 'terms' | 'cookies' | 'domains' | 'contact' | 'security';
 
 interface LegalPageProps {
   type?: LegalPageType;
+  onNavigateHome?: () => void;
+  onNavigateToPath?: (path: string) => void;
 }
 
-export function LegalPage({ type = 'privacy' }: LegalPageProps) {
+export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }: LegalPageProps) {
   const [activeTab, setActiveTab] = useState<LegalPageType>(type);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab(type);
+  }, [type]);
+
+  useEffect(() => {
+    const meta = ROUTE_METADATA[activeTab];
+    if (meta) {
+      updatePageMetadata(meta);
+    }
+  }, [activeTab]);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -45,7 +60,9 @@ export function LegalPage({ type = 'privacy' }: LegalPageProps) {
 
   const switchTab = (tabId: LegalPageType, path: string) => {
     setActiveTab(tabId);
-    if (window.history && window.history.pushState) {
+    if (onNavigateToPath) {
+      onNavigateToPath(path);
+    } else if (typeof window !== 'undefined' && window.history && window.history.pushState) {
       window.history.pushState(null, '', path);
     }
   };
@@ -55,16 +72,24 @@ export function LegalPage({ type = 'privacy' }: LegalPageProps) {
       {/* Top Header */}
       <header className="border-b border-[#3a352c] bg-[#1a1713]/95 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 sm:px-6 py-4">
-          <a href="/" className="flex items-center gap-3 no-underline group">
-            <div className="w-8 h-8 rounded-[4px] bg-[#b23a2e]/20 border border-[#b23a2e]/40 flex items-center justify-center text-[#e87063] group-hover:border-[#b23a2e] transition-colors">
-              <ShieldCheck className="h-5 w-5 text-[#b23a2e]" />
-            </div>
+          <a 
+            href="/" 
+            onClick={(e) => {
+              if (onNavigateHome) {
+                e.preventDefault();
+                onNavigateHome();
+              }
+            }}
+            className="flex items-center gap-3 no-underline group cursor-pointer"
+            aria-label="TraceXMail Home"
+          >
+            <TraceXLogo size="sm" />
             <div>
               <span className="text-base font-semibold tracking-tight text-[#ede6d8] block">
                 TraceXMail
               </span>
               <span className="text-[10px] font-mono text-[#8a8070] uppercase tracking-widest block">
-                Compliance & Legal Portal
+                Compliance &amp; Legal Portal
               </span>
             </div>
           </a>
@@ -83,7 +108,13 @@ export function LegalPage({ type = 'privacy' }: LegalPageProps) {
 
             <a
               href="/"
-              className="inline-flex items-center gap-2 text-xs font-semibold text-[#ede6d8] bg-[#24201a] hover:bg-[#302b23] border border-[#3a352c] px-3.5 py-1.5 rounded-[3px] transition-colors no-underline"
+              onClick={(e) => {
+                if (onNavigateHome) {
+                  e.preventDefault();
+                  onNavigateHome();
+                }
+              }}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-[#ede6d8] bg-[#24201a] hover:bg-[#302b23] border border-[#3a352c] px-3.5 py-1.5 rounded-[3px] transition-colors no-underline cursor-pointer"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-[#b23a2e]" />
               Open Platform
@@ -165,7 +196,7 @@ export function LegalPage({ type = 'privacy' }: LegalPageProps) {
           <div>
             <span className="font-medium text-[#ede6d8]">TraceXMail Forensic Intelligence Platform</span>
             <span className="block mt-0.5 text-[11px] text-[#8a8070]">
-              Developer: Jayram Sappa (jayramsappa537@gmail.com) • Production: https://tracexmail.vercel.app
+              &copy; {new Date().getFullYear()} TraceXMail. All rights reserved. • Lead Developer: Jayram Sappa (jayramsappa537@gmail.com) • Production: https://tracexmail.vercel.app
             </span>
           </div>
 
@@ -589,11 +620,42 @@ function DomainsContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
 ========================================================================= */
 function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) => void; copiedKey: string | null }) {
   const [formSent, setFormSent] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', subject: 'Inquiry / Support', message: '' });
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [ticketRef, setTicketRef] = useState<string>('');
+  const [formData, setFormData] = useState({ name: '', email: '', subject: 'Google OAuth App Review / Verification', message: '' });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSent(true);
+    setFormError(null);
+
+    const name = formData.name.trim();
+    const email = formData.email.trim();
+    const message = formData.message.trim();
+
+    if (!name || name.length < 2) {
+      setFormError('Please provide your full name or analyst callsign (at least 2 characters).');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || !emailRegex.test(email)) {
+      setFormError('Please enter a valid email address (e.g. analyst@organization.com).');
+      return;
+    }
+
+    if (!message || message.length < 10) {
+      setFormError('Please include a detailed message (at least 10 characters) explaining your inquiry.');
+      return;
+    }
+
+    setFormSubmitting(true);
+    setTimeout(() => {
+      const generatedRef = `TMX-${Math.random().toString(36).substring(2, 7).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+      setTicketRef(generatedRef);
+      setFormSubmitting(false);
+      setFormSent(true);
+    }, 600);
   };
 
   return (
@@ -613,8 +675,9 @@ function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
                 jayramsappa537@gmail.com
               </a>
               <button
+                type="button"
                 onClick={() => onCopy('jayramsappa537@gmail.com', 'c_dev')}
-                className="text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8]"
+                className="text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8] cursor-pointer"
               >
                 {copiedKey === 'c_dev' ? 'Copied' : 'Copy'}
               </button>
@@ -623,15 +686,16 @@ function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
 
           <div className="p-4 bg-[#14120f] border border-[#2e2922] rounded-[3px] space-y-2">
             <div className="text-xs font-mono text-[#8a8070] uppercase">Platform Operations &amp; Support</div>
-            <div className="text-base font-bold text-[#ede6d8]">TraceXMail SOC Operations</div>
+            <div className="text-base font-bold text-[#ede6d8]">TraceXMail Security Operations</div>
             <div className="text-xs text-[#b9af9c]">Threat Intelligence &amp; Ingestion Support</div>
             <div className="pt-2 flex items-center justify-between">
-              <span className="text-xs font-mono text-[#b9af9c]">
-                support@tracexmail.sec
-              </span>
+              <a href="mailto:jayramsappa537@gmail.com" className="text-xs font-mono text-[#b9af9c] hover:underline">
+                jayramsappa537@gmail.com
+              </a>
               <button
-                onClick={() => onCopy('support@tracexmail.sec', 'c_soc')}
-                className="text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8]"
+                type="button"
+                onClick={() => onCopy('jayramsappa537@gmail.com', 'c_soc')}
+                className="text-[11px] font-mono text-[#8a8070] hover:text-[#ede6d8] cursor-pointer"
               >
                 {copiedKey === 'c_soc' ? 'Copied' : 'Copy'}
               </button>
@@ -642,42 +706,61 @@ function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
 
       <Section title="2. Send a Direct Message / Support Inquiry" badge="Instant Portal">
         {formSent ? (
-          <div className="p-6 bg-[#14120f] border border-emerald-500/30 rounded text-center space-y-2">
-            <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto" />
-            <h3 className="text-base font-semibold text-[#ede6d8]">Message Received</h3>
-            <p className="text-xs text-[#b9af9c]">
-              Thank you for reaching out. We have logged your request. For urgent inquiries, email{' '}
-              <strong className="text-[#ede6d8]">jayramsappa537@gmail.com</strong> directly.
+          <div className="p-6 bg-[#14120f] border border-emerald-500/30 rounded text-center space-y-3">
+            <CheckCircle2 className="h-9 w-9 text-emerald-400 mx-auto" />
+            <h3 className="text-base font-semibold text-[#ede6d8]">Message Received &amp; Logged</h3>
+            <p className="text-xs text-[#b9af9c] max-w-md mx-auto">
+              Your message has been assigned tracking docket <code className="px-1.5 py-0.5 rounded bg-[#1f1a14] border border-[#3a352c] text-emerald-400 font-mono text-xs">{ticketRef}</code>. We will respond directly to <span className="text-[#ede6d8] font-mono">{formData.email}</span>.
             </p>
-            <button
-              onClick={() => { setFormSent(false); setFormData({ name: '', email: '', subject: 'Inquiry / Support', message: '' }); }}
-              className="mt-3 px-4 py-1.5 bg-[#24201a] text-xs text-[#ede6d8] rounded border border-[#3a352c]"
-            >
-              Send Another Inquiry
-            </button>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => { 
+                  setFormSent(false); 
+                  setFormData({ name: '', email: '', subject: 'Google OAuth App Review / Verification', message: '' }); 
+                  setFormError(null);
+                }}
+                className="px-4 py-2 bg-[#24201a] hover:bg-[#302b23] text-xs text-[#ede6d8] rounded border border-[#3a352c] transition-colors cursor-pointer"
+              >
+                Send Another Inquiry
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {formError && (
+              <div className="p-3 rounded bg-rose-950/40 border border-rose-800 text-rose-300 text-xs font-mono flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-mono text-[#8a8070] mb-1">Your Name</label>
+                <label className="block text-xs font-mono text-[#8a8070] mb-1">Your Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, name: e.target.value });
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="Security Analyst"
                   className="w-full bg-[#14120f] border border-[#3a352c] rounded px-3 py-2 text-xs text-[#ede6d8] focus:border-[#b23a2e] focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-[#8a8070] mb-1">Your Email</label>
+                <label className="block text-xs font-mono text-[#8a8070] mb-1">Your Email *</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value });
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="analyst@organization.com"
                   className="w-full bg-[#14120f] border border-[#3a352c] rounded px-3 py-2 text-xs text-[#ede6d8] focus:border-[#b23a2e] focus:outline-none"
                 />
@@ -699,12 +782,15 @@ function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-[#8a8070] mb-1">Message</label>
+              <label className="block text-xs font-mono text-[#8a8070] mb-1">Message *</label>
               <textarea
                 required
                 rows={4}
                 value={formData.message}
-                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, message: e.target.value });
+                  if (formError) setFormError(null);
+                }}
                 placeholder="Describe your inquiry, verification request, or feedback..."
                 className="w-full bg-[#14120f] border border-[#3a352c] rounded px-3 py-2 text-xs text-[#ede6d8] focus:border-[#b23a2e] focus:outline-none"
               />
@@ -712,10 +798,11 @@ function ContactContent({ onCopy, copiedKey }: { onCopy: (t: string, k: string) 
 
             <button
               type="submit"
-              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-5 py-2 rounded-[3px] text-xs font-semibold transition-colors flex items-center gap-2"
+              disabled={formSubmitting}
+              className="bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-5 py-2.5 rounded-[3px] text-xs font-semibold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <Mail className="h-3.5 w-3.5" />
-              Transmit Inquiry
+              <span>{formSubmitting ? 'Transmitting…' : 'Transmit Inquiry'}</span>
             </button>
           </form>
         )}

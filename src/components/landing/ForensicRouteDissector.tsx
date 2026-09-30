@@ -54,7 +54,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
   // Fetch real cases on mount
   useEffect(() => {
     fetch('/api/cases')
-      .then(res => res.json())
+      .then(res => (res.ok ? res.json() : []))
       .then(casesList => {
         if (Array.isArray(casesList) && casesList.length > 0) {
           setDbCases(casesList);

@@ -462,11 +462,11 @@ export const CompleteProject3DShowcase: React.FC<CompleteProject3DShowcaseProps>
 
     // Animation Loop
     let animId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
+      const elapsed = (performance.now() - startTime) * 0.001;
 
       if (!isDragging) {
         targetRotY += 0.002;

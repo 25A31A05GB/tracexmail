@@ -30,7 +30,9 @@ import {
   ShieldCheck,
   Building2,
   Link2,
-  Hash
+  Hash,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { WebSocketAlert, ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { EmailAnalysis } from '../types';
@@ -74,6 +76,7 @@ export function AlertsView({
   const [slackStatus, setSlackStatus] = useState<any>(null);
   const [slackLoading, setSlackLoading] = useState<boolean>(false);
   const [webhookInput, setWebhookInput] = useState<string>('');
+  const [showWebhookUrl, setShowWebhookUrl] = useState<boolean>(false);
   const [autoSendSlack, setAutoSendSlack] = useState<boolean>(true);
   const [minSeveritySlack, setMinSeveritySlack] = useState<'ALL' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('HIGH');
   const [slackChannel, setSlackChannel] = useState<string>('#soc-alerts');
@@ -761,13 +764,24 @@ export function AlertsView({
                     </span>
                   )}
                 </label>
-                <input
-                  type="password"
-                  placeholder={slackStatus?.configured ? '•••••••••••• (Leave blank to keep existing)' : 'https://hooks.slack.com/services/T00/B00/XXXX'}
-                  value={webhookInput}
-                  onChange={(e) => setWebhookInput(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showWebhookUrl ? 'text' : 'password'}
+                    placeholder={slackStatus?.configured ? '•••••••••••• (Leave blank to keep existing)' : 'https://hooks.slack.com/services/T00/B00/XXXX'}
+                    value={webhookInput}
+                    onChange={(e) => setWebhookInput(e.target.value)}
+                    className="w-full px-3.5 pr-10 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500"
+                    aria-label="Slack Incoming Webhook URL"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowWebhookUrl(!showWebhookUrl)}
+                    aria-label={showWebhookUrl ? 'Hide webhook URL' : 'Show webhook URL'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 rounded bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                  >
+                    {showWebhookUrl ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
                 <p className="text-[11px] text-slate-500">
                   Generate in Slack via: Apps &gt; Custom Integrations &gt; Incoming Webhooks.
                 </p>

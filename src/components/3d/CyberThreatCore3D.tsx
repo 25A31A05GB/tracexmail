@@ -113,10 +113,10 @@ export const CyberThreatCore3D: React.FC<CyberThreatCore3DProps> = ({
     coreGroup.add(particleSystem);
 
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
 
     const animate = () => {
-      const elapsedTime = clock.getElapsedTime();
+      const elapsedTime = (performance.now() - startTime) * 0.001;
 
       // Continuous rotation
       coreMesh.rotation.y = elapsedTime * 0.3;

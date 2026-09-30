@@ -61,6 +61,9 @@ import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { ResetPasswordView } from './components/ResetPasswordView';
 import { AcceptInviteView } from './components/AcceptInviteView';
 import { MagicLinkVerifyView } from './components/MagicLinkVerifyView';
+import { LegalPage, LegalPageType } from './components/LegalPage';
+import { NotFoundView } from './components/NotFoundView';
+import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
 
 function ViewSuspenseLoader() {
@@ -75,15 +78,26 @@ function ViewSuspenseLoader() {
 }
 
 export default function App() {
-  const publicPath = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window === 'undefined') return '/';
+    return (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
+  });
 
-  if (publicPath === '/oauth/consent' || publicPath === '/oauth/authorize') {
-    return (
-      <Suspense fallback={<ViewSuspenseLoader />}>
-        <OAuthConsentScreen />
-      </Suspense>
-    );
-  }
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = (window.location.pathname || '').toLowerCase().replace(/\/+$/, '') || '/';
+      setCurrentPath(p);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateToPath = (path: string) => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', path);
+    }
+    setCurrentPath(path.toLowerCase().replace(/\/+$/, '') || '/');
+  };
 
   // Real Supabase Auth, RBAC, and Account Tiers hook
   const { 
@@ -191,6 +205,38 @@ export default function App() {
     if (featureName) setUpgradeTargetFeature(featureName);
     setIsUpgradeModalOpen(true);
   };
+
+  // Ensure non-admins cannot access admin tabs
+  const effectiveTab = (activeTab === 'organization' || activeTab === 'team') && role !== 'admin'
+    ? 'dashboard'
+    : activeTab;
+
+  // Dynamic Page Title, Meta Description, OpenGraph and Canonical URL synchronization
+  useEffect(() => {
+    if (currentPath === '/oauth/consent' || currentPath === '/oauth/authorize') {
+      updatePageMetadata({
+        title: 'Google OAuth Consent | TraceXMail',
+        description: 'Authorize TraceXMail to perform read-only email threat analysis via Gmail API.',
+        canonicalPath: currentPath
+      });
+    } else if (['/privacy', '/terms', '/cookies', '/domains', '/contact', '/security'].includes(currentPath)) {
+      const key = currentPath.replace(/^\//, '');
+      if (ROUTE_METADATA[key]) {
+        updatePageMetadata(ROUTE_METADATA[key]);
+      }
+    } else if (currentPath !== '/' && currentPath !== '/index.html' && currentPath !== '') {
+      updatePageMetadata(ROUTE_METADATA['404']);
+    } else if (!session) {
+      if (authView === 'intro') {
+        updatePageMetadata(ROUTE_METADATA['landing']);
+      } else if (ROUTE_METADATA[authView]) {
+        updatePageMetadata(ROUTE_METADATA[authView]);
+      }
+    } else {
+      const tabMeta = TAB_METADATA[effectiveTab] || TAB_METADATA['overview'];
+      updatePageMetadata(tabMeta);
+    }
+  }, [currentPath, session, authView, effectiveTab]);
 
   // Track session transition to automatically redirect to Email Ingestion tab upon confirmed login
   const prevSessionUserIdRef = React.useRef<string | null>(null);
@@ -620,7 +666,7 @@ export default function App() {
   // If Supabase authentication check is in-flight
   if (authLoading) {
     return (
-      <div className="min-h-screen w-screen bg-[#0b0d12] flex flex-col items-center justify-center text-[#e7ebf1] font-sans">
+      <div className="min-h-screen w-full bg-[#0b0d12] flex flex-col items-center justify-center text-[#e7ebf1] font-sans">
         <div className="flex items-center gap-3">
           <Loader2 className="w-5 h-5 animate-spin text-[#5b8dd6]" />
           <span className="font-mono text-xs tracking-wider text-[#7d8794]">
@@ -628,6 +674,38 @@ export default function App() {
           </span>
         </div>
       </div>
+    );
+  }
+
+  // Google OAuth Consent / Authorize endpoint
+  if (currentPath === '/oauth/consent' || currentPath === '/oauth/authorize') {
+    return (
+      <Suspense fallback={<ViewSuspenseLoader />}>
+        <OAuthConsentScreen />
+      </Suspense>
+    );
+  }
+
+  // Public Legal and Compliance portals (Privacy, Terms, Cookies, Domains, Contact, Security)
+  const legalRoutes: LegalPageType[] = ['privacy', 'terms', 'cookies', 'domains', 'contact', 'security'];
+  const strippedPath = currentPath.replace(/^\//, '') as LegalPageType;
+  if (legalRoutes.includes(strippedPath)) {
+    return (
+      <LegalPage 
+        type={strippedPath} 
+        onNavigateHome={() => navigateToPath('/')} 
+        onNavigateToPath={(p) => navigateToPath(p)} 
+      />
+    );
+  }
+
+  // 404 Route handling for any unmatched path
+  if (currentPath !== '/' && currentPath !== '/index.html' && currentPath !== '') {
+    return (
+      <NotFoundView 
+        pathname={currentPath} 
+        onNavigateHome={() => navigateToPath('/')} 
+      />
     );
   }
 
@@ -770,7 +848,7 @@ export default function App() {
   if (session && !isEmailVerified) {
     const userEmail = session.user?.email || 'your account email';
     return (
-      <div className="min-h-screen w-screen bg-[#0b0d12] flex flex-col items-center justify-center p-4 text-[#e7ebf1] font-sans select-text">
+      <div className="min-h-screen w-full bg-[#0b0d12] flex flex-col items-center justify-center p-4 text-[#e7ebf1] font-sans select-text">
         <div className="w-full max-w-md bg-[#16130f] border border-[#3a352c] rounded-[2px] p-6 shadow-[0_25px_60px_rgba(0,0,0,0.8)] space-y-5 text-center">
           <div className="w-12 h-12 rounded-full bg-[rgba(201,162,39,0.15)] border border-[var(--stamp)] text-[var(--stamp)] flex items-center justify-center mx-auto">
             <MailCheck className="w-6 h-6" />
@@ -863,11 +941,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Ensure non-admins cannot access admin tabs
-  const effectiveTab = (activeTab === 'organization' || activeTab === 'team') && role !== 'admin'
-    ? 'dashboard'
-    : activeTab;
 
   const isPersonalRestrictedTab = accountType === 'personal' && !['ingest', 'overview', 'hops', 'map', 'logs', 'headers', 'settings'].includes(effectiveTab);
 

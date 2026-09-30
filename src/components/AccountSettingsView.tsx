@@ -24,6 +24,7 @@ import {
   Clock,
   Volume2,
   VolumeX,
+  Eye,
   EyeOff
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
@@ -111,8 +112,72 @@ export function AccountSettingsView({
   const [unenrollFactorId, setUnenrollFactorId] = useState<string | null>(null);
   const [unenrolling, setUnenrolling] = useState(false);
 
+  // Change Password state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
   const isAdmin = role === 'admin';
   const hasVerifiedTotp = factors.some(f => f.status === 'verified');
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError('Password policy requires at least 8 characters.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match. Please verify and try again.');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      let sessionToken: string | null = null;
+      if (getIsSupabaseConfigured() && supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          sessionToken = session.access_token;
+          await supabase.auth.updateUser({ password: newPassword });
+        }
+      }
+
+      // Sync with server update-password endpoint
+      const res = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
+        },
+        body: JSON.stringify({
+          email: user?.email,
+          newPassword
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update master password.');
+      }
+
+      setPasswordSuccess('Master password updated successfully.');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      console.error('[AccountSettings] Change password error:', err);
+      setPasswordError(err.message || 'Error updating password. Please try again.');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   // Load factors & policy on mount
   useEffect(() => {
@@ -683,6 +748,8 @@ export function AccountSettingsView({
                         <img 
                           src={enrollData.qrCode} 
                           alt="Authenticator TOTP QR Code" 
+                          width={160}
+                          height={160}
                           className="w-[160px] h-[160px] object-contain"
                           crossOrigin="anonymous"
                         />
@@ -961,7 +1028,109 @@ export function AccountSettingsView({
             </div>
           </div>
 
-          {/* Section 4: Session Management & Revocation */}
+          {/* Section 4: Change Master Password */}
+          <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
+            <div className="border-b border-[var(--line)] pb-3">
+              <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-[var(--stamp)]" />
+                <span>CHANGE MASTER PASSWORD</span>
+              </div>
+              <div className="text-[11.5px] text-[var(--paper-dim)] mt-0.5">
+                Update your account's primary authentication passphrase.
+              </div>
+            </div>
+
+            {passwordSuccess && (
+              <div className="p-2.5 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-xs text-[var(--paper)] font-mono flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
+                <span>{passwordSuccess}</span>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="p-2.5 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-[var(--thread)] shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* New Password */}
+                <div>
+                  <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+                    New Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
+                      aria-label="New Password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider">
+                    Confirm New Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
+                      aria-label="Confirm New Password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" /> : <Eye className="w-4 h-4 text-[var(--paper-dim)]" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={changingPassword || !newPassword || newPassword !== confirmPassword}
+                  className="py-2 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  {changingPassword ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Updating Password…</span>
+                    </>
+                  ) : (
+                    <span>Update Master Password</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Section 5: Session Management & Revocation */}
           <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
             <div className="border-b border-[var(--line)] pb-3">
               <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">

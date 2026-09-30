@@ -1,0 +1,12 @@
+<svg width="512" height="512" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M24 4L42 12V25C42 35.5 34.3 43.8 24 46C13.7 43.8 6 35.5 6 25V12L24 4Z" fill="#1c1813" stroke="#3d3428" stroke-width="2"/>
+  <path d="M24 7L39 13.7V24.5C39 33.3 32.7 40.5 24 42.5C15.3 40.5 9 33.3 9 24.5V13.7L24 7Z" fill="#14110d" stroke="#b23a2e" stroke-width="1.5" stroke-opacity="0.9"/>
+  <path d="M14 18H34V32H14V18Z" fill="#1c1813" stroke="#8e8574" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M14 19L24 26L34 19" stroke="#c9a227" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="24" y1="12" x2="24" y2="16" stroke="#b23a2e" stroke-width="2" stroke-linecap="round" />
+  <line x1="24" y1="34" x2="24" y2="38" stroke="#b23a2e" stroke-width="2" stroke-linecap="round" />
+  <line x1="8" y1="25" x2="12" y2="25" stroke="#b23a2e" stroke-width="2" stroke-linecap="round" />
+  <line x1="36" y1="25" x2="40" y2="25" stroke="#b23a2e" stroke-width="2" stroke-linecap="round" />
+  <circle cx="24" cy="25" r="3" fill="#b23a2e" />
+  <circle cx="24" cy="25" r="1.2" fill="#ede6d8" />
+</svg>

@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send, Eye, EyeOff } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface LoginViewProps {
@@ -32,6 +32,7 @@ export function LoginView({
   const [authMode, setAuthMode] = useState<'password' | 'magic-link'>('password');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [verificationPending, setVerificationPending] = useState(false);
@@ -171,12 +172,15 @@ export function LoginView({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email || !password) {
+    const cleanEmail = email.trim();
+    const cleanPassword = password; // Do not modify or lowercase password
+
+    if (!cleanEmail || !cleanPassword) {
       setErrorMsg('Please enter both your work email and password.');
       return;
     }
 
-    if (password.length < 6) {
+    if (cleanPassword.length < 6) {
       setErrorMsg('Password must be at least 6 characters.');
       return;
     }
@@ -187,63 +191,102 @@ export function LoginView({
     setResendStatus(null);
 
     try {
-      // 1. Primary: Supabase Auth
+      let supabaseAuthenticated = false;
+      let authenticatedSession: any = null;
+      let authenticatedUser: any = null;
+
+      // 1. Primary: Supabase Auth Attempt if configured
       if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password
-        });
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: cleanPassword
+          });
 
-        if (error) {
-          const msg = error.message.toLowerCase();
-          if (msg.includes('email not confirmed') || msg.includes('unverified') || msg.includes('not verified')) {
-            setVerificationPending(true);
-            setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
-            setLoading(false);
-            return;
+          if (!error && data.session && data.user) {
+            // Check if email unconfirmed
+            if (!data.user.email_confirmed_at && data.user.app_metadata?.provider === 'email') {
+              setVerificationPending(true);
+              setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
+              setLoading(false);
+              return;
+            }
+
+            supabaseAuthenticated = true;
+            authenticatedSession = data.session;
+            authenticatedUser = data.user;
+          } else if (error) {
+            const msg = (error.message || '').toLowerCase();
+            if (msg.includes('email not confirmed') || msg.includes('unverified') || msg.includes('not verified')) {
+              setVerificationPending(true);
+              setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
+              setLoading(false);
+              return;
+            }
+            // Supabase auth failed for this user, fall through to server login check
           }
-          // Generic non-enumerating error message
-          setErrorMsg('Authentication Failed: Invalid email or password. Access is strictly denied.');
-          setLoading(false);
-          return;
-        }
-
-        if (data.session) {
-          // Check if email confirmed
-          if (!data.user?.email_confirmed_at && data.user?.app_metadata?.provider === 'email') {
-            setVerificationPending(true);
-            setErrorMsg('Access Restricted: Email verification pending. Please verify your email before logging in.');
-            setLoading(false);
-            return;
-          }
-
-          if (onSuccess) onSuccess();
-          return;
+        } catch (sbErr) {
+          console.warn('[LoginView] Supabase auth attempt note:', sbErr);
         }
       }
 
-      // 2. Fallback: Authenticate via hardened server endpoint /api/auth/login
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password })
-      });
-
-      const resData = await res.json();
-      if (!res.ok) {
-        setErrorMsg(resData.error || 'Authentication Failed: Invalid email or password.');
+      // If Supabase session succeeded
+      if (supabaseAuthenticated && authenticatedSession && authenticatedUser) {
+        const assignedRole: UserRole = (authenticatedUser.user_metadata?.role as UserRole) || 'analyst';
+        if (onSelectRoleLogin) {
+          onSelectRoleLogin(assignedRole, {
+            token: authenticatedSession.access_token,
+            userId: authenticatedUser.id,
+            email: authenticatedUser.email || cleanEmail,
+            fullName: authenticatedUser.user_metadata?.full_name || cleanEmail.split('@')[0],
+            orgName: authenticatedUser.user_metadata?.organization_name || 'Acme Cyber Defense SOC',
+            accountType: 'organization',
+            isEmailVerified: Boolean(authenticatedUser.email_confirmed_at)
+          });
+        }
+        if (onSuccess) onSuccess();
         setLoading(false);
         return;
       }
 
-      // Strict check on server response
+      // 2. Authoritative Fallback: Authenticate via hardened server endpoint /api/auth/login
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+      });
+
+      if (res.status === 429) {
+        setErrorMsg('Too many login attempts. Please wait a moment and try again.');
+        setLoading(false);
+        return;
+      }
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        if (resData.code === 'RATE_LIMITED') {
+          setErrorMsg('Too many login attempts. Please wait a moment and try again.');
+        } else if (resData.code === 'UNVERIFIED_EMAIL') {
+          setVerificationPending(true);
+          setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
+        } else if (res.status >= 500) {
+          setErrorMsg('Unable to connect to authentication server. Please try again later.');
+        } else {
+          setErrorMsg('Invalid email or password.');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Check server session payload
       if (!resData.token || !resData.user?.id) {
         setErrorMsg('Authentication Error: Server failed to issue a valid authentication session.');
         setLoading(false);
         return;
       }
 
-      if (!resData.user.emailVerified) {
+      if (resData.user.emailVerified === false) {
         setVerificationPending(true);
         setErrorMsg('Strict Access Control: Email verification is required before access is unlocked. Please click the confirmation link sent to your email.');
         setLoading(false);
@@ -258,14 +301,19 @@ export function LoginView({
           fullName: resData.user.fullName || resData.user.email.split('@')[0],
           orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
           accountType: 'organization',
-          isEmailVerified: resData.user.emailVerified
+          isEmailVerified: Boolean(resData.user.emailVerified)
         });
-      } else if (onSuccess) {
-        onSuccess();
       }
+      
+      if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('[Login] Authentication error:', err);
-      setErrorMsg('Authentication Failed: Invalid email or password.');
+      if (err.name === 'TypeError' || (err.message && err.message.toLowerCase().includes('fetch'))) {
+        setErrorMsg('Unable to connect. Please check your internet connection and try again.');
+      } else {
+        setErrorMsg('An unexpected error occurred during authentication. Please try again.');
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -519,14 +567,29 @@ export function LoginView({
                   </button>
                 )}
               </div>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full text-xs font-mono py-2.5 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+                  aria-label="Password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-[var(--paper-dim)]" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button

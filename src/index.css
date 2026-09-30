@@ -123,6 +123,8 @@
   html {
     scroll-behavior: smooth;
     min-height: 100%;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
@@ -133,13 +135,34 @@
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     min-height: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    overflow-x: clip;
     -webkit-overflow-scrolling: touch;
   }
 
   #root {
     min-height: 100%;
     width: 100%;
+    max-width: 100%;
+  }
+
+  /* Responsive media sizing preventing horizontal overflow */
+  img, svg, video, canvas, audio, iframe, embed, object {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Prevent code snippets and long RFC822 strings from breaking containers */
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  code {
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 
   h1, h2, h3, h4, h5, h6, .font-serif, .font-display {
@@ -863,5 +886,94 @@
 }
 .leaflet-container a.leaflet-popup-close-button {
   color: #94a3b8 !important;
+}
+
+/* Lenis Smooth Scroll Core Rules */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis:not(.lenis-autoToggle).lenis-stopped {
+  overflow: clip;
+}
+
+.lenis [data-lenis-prevent],
+.lenis [data-lenis-prevent-wheel],
+.lenis [data-lenis-prevent-touch],
+.lenis [data-lenis-prevent-vertical],
+.lenis [data-lenis-prevent-horizontal] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+.lenis.lenis-autoToggle {
+  transition-property: overflow;
+  transition-duration: 1ms;
+  transition-behavior: allow-discrete;
+}
+
+/* Basement Studio-Inspired Motion & Micro-Interactions */
+.btn-basement {
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 160ms ease,
+              background-color 160ms ease;
+}
+.btn-basement:hover {
+  transform: translateY(-1px);
+}
+.btn-basement:active {
+  transform: scale(0.98);
+}
+
+.card-basement {
+  transition: border-color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 240ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card-basement:hover {
+  border-color: #b9af9c;
+  background-color: #221e18;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.5);
+}
+
+.link-basement {
+  position: relative;
+  transition: color 180ms ease;
+}
+.link-basement::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background-color: currentColor;
+  transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.link-basement:hover::after {
+  width: 100%;
+}
+
+/* Prefers Reduced Motion Safeguards */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn-basement:hover,
+  .card-basement:hover {
+    transform: none !important;
+  }
 }
 

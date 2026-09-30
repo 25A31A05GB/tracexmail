@@ -451,11 +451,11 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
     resizeObserver.observe(container);
 
     let animId: number;
-    let clock = new THREE.Clock();
+    let startTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const time = clock.getElapsedTime();
+      const time = (performance.now() - startTime) * 0.001;
 
       if (!isMouseDown) {
         rotY += 0.003;

@@ -1,7 +1,7 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, User, Building2, MailCheck, Send, RefreshCw, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, EyeOff, User, Building2, MailCheck, Send, RefreshCw, Mail } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface SignupViewProps {
@@ -30,6 +30,7 @@ export function SignupView({
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('analyst');
   const [loading, setLoading] = useState(false);
@@ -481,15 +482,30 @@ export function SignupView({
                   </label>
                   <span className="text-[10px] font-mono text-[var(--paper-dim)]">Min 12 characters</span>
                 </div>
-                <input
-                  type="password"
-                  required
-                  minLength={12}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••••••"
-                  className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    minLength={12}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••••••"
+                    className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
+                    aria-label="Master Password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[var(--paper-dim)] hover:text-[var(--paper)] focus:outline-none focus:ring-1 focus:ring-[var(--stamp)] rounded-xs bg-transparent border-0 cursor-pointer flex items-center justify-center transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-[var(--paper-dim)]" />
+                    ) : (
+                      <Eye className="w-4 h-4 text-[var(--paper-dim)]" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               <button
