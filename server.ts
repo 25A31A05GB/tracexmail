@@ -1845,7 +1845,7 @@ async function startServer() {
   validateProductionEnvironment();
   assertEncryptionKeyConfigured();
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Configure reverse proxy trust appropriately for Cloud Run / production load balancers
   app.set('trust proxy', true);

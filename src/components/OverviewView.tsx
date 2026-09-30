@@ -826,11 +826,11 @@ export function OverviewView({
 
             {/* Real-time Severity Badge */}
             {analysis.severity && (
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border transition-all ${
                 analysis.severity.toUpperCase() === 'CRITICAL'
-                  ? 'bg-red-950/80 border-red-500 text-red-200'
+                  ? 'bg-red-950/80 border-red-500 text-red-200 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]'
                   : analysis.severity.toUpperCase() === 'HIGH'
-                  ? 'bg-amber-950/80 border-amber-500 text-amber-200'
+                  ? 'bg-amber-950/80 border-amber-500 text-amber-200 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.3)]'
                   : analysis.severity.toUpperCase() === 'MEDIUM'
                   ? 'bg-yellow-950/80 border-yellow-500 text-yellow-200'
                   : 'bg-slate-900 border-slate-700 text-slate-300'

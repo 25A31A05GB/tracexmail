@@ -193,8 +193,8 @@ export function ForensicScanAnimationModal({
   // Combined authoritative or speculative analysis
   const effectiveAnalysis = analysis || earlyParsed;
 
-  // Sound cue generator using Web Audio API
-  const playChirp = (frequency: number = 660, durationMs: number = 70) => {
+  // Sound cue generator using Web Audio API with multi-tone forensic chimes
+  const playChirp = (frequency: number = 660, durationMs: number = 70, type: OscillatorType = 'sine') => {
     if (!isSoundEnabled) return;
     try {
       if (!audioCtxRef.current) {
@@ -204,9 +204,9 @@ export function ForensicScanAnimationModal({
       if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
         const osc = audioCtxRef.current.createOscillator();
         const gain = audioCtxRef.current.createGain();
-        osc.type = 'sine';
+        osc.type = type;
         osc.frequency.setValueAtTime(frequency, audioCtxRef.current.currentTime);
-        gain.gain.setValueAtTime(0.04, audioCtxRef.current.currentTime);
+        gain.gain.setValueAtTime(0.05, audioCtxRef.current.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + durationMs / 1000);
         osc.connect(gain);
         gain.connect(audioCtxRef.current.destination);
@@ -815,45 +815,61 @@ export function ForensicScanAnimationModal({
                   {selectedInspectorStage === 2 && (
                     /* Stage 3: Mail Route & Origin GeoIP Trace */
                     <div className="space-y-3">
-                      <div className="p-3 rounded bg-[#07080c] border border-[#191e28] space-y-2.5 font-mono text-xs">
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider">
-                          MTA Relay Chain Traceroute
+                      <div className="p-3 rounded bg-[#07080c] border border-[#191e28] space-y-2.5 font-mono text-xs relative overflow-hidden">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                            MTA Relay Chain Traceroute
+                          </span>
+                          <span className="text-[10px] text-cyan-400 font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                            <span>TRANSIT MAPPING</span>
+                          </span>
                         </div>
                         
                         {/* Hop 1 */}
-                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e]">
+                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e] relative group hover:border-amber-500/40 transition-colors">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] flex items-center justify-center font-bold">1</span>
+                            <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] flex items-center justify-center font-bold border border-amber-500/40 animate-pulse">1</span>
                             <div>
-                              <p className="text-slate-200 font-semibold">185.220.101.5 (Origin)</p>
-                              <p className="text-[10px] text-slate-400">Sofia, Bulgaria · AS200548</p>
+                              <p className="text-slate-200 font-semibold">{effectiveAnalysis?.hops?.[0]?.fromIp || '185.220.101.5'} (Origin)</p>
+                              <p className="text-[10px] text-slate-400">{effectiveAnalysis?.hops?.[0]?.city || 'Sofia'}, {effectiveAnalysis?.hops?.[0]?.country || 'Bulgaria'} · {effectiveAnalysis?.hops?.[0]?.asn || 'AS200548'}</p>
                             </div>
                           </div>
-                          <span className="text-[10px] text-amber-400 font-bold">+18ms</span>
+                          <span className="text-[10px] text-amber-400 font-bold bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/30">+18ms</span>
+                        </div>
+
+                        {/* Animated Traceroute Connector */}
+                        <div className="h-2 flex items-center justify-center">
+                          <div className="w-0.5 h-full bg-gradient-to-b from-amber-500 to-slate-500 animate-pulse" />
                         </div>
 
                         {/* Hop 2 */}
-                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e]">
+                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e] hover:border-slate-500/40 transition-colors">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 text-[10px] flex items-center justify-center font-bold">2</span>
+                            <span className="w-5 h-5 rounded-full bg-slate-800 text-slate-300 text-[10px] flex items-center justify-center font-bold border border-slate-700">2</span>
                             <div>
-                              <p className="text-slate-200 font-semibold">relay-eu-central.mail-cluster.net</p>
+                              <p className="text-slate-200 font-semibold">{effectiveAnalysis?.hops?.[1]?.fromHost || 'relay-eu-central.mail-cluster.net'}</p>
                               <p className="text-[10px] text-slate-400">Frankfurt, Germany · AS16509</p>
                             </div>
                           </div>
-                          <span className="text-[10px] text-slate-400 font-bold">+42ms</span>
+                          <span className="text-[10px] text-slate-400 font-bold bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700">+42ms</span>
+                        </div>
+
+                        {/* Animated Traceroute Connector */}
+                        <div className="h-2 flex items-center justify-center">
+                          <div className="w-0.5 h-full bg-gradient-to-b from-slate-500 to-emerald-500 animate-pulse" />
                         </div>
 
                         {/* Hop 3 */}
-                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e]">
+                        <div className="flex items-center justify-between p-2 rounded bg-[#0e1117] border border-[#1c222e] hover:border-emerald-500/40 transition-colors">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] flex items-center justify-center font-bold">3</span>
+                            <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] flex items-center justify-center font-bold border border-emerald-500/40">3</span>
                             <div>
                               <p className="text-slate-200 font-semibold">mx.google.com (Final Ingress)</p>
                               <p className="text-[10px] text-slate-400">Mountain View, United States · AS15169</p>
                             </div>
                           </div>
-                          <span className="text-[10px] text-emerald-400 font-bold">+65ms</span>
+                          <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-500/30">+65ms</span>
                         </div>
                       </div>
                     </div>
@@ -863,8 +879,11 @@ export function ForensicScanAnimationModal({
                     /* Stage 4: AI Threat Vector Scan & Link Intelligence */
                     <div className="space-y-3 font-mono text-xs">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div className={`p-2.5 rounded border ${isMalicious ? 'bg-rose-950/20 border-rose-500/40' : 'bg-emerald-950/20 border-emerald-500/40'}`}>
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Embedded Link Audit</span>
+                        <div className={`p-2.5 rounded border transition-all ${isMalicious ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.1)]' : 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-500/60'}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-bold text-slate-400">Embedded Link Audit</span>
+                            {isMalicious && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
+                          </div>
                           <p className={`text-xs font-semibold mt-0.5 ${isMalicious ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isMalicious ? '1 Typosquatted URL Flagged' : 'Zero Malicious URLs Detected'}
                           </p>
@@ -873,8 +892,11 @@ export function ForensicScanAnimationModal({
                           </p>
                         </div>
 
-                        <div className={`p-2.5 rounded border ${isMalicious ? 'bg-rose-950/20 border-rose-500/40' : 'bg-emerald-950/20 border-emerald-500/40'}`}>
-                          <span className="text-[10px] uppercase font-bold text-slate-400">NLP Urgency Heuristics</span>
+                        <div className={`p-2.5 rounded border transition-all ${isMalicious ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.1)]' : 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-500/60'}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] uppercase font-bold text-slate-400">NLP Urgency Heuristics</span>
+                            {isMalicious && <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
+                          </div>
                           <p className={`text-xs font-semibold mt-0.5 ${isMalicious ? 'text-rose-400' : 'text-emerald-400'}`}>
                             {isMalicious ? 'High Deceptive Urgency (94%)' : 'Standard Business Tone (Low)'}
                           </p>
@@ -884,8 +906,12 @@ export function ForensicScanAnimationModal({
                         </div>
                       </div>
 
-                      <div className="p-2.5 rounded bg-[#07080c] border border-[#191e28] text-slate-300">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">AI Threat Verdict Synthesis</span>
+                      <div className="p-2.5 rounded bg-[#07080c] border border-[#191e28] text-slate-300 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-xl pointer-events-none" />
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider flex items-center justify-between mb-1">
+                          <span>AI Threat Verdict Synthesis</span>
+                          <span className="text-[10px] text-cyan-400 font-mono">Gemini 3.6 Intel Core</span>
+                        </span>
                         <p className="text-[11px] leading-relaxed font-sans">
                           {isMalicious 
                             ? 'Gemini Threat Engine flags high likelihood of credential phishing through visual brand impersonation and homoglyph substitution.'
@@ -898,30 +924,39 @@ export function ForensicScanAnimationModal({
                   {selectedInspectorStage === 4 && (
                     /* Stage 5: Custody Seal & Vault Registration */
                     <div className="space-y-3 font-mono text-xs">
-                      <div className="p-3 rounded bg-[#07080c] border border-[#191e28] space-y-2">
+                      <div className="p-3 rounded bg-[#07080c] border border-[#191e28] space-y-2 relative overflow-hidden">
+                        {/* Rotating Custody Seal Background Stamp */}
+                        <div className="absolute -right-6 -bottom-6 w-28 h-28 border border-emerald-500/20 rounded-full flex items-center justify-center animate-spin-slow pointer-events-none">
+                          <div className="w-20 h-20 border border-dashed border-emerald-500/20 rounded-full" />
+                        </div>
+
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400 uppercase tracking-wider">
-                            SHA-256 Custody Hash (NIST SP 800-86)
+                          <span className="text-[10px] text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>SHA-256 Custody Hash (NIST SP 800-86)</span>
                           </span>
                           <button
                             onClick={handleCopyHash}
-                            className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                            className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer bg-[#141822] px-2 py-0.5 rounded border border-[#273042]"
                           >
                             {copiedHash ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                             <span>{copiedHash ? 'Copied' : 'Copy Hash'}</span>
                           </button>
                         </div>
-                        <p className="text-slate-200 font-bold break-all bg-[#0e1117] p-2 rounded border border-[#1c222e] text-[11px]">
+                        <p className="text-slate-200 font-bold break-all bg-[#0e1117] p-2 rounded border border-[#1c222e] text-[11px] shadow-inner font-mono">
                           sha256:{effectiveAnalysis?.id || 'e89a4b12c89f018e9a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f'}
                         </p>
                         <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
-                          <div>
+                          <div className="p-2 rounded bg-[#0d1016] border border-[#1c222e]">
                             <span className="text-slate-500 block text-[10px]">EVIDENTIARY VAULT</span>
-                            <span className="text-emerald-400 font-semibold">Registered & Sealed</span>
+                            <span className="text-emerald-400 font-semibold flex items-center gap-1 mt-0.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                              Registered &amp; Sealed
+                            </span>
                           </div>
-                          <div>
-                            <span className="text-slate-500 block text-[10px]">TIMESTAMP</span>
-                            <span className="text-slate-300 font-semibold">{new Date().toISOString().split('T')[0]} · {new Date().toLocaleTimeString()}</span>
+                          <div className="p-2 rounded bg-[#0d1016] border border-[#1c222e]">
+                            <span className="text-slate-500 block text-[10px]">DIGITAL TIMESTAMP</span>
+                            <span className="text-slate-300 font-semibold block mt-0.5 truncate">{new Date().toISOString().split('T')[0]} · {new Date().toLocaleTimeString()}</span>
                           </div>
                         </div>
                       </div>

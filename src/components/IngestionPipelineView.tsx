@@ -616,22 +616,32 @@ export function IngestionPipelineView({
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`p-10 sm:p-12 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all ${
+                className={`p-10 sm:p-12 border-2 border-dashed rounded-sm text-center cursor-pointer transition-all relative overflow-hidden group ${
                   isDragging
-                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.15)] scale-[1.01]'
+                    ? 'border-[var(--thread)] bg-[rgba(178,58,46,0.15)] scale-[1.01] shadow-[0_0_25px_rgba(178,58,46,0.25)]'
                     : 'border-[var(--line)] hover:border-[var(--slate)] bg-[var(--ink)] hover:bg-[#1a1713]'
                 }`}
               >
-                <div className="w-14 h-14 mx-auto rounded-full bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] flex items-center justify-center text-[var(--slate)] mb-3 shadow-inner">
-                  <Upload className="w-7 h-7" />
+                {/* Holographic Laser Scan Bar on Hover or Drag */}
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--slate)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
+
+                <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-3 shadow-inner transition-all duration-300 relative ${
+                  isDragging
+                    ? 'bg-[rgba(178,58,46,0.25)] border-2 border-[var(--thread)] text-[var(--thread)] scale-110'
+                    : 'bg-[rgba(127,163,186,0.12)] border border-[rgba(127,163,186,0.3)] text-[var(--slate)] group-hover:scale-105 group-hover:border-[var(--slate)]'
+                }`}>
+                  {/* Subtle pulsing background radar ring */}
+                  <div className="absolute inset-0 rounded-full border border-[var(--slate)]/30 animate-ping pointer-events-none opacity-40" />
+                  <Upload className="w-7 h-7 relative z-10 transition-transform group-hover:-translate-y-0.5" />
                 </div>
-                <p className="text-sm font-bold text-[var(--paper)]">
-                  Click to select or drag &amp; drop your .EML file here
+                <p className="text-sm font-bold text-[var(--paper)] group-hover:text-white transition-colors">
+                  {isDragging ? 'Drop .EML or raw header payload to begin inspection' : 'Click to select or drag & drop your .EML file here'}
                 </p>
                 <p className="text-xs text-[var(--paper-dim)] font-sans mt-1 max-w-sm mx-auto">
                   Automatic MIME parsing, hop routing extraction, SPF/DKIM verification, and threat analysis.
                 </p>
-                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded bg-[#201c16] border border-[#3a352c] text-[11px] font-mono text-[var(--paper-muted)]">
+                <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded bg-[#201c16] border border-[#3a352c] text-[11px] font-mono text-[var(--paper-muted)] shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse" />
                   <span>Accepts: .eml, .msg, .txt RFC822</span>
                 </div>
                 <input

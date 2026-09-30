@@ -52,9 +52,9 @@ export function CaseRealtimeTriageCard({
   const getSeverityBadge = (sev: string) => {
     switch (sev) {
       case 'CRITICAL':
-        return 'bg-red-950/80 border-red-500 text-red-200';
+        return 'bg-red-950/80 border-red-500 text-red-200 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.4)]';
       case 'HIGH':
-        return 'bg-amber-950/80 border-amber-500 text-amber-200';
+        return 'bg-amber-950/80 border-amber-500 text-amber-200 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.3)]';
       case 'MEDIUM':
         return 'bg-yellow-950/80 border-yellow-500 text-yellow-200';
       case 'LOW':
