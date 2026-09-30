@@ -73,6 +73,7 @@ interface SidebarProps {
   viewMode?: 'simple' | 'analyst';
   onOpenShortcutsHelp?: () => void;
   onOpenCommandPalette?: () => void;
+  onStartTour?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
 }
@@ -90,6 +91,7 @@ export function Sidebar({
   viewMode = 'simple',
   onOpenShortcutsHelp,
   onOpenCommandPalette,
+  onStartTour,
   isMobileOpen = false,
   onCloseMobile
 }: SidebarProps) {
@@ -398,6 +400,7 @@ export function Sidebar({
                 <div key={item.id} className="relative group">
                   <motion.button
                     id={`nav-btn-${item.id}`}
+                    data-tour={`nav-${item.id}`}
                     onClick={() => handleTabClick(item.id, item.label)}
                     whileHover={{ x: isDesktopCollapsed ? 0 : 3 }}
                     whileTap={{ scale: 0.98 }}
@@ -514,6 +517,7 @@ export function Sidebar({
                     <div key={item.id} className="relative group">
                       <motion.button
                         id={`nav-btn-${item.id}`}
+                        data-tour={`nav-${item.id}`}
                         onClick={() => handleTabClick(item.id, item.label)}
                         whileHover={{ x: isDesktopCollapsed ? 0 : 3 }}
                         whileTap={{ scale: 0.98 }}
@@ -756,6 +760,17 @@ export function Sidebar({
           {/* Secondary Utilities Row */}
           {!isDesktopCollapsed && (
             <div className="flex items-center gap-1.5 pt-0.5">
+              {onStartTour && (
+                <button
+                  onClick={onStartTour}
+                  className="flex-1 py-1.5 px-2 rounded text-[11px] font-mono text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-bold"
+                  title="Take Interactive Website Tour"
+                >
+                  <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                  <span>Tour</span>
+                </button>
+              )}
+
               {onOpenWalkthrough && (
                 <button
                   onClick={onOpenWalkthrough}

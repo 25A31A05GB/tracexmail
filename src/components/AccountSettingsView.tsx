@@ -46,6 +46,7 @@ interface AccountSettingsViewProps {
   userPersona?: 'technical' | 'non_technical';
   onSetPersona?: (persona: 'technical' | 'non_technical') => void;
   onOpenOnboarding?: () => void;
+  onStartTour?: () => void;
   inactivityConfig?: InactivityConfig;
   onUpdateInactivityConfig?: (config: Partial<InactivityConfig>) => void;
   onLockWorkspaceNow?: () => void;
@@ -75,6 +76,7 @@ export function AccountSettingsView({
   userPersona = 'technical',
   onSetPersona,
   onOpenOnboarding,
+  onStartTour,
   inactivityConfig,
   onUpdateInactivityConfig,
   onLockWorkspaceNow,
@@ -622,6 +624,22 @@ export function AccountSettingsView({
                   </button>
                 )}
               </div>
+
+              {onStartTour && (
+                <div className="mt-3 pt-3 border-t border-[var(--line)] flex items-center justify-between">
+                  <div className="text-[11px] text-[var(--paper-dim)]">
+                    First-Time Orientation
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onStartTour}
+                    className="px-2.5 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span>Restart Tour</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

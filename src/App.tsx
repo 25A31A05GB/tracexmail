@@ -29,6 +29,7 @@ import { mapBackendCaseToAnalysis } from './utils/parser';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from './lib/supabase';
 import type { ObjectiveSelection } from './components/InvestigationObjectiveModal';
 import { UserOnboardingModal, UserPersona, OnboardingAnswers } from './components/UserOnboardingModal';
+import { InteractiveOnboardingTour } from './components/InteractiveOnboardingTour';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { useInactivityTimer } from './hooks/useInactivityTimer';
 import { InactivityWarningModal } from './components/InactivityWarningModal';
@@ -324,18 +325,33 @@ export default function App() {
   });
 
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
+  const [isTourOpen, setIsTourOpen] = useState<boolean>(false);
+  const [isInitialTourWelcome, setIsInitialTourWelcome] = useState<boolean>(true);
 
-  // Trigger onboarding questionnaire when user is logged in if not completed yet
+  // Trigger onboarding questionnaire / interactive tour for new users
   useEffect(() => {
     if (session && !authLoading) {
       try {
         const completed = localStorage.getItem('tracexmail_onboarding_completed') === 'true';
+        const tourStatus = localStorage.getItem('tracexmail_tour_status');
+        
         if (!completed) {
           setIsOnboardingOpen(true);
+        } else if (!tourStatus || tourStatus === 'not_started') {
+          const timer = setTimeout(() => {
+            setIsInitialTourWelcome(true);
+            setIsTourOpen(true);
+          }, 500);
+          return () => clearTimeout(timer);
         }
       } catch {}
     }
   }, [session, authLoading]);
+
+  const handleStartTour = (initialWelcome = false) => {
+    setIsInitialTourWelcome(initialWelcome);
+    setIsTourOpen(true);
+  };
 
   const handleToggleViewMode = (mode: 'simple' | 'analyst') => {
     setViewMode(mode);
@@ -960,6 +976,7 @@ export default function App() {
         viewMode={viewMode}
         onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onStartTour={() => handleStartTour(false)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -990,6 +1007,7 @@ export default function App() {
           onOpenOnboarding={() => setIsOnboardingOpen(true)}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+          onStartTour={() => handleStartTour(false)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           isMobileSidebarOpen={isMobileSidebarOpen}
           onSyncCases={() => setCasesRefreshSignal(prev => prev + 1)}
@@ -1172,6 +1190,7 @@ export default function App() {
                   userPersona={userPersona}
                   onSetPersona={handleSetPersona}
                   onOpenOnboarding={() => setIsOnboardingOpen(true)}
+                  onStartTour={() => handleStartTour(false)}
                   inactivityConfig={inactivityConfig}
                   onUpdateInactivityConfig={updateInactivityConfig}
                   onLockWorkspaceNow={() => lockWorkspaceNow('manual')}
@@ -1354,6 +1373,10 @@ export default function App() {
             setIsCommandPaletteOpen(false);
             setIsShortcutsHelpOpen(true);
           }}
+          onStartTour={() => {
+            setIsCommandPaletteOpen(false);
+            handleStartTour(false);
+          }}
           onSelectAnalysis={(analysis) => {
             setCurrentAnalysis(analysis);
             setActiveTab('overview');
@@ -1376,11 +1399,29 @@ export default function App() {
           onComplete={(answers) => {
             handleSetPersona(answers.persona);
             setIsOnboardingOpen(false);
-            setActiveTab('overview');
+            const tourStatus = localStorage.getItem('tracexmail_tour_status');
+            if (!tourStatus || tourStatus === 'not_started') {
+              handleStartTour(true);
+            }
           }}
           initialPersona={userPersona}
           initialReason={typeof localStorage !== 'undefined' ? localStorage.getItem('tracexmail_use_reason') || undefined : undefined}
           canDismiss={true}
+        />
+
+        {/* Interactive Guided Onboarding Tour with Visual Spotlight & Smart Tooltips */}
+        <InteractiveOnboardingTour
+          isOpen={isTourOpen}
+          onClose={() => setIsTourOpen(false)}
+          onComplete={() => {
+            setIsTourOpen(false);
+          }}
+          onNavigateTab={(tab) => {
+            setActiveTab(tab);
+          }}
+          currentTab={effectiveTab}
+          userRole={role}
+          isInitialWelcome={isInitialTourWelcome}
         />
       </Suspense>
 

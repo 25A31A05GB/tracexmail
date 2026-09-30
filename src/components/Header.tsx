@@ -65,6 +65,7 @@ interface HeaderProps {
   onOpenOnboarding?: () => void;
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
+  onStartTour?: () => void;
   onToggleMobileSidebar?: () => void;
   isMobileSidebarOpen?: boolean;
   onSyncCases?: () => void | Promise<void>;
@@ -96,6 +97,7 @@ export function Header({
   onOpenOnboarding,
   onOpenCommandPalette,
   onOpenShortcutsHelp,
+  onStartTour,
   onToggleMobileSidebar,
   isMobileSidebarOpen = false,
   onSyncCases,
@@ -240,6 +242,24 @@ export function Header({
 
       {/* Right: Consolidated Actions & Top-Right Account/Profile Menu */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+
+        {/* Quick Global Search / Command Bar Trigger */}
+        {onOpenCommandPalette && (
+          <button
+            type="button"
+            id="btn-header-search"
+            data-tour="header-search"
+            onClick={onOpenCommandPalette}
+            className="hidden xs:flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md bg-[#1a1713] hover:bg-[#221e17] border border-[#342e26] text-xs text-[#b9af9c] hover:text-[#ede6d8] transition-colors cursor-pointer"
+            title="Search & Command Palette (⌘K)"
+          >
+            <Search className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden md:inline font-sans">Search</span>
+            <kbd className="hidden sm:inline px-1 py-0.2 text-[9px] font-mono bg-black/40 border border-[#3a352c] rounded text-[#8a8070]">
+              ⌘K
+            </kbd>
+          </button>
+        )}
 
         {/* Enclave Tools & Safety Overflow Menu (Hidden on mobile, visible on sm+) */}
         <div className="hidden sm:block relative dropdown-container">
@@ -406,6 +426,8 @@ export function Header({
         {/* Top-Right Account / Profile Menu (Standard Placement) */}
         <div className="relative dropdown-container">
           <button 
+            id="btn-header-profile"
+            data-tour="header-profile"
             onClick={() => setUserDropdownOpen(!userDropdownOpen)}
             aria-expanded={userDropdownOpen}
             aria-haspopup="menu"
@@ -527,6 +549,22 @@ export function Header({
 
               {/* 5. Help / Support */}
               <div className="py-1">
+                {onStartTour && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      onStartTour();
+                    }}
+                    className="w-full text-left px-3.5 py-2 text-amber-300 hover:bg-[rgba(201,162,39,0.15)] flex items-center justify-between cursor-pointer transition-colors font-sans font-medium"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Take Tour Again</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-amber-400">&rarr;</span>
+                  </button>
+                )}
                 {onOpenWalkthrough && (
                   <button
                     role="menuitem"

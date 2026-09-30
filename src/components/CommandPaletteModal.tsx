@@ -48,6 +48,7 @@ interface CommandPaletteModalProps {
   onToggleViewMode?: () => void;
   onToggleDemoCases?: () => void;
   onOpenShortcutsHelp?: () => void;
+  onStartTour?: () => void;
   onSelectAnalysis: (analysis: EmailAnalysis) => void;
   currentAnalysis?: EmailAnalysis;
   cases?: EmailAnalysis[];
@@ -77,6 +78,7 @@ export function CommandPaletteModal({
   onToggleViewMode,
   onToggleDemoCases,
   onOpenShortcutsHelp,
+  onStartTour,
   onSelectAnalysis,
   currentAnalysis,
   cases = [],
@@ -137,6 +139,17 @@ export function CommandPaletteModal({
         action: () => {
           onClose();
           onToggleViewMode?.();
+        }
+      },
+      {
+        id: 'action-start-tour',
+        title: 'Take Interactive Website Tour',
+        subtitle: 'Learn how to inspect emails, trace server routes, and check safety verdicts',
+        category: 'Actions',
+        icon: Sparkles,
+        action: () => {
+          onClose();
+          onStartTour?.();
         }
       },
       {
