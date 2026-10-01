@@ -40,6 +40,7 @@ import { EmailAnalysis } from '../types';
 import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
+import { ContinuousForensicsNetworkLoop } from './landing/ContinuousForensicsNetworkLoop';
 import { useLenisScroll } from '../hooks/useLenisScroll';
 import { ShaderGradientHero } from './landing/ShaderGradientHero';
 import { RiveInteractiveVisual } from './landing/RiveInteractiveVisual';
@@ -208,6 +209,10 @@ export function LandingView({
             <button data-scroll-to="telemetry-feed" onClick={() => scrollToSection('telemetry-feed')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Live Feed
             </button>
+            <button data-scroll-to="growth-loop" onClick={() => scrollToSection('growth-loop')} className="text-[#06b6d4] hover:text-[#38bdf8] font-semibold transition-colors bg-transparent border-none cursor-pointer link-basement flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span>Threat Loop</span>
+            </button>
             <button data-scroll-to="challenges-solution" onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Why TraceXMail
             </button>
@@ -288,6 +293,15 @@ export function LandingView({
                 className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
               >
                 Live Telemetry Feed
+              </button>
+              <button
+                type="button"
+                data-scroll-to="growth-loop"
+                onClick={() => { scrollToSection('growth-loop'); setMobileMenuOpen(false); }}
+                className="text-left text-cyan-300 font-semibold py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center gap-2"
+              >
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span>Threat Intelligence Loop</span>
               </button>
               <button
                 type="button"
@@ -435,6 +449,41 @@ export function LandingView({
           <LiveDynamicTelemetryRibbon
             onSelectCase={onSelectCase}
             onOpenConsole={onOpenConsole}
+          />
+        </div>
+      </section>
+
+      {/* Flagship SaaS Visual Growth Loop Animation Section */}
+      <section id="growth-loop" className="py-16 sm:py-24 border-b border-[#1b2b46]/60 bg-[#050B14] relative overflow-hidden">
+        {/* Subtle Cyber Grid & Ambient Glow Accents */}
+        <div className="absolute inset-0 pointer-events-none opacity-40">
+          <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.12),transparent_70%)] blur-3xl" />
+          <div className="absolute bottom-0 right-10 w-[500px] h-[300px] bg-[radial-gradient(ellipse_at_center,rgba(59,130,246,0.08),transparent_70%)] blur-3xl" />
+        </div>
+
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8 sm:space-y-12">
+          {/* Section Header with Refined Typography & Clean Unboxed Metadata */}
+          <div className="max-w-3xl space-y-3">
+            <div className="flex items-center gap-2 text-cyan-400 font-mono text-xs font-semibold uppercase tracking-wider">
+              <Network className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Collective Defense Intelligence Loop</span>
+              <span aria-hidden="true" className="text-cyan-800">·</span>
+              <span className="text-[#64748b]">10-Phase Kinetic Flow</span>
+            </div>
+            
+            <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[38px] lg:text-[42px] text-[#ede6d8] leading-[1.15] tracking-tight [text-wrap:balance]">
+              From Suspicious Envelope to Global Threat Consensus
+            </h2>
+            
+            <p className="text-[#94a3b8] text-[15px] sm:text-[16.5px] leading-relaxed font-sans max-w-2xl">
+              Trace the continuous lifecycle of an email threat: an unverified message arrives, undergoes deep cryptographic dissection inside TraceXMail, generates deterministic evidence, and establishes shared immunity across connected security teams.
+            </p>
+          </div>
+
+          {/* Interactive Continuous Growth Loop Animation Component */}
+          <ContinuousForensicsNetworkLoop
+            onOpenConsole={onOpenConsole}
+            onExploreCase={handleCaseClick}
           />
         </div>
       </section>
