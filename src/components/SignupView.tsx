@@ -33,6 +33,7 @@ export function SignupView({
   const [showPassword, setShowPassword] = useState(false);
   const [orgName, setOrgName] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('analyst');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
@@ -55,6 +56,11 @@ export function SignupView({
 
     if (password.length < 12) {
       setErrorMsg('Security Policy: Password must be at least 12 characters in length.');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setErrorMsg('Mandatory: You must accept the Terms of Service and Privacy Policy to create an account.');
       return;
     }
 
@@ -508,10 +514,62 @@ export function SignupView({
                 </div>
               </div>
 
+              {/* Explicit Mandatory Terms & Conditions Acceptance Checkbox */}
+              <div className="p-3 rounded bg-[var(--ink)] border border-[var(--line)] space-y-2 mt-1">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={agreedToTerms}
+                    onChange={(e) => {
+                      setAgreedToTerms(e.target.checked);
+                      if (errorMsg) setErrorMsg(null);
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded-xs border-[var(--line)] bg-[#0d0b09] text-amber-500 focus:ring-1 focus:ring-amber-500 focus:ring-offset-0 cursor-pointer shrink-0 accent-amber-500"
+                  />
+                  <div className="text-xs text-[var(--paper-dim)] group-hover:text-[var(--paper)] leading-relaxed font-sans">
+                    <span className="font-semibold text-white">I agree to the Terms &amp; Policies *</span>
+                    <p className="text-[11px] text-[#8a8070] mt-0.5 font-mono">
+                      I have read and agree to TraceXMail&apos;s{' '}
+                      <a 
+                        href="/terms" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="text-amber-400 hover:text-amber-300 underline font-semibold transition-colors"
+                      >
+                        Terms of Service
+                      </a>
+                      ,{' '}
+                      <a 
+                        href="/privacy" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="text-amber-400 hover:text-amber-300 underline font-semibold transition-colors"
+                      >
+                        Privacy Policy
+                      </a>
+                      , and{' '}
+                      <a 
+                        href="/cookies" 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="text-amber-400 hover:text-amber-300 underline font-semibold transition-colors"
+                      >
+                        Cookie Policy
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </label>
+              </div>
+
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                disabled={loading || !agreedToTerms}
+                className="w-full mt-2 py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
               >
                 {loading ? (
                   <>
@@ -535,6 +593,25 @@ export function SignupView({
               >
                 Sign in here
               </button>
+            </div>
+
+            {/* Legal & Privacy Trust Notice */}
+            <div className="mt-3 pt-3 border-t border-[var(--line)]/60 text-center">
+              <p className="text-[11px] text-[var(--paper-dim)] font-mono leading-relaxed">
+                By registering, you agree to TraceXMail&apos;s{' '}
+                <a href="/terms" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+                  Terms of Service
+                </a>
+                ,{' '}
+                <a href="/privacy" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+                  Privacy Policy
+                </a>
+                , and{' '}
+                <a href="/cookies" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+                  Cookie Policy
+                </a>
+                .
+              </p>
             </div>
           </>
         )}

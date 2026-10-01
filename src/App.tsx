@@ -63,6 +63,7 @@ import { ResetPasswordView } from './components/ResetPasswordView';
 import { AcceptInviteView } from './components/AcceptInviteView';
 import { MagicLinkVerifyView } from './components/MagicLinkVerifyView';
 import { LegalPage, LegalPageType } from './components/LegalPage';
+import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { NotFoundView } from './components/NotFoundView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
@@ -856,6 +857,7 @@ export default function App() {
             }}
           />
         )}
+        <CookieConsentBanner onNavigateToLegal={(type) => navigateToPath('/' + type)} />
       </Suspense>
     );
   }
@@ -1462,6 +1464,9 @@ export default function App() {
           unlocking={workspaceUnlocking}
         />
       )}
+
+      {/* Global Cookie & Privacy Transparency Banner */}
+      <CookieConsentBanner onNavigateToLegal={(type) => navigateToPath('/' + type)} />
     </div>
   );
 }

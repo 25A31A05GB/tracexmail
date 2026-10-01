@@ -642,6 +642,65 @@ export function AccountSettingsView({
               )}
             </div>
           </div>
+
+          {/* Privacy, Legal & Regulatory Compliance Card */}
+          <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5">
+              <span className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5 font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Legal &amp; Privacy Trust</span>
+              </span>
+              <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-400 font-bold">
+                GDPR / CCPA
+              </span>
+            </div>
+
+            <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
+              TraceXMail enforces zero-training AI, client-side data minimization, and strict Google Limited Use guidelines.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded bg-[var(--ink)] border border-[var(--line)] hover:border-amber-500/40 text-xs font-mono text-[var(--paper)] flex items-center justify-between no-underline transition-colors"
+              >
+                <span>Privacy Policy</span>
+                <ExternalLink className="w-3 h-3 text-[var(--paper-dim)]" />
+              </a>
+
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded bg-[var(--ink)] border border-[var(--line)] hover:border-amber-500/40 text-xs font-mono text-[var(--paper)] flex items-center justify-between no-underline transition-colors"
+              >
+                <span>Terms of Service</span>
+                <ExternalLink className="w-3 h-3 text-[var(--paper-dim)]" />
+              </a>
+
+              <a
+                href="/cookies"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded bg-[var(--ink)] border border-[var(--line)] hover:border-amber-500/40 text-xs font-mono text-[var(--paper)] flex items-center justify-between no-underline transition-colors"
+              >
+                <span>Cookie Policy</span>
+                <ExternalLink className="w-3 h-3 text-[var(--paper-dim)]" />
+              </a>
+
+              <a
+                href="/security"
+                target="_blank"
+                rel="noreferrer"
+                className="p-2 rounded bg-[var(--ink)] border border-[var(--line)] hover:border-amber-500/40 text-xs font-mono text-[var(--paper)] flex items-center justify-between no-underline transition-colors"
+              >
+                <span>Security &amp; VDP</span>
+                <ExternalLink className="w-3 h-3 text-[var(--paper-dim)]" />
+              </a>
+            </div>
+          </div>
         </div>
 
         {/* Center & Right Column: Multi-Factor Authentication Management */}

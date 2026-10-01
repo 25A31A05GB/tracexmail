@@ -19,6 +19,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [role, setRole] = useState<'analyst' | 'admin' | 'read_only'>('analyst');
   const [organizationId, setOrganizationId] = useState('');
   const [fullName, setFullName] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -100,6 +101,11 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
 
     if (!email.trim() || !password.trim()) {
       setErrorMessage('Please provide both email and password.');
+      return;
+    }
+
+    if (mode === 'signup' && !agreedToTerms) {
+      setErrorMessage('Mandatory: You must accept the Terms of Service and Privacy Policy to register.');
       return;
     }
 
@@ -568,13 +574,44 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                       </div>
                     </div>
                   </div>
+
+                  {/* Mandatory Terms & Conditions Checkbox */}
+                  <div className="p-2.5 rounded bg-slate-900/80 border border-slate-700/80 text-[11px] text-slate-300">
+                    <label className="flex items-start gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        required
+                        checked={agreedToTerms}
+                        onChange={(e) => {
+                          setAgreedToTerms(e.target.checked);
+                          if (errorMessage) setErrorMessage(null);
+                        }}
+                        className="mt-0.5 w-3.5 h-3.5 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-0 cursor-pointer shrink-0 accent-cyan-500"
+                      />
+                      <span className="leading-snug">
+                        I agree to TraceXMail&apos;s{' '}
+                        <a href="/terms" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline font-medium">
+                          Terms of Service
+                        </a>
+                        ,{' '}
+                        <a href="/privacy" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline font-medium">
+                          Privacy Policy
+                        </a>
+                        , and{' '}
+                        <a href="/cookies" target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline font-medium">
+                          Cookie Policy
+                        </a>
+                        .
+                      </span>
+                    </label>
+                  </div>
                 </>
               )}
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-2 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                disabled={loading || (mode === 'signup' && !agreedToTerms)}
+                className="w-full mt-2 py-2 px-4 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span>Processing...</span>

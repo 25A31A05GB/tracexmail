@@ -623,6 +623,25 @@ export function LoginView({
             <span className="font-mono text-[11px] text-[var(--paper-muted)]">Contact Administrator</span>
           )}
         </div>
+
+        {/* Legal & Privacy Trust Notice */}
+        <div className="mt-4 pt-3 border-t border-[var(--line)]/60 text-center">
+          <p className="text-[11px] text-[var(--paper-dim)] font-mono leading-relaxed">
+            By signing in, you agree to TraceXMail&apos;s{' '}
+            <a href="/terms" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+              Terms of Service
+            </a>
+            ,{' '}
+            <a href="/privacy" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+              Privacy Policy
+            </a>
+            , and{' '}
+            <a href="/cookies" className="text-[var(--paper)] hover:text-amber-400 underline transition-colors">
+              Cookie Policy
+            </a>
+            .
+          </p>
+        </div>
       </div>
     </div>
   );

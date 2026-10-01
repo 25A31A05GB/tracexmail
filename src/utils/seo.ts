@@ -54,33 +54,33 @@ export const ROUTE_METADATA: Record<string, PageMetadata> = {
     canonicalPath: '/'
   },
   privacy: {
-    title: 'Privacy Policy | TraceXMail Compliance',
-    description: 'Review TraceXMail commitments to minimal data retention, zero third-party telemetry sharing, and transparent data privacy.',
+    title: 'Privacy Policy & GDPR/CCPA Standards | TraceXMail',
+    description: 'Comprehensive disclosure of data processing, cryptographic forensic parsing, Google OAuth Limited Use compliance, and zero-training AI guarantee.',
     canonicalPath: '/privacy'
   },
   terms: {
-    title: 'Terms of Service | TraceXMail Legal',
-    description: 'Terms of service and acceptable operational use policies for the TraceXMail forensic intelligence platform.',
+    title: 'Terms of Service & Lawful Forensic Use | TraceXMail',
+    description: 'Terms of service, lawful cybersecurity investigation requirements, 100% evidence ownership, and service level commitments for TraceXMail.',
     canonicalPath: '/terms'
   },
   cookies: {
-    title: 'Cookie Policy | TraceXMail Legal',
-    description: 'Learn about the minimal essential session tokens used by TraceXMail with zero advertising tracking cookies.',
+    title: 'Cookie Policy & Local Storage Transparency | TraceXMail',
+    description: 'Complete inventory of essential session storage keys with an absolute zero third-party advertising or behavioral tracking guarantee.',
     canonicalPath: '/cookies'
   },
   domains: {
-    title: 'Authorized Domains | TraceXMail Legal',
-    description: 'Official authorized production domains and cryptographic redirect endpoints for TraceXMail.',
+    title: 'Authorized Domains & Google OAuth Verification | TraceXMail',
+    description: 'Official verified production domains, Google OAuth 2.0 authorized redirect URIs, CSP origins, and infrastructure endpoints for TraceXMail.',
     canonicalPath: '/domains'
   },
   contact: {
-    title: 'Developer & Security Contact | TraceXMail',
-    description: 'Direct contact channel for TraceXMail lead architect, vulnerability disclosures, and OAuth verification.',
+    title: 'Developer Contact, DPO & Legal Enquiries | TraceXMail',
+    description: 'Direct contact channels for Data Protection Officer (DPO), Google OAuth app verification, enterprise support, and security inquiries.',
     canonicalPath: '/contact'
   },
   security: {
-    title: 'Security & Cryptographic Standards | TraceXMail',
-    description: 'Technical specifications on TraceXMail SHA-256 evidence vault, enclave isolation, and security compliance.',
+    title: 'Security Architecture & Vulnerability Disclosure (VDP) | TraceXMail',
+    description: 'Technical specifications on NIST SP 800-86 evidence chain of custody, AES-256-GCM encryption, sandboxed link defanging, and safe harbor disclosure.',
     canonicalPath: '/security'
   },
   '404': {
