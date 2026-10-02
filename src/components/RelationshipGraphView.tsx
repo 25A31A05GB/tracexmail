@@ -51,9 +51,20 @@ import {
   Activity,
   Zap,
   Copy,
-  Check
+  Check,
+  Download,
+  FileJson,
+  FileSpreadsheet,
+  ChevronDown,
+  Hash,
+  MapPin,
+  Users,
+  Printer,
+  X
 } from 'lucide-react';
 import { EmailAnalysis, EmailHop } from '../types';
+import { ShareCaseModal } from './ShareCaseModal';
+import { exportEvidenceAsJson, exportEvidenceAsCsv, exportEvidenceAsPdf } from '../utils/exportEvidence';
 
 // Custom Entity Node supporting all forensic evidence types in ReactFlow
 const CustomGraphNode = ({ data }: any) => {
@@ -98,52 +109,38 @@ const CustomGraphNode = ({ data }: any) => {
 
     case 'sender':
       Icon = Mail;
-      bgClass = "bg-blue-950/80";
-      borderClass = "border-blue-500/80";
+      bgClass = "bg-blue-950/70";
+      borderClass = "border-blue-500/60";
       iconClass = "text-blue-400";
       badgeColor = "bg-blue-900/60 text-blue-300";
       break;
 
     case 'alias':
       Icon = UserCheck;
-      bgClass = "bg-amber-950/70";
-      borderClass = "border-amber-500/70";
-      iconClass = "text-amber-400";
-      badgeColor = "bg-amber-900/60 text-amber-300";
-      break;
-
-    case 'reply_to':
-      Icon = Repeat;
-      if (isDiverter) {
-        bgClass = "bg-rose-950/90";
-        borderClass = "border-rose-500 animate-pulse";
-        iconClass = "text-rose-400";
-        badgeColor = "bg-rose-900/80 text-rose-200 font-bold";
-      } else {
-        bgClass = "bg-slate-900";
-        borderClass = "border-slate-600";
-        iconClass = "text-slate-300";
-        badgeColor = "bg-slate-800 text-slate-300";
-      }
-      break;
-
-    case 'return_path':
-      Icon = ArrowRight;
-      if (isMismatch) {
-        bgClass = "bg-orange-950/90";
-        borderClass = "border-orange-500";
-        iconClass = "text-orange-400";
-        badgeColor = "bg-orange-900/80 text-orange-200 font-bold";
-      } else {
-        bgClass = "bg-slate-900";
-        borderClass = "border-slate-600";
-        iconClass = "text-slate-300";
-        badgeColor = "bg-slate-800 text-slate-300";
-      }
+      bgClass = "bg-indigo-950/70";
+      borderClass = "border-indigo-500/60";
+      iconClass = "text-indigo-400";
+      badgeColor = "bg-indigo-900/60 text-indigo-300";
       break;
 
     case 'domain':
       Icon = Globe;
+      bgClass = isMismatch ? "bg-orange-950/80" : "bg-cyan-950/70";
+      borderClass = isMismatch ? "border-orange-500/80" : "border-cyan-500/60";
+      iconClass = isMismatch ? "text-orange-400" : "text-cyan-400";
+      badgeColor = isMismatch ? "bg-orange-900/80 text-orange-200" : "bg-cyan-900/60 text-cyan-300";
+      break;
+
+    case 'reply_to':
+      Icon = Repeat;
+      bgClass = isDiverter ? "bg-rose-950/85" : "bg-slate-900";
+      borderClass = isDiverter ? "border-rose-500/80" : "border-slate-700";
+      iconClass = isDiverter ? "text-rose-400" : "text-slate-400";
+      badgeColor = isDiverter ? "bg-rose-900/80 text-rose-200" : "bg-slate-800 text-slate-300";
+      break;
+
+    case 'return_path':
+      Icon = Repeat;
       bgClass = "bg-indigo-950/70";
       borderClass = "border-indigo-500/60";
       iconClass = "text-indigo-400";
@@ -402,6 +399,10 @@ export function RelationshipGraphView({
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [activeConstellationNode, setActiveConstellationNode] = useState<string>('email');
   const [copiedId, setCopiedId] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(true);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const effectiveAnalysis = analysis;
 
@@ -449,9 +450,9 @@ export function RelationshipGraphView({
       data: {
         type: 'sender',
         label: cleanSenderAddr,
-        sublabel: 'Header From / Envelope Sender',
-        riskLevel: effectiveVerdict,
-        raw: effectiveAnalysis.from
+        sublabel: senderName ? `Display: "${senderName}"` : 'Direct Header Sender',
+        status: effectiveVerdict === 'MALICIOUS PHISH' || effectiveVerdict === 'MALICIOUS' ? 'FLAGGED' : 'OBSERVED',
+        tag: 'ENVELOPE SENDER'
       }
     });
 
@@ -459,111 +460,22 @@ export function RelationshipGraphView({
       id: 'edge-case-sender',
       source: 'node-case',
       target: 'node-sender',
-      label: 'authored by',
-      type: 'smoothstep',
-      style: { stroke: '#3b82f6', strokeWidth: 1.5 },
-      labelStyle: { fill: '#60a5fa', fontSize: 10 },
-      labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
+      label: 'CLAIMED SENDER',
+      animated: true,
+      style: { stroke: '#3b82f6', strokeWidth: 1.5 }
     });
 
-    // 3. Sender Alias Node
-    if (senderName) {
-      newNodes.push({
-        id: 'node-alias',
-        type: 'entity',
-        position: { x: -160, y: 160 },
-        data: {
-          type: 'alias',
-          label: senderName,
-          sublabel: 'Claimed Display Name / Alias',
-          riskLevel: 'SUSPICIOUS'
-        }
-      });
-
-      newEdges.push({
-        id: 'edge-alias-sender',
-        source: 'node-alias',
-        target: 'node-sender',
-        label: 'claims identity',
-        type: 'smoothstep',
-        style: { stroke: '#f59e0b', strokeWidth: 1.5 },
-        labelStyle: { fill: '#f59e0b', fontSize: 10 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      });
-    }
-
-    // 4. Return-Path Node (Check for Domain Mismatch)
-    const effectiveReturnPath = effectiveAnalysis.headers?.returnPath || effectiveAnalysis.returnPath;
-    if (effectiveReturnPath) {
-      const returnPathDomain = effectiveReturnPath.includes('@') ? effectiveReturnPath.split('@')[1].replace(/[<>]/g, '').trim() : '';
-      const isMismatch = Boolean(returnPathDomain && senderDomain && !returnPathDomain.includes(senderDomain) && !senderDomain.includes(returnPathDomain));
-
-      newNodes.push({
-        id: 'node-returnpath',
-        type: 'entity',
-        position: { x: -160, y: 280 },
-        data: {
-          type: 'return_path',
-          label: effectiveReturnPath,
-          sublabel: isMismatch ? 'BOUNCE DOMAIN MISMATCH (Sender vs Return-Path)' : 'Validated Bounce Path',
-          isMismatch,
-          status: isMismatch ? 'MISMATCH' : 'ALIGNED'
-        }
-      });
-
-      newEdges.push({
-        id: 'edge-sender-returnpath',
-        source: 'node-sender',
-        target: 'node-returnpath',
-        label: isMismatch ? 'mismatched bounce target' : 'return path',
-        type: 'smoothstep',
-        style: { stroke: isMismatch ? '#f97316' : '#64748b', strokeWidth: isMismatch ? 2 : 1 },
-        labelStyle: { fill: isMismatch ? '#f97316' : '#94a3b8', fontSize: 10 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      });
-    }
-
-    // 5. Reply-To Node (Check for Diverter)
-    const effectiveReplyTo = effectiveAnalysis.headers?.replyTo || effectiveAnalysis.replyTo;
-    if (effectiveReplyTo && effectiveReplyTo !== effectiveAnalysis.from) {
-      const isDiverted = effectiveReplyTo.toLowerCase() !== cleanSenderAddr.toLowerCase();
-      newNodes.push({
-        id: 'node-replyto',
-        type: 'entity',
-        position: { x: -160, y: 400 },
-        data: {
-          type: 'reply_to',
-          label: effectiveReplyTo,
-          sublabel: isDiverted ? 'ANOMALOUS DIVERTER (Replies hijacked away from sender)' : 'Direct Reply Target',
-          isDiverter: isDiverted,
-          riskLevel: isDiverted ? 'MALICIOUS' : 'NORMAL'
-        }
-      });
-
-      newEdges.push({
-        id: 'edge-sender-replyto',
-        source: 'node-sender',
-        target: 'node-replyto',
-        label: isDiverted ? 'HIJACKED REPLY TARGET' : 'replies to',
-        type: 'smoothstep',
-        animated: isDiverted,
-        style: { stroke: isDiverted ? '#f43f5e' : '#94a3b8', strokeWidth: isDiverted ? 2.5 : 1, strokeDasharray: isDiverted ? '5,5' : undefined },
-        labelStyle: { fill: isDiverted ? '#f43f5e' : '#94a3b8', fontSize: 10, fontWeight: isDiverted ? 'bold' : 'normal' },
-        labelBgStyle: { fill: '#0f172a', stroke: isDiverted ? '#881337' : '#1e293b' }
-      });
-    }
-
-    // 6. Sender Domain & DNS Infrastructure
-    const domIntel = effectiveAnalysis.domain_intelligence || effectiveAnalysis.domainIntelligence;
+    // 3. Sender Domain Node
     newNodes.push({
       id: 'node-domain',
       type: 'entity',
-      position: { x: 720, y: 160 },
+      position: { x: 120, y: 300 },
       data: {
         type: 'domain',
         label: senderDomain,
-        sublabel: domIntel?.registrar ? `Registrar: ${domIntel.registrar}` : 'Sender Registered Domain',
-        tag: domIntel?.domain_age_days !== undefined ? `Age: ${domIntel.domain_age_days} days` : 'WHOIS Registered'
+        sublabel: effectiveAnalysis.domain_intelligence?.registrar ? `Registrar: ${effectiveAnalysis.domain_intelligence.registrar}` : 'Registered Domain',
+        status: effectiveAnalysis.domain_intelligence?.is_newly_registered ? 'NEW REG' : 'ESTABLISHED',
+        tag: effectiveAnalysis.domain_intelligence?.domain_age_days ? `AGE: ${effectiveAnalysis.domain_intelligence.domain_age_days}d` : 'DNS DOMAIN'
       }
     });
 
@@ -571,100 +483,138 @@ export function RelationshipGraphView({
       id: 'edge-sender-domain',
       source: 'node-sender',
       target: 'node-domain',
-      label: 'author domain',
-      type: 'smoothstep',
-      style: { stroke: '#6366f1', strokeWidth: 1.5 },
-      labelStyle: { fill: '#818cf8', fontSize: 10 },
-      labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
+      label: 'RESOLVES TO',
+      style: { stroke: '#06b6d4', strokeWidth: 1.5 }
     });
 
-    // 7. Cryptographic Authentication Nodes (SPF, DKIM, DMARC)
-    const spfStatus = effectiveAnalysis.authResults?.spf?.status || effectiveAnalysis.auth?.spf?.status || 'PASS';
-    const dkimStatus = effectiveAnalysis.authResults?.dkim?.status || effectiveAnalysis.auth?.dkim?.status || 'PASS';
-    const dmarcStatus = effectiveAnalysis.authResults?.dmarc?.status || effectiveAnalysis.auth?.dmarc?.status || 'PASS';
-    const dmarcPolicy = effectiveAnalysis.authResults?.dmarc?.policy || domIntel?.dns?.dmarc_policy || 'p=none';
+    // 4. Return-Path Node
+    const returnPath = effectiveAnalysis.headers?.returnPath || effectiveAnalysis.headers?.['return-path'] || effectiveAnalysis.returnPath;
+    if (returnPath) {
+      const cleanReturn = returnPath.replace(/[<>]/g, '').trim();
+      const returnDomain = cleanReturn.includes('@') ? cleanReturn.split('@')[1] : cleanReturn;
+      const isMismatch = returnDomain.toLowerCase() !== senderDomain.toLowerCase();
 
+      newNodes.push({
+        id: 'node-return-path',
+        type: 'entity',
+        position: { x: -140, y: 160 },
+        data: {
+          type: 'return_path',
+          label: cleanReturn,
+          sublabel: isMismatch ? `MISMATCH with ${senderDomain}` : 'Aligned Envelope Header',
+          isMismatch,
+          status: isMismatch ? 'MISMATCH' : 'ALIGNED',
+          tag: 'BOUNCE PATH'
+        }
+      });
+
+      newEdges.push({
+        id: 'edge-sender-return',
+        source: 'node-sender',
+        target: 'node-return-path',
+        label: isMismatch ? 'BOUNCE DIVERGENCE' : 'BOUNCE ADDRESS',
+        style: { stroke: isMismatch ? '#f97316' : '#6366f1', strokeWidth: 1.5, strokeDasharray: isMismatch ? '4,4' : undefined }
+      });
+    }
+
+    // 5. Reply-To Node
+    const replyTo = effectiveAnalysis.headers?.replyTo || effectiveAnalysis.headers?.['reply-to'];
+    if (replyTo && replyTo !== senderEmail) {
+      const cleanReply = replyTo.replace(/[<>]/g, '').trim();
+      newNodes.push({
+        id: 'node-reply-to',
+        type: 'entity',
+        position: { x: -140, y: 300 },
+        data: {
+          type: 'reply_to',
+          label: cleanReply,
+          sublabel: 'Header reply recipient differs from sender',
+          isDiverter: true,
+          status: 'DIVERTED',
+          tag: 'DECEPTIVE DIVERT'
+        }
+      });
+
+      newEdges.push({
+        id: 'edge-sender-replyto',
+        source: 'node-sender',
+        target: 'node-reply-to',
+        label: 'DECEPTIVE REDIRECT',
+        animated: true,
+        style: { stroke: '#ef4444', strokeWidth: 2 }
+      });
+    }
+
+    // 6. Cryptographic Authentication Nodes (SPF, DKIM, DMARC)
+    const spfVal = effectiveAnalysis.authResults?.spf?.status || (typeof effectiveAnalysis.auth?.spf === 'string' ? effectiveAnalysis.auth?.spf : effectiveAnalysis.auth?.spf?.status) || 'PASS';
     newNodes.push({
       id: 'node-auth-spf',
       type: 'entity',
-      position: { x: 1000, y: 60 },
+      position: { x: 380, y: 190 },
       data: {
         type: 'auth_spf',
-        label: `SPF: ${spfStatus}`,
-        sublabel: effectiveAnalysis.auth?.spf?.record || 'Sender Policy Framework record',
-        status: spfStatus
+        label: `SPF: ${spfVal}`,
+        sublabel: `Envelope authorization check`,
+        status: String(spfVal).toUpperCase(),
+        tag: 'RFC 7208'
       }
     });
+    newEdges.push({
+      id: 'edge-domain-spf',
+      source: 'node-domain',
+      target: 'node-auth-spf',
+      label: 'ENVELOPE POLICY',
+      style: { stroke: spfVal === 'PASS' ? '#10b981' : '#ef4444', strokeWidth: 1.5 }
+    });
 
+    const dkimVal = effectiveAnalysis.authResults?.dkim?.status || (typeof effectiveAnalysis.auth?.dkim === 'string' ? effectiveAnalysis.auth?.dkim : effectiveAnalysis.auth?.dkim?.status) || 'PASS';
     newNodes.push({
       id: 'node-auth-dkim',
       type: 'entity',
-      position: { x: 1000, y: 180 },
+      position: { x: 580, y: 190 },
       data: {
         type: 'auth_dkim',
-        label: `DKIM: ${dkimStatus}`,
-        sublabel: 'Cryptographic DomainKeys Signature',
-        status: dkimStatus
+        label: `DKIM: ${dkimVal}`,
+        sublabel: `Cryptographic body & header signature`,
+        status: String(dkimVal).toUpperCase(),
+        tag: 'RFC 6376'
       }
     });
+    newEdges.push({
+      id: 'edge-case-dkim',
+      source: 'node-case',
+      target: 'node-auth-dkim',
+      label: 'CRYPTO SIGNATURE',
+      style: { stroke: dkimVal === 'PASS' ? '#10b981' : '#ef4444', strokeWidth: 1.5 }
+    });
 
+    const dmarcVal = effectiveAnalysis.authResults?.dmarc?.status || (typeof effectiveAnalysis.auth?.dmarc === 'string' ? effectiveAnalysis.auth?.dmarc : effectiveAnalysis.auth?.dmarc?.status) || 'PASS';
     newNodes.push({
       id: 'node-auth-dmarc',
       type: 'entity',
-      position: { x: 1000, y: 300 },
+      position: { x: 480, y: 290 },
       data: {
         type: 'auth_dmarc',
-        label: `DMARC: ${dmarcStatus}`,
-        sublabel: `Policy: ${dmarcPolicy}`,
-        status: dmarcStatus
+        label: `DMARC: ${dmarcVal}`,
+        sublabel: `Sender domain alignment & enforcement`,
+        status: String(dmarcVal).toUpperCase(),
+        tag: 'RFC 7489'
       }
     });
+    newEdges.push({
+      id: 'edge-domain-dmarc',
+      source: 'node-domain',
+      target: 'node-auth-dmarc',
+      label: 'DOMAIN ENFORCEMENT',
+      style: { stroke: dmarcVal === 'PASS' ? '#10b981' : '#ef4444', strokeWidth: 1.5 }
+    });
 
-    newEdges.push(
-      {
-        id: 'edge-domain-spf',
-        source: 'node-domain',
-        target: 'node-auth-spf',
-        label: 'SPF auth',
-        type: 'smoothstep',
-        style: { stroke: spfStatus === 'PASS' ? '#10b981' : '#f43f5e', strokeWidth: 1.5 },
-        labelStyle: { fill: spfStatus === 'PASS' ? '#34d399' : '#fb7185', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      },
-      {
-        id: 'edge-domain-dkim',
-        source: 'node-domain',
-        target: 'node-auth-dkim',
-        label: 'DKIM signature',
-        type: 'smoothstep',
-        style: { stroke: dkimStatus === 'PASS' ? '#10b981' : '#f43f5e', strokeWidth: 1.5 },
-        labelStyle: { fill: dkimStatus === 'PASS' ? '#34d399' : '#fb7185', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      },
-      {
-        id: 'edge-domain-dmarc',
-        source: 'node-domain',
-        target: 'node-auth-dmarc',
-        label: 'DMARC alignment',
-        type: 'smoothstep',
-        style: { stroke: dmarcStatus === 'PASS' ? '#10b981' : '#f43f5e', strokeWidth: 1.5 },
-        labelStyle: { fill: dmarcStatus === 'PASS' ? '#34d399' : '#fb7185', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      }
-    );
-
-    // 8. Transmission Relay Hops
-    let prevHopNodeId = 'node-sender';
-    let currentY = 320;
-
-    filteredHops.forEach((hop, idx) => {
-      const hopNodeId = `node-hop-${hop.hopNumber || idx + 1}`;
-      const hopIp = hop.fromIp || hop.fromHost || `hop-${idx + 1}`;
-      const isOriginHop = hop.isOrigin || (idx === 0 && !hop.isPrivate);
-
-      const hopX = 420;
-      const hopY = currentY;
-      currentY += 130;
+    // 7. Transmission Hop Nodes (DAG Pipeline)
+    let prevHopNodeId: string | null = null;
+    filteredHops.forEach((h: EmailHop, idx: number) => {
+      const hopNodeId = `node-hop-${idx + 1}`;
+      const hopX = 350 + (idx * 220);
+      const hopY = 430;
 
       newNodes.push({
         id: hopNodeId,
@@ -672,260 +622,165 @@ export function RelationshipGraphView({
         position: { x: hopX, y: hopY },
         data: {
           type: 'relay_hop',
-          label: hopIp,
-          sublabel: hop.fromHost || (hop.isPrivate ? 'Internal Datacenter Gateway' : 'Public Transmission Node'),
-          hopNumber: hop.hopNumber || idx + 1,
-          isOrigin: isOriginHop,
-          isPrivate: hop.isPrivate,
-          city: hop.city,
-          country: hop.countryCode || hop.country,
-          asn: hop.asn,
-          protocol: hop.protocol || 'ESMTP',
-          delaySec: hop.delaySec,
-          isTor: hop.is_tor,
-          isVpn: hop.is_vpn,
-          rawHop: hop
+          label: h.fromIp || `Relay #${idx + 1}`,
+          sublabel: h.byHost || h.fromHost || `Hop Index ${idx + 1}`,
+          hopNumber: idx + 1,
+          isOrigin: h.isOrigin,
+          isPrivate: h.isPrivate,
+          city: h.city,
+          country: h.country,
+          asn: h.asn,
+          delaySec: h.delaySec ?? (h as any).delay,
+          isTor: h.is_tor,
+          status: h.isOrigin ? 'ORIGIN' : h.is_tor ? 'TOR RELAY' : h.isPrivate ? 'PRIVATE' : 'PUBLIC'
         }
       });
 
-      const edgeLabel = hop.delaySec !== undefined 
-        ? `Relay Hop #${hop.hopNumber || idx + 1} (+${hop.delaySec}s)` 
-        : `Relay Hop #${hop.hopNumber || idx + 1}`;
-
-      newEdges.push({
-        id: `edge-relay-${prevHopNodeId}-${hopNodeId}`,
-        source: prevHopNodeId,
-        target: hopNodeId,
-        label: edgeLabel,
-        type: 'smoothstep',
-        animated: true,
-        markerEnd: { type: MarkerType.ArrowClosed, color: isOriginHop ? '#f43f5e' : '#38bdf8' },
-        style: { stroke: isOriginHop ? '#f43f5e' : '#38bdf8', strokeWidth: isOriginHop ? 2.5 : 2 },
-        labelStyle: { fill: '#38bdf8', fontSize: 10, fontWeight: 600 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#0284c7' }
-      });
-
-      prevHopNodeId = hopNodeId;
-
-      // ASN Node
-      if (hop.asn && !hop.isPrivate) {
-        const asnNodeId = `node-asn-${hop.asn.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        if (!newNodes.some(n => n.id === asnNodeId)) {
-          newNodes.push({
-            id: asnNodeId,
-            type: 'entity',
-            position: { x: hopX + 280, y: hopY },
-            data: {
-              type: 'asn',
-              label: hop.asn,
-              sublabel: hop.org || hop.isp || 'Autonomous System Infrastructure',
-              asn: hop.asn,
-              isp: hop.isp
-            }
-          });
-
-          newEdges.push({
-            id: `edge-hop-asn-${hopNodeId}`,
-            source: hopNodeId,
-            target: asnNodeId,
-            label: 'routed by',
-            type: 'smoothstep',
-            style: { stroke: '#a855f7', strokeWidth: 1.5 },
-            labelStyle: { fill: '#c084fc', fontSize: 9 },
-            labelBgStyle: { fill: '#0f172a', stroke: '#581c87' }
-          });
-        }
+      if (prevHopNodeId) {
+        const hopDelay = h.delaySec ?? (h as any).delay;
+        newEdges.push({
+          id: `edge-${prevHopNodeId}-${hopNodeId}`,
+          source: prevHopNodeId,
+          target: hopNodeId,
+          label: hopDelay ? `+${hopDelay}s DELAY` : 'SMTP HANDOFF',
+          animated: true,
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#38bdf8' },
+          style: { stroke: '#38bdf8', strokeWidth: 2 }
+        });
+      } else {
+        newEdges.push({
+          id: `edge-sender-${hopNodeId}`,
+          source: 'node-sender',
+          target: hopNodeId,
+          label: 'ORIGIN INGRESS',
+          animated: true,
+          style: { stroke: '#f43f5e', strokeWidth: 2 }
+        });
       }
+      prevHopNodeId = hopNodeId;
     });
 
-    // 9. Recipient Node
-    const recipientEmail = effectiveAnalysis.headers?.to || effectiveAnalysis.to || 'recipient@company.com';
+    // 8. Ingress Recipient Mailbox Node
+    const recipientAddr = effectiveAnalysis.headers?.to || effectiveAnalysis.to || 'recipient@internal.corp';
+    const recX = 350 + (filteredHops.length * 220);
+    const recY = 430;
     newNodes.push({
       id: 'node-recipient',
       type: 'entity',
-      position: { x: 420, y: currentY + 20 },
+      position: { x: recX, y: recY },
       data: {
         type: 'recipient',
-        label: recipientEmail,
-        sublabel: 'Target Recipient Mailbox / Ingress Delivery',
-        riskLevel: 'CLEAN'
+        label: recipientAddr,
+        sublabel: 'Target Corporate Mailbox',
+        status: 'DELIVERED',
+        tag: 'INGRESS MAILBOX'
       }
     });
 
-    newEdges.push({
-      id: `edge-final-delivery`,
-      source: prevHopNodeId,
-      target: 'node-recipient',
-      label: 'delivered to inbox',
-      type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
-      style: { stroke: '#10b981', strokeWidth: 2 },
-      labelStyle: { fill: '#34d399', fontSize: 10, fontWeight: 'bold' },
-      labelBgStyle: { fill: '#0f172a', stroke: '#065f46' }
-    });
+    if (prevHopNodeId) {
+      newEdges.push({
+        id: `edge-${prevHopNodeId}-recipient`,
+        source: prevHopNodeId,
+        target: 'node-recipient',
+        label: 'LOCAL DELIVERY',
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#10b981' },
+        style: { stroke: '#10b981', strokeWidth: 2 }
+      });
+    }
 
-    // 10. Observed Threat Artifacts / IOCs (URLs, Attachments)
-    const urls = effectiveAnalysis.urls || [];
-    urls.slice(0, 3).forEach((urlItem, idx) => {
-      const urlNodeId = `node-url-${idx}`;
+    // 9. Weaponized IOCs & Indicators
+    (effectiveAnalysis.urls || []).slice(0, 3).forEach((u, i) => {
+      const urlNodeId = `node-ioc-url-${i}`;
       newNodes.push({
         id: urlNodeId,
         type: 'entity',
-        position: { x: -160, y: 520 + idx * 110 },
+        position: { x: 740, y: 60 + (i * 90) },
         data: {
           type: 'ioc_url',
-          label: urlItem.domain || urlItem.url.slice(0, 24),
-          sublabel: urlItem.defangedUrl || urlItem.url,
-          status: urlItem.status || 'SUSPICIOUS',
-          tag: urlItem.virustotalScore ? `VT: ${urlItem.virustotalScore}` : 'Extracted Link'
+          label: u.domain || u.url,
+          sublabel: u.url.length > 34 ? `${u.url.slice(0, 32)}...` : u.url,
+          status: u.status || 'MALICIOUS',
+          tag: u.virustotalScore ? `VT: ${u.virustotalScore}` : 'URL IOC'
         }
       });
-
       newEdges.push({
         id: `edge-case-${urlNodeId}`,
         source: 'node-case',
         target: urlNodeId,
-        label: 'payload link',
-        type: 'smoothstep',
-        style: { stroke: urlItem.status === 'MALICIOUS' ? '#f43f5e' : '#f59e0b', strokeWidth: 1.5 },
-        labelStyle: { fill: urlItem.status === 'MALICIOUS' ? '#f43f5e' : '#f59e0b', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
+        label: 'PAYLOAD LINK',
+        style: { stroke: '#ef4444', strokeWidth: 1.8 }
       });
     });
 
-    const attachments = effectiveAnalysis.attachments || [];
-    attachments.slice(0, 2).forEach((att, idx) => {
-      const attNodeId = `node-att-${idx}`;
+    // 10. Attachments IOCs
+    (effectiveAnalysis.attachments || []).slice(0, 2).forEach((att, i) => {
+      const attNodeId = `node-ioc-att-${i}`;
       newNodes.push({
         id: attNodeId,
         type: 'entity',
-        position: { x: 120, y: 520 + idx * 110 },
+        position: { x: 740, y: 340 + (i * 90) },
         data: {
           type: 'ioc_attachment',
-          label: att.filename || `payload-${idx + 1}.dat`,
-          sublabel: `MIME: ${att.mimeType || 'unknown'} • ${att.size || 'N/A'}`,
-          status: att.status || 'SUSPICIOUS',
-          tag: att.sha256 ? `SHA: ${att.sha256.slice(0, 8)}...` : 'File Attachment'
+          label: att.filename,
+          sublabel: `SHA-256: ${(att.sha256 || 'N/A').slice(0, 14)}...`,
+          status: att.status || 'MALICIOUS',
+          tag: att.vtDetection || 'ATTACHMENT'
         }
       });
-
       newEdges.push({
         id: `edge-case-${attNodeId}`,
         source: 'node-case',
         target: attNodeId,
-        label: 'weaponized attachment',
-        type: 'smoothstep',
-        style: { stroke: att.status === 'MALICIOUS' ? '#f43f5e' : '#eab308', strokeWidth: 1.5 },
-        labelStyle: { fill: att.status === 'MALICIOUS' ? '#f43f5e' : '#eab308', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
+        label: 'EMBEDDED FILE',
+        style: { stroke: '#ef4444', strokeWidth: 1.8 }
       });
     });
 
-    // 11. Threat Campaign & Attribution Node
-    const campaignName = effectiveAnalysis.campaign_name || effectiveAnalysis.campaign_id || (effectiveAnalysis.correlationEvidence?.length ? 'CAMP-2026-OCT-01' : null);
-    if (campaignName) {
-      newNodes.push({
-        id: 'node-campaign',
-        type: 'entity',
-        position: { x: 720, y: 440 },
-        data: {
-          type: 'threat_campaign',
-          label: campaignName,
-          sublabel: 'Active Threat Campaign Correlation Cluster',
-          status: 'CORRELATED'
-        }
-      });
-
-      newEdges.push({
-        id: 'edge-case-campaign',
-        source: 'node-case',
-        target: 'node-campaign',
-        label: 'part of campaign',
-        type: 'smoothstep',
-        style: { stroke: '#d946ef', strokeWidth: 2 },
-        labelStyle: { fill: '#e879f9', fontSize: 9, fontWeight: 'bold' },
-        labelBgStyle: { fill: '#0f172a', stroke: '#701a75' }
-      });
-    }
-
-    // 12. MITRE ATT&CK Techniques
-    const triggeredHeuristics = (effectiveAnalysis.heuristics || []).filter(h => h.triggered).slice(0, 2);
-    triggeredHeuristics.forEach((heur, idx) => {
-      const mitreNodeId = `node-mitre-${idx}`;
-      newNodes.push({
-        id: mitreNodeId,
-        type: 'entity',
-        position: { x: 1000, y: 440 + idx * 110 },
-        data: {
-          type: 'threat_mitre',
-          label: heur.title || heur.id,
-          sublabel: heur.description || 'MITRE ATT&CK Matrix Indicator',
-          techniqueId: heur.id.startsWith('T') ? heur.id : `T1566.00${idx + 1}`
-        }
-      });
-
-      newEdges.push({
-        id: `edge-case-${mitreNodeId}`,
-        source: 'node-case',
-        target: mitreNodeId,
-        label: 'exhibits technique',
-        type: 'smoothstep',
-        style: { stroke: '#f43f5e', strokeWidth: 1.5 },
-        labelStyle: { fill: '#fb7185', fontSize: 9 },
-        labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
-      });
-    });
-
-    // 13. SOC Lead Analyst Attribution Node
-    const analystName = effectiveAnalysis.assigned_user || effectiveAnalysis.assignedUser || effectiveAnalysis.user_email || 'Jayaram Sappa';
+    // 11. Campaign Cluster Node
+    const campaignName = effectiveAnalysis.campaign_name || effectiveAnalysis.campaign_id || 'CAMP-2026-FIN-091';
     newNodes.push({
-      id: 'node-analyst',
+      id: 'node-campaign',
       type: 'entity',
-      position: { x: 720, y: 580 },
+      position: { x: 120, y: 20 },
       data: {
-        type: 'soc_analyst',
-        label: analystName,
-        sublabel: 'Lead Incident Investigator & Triage Lead',
-        tag: effectiveAnalysis.status || 'TRIAGED / ACTIVE'
+        type: 'threat_campaign',
+        label: campaignName,
+        sublabel: 'Correlated Phishing Campaign Cluster',
+        status: 'CORRELATED',
+        tag: 'CLUSTER INTEL'
       }
     });
-
     newEdges.push({
-      id: 'edge-case-analyst',
+      id: 'edge-case-campaign',
       source: 'node-case',
-      target: 'node-analyst',
-      label: 'triaged by',
-      type: 'smoothstep',
-      style: { stroke: '#38bdf8', strokeWidth: 1.5 },
-      labelStyle: { fill: '#7dd3fc', fontSize: 9 },
-      labelBgStyle: { fill: '#0f172a', stroke: '#1e293b' }
+      target: 'node-campaign',
+      label: 'CAMPAIGN CLUSTER',
+      style: { stroke: '#d946ef', strokeWidth: 1.8 }
     });
 
-    // Apply View Mode Filters
+    // Filter by viewMode presets
     let finalNodes = newNodes;
     let finalEdges = newEdges;
 
     if (viewMode === 'relay_pipeline') {
       const allowedTypes = ['sender', 'relay_hop', 'asn', 'recipient'];
       finalNodes = newNodes.filter(n => allowedTypes.includes(String((n.data as any)?.type)));
-      finalEdges = newEdges.filter(e => e.id.startsWith('edge-relay-') || e.id.startsWith('edge-final-') || e.id.startsWith('edge-hop-asn-'));
+      finalEdges = newEdges.filter(e => e.id.startsWith('edge-node-hop') || e.id.includes('sender') || e.id.includes('recipient'));
     } else if (viewMode === 'iocs_threats') {
       const allowedTypes = ['case', 'ioc_url', 'ioc_attachment', 'ioc_qr', 'threat_campaign', 'threat_mitre'];
       finalNodes = newNodes.filter(n => allowedTypes.includes(String((n.data as any)?.type)));
-      const allowedNodeIds = new Set(finalNodes.map(n => n.id));
-      finalEdges = newEdges.filter(e => allowedNodeIds.has(e.source) && allowedNodeIds.has(e.target));
+      finalEdges = newEdges.filter(e => finalNodes.some(fn => fn.id === e.source) && finalNodes.some(fn => fn.id === e.target));
     } else if (viewMode === 'auth_identity') {
-      const allowedTypes = ['case', 'sender', 'alias', 'return_path', 'reply_to', 'domain', 'auth_spf', 'auth_dkim', 'auth_dmarc', 'dns_mx'];
+      const allowedTypes = ['case', 'sender', 'alias', 'domain', 'return_path', 'reply_to', 'auth_spf', 'auth_dkim', 'auth_dmarc'];
       finalNodes = newNodes.filter(n => allowedTypes.includes(String((n.data as any)?.type)));
-      const allowedNodeIds = new Set(finalNodes.map(n => n.id));
-      finalEdges = newEdges.filter(e => allowedNodeIds.has(e.source) && allowedNodeIds.has(e.target));
+      finalEdges = newEdges.filter(e => finalNodes.some(fn => fn.id === e.source) && finalNodes.some(fn => fn.id === e.target));
     }
 
-    // Filter nodes based on search
+    // Filter by live text query
     if (searchFilter.trim()) {
       const q = searchFilter.toLowerCase();
       finalNodes = finalNodes.filter(n => 
-        String(n.data?.label || '').toLowerCase().includes(q) || 
+        String(n.data?.label || '').toLowerCase().includes(q) ||
         String(n.data?.sublabel || '').toLowerCase().includes(q) ||
         String(n.data?.type || '').toLowerCase().includes(q)
       );
@@ -939,11 +794,13 @@ export function RelationshipGraphView({
 
   const onNodeClick = (_: React.MouseEvent, node: Node) => {
     setSelectedEntity({ type: 'node', data: node.data });
+    setIsDossierOpen(true);
     if (onSelectNode) onSelectNode(node.data);
   };
 
   const onEdgeClick = (_: React.MouseEvent, edge: Edge) => {
     setSelectedEntity({ type: 'edge', data: edge.data, label: edge.label });
+    setIsDossierOpen(true);
   };
 
   // -------------------------------------------------------------
@@ -966,13 +823,14 @@ export function RelationshipGraphView({
     const attsCount = (effectiveAnalysis.attachments || []).length;
     const indicatorCount = urlsCount + attsCount;
 
-    const campaignCluster = effectiveAnalysis.campaign_name || effectiveAnalysis.campaign_id || (effectiveAnalysis.correlationEvidence?.length ? 'CAMP-2026-OCT-01' : 'Cluster: Standalone');
+    const campaignCluster = effectiveAnalysis.campaign_name || effectiveAnalysis.campaign_id || (effectiveAnalysis.correlationEvidence?.length ? 'CAMP-2026-OCT-01' : 'CAMP-2026-FIN-091');
     const infraAsn = firstHop?.asn || 'AS208294';
     const relayCount = hops.length || 1;
 
     const verdict = effectiveAnalysis.threatVerdict || effectiveAnalysis.verdict || 'SUSPICIOUS';
     const score = effectiveAnalysis.threatScore ?? effectiveAnalysis.riskScore ?? 0;
     const subject = effectiveAnalysis.headers?.subject || effectiveAnalysis.subject || '(No Subject)';
+    const assignedUser = effectiveAnalysis.assigned_user || effectiveAnalysis.assignedUser || effectiveAnalysis.user_email || 'Jayaram Sappa';
 
     // Satellite definitions mapping 1-to-1 to the user's reference image
     const nodesMap: Record<string, {
@@ -1086,6 +944,10 @@ export function RelationshipGraphView({
       ['sender', 'domain']
     ];
 
+    const spfStatus = effectiveAnalysis.authResults?.spf?.status || (typeof effectiveAnalysis.auth?.spf === 'string' ? effectiveAnalysis.auth?.spf : effectiveAnalysis.auth?.spf?.status) || 'PASS';
+    const dkimStatus = effectiveAnalysis.authResults?.dkim?.status || (typeof effectiveAnalysis.auth?.dkim === 'string' ? effectiveAnalysis.auth?.dkim : effectiveAnalysis.auth?.dkim?.status) || 'PASS';
+    const dmarcStatus = effectiveAnalysis.authResults?.dmarc?.status || (typeof effectiveAnalysis.auth?.dmarc === 'string' ? effectiveAnalysis.auth?.dmarc : effectiveAnalysis.auth?.dmarc?.status) || 'PASS';
+
     return {
       nodesMap,
       connections,
@@ -1097,7 +959,8 @@ export function RelationshipGraphView({
         originIp,
         originLoc,
         campaignCluster,
-        authStatus: `${effectiveAnalysis.authResults?.spf?.status || 'SPF:PASS'} • ${effectiveAnalysis.authResults?.dmarc?.status || 'DMARC:PASS'}`
+        assignedUser,
+        authStatus: `SPF: ${spfStatus} • DKIM: ${dkimStatus} • DMARC: ${dmarcStatus}`
       }
     };
   }, [effectiveAnalysis]);
@@ -1105,6 +968,7 @@ export function RelationshipGraphView({
   // Handle node selection in constellation
   const handleSelectConstellationNode = (nodeId: string) => {
     setActiveConstellationNode(nodeId);
+    setIsDossierOpen(true);
     if (!constellationData) return;
     const n = constellationData.nodesMap[nodeId];
     if (n) {
@@ -1133,28 +997,103 @@ export function RelationshipGraphView({
     setTimeout(() => setCopiedId(false), 2000);
   };
 
+  const handleExportJson = () => {
+    try {
+      exportEvidenceAsJson(effectiveAnalysis, {
+        caseId: caseId || effectiveAnalysis?.id,
+        evidenceId: effectiveAnalysis?.evidenceId
+      });
+    } catch (err) {
+      console.error('Failed to export graph evidence as JSON:', err);
+    }
+  };
+
+  const handleExportCsv = () => {
+    try {
+      exportEvidenceAsCsv(effectiveAnalysis, {
+        caseId: caseId || effectiveAnalysis?.id,
+        evidenceId: effectiveAnalysis?.evidenceId
+      });
+    } catch (err) {
+      console.error('Failed to export graph evidence as CSV:', err);
+    }
+  };
+
+  const handleExportPdf = () => {
+    try {
+      setExportingPdf(true);
+      exportEvidenceAsPdf(null, `TraceXMail-Evidence-${currentCaseId}.pdf`, {
+        analysis: effectiveAnalysis,
+        caseId: caseId || effectiveAnalysis?.id,
+        evidenceId: effectiveAnalysis?.evidenceId
+      });
+    } catch (err) {
+      console.error('Failed to export graph evidence as PDF:', err);
+    } finally {
+      setTimeout(() => setExportingPdf(false), 1200);
+    }
+  };
+
+  const currentCaseId = caseId || effectiveAnalysis?.id || 'CASE-2026-0881';
+  const currentVerdict = effectiveAnalysis?.threatVerdict || effectiveAnalysis?.verdict || 'SUSPICIOUS';
+  const currentScore = effectiveAnalysis?.threatScore ?? effectiveAnalysis?.riskScore ?? 85;
+  const isMalicious = currentVerdict.toUpperCase().includes('MALICIOUS');
+  const isSuspicious = currentVerdict.toUpperCase().includes('SUSPICIOUS');
+  const assignedLead = effectiveAnalysis?.assigned_user || effectiveAnalysis?.assignedUser || effectiveAnalysis?.user_email || 'Jayaram Sappa';
+
+  const hops = effectiveAnalysis?.hops || [];
+  const firstHop = hops.find(h => h.isOrigin) || hops[0];
+  const originIp = firstHop?.fromIp || effectiveAnalysis?.realSenderIp?.ip || '185.220.101.4';
+  const originLocation = firstHop ? [firstHop.city, firstHop.country].filter(Boolean).join(', ') : 'Sofia, Bulgaria';
+  const originAsn = firstHop?.asn || 'AS208294 (ZettaHost)';
+  const originDelay = firstHop?.delaySec ?? (firstHop as any)?.delay ?? 2.4;
+
+  const spfStatus = effectiveAnalysis?.authResults?.spf?.status || (typeof effectiveAnalysis?.auth?.spf === 'string' ? effectiveAnalysis?.auth?.spf : effectiveAnalysis?.auth?.spf?.status) || 'PASS';
+  const dkimStatus = effectiveAnalysis?.authResults?.dkim?.status || (typeof effectiveAnalysis?.auth?.dkim === 'string' ? effectiveAnalysis?.auth?.dkim : effectiveAnalysis?.auth?.dkim?.status) || 'PASS';
+  const dmarcStatus = effectiveAnalysis?.authResults?.dmarc?.status || (typeof effectiveAnalysis?.auth?.dmarc === 'string' ? effectiveAnalysis?.auth?.dmarc : effectiveAnalysis?.auth?.dmarc?.status) || 'PASS';
+
+  const campaignName = effectiveAnalysis?.campaign_name || effectiveAnalysis?.campaign_id || 'CAMP-2026-FIN-091';
+  const campaignSimilarity = (effectiveAnalysis as any)?.campaignSimilarity || 94;
+
+  const sha256Digest = effectiveAnalysis?.sha256Hash || effectiveAnalysis?.sha256 || 'e8f12b9d283c4f7a1928374a5b6c7d8e9f0123456789abcdef0123456789abcd';
+
   return (
-    <div className="relative h-full min-h-[620px] bg-[#080d17] rounded-2xl border border-[#162338] overflow-hidden flex flex-col shadow-2xl">
-      {/* Top Forensic Toolbar */}
+    <div className="relative h-full min-h-[640px] bg-[#080d17] rounded-2xl border border-[#162338] overflow-hidden flex flex-col shadow-2xl">
+      {/* Top Forensic Toolbar - Similarly Organized with Evidence Identification, Badges & Controls */}
       <div className="px-5 py-3 border-b border-[#162338] bg-[#0b1220]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-cyan-950/80 border border-cyan-700/60 flex items-center justify-center text-cyan-400 shadow-sm shadow-cyan-950/40">
             <Network className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <span>Threat Infrastructure &amp; Evidence Graph</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800/80 text-cyan-300 font-mono tracking-wider">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Threat Infrastructure &amp; Evidence Graph</span>
+              </h3>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#101b2e] border border-[#213554] text-cyan-300 font-bold">
+                {currentCaseId}
+              </span>
+              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                isMalicious 
+                  ? 'bg-rose-950/80 border-rose-600 text-rose-300 animate-pulse' 
+                  : isSuspicious 
+                  ? 'bg-amber-950/80 border-amber-600 text-amber-300' 
+                  : 'bg-emerald-950/80 border-emerald-600 text-emerald-300'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isMalicious ? 'bg-rose-400' : isSuspicious ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                <span>SEV: {isMalicious ? 'CRITICAL' : isSuspicious ? 'HIGH' : 'LOW'}</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/80 border border-cyan-800/80 text-cyan-300 font-mono tracking-wider">
                 {viewMode === 'constellation' ? '8 CONSTELLATION NODES' : `${nodes.length} EVIDENCE NODES • ${edges.length} RELATIONS`}
               </span>
-            </h3>
-            <p className="text-[11px] text-slate-400">
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
               Interactive relationship network connecting email entity, origin IPs, infrastructure, IOC indicators &amp; campaign clusters
             </p>
           </div>
         </div>
 
-        {/* View Mode Switches & Search Bar */}
+        {/* View Mode Switches, Search Bar & Utility Controls */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Search Bar */}
           <div className="relative">
@@ -1164,7 +1103,7 @@ export function RelationshipGraphView({
               placeholder="Search evidence / IOCs..."
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              className="pl-8 pr-3 py-1.5 rounded-lg bg-[#0f172a] border border-[#1e293b] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-44"
+              className="pl-8 pr-3 py-1.5 rounded-lg bg-[#0f172a] border border-[#1e293b] text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-40"
             />
           </div>
 
@@ -1172,7 +1111,7 @@ export function RelationshipGraphView({
           <div className="flex items-center rounded-lg bg-[#0e1626] border border-[#1b2b44] p-0.5">
             <button
               onClick={() => setViewMode('constellation')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'constellation'
                   ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-950/60'
                   : 'text-slate-400 hover:text-slate-200'
@@ -1217,24 +1156,101 @@ export function RelationshipGraphView({
             </button>
           </div>
 
-          {/* Toggle Private LAN Hops in Topology */}
-          {viewMode !== 'constellation' && (
+          {/* Toggle Evidence Dossier Drawer */}
+          <button
+            onClick={() => setIsDossierOpen(!isDossierOpen)}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+              isDossierOpen
+                ? 'bg-cyan-950/80 border-cyan-600 text-cyan-200 shadow-sm shadow-cyan-950/50'
+                : 'bg-[#101b2e] border-[#1b2b44] text-slate-300 hover:text-slate-100 hover:border-slate-600'
+            }`}
+            title="Toggle Forensic Evidence Dossier & Telemetry Inspector"
+          >
+            <Layers className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Evidence Dossier</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${isDossierOpen ? 'bg-cyan-400 animate-pulse' : 'bg-slate-600'}`} />
+          </button>
+
+          {/* Export JSON / CSV Dropdown */}
+          <div className="relative inline-block text-left">
             <button
-              onClick={() => setHidePrivateHops(!hidePrivateHops)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
-                hidePrivateHops
-                  ? 'bg-cyan-950/70 border-cyan-700 text-cyan-200'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-              title="Filter RFC 1918 Private Address Relays"
+              type="button"
+              onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+              className="px-2.5 py-1.5 rounded-lg border bg-[#101b2e] border-[#1b2b44] text-slate-300 hover:text-slate-100 hover:border-slate-600 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              title="Export Forensic Telemetry as JSON, CSV, or PDF"
             >
-              {hidePrivateHops ? 'Public Only' : 'Include RFC 1918'}
+              <Download className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Export</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
-          )}
+
+            {exportDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-1 w-48 rounded-xl shadow-2xl bg-[#0f172a] border border-[#223652] py-1.5 z-50 text-xs font-mono animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400 border-b border-[#1b2b44] mb-1">
+                  Export Case Data
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportDropdownOpen(false);
+                    handleExportJson();
+                  }}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#1b2b44] text-slate-200 hover:text-cyan-300 cursor-pointer transition-colors"
+                >
+                  <FileJson className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Export JSON</span>
+                    <span className="text-[9px] text-slate-400">Full forensic dossier</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportDropdownOpen(false);
+                    handleExportCsv();
+                  }}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#1b2b44] text-slate-200 hover:text-emerald-300 cursor-pointer transition-colors"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold">Export CSV</span>
+                    <span className="text-[9px] text-slate-400">RFC 4180 spreadsheet</span>
+                  </div>
+                </button>
+                <div className="my-1 border-t border-[#1b2b44]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExportDropdownOpen(false);
+                    handleExportPdf();
+                  }}
+                  disabled={exportingPdf}
+                  className="w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#1b2b44] text-slate-300 hover:text-amber-300 cursor-pointer transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="text-[11px]">{exportingPdf ? 'Generating PDF...' : 'Export PDF Dossier'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Share Case Button */}
+          <button
+            type="button"
+            onClick={() => setShareModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-lg border bg-[#101b2e] border-[#1b2b44] text-cyan-300 hover:text-cyan-100 hover:border-cyan-600 text-xs font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            title="Generate secure, temporary link for internal team collaboration"
+          >
+            <Share2 className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Share Case</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Canvas Area + Side Detail Inspector */}
+      {/* Main Canvas Area + Side Organized Evidence Inspector Drawer */}
       <div className="flex-1 relative flex overflow-hidden">
         {/* ======================================================== */}
         {/* 1. CONSTELLATION GRAPH VIEW (Exact Match to User Reference) */}
@@ -1394,27 +1410,76 @@ export function RelationshipGraphView({
                 );
               })}
 
-              {/* Floating Summary Card Positioned in constellation (Matching Screenshot) */}
-              <foreignObject x="250" y="270" width="160" height="110" className="overflow-visible pointer-events-auto">
+              {/* Floating Summary Card Positioned in constellation - Organized Similarly to Evidence Card */}
+              <foreignObject x="235" y="215" width="225" height="195" className="overflow-visible pointer-events-auto">
                 <div 
-                  onClick={() => handleSelectConstellationNode('email')}
-                  className="w-full h-full rounded-xl bg-[#0d1627]/85 backdrop-blur-md border border-[#223652] p-3 shadow-2xl flex flex-col justify-between hover:border-cyan-500/80 transition-all cursor-pointer group"
+                  onClick={() => {
+                    handleSelectConstellationNode('email');
+                    setIsDossierOpen(true);
+                  }}
+                  className="w-full h-full rounded-xl bg-[#0d1627]/92 backdrop-blur-md border border-[#223652] p-3 shadow-2xl flex flex-col justify-between hover:border-cyan-500/80 transition-all cursor-pointer group hover:shadow-cyan-950/50"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-cyan-300 font-mono tracking-wide">Summary</span>
-                    <span className={`w-2 h-2 rounded-full ${constellationData.summary.verdict.includes('MALICIOUS') ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400'}`} />
+                  {/* Card Header */}
+                  <div className="flex items-center justify-between pb-1.5 border-b border-[#1b2b44]">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[11px] font-bold text-slate-100 font-mono tracking-wide">CASE EVIDENCE</span>
+                    </div>
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                      isMalicious 
+                        ? 'bg-rose-950 text-rose-300 border border-rose-800' 
+                        : isSuspicious 
+                        ? 'bg-amber-950 text-amber-300 border border-amber-800' 
+                        : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    }`}>
+                      {constellationData.summary.score}/100
+                    </span>
                   </div>
 
-                  {/* Clean Mock Placeholder Rows as seen in the reference visual */}
-                  <div className="space-y-1.5 my-1">
-                    <div className="h-1.5 rounded-full bg-cyan-900/60 w-full" />
-                    <div className="h-1.5 rounded-full bg-cyan-900/40 w-4/5" />
-                    <div className="h-1.5 rounded-full bg-cyan-900/30 w-3/5" />
+                  {/* Refined Structured Forensic Data Rows (Clean Alignment & Spacing) */}
+                  <div className="space-y-1.5 my-1 text-[10px] font-mono">
+                    {/* Subject & Verdict Banner */}
+                    <div className="truncate text-slate-200 font-semibold" title={constellationData.summary.subject}>
+                      {constellationData.summary.subject}
+                    </div>
+
+                    {/* Origin Row */}
+                    <div className="flex items-center justify-between text-slate-300 bg-[#070d17]/80 px-1.5 py-0.5 rounded border border-[#142338]">
+                      <span className="text-slate-500 text-[9px] uppercase">ORIGIN</span>
+                      <span className="text-cyan-300 font-bold truncate max-w-[125px]">
+                        {constellationData.summary.originIp}
+                      </span>
+                    </div>
+
+                    {/* Auth Row */}
+                    <div className="flex items-center justify-between text-slate-300 bg-[#070d17]/80 px-1.5 py-0.5 rounded border border-[#142338]">
+                      <span className="text-slate-500 text-[9px] uppercase">AUTH</span>
+                      <span className="text-emerald-400 truncate max-w-[125px]">
+                        {constellationData.summary.authStatus}
+                      </span>
+                    </div>
+
+                    {/* Campaign / Incident Cluster */}
+                    <div className="flex items-center justify-between text-slate-300 bg-[#070d17]/80 px-1.5 py-0.5 rounded border border-[#142338]">
+                      <span className="text-slate-500 text-[9px] uppercase">INCIDENT</span>
+                      <span className="text-fuchsia-300 truncate max-w-[125px]">
+                        {constellationData.summary.campaignCluster}
+                      </span>
+                    </div>
+
+                    {/* SOC Analyst */}
+                    <div className="flex items-center justify-between text-slate-300 bg-[#070d17]/80 px-1.5 py-0.5 rounded border border-[#142338]">
+                      <span className="text-slate-500 text-[9px] uppercase">ANALYST</span>
+                      <span className="text-blue-300 truncate max-w-[125px]">
+                        {constellationData.summary.assignedUser}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[9px] font-mono text-slate-400 pt-1 border-t border-[#1b2b44]">
-                    <span className="truncate max-w-[90px]">{constellationData.summary.verdict}</span>
-                    <span className="text-cyan-400 font-bold">{constellationData.summary.score}/100</span>
+                  {/* Bottom Action Footer */}
+                  <div className="flex items-center justify-between text-[9px] font-mono text-cyan-400 pt-1.5 border-t border-[#1b2b44] group-hover:text-cyan-300 font-semibold">
+                    <span>Inspect Evidence Dossier</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
               </foreignObject>
@@ -1496,118 +1561,331 @@ export function RelationshipGraphView({
         )}
 
         {/* ======================================================== */}
-        {/* 3. SIDE TELEMETRY INSPECTOR DRAWER */}
+        {/* 3. STRUCTURED FORENSIC EVIDENCE DOSSIER DRAWER */}
+        {/* Organized identically to the approved Evidence Tag Card */}
         {/* ======================================================== */}
-        {selectedEntity && (
-          <div className="w-80 border-l border-[#1a293f] bg-[#0b1220]/95 backdrop-blur-md p-5 flex flex-col shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-200 shrink-0 z-30">
-            <div className="flex items-center justify-between pb-3 border-b border-[#1b2b44] mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-400">
-                  <Eye className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    {selectedEntity.type === 'node' ? 'Evidence Telemetry' : 'Evidence Link'}
-                  </h4>
-                  <span className="text-[10px] text-slate-400 font-mono uppercase">
-                    {selectedEntity.data.type || 'RELATIONSHIP'}
-                  </span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedEntity(null)} 
-                className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-[#162338] cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Entity Details Content */}
-            <div className="space-y-3.5 text-xs text-slate-300 flex-1">
-              <div>
-                <span className="text-[10px] uppercase font-mono text-slate-500 block">Identifier / Value</span>
-                <span className="font-mono text-sm font-bold text-white break-all">
-                  {selectedEntity.data.label || selectedEntity.label}
-                </span>
-              </div>
-
-              {selectedEntity.data.sublabel && (
-                <div className="p-2.5 rounded-lg bg-[#0e1726] border border-[#1b2b44]">
-                  <span className="text-[10px] uppercase font-mono text-slate-400 block mb-1">Forensic Details</span>
-                  <p className="text-xs text-slate-300 leading-relaxed break-words">
-                    {selectedEntity.data.sublabel}
-                  </p>
-                </div>
-              )}
-
-              {/* Status / Tag */}
-              {selectedEntity.data.status && (
-                <div className="p-2 rounded bg-[#0e1726] border border-[#1b2b44] flex justify-between items-center">
-                  <span className="text-[10px] uppercase font-mono text-slate-500">Status</span>
-                  <span className="font-mono font-bold text-cyan-300">{selectedEntity.data.status}</span>
-                </div>
-              )}
-
-              {/* Hop Details */}
-              {selectedEntity.data.hopNumber !== undefined && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded bg-[#0e1726] border border-[#1b2b44]">
-                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Hop Index</span>
-                    <span className="font-mono font-bold text-cyan-400">Hop #{selectedEntity.data.hopNumber}</span>
+        {isDossierOpen && (
+          <div className="w-96 border-l border-[#1a293f] bg-[#090f1c]/95 backdrop-blur-md flex flex-col shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-200 shrink-0 z-30">
+            {/* 1. Header & Fast Situational Awareness */}
+            <div className="p-4 border-b border-[#1b2b44] bg-[#0b1322] sticky top-0 z-10 backdrop-blur-md">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-400 shadow-sm">
+                    <ShieldAlert className="w-4 h-4" />
                   </div>
-                  <div className="p-2 rounded bg-[#0e1726] border border-[#1b2b44]">
-                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Delay</span>
-                    <span className="font-mono font-bold text-amber-400">
-                      {selectedEntity.data.delaySec !== undefined ? `+${selectedEntity.data.delaySec}s` : '0s'}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>FORENSIC EVIDENCE DOSSIER</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {currentCaseId} • UTC: {new Date().toISOString().slice(11, 19)}
                     </span>
                   </div>
                 </div>
-              )}
 
-              {/* Geo / ASN Details */}
-              {(selectedEntity.data.city || selectedEntity.data.asn) && (
-                <div className="p-3 rounded-xl bg-[#0e1726] border border-[#1b2b44] space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Network &amp; Location Intelligence
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => setIsDossierOpen(false)} 
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-[#162338] cursor-pointer"
+                    title="Close Dossier"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Severity Badge & Quick Export Actions */}
+              <div className="mt-3 flex items-center justify-between gap-2 flex-wrap pt-2 border-t border-[#1b2b44]/70">
+                <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold border flex items-center gap-1.5 ${
+                  isMalicious 
+                    ? 'bg-rose-950/80 border-rose-600 text-rose-200 animate-pulse' 
+                    : isSuspicious 
+                    ? 'bg-amber-950/80 border-amber-600 text-amber-200' 
+                    : 'bg-emerald-950/80 border-emerald-600 text-emerald-200'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isMalicious ? 'bg-rose-400' : isSuspicious ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                  <span>SEV: {isMalicious ? 'CRITICAL' : isSuspicious ? 'HIGH' : 'LOW'}</span>
+                </span>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="px-2 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800/70 text-[10px] font-mono text-cyan-300 cursor-pointer flex items-center gap-1"
+                    title="Export as JSON"
+                  >
+                    <FileJson className="w-3 h-3" />
+                    <span>JSON</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    className="px-2 py-0.5 rounded bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-800/70 text-[10px] font-mono text-emerald-300 cursor-pointer flex items-center gap-1"
+                    title="Export as CSV"
+                  >
+                    <FileSpreadsheet className="w-3 h-3" />
+                    <span>CSV</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShareModalOpen(true)}
+                    className="px-2 py-0.5 rounded bg-blue-950/60 hover:bg-blue-900 border border-blue-800/70 text-[10px] font-mono text-blue-300 cursor-pointer flex items-center gap-1"
+                    title="Share Case Link"
+                  >
+                    <Share2 className="w-3 h-3" />
+                    <span>Share</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Dossier Body with Clear Hierarchical Sections */}
+            <div className="p-4 space-y-4 text-xs text-slate-300">
+              
+              {/* Selected Entity Card if an active node/edge is selected */}
+              {selectedEntity && (
+                <div className="p-3 rounded-xl bg-[#0f1828] border border-cyan-500/50 shadow-lg space-y-2">
+                  <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-cyan-400 border-b border-cyan-900/60 pb-1.5">
+                    <span className="flex items-center gap-1">
+                      <Eye className="w-3 h-3 text-cyan-400" />
+                      <span>SELECTED {selectedEntity.type?.toUpperCase()}</span>
+                    </span>
+                    <button 
+                      onClick={() => setSelectedEntity(null)}
+                      className="text-slate-400 hover:text-cyan-300 underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
                   </div>
-                  {selectedEntity.data.city && (
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Location:</span>
-                      <span className="text-slate-200 font-medium">
-                        {selectedEntity.data.city}, {selectedEntity.data.country}
-                      </span>
-                    </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-mono text-slate-500 block">Identifier / Value</span>
+                    <span className="font-mono text-xs font-bold text-white break-all">
+                      {selectedEntity.data.label || selectedEntity.label}
+                    </span>
+                  </div>
+                  {selectedEntity.data.sublabel && (
+                    <p className="text-[11px] text-slate-300 font-mono bg-[#080d17] p-2 rounded border border-[#1b2b44]">
+                      {selectedEntity.data.sublabel}
+                    </p>
                   )}
-                  {selectedEntity.data.asn && (
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-slate-400">Autonomous System:</span>
-                      <span className="text-purple-300 font-mono font-semibold">{selectedEntity.data.asn}</span>
-                    </div>
-                  )}
-                  {selectedEntity.data.isOrigin && (
-                    <div className="mt-2 p-2 rounded bg-rose-950/70 border border-rose-800/80 text-[11px] text-rose-300 flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>Earliest reliable public source node identified in header chain.</span>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleCopyIdentifier(selectedEntity.data.label || selectedEntity.label)}
+                    className="w-full py-1 px-2 rounded bg-[#162338] hover:bg-[#1e2f4a] border border-[#223652] text-[10.5px] font-mono text-cyan-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                  >
+                    {copiedId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-cyan-400" />}
+                    <span>{copiedId ? 'Copied Identifier!' : 'Copy Identifier'}</span>
+                  </button>
                 </div>
               )}
 
-              {/* Action buttons */}
-              <div className="pt-3 border-t border-[#1b2b44] space-y-2">
-                <button
-                  type="button"
-                  onClick={() => handleCopyIdentifier(selectedEntity.data.label || selectedEntity.label)}
-                  className="w-full py-1.5 px-3 rounded-lg bg-[#142033] hover:bg-[#1c2c47] border border-[#223652] text-xs font-medium text-slate-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-                  <span>{copiedId ? 'Copied to Clipboard!' : 'Copy Identifier'}</span>
-                </button>
+              {/* 2. Subject & Threat Verdict Banner */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2">
+                <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                  <span>THREAT VERDICT OVERVIEW</span>
+                  <span className={`px-2 py-0.5 rounded font-bold ${
+                    isMalicious ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-amber-950 text-amber-300 border border-amber-800'
+                  }`}>
+                    {currentVerdict}
+                  </span>
+                </div>
+                <h5 className="font-bold text-slate-100 text-sm leading-snug break-words">
+                  {effectiveAnalysis?.headers?.subject || effectiveAnalysis?.subject || '(No Subject Line Extracted)'}
+                </h5>
+                <div className="grid grid-cols-2 gap-2 pt-1.5 border-t border-[#1b2b44]">
+                  <div>
+                    <span className="text-[9px] uppercase font-mono text-slate-500 block">THREAT RISK SCORE</span>
+                    <span className={`font-mono text-sm font-bold ${isMalicious ? 'text-rose-400' : 'text-amber-400'}`}>
+                      {currentScore} / 100
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-mono text-slate-500 block">CLASSIFICATION</span>
+                    <span className="font-mono text-xs font-semibold text-cyan-300">
+                      {((effectiveAnalysis as any)?.mlPrediction as any)?.label || ((effectiveAnalysis as any)?.ml_prediction as any)?.label || 'Suspicious Phish'}
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* 3. Origin & Network Routing (Refined Origin Section) */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1b2b44] pb-1.5">
+                  <div className="flex items-center gap-1.5 text-cyan-400">
+                    <Server className="w-3.5 h-3.5" />
+                    <span>ORIGIN &amp; NETWORK ROUTING</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold">
+                    FIRST PUBLIC HOP
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] font-mono">
+                  <div className="flex justify-between items-center bg-[#080d17] p-2 rounded border border-[#162338]">
+                    <span className="text-slate-400">Origin IP:</span>
+                    <span className="font-bold text-cyan-300 break-all">{originIp}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-[#080d17] p-2 rounded border border-[#162338]">
+                    <span className="text-slate-400">Geolocation:</span>
+                    <span className="text-slate-200">📍 {originLocation}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-[#080d17] p-2 rounded border border-[#162338]">
+                    <span className="text-slate-400">Autonomous System:</span>
+                    <span className="text-purple-300 font-semibold truncate max-w-[170px]">{originAsn}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-[#080d17] p-2 rounded border border-[#162338]">
+                      <span className="text-[9px] text-slate-500 block">TOTAL RELAYS</span>
+                      <span className="font-bold text-slate-200">{hops.length || 1} Hops Traced</span>
+                    </div>
+                    <div className="bg-[#080d17] p-2 rounded border border-[#162338]">
+                      <span className="text-[9px] text-slate-500 block">INGRESS DELAY</span>
+                      <span className="font-bold text-amber-400">+{originDelay}s latency</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Threat Breakdown & Cryptographic Verification */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1b2b44] pb-1.5">
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>AUTHENTICATION &amp; CRYPTO</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-slate-400">RFC 7208 / 6376</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
+                  <div className={`p-2 rounded border text-center ${
+                    spfStatus === 'PASS' ? 'bg-emerald-950/70 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/70 border-rose-700/60 text-rose-300'
+                  }`}>
+                    <span className="block text-[8.5px] uppercase text-slate-400">SPF</span>
+                    <span className="font-bold">{spfStatus}</span>
+                  </div>
+                  <div className={`p-2 rounded border text-center ${
+                    dkimStatus === 'PASS' ? 'bg-emerald-950/70 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/70 border-rose-700/60 text-rose-300'
+                  }`}>
+                    <span className="block text-[8.5px] uppercase text-slate-400">DKIM</span>
+                    <span className="font-bold">{dkimStatus}</span>
+                  </div>
+                  <div className={`p-2 rounded border text-center ${
+                    dmarcStatus === 'PASS' ? 'bg-emerald-950/70 border-emerald-700/60 text-emerald-300' : 'bg-rose-950/70 border-rose-700/60 text-rose-300'
+                  }`}>
+                    <span className="block text-[8.5px] uppercase text-slate-400">DMARC</span>
+                    <span className="font-bold">{dmarcStatus}</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#080d17] p-2 rounded border border-[#162338] text-[11px] font-mono flex justify-between items-center">
+                  <span className="text-slate-400">Domain Alignment:</span>
+                  <span className="text-emerald-400 font-semibold">Strict Envelope Match</span>
+                </div>
+              </div>
+
+              {/* 5. Related Incident & Threat Campaign */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1b2b44] pb-1.5">
+                  <div className="flex items-center gap-1.5 text-fuchsia-400">
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>RELATED INCIDENT &amp; CAMPAIGN</span>
+                  </div>
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-fuchsia-950 text-fuchsia-300 border border-fuchsia-800 font-bold">
+                    {campaignSimilarity}% MATCH
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 font-mono text-[11px]">
+                  <div className="flex justify-between items-center bg-[#080d17] p-2 rounded border border-[#162338]">
+                    <span className="text-slate-400">Campaign ID:</span>
+                    <span className="text-fuchsia-300 font-bold">{campaignName}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-[#080d17] p-2 rounded border border-[#162338]">
+                    <span className="text-slate-400">Correlated Cases:</span>
+                    <span className="text-slate-200">3 Related Incidents in Tenant</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. Assigned Team & SOC Lead Analyst */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1b2b44] pb-1.5">
+                  <div className="flex items-center gap-1.5 text-blue-400">
+                    <User className="w-3.5 h-3.5" />
+                    <span>ASSIGNED SOC ANALYST</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-emerald-400">ACTIVE TRIAGE</span>
+                </div>
+
+                <div className="flex items-center gap-3 bg-[#080d17] p-2.5 rounded-xl border border-[#162338]">
+                  <div className="w-8 h-8 rounded-full bg-blue-950 border border-blue-600 flex items-center justify-center text-blue-300 font-bold font-mono text-xs">
+                    {assignedLead.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-slate-100 font-mono truncate">{assignedLead}</div>
+                    <div className="text-[10px] text-slate-400">Tier-2 Senior Incident Response Lead</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. Weaponized IOCs & Indicators */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2.5">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1b2b44] pb-1.5">
+                  <div className="flex items-center gap-1.5 text-rose-400">
+                    <Crosshair className="w-3.5 h-3.5" />
+                    <span>OBSERVED IOCS &amp; MITRE TACTICS</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-rose-300">T1566 Phishing</span>
+                </div>
+
+                <div className="space-y-1.5 font-mono text-[10.5px]">
+                  {(effectiveAnalysis?.urls || []).length > 0 ? (
+                    (effectiveAnalysis?.urls || []).slice(0, 2).map((u, idx) => (
+                      <div key={idx} className="p-2 rounded bg-rose-950/30 border border-rose-900/60 text-rose-200 flex items-center justify-between gap-2">
+                        <span className="truncate">{u.url}</span>
+                        <span className="text-[9px] font-bold text-rose-400 shrink-0">FLAGGED</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-2 rounded bg-[#080d17] border border-[#162338] text-slate-400 text-center">
+                      No malicious URL payloads detected
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 8. Tamper-Proof Digest & Recommended Action */}
+              <div className="p-3.5 rounded-xl bg-[#0e1626] border border-[#1b2b44] space-y-2">
+                <span className="text-[10px] uppercase font-mono text-slate-500 block">TAMPER-PROOF DIGEST (SHA-256)</span>
+                <div className="font-mono text-[10px] text-slate-300 bg-[#080d17] p-2 rounded border border-[#162338] break-all select-all">
+                  {sha256Digest}
+                </div>
+                <div className="pt-2 flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-slate-400">Recommended SOC Action:</span>
+                  <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold">
+                    QUARANTINE &amp; BLOCK
+                  </span>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
       </div>
+
+      {/* Share Case Modal */}
+      {shareModalOpen && (
+        <ShareCaseModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          caseId={currentCaseId}
+          evidenceId={effectiveAnalysis?.evidenceId || 'EVD-2026-0881'}
+          subject={effectiveAnalysis?.headers?.subject || effectiveAnalysis?.subject}
+          verdict={currentVerdict}
+          severity={isMalicious ? 'CRITICAL' : isSuspicious ? 'HIGH' : 'LOW'}
+          threatScore={currentScore}
+        />
+      )}
     </div>
   );
 }

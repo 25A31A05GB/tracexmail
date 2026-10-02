@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
-import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap, Share2, Globe, Server, ShieldCheck, User, Link as LinkIcon, Network, Shield, ArrowRight, Download, FileSpreadsheet, FileJson } from 'lucide-react';
+import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap, Share2, Globe, Server, ShieldCheck, User, Link as LinkIcon, Network, Shield, ArrowRight, Download, FileSpreadsheet, FileJson, Layers, Mail } from 'lucide-react';
 import { StixExportModal } from './StixExportModal';
 import { MitreAttackMatrixModal } from './MitreAttackMatrixModal';
 import { QuishingInspectorModal } from './QuishingInspectorModal';
@@ -438,7 +438,7 @@ export function EvidenceTagCard({
   const cardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   const [evidenceCopied, setEvidenceCopied] = useState(false);
-  const [evidenceFilterTab, setEvidenceFilterTab] = useState<'ALL' | 'ENVELOPE' | 'AUTH' | 'ROUTING' | 'IOCS'>('ALL');
+  const [evidenceFilterTab, setEvidenceFilterTab] = useState<'ALL' | 'SENDER' | 'DOMAIN' | 'IP' | 'INFRA' | 'INDICATOR' | 'CAMPAIGN' | 'LAB'>('ALL');
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [deepAnalysisOpen, setDeepAnalysisOpen] = useState(false);
   const [showAllCounterfactuals, setShowAllCounterfactuals] = useState(false);
@@ -1153,294 +1153,391 @@ export function EvidenceTagCard({
           </div>
         </motion.div>
 
-        {/* 2️⃣ ENVELOPE & SENDER IDENTITY (Clean 2-Column Grid) */}
-        <motion.div variants={cardItemVariants} className="mb-4">
-          <div className="section-label">ENVELOPE &amp; SENDER IDENTITY</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
-            {cardData.identityRows.map((r, idx) => (
-              <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
-                <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
-                <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
-                  {r.v}
-                </span>
-              </div>
-            ))}
-          </div>
+        {/* 🧭 CONSTELLATION PILLAR QUICK FILTER & NAVIGATION STRIP */}
+        <motion.div variants={cardItemVariants} className="flex items-center gap-1 overflow-x-auto pb-1 mb-3.5 scrollbar-none text-[10px] font-mono border-b border-[#2b241e]/70">
+          {[
+            { id: 'ALL', label: 'All Evidence', icon: Layers },
+            { id: 'SENDER', label: '1. Sender', icon: Mail },
+            { id: 'DOMAIN', label: '2. Domain', icon: Globe },
+            { id: 'IP', label: '3. Origin IP', icon: Server },
+            { id: 'INFRA', label: '4. Infra', icon: Network },
+            { id: 'INDICATOR', label: '5. Indicators', icon: LinkIcon },
+            { id: 'CAMPAIGN', label: '6. Campaign', icon: Share2 },
+            { id: 'LAB', label: '7. Deep Lab', icon: Sparkles }
+          ].map(p => {
+            const Icon = p.icon;
+            const active = evidenceFilterTab === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setEvidenceFilterTab(p.id as any)}
+                className={`px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer border ${
+                  active
+                    ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#EDE6DC] font-bold shadow-sm'
+                    : 'bg-[#12161F] border-[#222b3a] text-[#8a9bb0] hover:text-[#ede6d8] hover:border-[#384960]'
+                }`}
+              >
+                <Icon className={`w-3 h-3 ${active ? 'text-[#CC9A4A]' : 'text-[#627a94]'}`} />
+                <span>{p.label}</span>
+              </button>
+            );
+          })}
         </motion.div>
 
-        {/* 3️⃣ DUAL SECURITY PILLARS: AUTH & ORIGIN INFRASTRUCTURE */}
-        <motion.div variants={cardItemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-          {/* Left Column: Cryptographic Authentication */}
-          <div className="bg-[#15120e] p-3 rounded border border-[#2b241e] flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="section-label mb-0">CRYPTOGRAPHIC AUTHENTICATION</span>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              </div>
-              <div className="grid grid-cols-3 gap-1.5 mb-2">
-                {cardData.checks.map((c, idx) => (
-                  <div key={idx} className="chip text-center p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
-                    <div className="label text-[9px] text-[#8a8070] font-semibold">{c.label}</div>
-                    <div className={`val text-[11px] font-bold mt-0.5 ${c.status}`}>{c.value}</div>
-                  </div>
-                ))}
-              </div>
+        {/* 1️⃣ PILLAR 1: SENDER & ENVELOPE IDENTITY */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'SENDER') && (
+          <motion.div variants={cardItemVariants} className="mb-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-blue-300">
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>1. SENDER &amp; ENVELOPE IDENTITY</span>
+              </span>
+              <span className="text-[10px] font-mono text-[#8a8070]">Header Audit</span>
             </div>
-            <div className="text-[10.5px] font-mono text-[#8a8070] space-y-0.5 pt-1.5 border-t border-[#221c17]">
-              <div>DMARC Policy: <span className="text-slate-300">{cardData.dnsData?.dmarcPolicy || 'none'}</span></div>
-              <div>Alignment: <span className="text-slate-300">{cardData.dnsData?.dmarcEnforcement || 'Verified Cryptographic SPF/DKIM'}</span></div>
-            </div>
-          </div>
-
-          {/* Right Column: Origin & Transmission Infrastructure */}
-          {cardData.origin && (
-            <div className="bg-[#15120e] p-3 rounded border border-[#2b241e] flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="section-label mb-0">ORIGIN &amp; TRANSMISSION ROUTE</span>
-                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
-                </div>
-                <div className="space-y-1 text-[11.5px] font-mono">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10.5px] text-[#8a8070]">First-Hop IP:</span>
-                    <span className={`font-bold ${cardData.origin.ipStatus || ''} ${maskPII ? 'pii-sensitive pii-ip' : ''}`}>
-                      {cardData.origin.ip}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10.5px] text-[#8a8070]">Location:</span>
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className={maskPII ? 'pii-sensitive pii-location' : ''}>{cardData.origin.location}</span>
-                      {cardData.origin.mapsUrl && (
-                        <button onClick={handleOpenMaps} className="inline-link text-[10px] shrink-0" title="Open Map">
-                          Map ↗
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {cardData.origin.extraRows && cardData.origin.extraRows.slice(0, 2).map((r, idx) => (
-                    <div key={idx} className="flex items-center justify-between gap-2">
-                      <span className="text-[10.5px] text-[#8a8070]">{r.k}:</span>
-                      <span className={`truncate text-right ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`} title={r.v}>
-                        {r.v}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {cardData.relay && (
-                <div className="pt-2 border-t border-[#221c17] mt-1.5 flex items-center justify-between text-[10.5px] font-mono text-[#8a8070]">
-                  <span className="truncate mr-2" dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} />
-                  <button onClick={handleOpenGraph} className="inline-link shrink-0 text-[10px]" title="Open Graph">
-                    Graph ↗
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </motion.div>
-
-        {/* 4️⃣ THREAT INTELLIGENCE & OBSERVED ARTIFACTS (IOCs) */}
-        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
-          <div className="section-label">THREAT INTELLIGENCE &amp; OBSERVED ARTIFACTS (IOCs)</div>
-          
-          {/* Domain Intelligence Bar */}
-          {cardData.entity && (
-            <div className="mb-2.5 pb-2 border-b border-[#221c17]">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
-                {cardData.entity.rows.map((r, idx) => (
-                  <div key={idx} className="flex flex-col">
-                    <span className="text-[9.5px] text-[#8a8070] font-semibold uppercase">{r.k}</span>
-                    <span className={`truncate font-medium text-[#ede6d8] ${r.status || ''}`}>{r.v}</span>
-                  </div>
-                ))}
-              </div>
-              {cardData.entity.flags && cardData.entity.flags.length > 0 && (
-                <div className="flags mt-2">
-                  {cardData.entity.flags.map((f, idx) => (
-                    <span key={idx} className={`flag ${f.level === 'amber' ? 'amber' : f.level === 'green' ? 'green' : ''}`}>
-                      {f.text}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Links & Attachments Findings */}
-          {cardData.findings && cardData.findings.length > 0 && (
-            <div className="space-y-1 mb-2">
-              <span className="text-[10px] text-[#8a8070] font-mono uppercase tracking-wider block">Observed Links &amp; File Payloads:</span>
-              {cardData.findings.map((f, idx) => (
-                <div key={idx} className="link-item flex items-center justify-between p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
-                  <span className="url text-xs text-[#ede6d8] truncate mr-2" title={f.label}>{f.label}</span>
-                  <span className={`badge ${f.status} shrink-0 text-[10px]`}>{f.badge}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
+              {cardData.identityRows.map((r, idx) => (
+                <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
+                  <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
+                  <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
+                    {r.v}
+                  </span>
                 </div>
               ))}
             </div>
-          )}
+          </motion.div>
+        )}
 
-          {/* Threat Score Breakdown Bars */}
-          {(cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown) && (() => {
-            const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
-            if (!bd || !bd.components) return null;
-            return (
-              <div className="pt-2 border-t border-[#221c17]">
-                <div className="flex items-center justify-between text-[10.5px] font-mono text-[#8a8070] mb-1.5">
-                  <span>Cumulative Risk Distribution:</span>
-                  <button
-                    type="button"
-                    onClick={() => setShowBreakdown(!showBreakdown)}
-                    className="inline-link text-[10px]"
-                  >
-                    {showBreakdown ? 'Hide Breakdown ▲' : 'Show Breakdown ▼'}
-                  </button>
-                </div>
-                {showBreakdown && (
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[10px] font-mono">
-                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
-                      <div className="text-[#8a8070]">Auth</div>
-                      <div className={bd.components.authentication?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
-                        +{bd.components.authentication?.score ?? 0} pts
-                      </div>
-                    </div>
-                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
-                      <div className="text-[#8a8070]">Domain</div>
-                      <div className={bd.components.domainRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
-                        +{bd.components.domainRisk?.score ?? 0} pts
-                      </div>
-                    </div>
-                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
-                      <div className="text-[#8a8070]">Infra</div>
-                      <div className={bd.components.infrastructureRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
-                        +{bd.components.infrastructureRisk?.score ?? 0} pts
-                      </div>
-                    </div>
-                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
-                      <div className="text-[#8a8070]">ML Content</div>
-                      <div className={bd.components.mlClassification?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
-                        +{bd.components.mlClassification?.score ?? 0} pts
-                      </div>
-                    </div>
-                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center col-span-2 sm:col-span-1">
-                      <div className="text-[#8a8070]">Heuristics</div>
-                      <div className={bd.components.heuristics?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
-                        +{bd.components.heuristics?.score ?? 0} pts
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </motion.div>
-
-        {/* 5️⃣ RELATED INCIDENTS & CAMPAIGN CORRELATION (Cross-Case Intel) */}
-        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="section-label mb-0">RELATED INCIDENTS &amp; CAMPAIGN CORRELATION</span>
-            <Network className="w-3.5 h-3.5 text-purple-400" />
-          </div>
-
-          <div className="p-2 rounded bg-[#100e0c] border border-[#221c17] space-y-2 text-xs font-mono">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 text-slate-200">
-                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-                <span className="text-[#8a8070]">Active Campaign Cluster:</span>
-                <span className="font-bold text-purple-300">
-                  {analysis?.campaign_name || analysis?.campaign_id || (analysis?.correlationEvidence?.length ? 'CAMP-2026-OCT-01 (Multi-Hop Infiltration)' : 'Cluster: Standalone Investigation')}
-                </span>
-              </div>
-              <span className="text-[10px] text-[#8a8070]">
-                {analysis?.correlationEvidence?.length ? `${analysis.correlationEvidence.length} Evidence Rules Matched` : 'Deterministic Hash & Origin Check'}
+        {/* 2️⃣ PILLAR 2: DOMAIN & CRYPTOGRAPHIC AUTHENTICATION */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'DOMAIN') && (
+          <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-indigo-300">
+                <Globe className="w-3.5 h-3.5 text-indigo-400" />
+                <span>2. DOMAIN &amp; CRYPTOGRAPHIC AUTHENTICATION</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                <span>Cryptographic Proof</span>
               </span>
             </div>
 
-            {analysis?.correlationEvidence && analysis.correlationEvidence.length > 0 ? (
-              <div className="space-y-1 pt-1 border-t border-[#221c17]">
-                {analysis.correlationEvidence.slice(0, 3).map((c, idx) => (
-                  <div key={idx} className="flex items-start gap-1.5 text-[11px] text-[#b9af9c]">
-                    <span className="text-purple-400 font-bold">↳</span>
-                    <span>{c.description || c.rule || 'Correlated cross-case IOC link detected'}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {/* Cryptographic Auth Checks */}
+              <div>
+                <span className="text-[10px] text-[#8a8070] font-mono uppercase tracking-wider block mb-1.5">
+                  Protocol Verification:
+                </span>
+                <div className="grid grid-cols-3 gap-1.5 mb-2">
+                  {cardData.checks.map((c, idx) => (
+                    <div key={idx} className="chip text-center p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
+                      <div className="label text-[9px] text-[#8a8070] font-semibold">{c.label}</div>
+                      <div className={`val text-[11px] font-bold mt-0.5 ${c.status}`}>{c.value}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[10.5px] font-mono text-[#8a8070] space-y-0.5 pt-1 border-t border-[#221c17]">
+                  <div>DMARC Policy: <span className="text-slate-300 font-semibold">{cardData.dnsData?.dmarcPolicy || 'none'}</span></div>
+                  <div>Alignment: <span className="text-slate-300">{cardData.dnsData?.dmarcEnforcement || 'Verified Cryptographic SPF/DKIM'}</span></div>
+                </div>
+              </div>
+
+              {/* Domain Registration Intel */}
+              {cardData.entity && (
+                <div className="lg:border-l lg:border-[#221c17] lg:pl-3">
+                  <span className="text-[10px] text-[#8a8070] font-mono uppercase tracking-wider block mb-1.5">
+                    WHOIS &amp; Domain Intel:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono">
+                    {cardData.entity.rows.slice(0, 4).map((r, idx) => (
+                      <div key={idx} className="flex flex-col p-1 rounded bg-[#100e0c] border border-[#221c17]">
+                        <span className="text-[9px] text-[#8a8070] uppercase">{r.k}</span>
+                        <span className={`truncate font-medium text-[#ede6d8] ${r.status || ''}`}>{r.v}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {cardData.entity.flags && cardData.entity.flags.length > 0 && (
+                    <div className="flags mt-2">
+                      {cardData.entity.flags.map((f, idx) => (
+                        <span key={idx} className={`flag ${f.level === 'amber' ? 'amber' : f.level === 'green' ? 'green' : ''}`}>
+                          {f.text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* 3️⃣ PILLAR 3: IP & TRANSMISSION ORIGIN */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'IP') && cardData.origin && (
+          <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-cyan-300">
+                <Server className="w-3.5 h-3.5 text-cyan-400" />
+                <span>3. IP &amp; TRANSMISSION ORIGIN</span>
+              </span>
+              <span className="text-[10px] font-mono text-[#8a8070]">Geographic Geolocation</span>
+            </div>
+
+            <div className="space-y-1.5 text-[11.5px] font-mono">
+              <div className="flex items-center justify-between gap-2 p-1.5 rounded bg-[#100e0c] border border-[#221c17]">
+                <span className="text-[10.5px] text-[#8a8070]">First-Hop Origin IP:</span>
+                <span className={`font-bold ${cardData.origin.ipStatus || ''} ${maskPII ? 'pii-sensitive pii-ip' : ''}`}>
+                  {cardData.origin.ip}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2 p-1.5 rounded bg-[#100e0c] border border-[#221c17]">
+                <span className="text-[10.5px] text-[#8a8070]">Geolocation:</span>
+                <div className="flex items-center gap-2 truncate">
+                  <span className={maskPII ? 'pii-sensitive pii-location' : ''}>{cardData.origin.location}</span>
+                  {cardData.origin.mapsUrl && (
+                    <button onClick={handleOpenMaps} className="inline-link text-[10px] shrink-0" title="Open Map">
+                      Google Maps ↗
+                    </button>
+                  )}
+                </div>
+              </div>
+              {analysis?.realSenderIp?.ip && analysis.realSenderIp.ip !== cardData.origin.ip && (
+                <div className="flex items-center justify-between gap-2 p-1.5 rounded bg-amber-950/30 border border-amber-800/40 text-amber-200">
+                  <span className="text-[10.5px] text-amber-400">Real Sender Client IP:</span>
+                  <span className="font-bold">{analysis.realSenderIp.ip} ({analysis.realSenderIp.city || 'Disclosed via X-Originating-IP'})</span>
+                </div>
+              )}
+              {cardData.origin.extraRows && cardData.origin.extraRows.slice(0, 2).map((r, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2 px-1">
+                  <span className="text-[10.5px] text-[#8a8070]">{r.k}:</span>
+                  <span className={`truncate text-right ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`} title={r.v}>
+                    {r.v}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* 4️⃣ PILLAR 4: INFRASTRUCTURE & RELAY ROUTE */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INFRA') && (
+          <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-purple-300">
+                <Network className="w-3.5 h-3.5 text-purple-400" />
+                <span>4. INFRASTRUCTURE &amp; RELAY ROUTE</span>
+              </span>
+              <button onClick={handleOpenGraph} className="inline-link shrink-0 text-[10px] font-mono flex items-center gap-1" title="Open Full Constellation Graph">
+                <span>Constellation Graph</span>
+                <span>↗</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono mb-2">
+              <div className="p-2 rounded bg-[#100e0c] border border-[#221c17]">
+                <span className="text-[9.5px] text-[#8a8070] block">Transit Relay Hops</span>
+                <span className="font-bold text-slate-200">{analysis?.hops?.length || 1} Intermediate Nodes</span>
+              </div>
+              <div className="p-2 rounded bg-[#100e0c] border border-[#221c17]">
+                <span className="text-[9.5px] text-[#8a8070] block">Autonomous System</span>
+                <span className="font-bold text-purple-300">{analysis?.hops?.[0]?.asn || 'AS-GLOBAL'}</span>
+              </div>
+              <div className="p-2 rounded bg-[#100e0c] border border-[#221c17]">
+                <span className="text-[9.5px] text-[#8a8070] block">Network Provider</span>
+                <span className="font-bold text-slate-300 truncate">{analysis?.hops?.[0]?.isp || analysis?.hops?.[0]?.org || 'Internet Gateway'}</span>
+              </div>
+            </div>
+
+            {cardData.relay && (
+              <div className="pt-2 border-t border-[#221c17] flex items-center justify-between text-[11px] font-mono text-[#8a8070]">
+                <span className="truncate mr-2" dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} />
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* 5️⃣ PILLAR 5: THREAT INDICATORS & OBSERVED IOCs */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INDICATOR') && (
+          <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-rose-300">
+                <LinkIcon className="w-3.5 h-3.5 text-rose-400" />
+                <span>5. THREAT INDICATORS &amp; OBSERVED IOCs</span>
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800/60 font-semibold">
+                {(analysis?.urls?.length || 0) + (analysis?.attachments?.length || 0)} IOCs Recorded
+              </span>
+            </div>
+
+            {/* Links & Attachments Findings */}
+            {cardData.findings && cardData.findings.length > 0 ? (
+              <div className="space-y-1 mb-2.5">
+                <span className="text-[10px] text-[#8a8070] font-mono uppercase tracking-wider block">Observed Links &amp; File Payloads:</span>
+                {cardData.findings.map((f, idx) => (
+                  <div key={idx} className="link-item flex items-center justify-between p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
+                    <span className="url text-xs text-[#ede6d8] truncate mr-2" title={f.label}>{f.label}</span>
+                    <span className={`badge ${f.status} shrink-0 text-[10px]`}>{f.badge}</span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-[11px] text-[#8a8070] italic pt-1 border-t border-[#221c17]">
-                Single-instance incident. No identical weaponized dropper hash or Tor relay overlaps detected across other open tenant cases.
+              <div className="text-[11px] text-[#8a8070] font-mono italic p-2 rounded bg-[#100e0c] border border-[#221c17] mb-2">
+                No active weaponized URLs or malicious attachments extracted.
               </div>
             )}
-          </div>
-        </motion.div>
 
-        {/* 6️⃣ TEAM ANALYST ACTIVITY & AUDIT TRAIL */}
-        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="section-label mb-0">TEAM ANALYST ATTRIBUTION &amp; TRIAGE</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800/60">
-              {analysis?.status || 'TRIAGED / IN PROGRESS'}
-            </span>
-          </div>
+            {/* Threat Score Breakdown Bars */}
+            {(cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown) && (() => {
+              const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
+              if (!bd || !bd.components) return null;
+              return (
+                <div className="pt-2 border-t border-[#221c17]">
+                  <div className="flex items-center justify-between text-[10.5px] font-mono text-[#8a8070] mb-1.5">
+                    <span>5-Component Cumulative Risk Breakdown:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBreakdown(!showBreakdown)}
+                      className="inline-link text-[10px] cursor-pointer"
+                    >
+                      {showBreakdown ? 'Hide Breakdown ▲' : 'Show Breakdown ▼'}
+                    </button>
+                  </div>
+                  {showBreakdown && (
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[10px] font-mono">
+                      <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                        <div className="text-[#8a8070]">Auth</div>
+                        <div className={bd.components.authentication?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                          +{bd.components.authentication?.score ?? 0} pts
+                        </div>
+                      </div>
+                      <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                        <div className="text-[#8a8070]">Domain</div>
+                        <div className={bd.components.domainRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                          +{bd.components.domainRisk?.score ?? 0} pts
+                        </div>
+                      </div>
+                      <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                        <div className="text-[#8a8070]">Infra</div>
+                        <div className={bd.components.infrastructureRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                          +{bd.components.infrastructureRisk?.score ?? 0} pts
+                        </div>
+                      </div>
+                      <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                        <div className="text-[#8a8070]">ML Content</div>
+                        <div className={bd.components.mlClassification?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                          +{bd.components.mlClassification?.score ?? 0} pts
+                        </div>
+                      </div>
+                      <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center col-span-2 sm:col-span-1">
+                        <div className="text-[#8a8070]">Heuristics</div>
+                        <div className={bd.components.heuristics?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                          +{bd.components.heuristics?.score ?? 0} pts
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-[#ede6d8] mb-2 p-2 rounded bg-[#100e0c] border border-[#221c17]">
-            <div className="flex items-center gap-2">
-              <User className="w-3.5 h-3.5 text-[#c9a227]" />
-              <span className="text-[#8a8070]">Investigator:</span>
-              <span className="font-bold">{analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa'}</span>
+        {/* 6️⃣ PILLAR 6: CAMPAIGN CORRELATION & SOC ATTRIBUTION */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'CAMPAIGN') && (
+          <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
+              <span className="section-label mb-0 flex items-center gap-1.5 text-fuchsia-300">
+                <Share2 className="w-3.5 h-3.5 text-fuchsia-400" />
+                <span>6. CAMPAIGN CORRELATION &amp; SOC ATTRIBUTION</span>
+              </span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800/60 font-semibold">
+                {analysis?.status || 'TRIAGED / IN PROGRESS'}
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-[#8a8070]">Clearance:</span>
-              <span className="text-cyan-300 font-semibold">{role === 'admin' ? 'Forensic Lead (Admin)' : 'Security Operations Analyst'}</span>
-            </div>
-          </div>
 
-          {/* AI Case Summary Narrative Box */}
-          {cardData.aiSummary && (
-            <div className="ai-box mt-2">
-              <p className={maskPII ? 'pii-sensitive' : ''}>{cardData.aiSummary.text}</p>
-              <div className="meta-row">
-                <span className="engine">{cardData.aiSummary.engine}</span>
-                <button 
-                  onClick={handleOpenNarrativeClick}
-                  className="inline-link"
-                  title="Inspect Full Forensic Narrative"
-                >
-                  Full narrative ↗
-                </button>
+            <div className="p-2 rounded bg-[#100e0c] border border-[#221c17] space-y-2 text-xs font-mono mb-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 text-slate-200">
+                  <span className="w-2 h-2 rounded-full bg-fuchsia-400 animate-pulse" />
+                  <span className="text-[#8a8070]">Campaign Cluster:</span>
+                  <span className="font-bold text-fuchsia-300">
+                    {analysis?.campaign_name || analysis?.campaign_id || (analysis?.correlationEvidence?.length ? 'CAMP-2026-OCT-01 (Multi-Hop Infiltration)' : 'Cluster: Standalone Investigation')}
+                  </span>
+                </div>
+                <span className="text-[10px] text-[#8a8070]">
+                  {analysis?.correlationEvidence?.length ? `${analysis.correlationEvidence.length} Rules Matched` : 'Deterministic Hash Check'}
+                </span>
+              </div>
+
+              {analysis?.correlationEvidence && analysis.correlationEvidence.length > 0 && (
+                <div className="space-y-1 pt-1 border-t border-[#221c17]">
+                  {analysis.correlationEvidence.slice(0, 3).map((c, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 text-[11px] text-[#b9af9c]">
+                      <span className="text-fuchsia-400 font-bold">↳</span>
+                      <span>{c.description || c.rule || 'Correlated cross-case IOC link detected'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Investigator Attribution Box */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-[#ede6d8] p-2 rounded bg-[#100e0c] border border-[#221c17]">
+              <div className="flex items-center gap-2">
+                <User className="w-3.5 h-3.5 text-[#c9a227]" />
+                <span className="text-[#8a8070]">Investigator:</span>
+                <span className="font-bold">{analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="text-[#8a8070]">Clearance:</span>
+                <span className="text-cyan-300 font-semibold">{role === 'admin' ? 'Forensic Lead (Admin)' : 'SOC Analyst Tier-2'}</span>
               </div>
             </div>
-          )}
-        </motion.div>
 
-        {/* 7️⃣ COLLAPSIBLE DEEP FORENSIC LAB */}
-        <motion.div variants={cardItemVariants} className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
-          {/* Main Deep Analysis Toggle Header */}
-          <button
-            type="button"
-            onClick={() => setDeepAnalysisOpen(!deepAnalysisOpen)}
-            className="w-full px-3 py-2 flex items-center justify-between bg-slate-800/60 hover:bg-slate-800 transition-colors text-left select-none cursor-pointer"
-          >
-            <div className="flex items-center gap-2 min-w-0 pr-2">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span className="font-semibold text-slate-200">Deep Forensic Lab</span>
-              <span className="px-1.5 py-0.2 rounded bg-cyan-950/60 border border-cyan-800/80 text-[10px] text-cyan-400 font-mono">
-                Kill-Chain &amp; Counterfactuals
-              </span>
-              {!deepAnalysisOpen && (
+            {/* AI Case Summary Narrative Box */}
+            {cardData.aiSummary && (
+              <div className="ai-box mt-2">
+                <p className={maskPII ? 'pii-sensitive' : ''}>{cardData.aiSummary.text}</p>
+                <div className="meta-row">
+                  <span className="engine">{cardData.aiSummary.engine}</span>
+                  <button 
+                    onClick={handleOpenNarrativeClick}
+                    className="inline-link cursor-pointer"
+                    title="Inspect Full Forensic Narrative"
+                  >
+                    Full narrative ↗
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* 7️⃣ PILLAR 7: DEEP FORENSIC LAB & REGULATORY AUDIT */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'LAB') && (
+          <motion.div variants={cardItemVariants} className="rounded-lg border border-slate-800 bg-slate-900/60 overflow-hidden mb-3">
+            <button
+              type="button"
+              onClick={() => setDeepAnalysisOpen(!deepAnalysisOpen)}
+              className="w-full px-3 py-2 flex items-center justify-between bg-slate-900/90 hover:bg-slate-800/80 transition-colors text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="w-4 h-4 text-purple-400 shrink-0" />
+                <span className="font-bold text-xs text-slate-200 uppercase tracking-wide">
+                  Deep Forensic Lab &amp; Regulatory Audit
+                </span>
                 <span className="text-[10px] text-slate-400 font-mono truncate hidden sm:inline ml-1" title={teaserSummary}>
                   — {teaserSummary}
                 </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {deepAnalysisOpen ? (
-                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              )}
-            </div>
-          </button>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {deepAnalysisOpen ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                )}
+              </div>
+            </button>
 
           {/* Expanded Deep Analysis Body */}
           {deepAnalysisOpen && (
@@ -1772,6 +1869,7 @@ export function EvidenceTagCard({
             </div>
           )}
         </motion.div>
+      )}
 
       </div>
 
