@@ -65,6 +65,7 @@ import {
 } from 'recharts';
 import { UserRole } from '../hooks/useSession';
 import { API_URL, apiFetch } from '../lib/api';
+import { GlobalThreatActivityMap } from './GlobalThreatActivityMap';
 
 export interface UltimateUserRecord {
   id: string;
@@ -908,6 +909,11 @@ export function UltimateBossAdminView({
         </div>
 
       </div>
+
+      {/* ============================================================= */}
+      {/* REAL-TIME GLOBAL THREAT ACTIVITY MAP (LEAFLET) */}
+      {/* ============================================================= */}
+      <GlobalThreatActivityMap />
 
       {/* Main Content: Master User Directory Table */}
       <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-xl p-6 space-y-5 shadow-xl">
