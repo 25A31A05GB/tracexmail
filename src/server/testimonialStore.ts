@@ -21,7 +21,10 @@ export interface UserTestimonial {
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
-const TESTIMONIALS_FILE = path.join(DATA_DIR, 'user_testimonials.json');
+const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+const TESTIMONIALS_FILE = isTestEnv
+  ? path.join(DATA_DIR, 'user_testimonials.test.json')
+  : path.join(DATA_DIR, 'user_testimonials.json');
 
 // In-memory cache
 let inMemoryTestimonials: UserTestimonial[] = [];

@@ -37,6 +37,7 @@ import { apiFetch } from '../lib/api';
 import { ForensicScanAnimationModal } from './ForensicScanAnimationModal';
 import { AlertToast } from './AlertToast';
 import { WebSocketAlert } from '../hooks/useWebSocketAlerts';
+import { EmlFormatGuide } from './EmlFormatGuide';
 
 const GmailConnectionView = lazy(() => import('./GmailConnectionView').then(m => ({ default: m.GmailConnectionView })));
 
@@ -652,6 +653,13 @@ export function IngestionPipelineView({
                   className="hidden"
                 />
               </div>
+
+              {/* Interactive Guide: How email is represented and exported as .EML */}
+              <EmlFormatGuide 
+                onLoadSampleEml={(sampleContent, sampleName) => {
+                  executePipelineWithAnimation(sampleContent, sampleName);
+                }}
+              />
             </div>
           )}
 
