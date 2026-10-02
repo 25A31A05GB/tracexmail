@@ -66,6 +66,7 @@ import { LegalPage, LegalPageType } from './components/LegalPage';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { ForensicOfflineModeBanner } from './components/common/ForensicOfflineModeBanner';
 import { NotFoundView } from './components/NotFoundView';
+import { AuthCallbackView } from './components/AuthCallbackView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
 
@@ -701,6 +702,19 @@ export default function App() {
       <Suspense fallback={<ViewSuspenseLoader />}>
         <OAuthConsentScreen />
       </Suspense>
+    );
+  }
+
+  // Google OAuth & Supabase Auth callback endpoints (prevents 404 on Google sign-in)
+  if (
+    currentPath === '/auth/callback' || 
+    currentPath.startsWith('/auth/callback') || 
+    currentPath === '/oauth/callback' ||
+    currentPath.startsWith('/oauth/callback') ||
+    currentPath === '/api/v1/gmail/callback'
+  ) {
+    return (
+      <AuthCallbackView onNavigateHome={() => navigateToPath('/')} />
     );
   }
 

@@ -616,6 +616,11 @@ export interface UserTestimonial {
   verified: boolean;
   verificationDigest: string;
   createdAt: string;
+  isReported?: boolean;
+  reportCount?: number;
+  reportReason?: string;
+  reportedAt?: string;
+  moderationStatus?: 'approved' | 'hidden';
 }
 
 

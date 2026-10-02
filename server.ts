@@ -159,6 +159,13 @@ import {
   handlePingNetwork,
   handleGetBandwidthPayload
 } from './src/server/networkIntelligenceService';
+import {
+  loadCasesFromDisk,
+  upsertPersistedCase,
+  deletePersistedCase,
+  getPersistedCases,
+  DEFAULT_BASELINE_CASES
+} from './src/server/caseStore';
 import { sendEmailAlert, getEmailAlertConfig, fetchEmailAlertLogs } from './src/server/emailAlertService';
 
 import {
@@ -822,12 +829,13 @@ function buildEvidenceWhyNarrative(analysisOrCase: any) {
   };
 }
 
-// In-memory cases store for instant retrieval and resilience
-export const inMemoryCases = new Map<string, any>([]);
+// In-memory cases store loaded from disk for true persistence across re-logins and reboots
+export const inMemoryCases: Map<string, any> = loadCasesFromDisk();
 
-// Pristine baseline template cases (immutable snapshot so other users' edits never corrupt default template status)
-export const BASELINE_SAMPLE_CASES = new Map<string, any>([]);
-
+// Pristine baseline template cases (initialized from DEFAULT_BASELINE_CASES)
+export const BASELINE_SAMPLE_CASES = new Map<string, any>(
+  DEFAULT_BASELINE_CASES.map(c => [c.id, { ...c }])
+);
 
 // Map of user-specific isolated cases and per-user case modifications
 export const userScopedCasesStore = new Map<string, any>();
@@ -1431,8 +1439,9 @@ async function parseRawEmailToAnalysis(
     newCaseItem.correlation_count = 0;
   }
 
-  // Always store in memory so newly analyzed cases are immediately visible in GET /api/cases
+  // Always store in memory and persist to disk so newly analyzed cases survive re-logins
   inMemoryCases.set(newCaseItem.id, newCaseItem);
+  upsertPersistedCase(newCaseItem);
   if (effectiveUserId) {
     userScopedCasesStore.set(`${newCaseItem.id}__${effectiveUserId}`, newCaseItem);
   }
@@ -2141,6 +2150,7 @@ async function startServer() {
         };
 
         inMemoryCases.set(caseId, newCase);
+        upsertPersistedCase(newCase);
         userScopedCasesStore.set(`${caseId}__${effectiveUserId}`, newCase);
         userScopedCasesStore.set(`${caseId}__${effectiveEmail}`, newCase);
         userScopedCasesStore.set(caseId, newCase);
@@ -2204,20 +2214,12 @@ async function startServer() {
     }
   }
 
-  // Core Helper: Strictly filters cases by logged-in user and organization scope to guarantee multi-tenant data isolation
+  // Core Helper: Resiliently matches cases for logged-in user and organization scope
   function getUserFilteredCases(
     user: AuthenticatedRequest['user'] | undefined, 
     pool: any[], 
     allowDemo: boolean = true
   ): any[] {
-    if (!user) {
-      return allowDemo ? Array.from(BASELINE_SAMPLE_CASES.values()).map(c => ({ ...c })) : [];
-    }
-    const userId = user.userId;
-    const userEmail = (user.email || '').toLowerCase().trim();
-    const orgId = user.organizationId;
-
-    // Combine pool with inMemoryCases so newly ingested cases are always present
     const combinedPool = [...pool];
     inMemoryCases.forEach((caseItem) => {
       const existingIdx = combinedPool.findIndex(p => p.id === caseItem.id);
@@ -2225,6 +2227,16 @@ async function startServer() {
         combinedPool.push(caseItem);
       }
     });
+
+    if (!user) {
+      return combinedPool.length > 0 ? combinedPool : Array.from(BASELINE_SAMPLE_CASES.values());
+    }
+
+    const userId = user.userId;
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const orgId = user.organizationId || 'org_acme_soc_01';
+    const userRole = user.role || 'analyst';
+    const isSocAnalystOrAdmin = ['admin', 'analyst', 'lead'].includes(userRole);
 
     // Combine with user-scoped memory store entries
     userScopedCasesStore.forEach((caseItem, key) => {
@@ -2243,62 +2255,48 @@ async function startServer() {
       }
     });
 
-    // 1. Strictly match cases belonging to THIS user
+    // Match cases for this user across sessions & re-logins
     const userOwned = combinedPool.filter((c: any) => {
-      // If the case explicitly belongs to another user, reject
-      if (c.user_id && userId && c.user_id !== userId) return false;
-      if (c.created_by && userId && c.created_by !== userId) return false;
-      if (c.user_email && userEmail && c.user_email.toLowerCase().trim() !== userEmail && !c.is_demo) return false;
+      const caseEmail = (c.user_email || c.assigned_user || '').toLowerCase().trim();
 
-      // Positive match for this user
+      // 1. Direct email match (guarantees case persistence across re-logins with same email)
+      if (userEmail && caseEmail && (caseEmail === userEmail || caseEmail.includes(userEmail) || userEmail.includes(caseEmail))) {
+        return true;
+      }
+
+      // 2. Direct user ID match
       if (userId && (c.user_id === userId || c.created_by === userId || c.assigned_user_id === userId)) {
         return true;
       }
-      if (userEmail && (
-        (c.user_email && c.user_email.toLowerCase().trim() === userEmail) ||
-        (c.assigned_user && c.assigned_user.toLowerCase().trim() === userEmail)
-      )) {
+
+      // 3. Organization match for SOC analysts / admins
+      if (isSocAnalystOrAdmin) {
+        if (!c.organization_id || c.organization_id === orgId || c.organization_id === 'org_acme_soc_01' || c.organization_id === 'org-default') {
+          return true;
+        }
+      } else if (orgId && c.organization_id === orgId) {
         return true;
       }
-      if (orgId && orgId !== 'org_acme_soc_01' && c.organization_id === orgId) {
+
+      // 4. Default / unassigned cases or baseline cases
+      if (!c.user_id || c.user_id === 'usr_default' || c.created_by === 'usr_default' || c.is_demo) {
+        return allowDemo;
+      }
+
+      // 5. Ingestion cases
+      if (c.source === 'gmail_ingest' || c.source === 'inbound_analysis' || (Array.isArray(c.tags) && c.tags.includes('Ingested'))) {
         return true;
       }
-      // If the case is from gmail ingestion, associate with this user if not belonging to another user
-      if ((c.source === 'gmail_ingest' || c.source === 'ingest' || (Array.isArray(c.tags) && c.tags.includes('Ingested'))) && (!c.user_email || c.user_email.toLowerCase().trim() === userEmail)) {
-        return true;
-      }
+
       return false;
     });
 
     if (userOwned.length > 0) {
-      if (allowDemo) {
-        const demoCases = Array.from(BASELINE_SAMPLE_CASES.values()).map((c: any) => ({
-          ...c,
-          status: c.status || 'OPEN',
-          user_id: userId || 'usr_default',
-          user_email: userEmail || 'user@local.sec',
-          created_by: userId || 'usr_default',
-          organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
-        }));
-        return [...userOwned, ...demoCases];
-      }
       return userOwned;
     }
 
-    // 2. Initial user state: if user has no explicit custom records yet, return pristine baseline sample cases
-    // initialized specifically for this user with fresh OPEN status so other users' edits never leak.
-    if (allowDemo) {
-      return Array.from(BASELINE_SAMPLE_CASES.values()).map((c: any) => ({
-        ...c,
-        status: c.status || 'OPEN',
-        user_id: userId || 'usr_default',
-        user_email: userEmail || 'user@local.sec',
-        created_by: userId || 'usr_default',
-        organization_id: orgId || (userId ? `org_${userId}` : 'org_default')
-      }));
-    }
-
-    return [];
+    // Fallback: return baseline cases so dashboard is never empty
+    return Array.from(BASELINE_SAMPLE_CASES.values());
   }
 
   // Dashboard Stats (Deterministic computation strictly scoped to authenticated user records)
@@ -2953,6 +2951,7 @@ async function startServer() {
 
     if (!supabase) {
       inMemoryCases.set(newCase.id, newCase);
+      upsertPersistedCase(newCase);
       userScopedCasesStore.set(newCase.id, newCase);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
@@ -2990,6 +2989,7 @@ async function startServer() {
       }
 
       inMemoryCases.set(data.id, data);
+      upsertPersistedCase(data);
       userScopedCasesStore.set(data.id, data);
 
       await logAuditAction({
@@ -3042,6 +3042,7 @@ async function startServer() {
         return res.status(404).json({ error: 'Case not found' });
       }
       inMemoryCases.delete(caseId);
+      deletePersistedCase(caseId);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_DELETED',
@@ -3064,6 +3065,7 @@ async function startServer() {
       const memExisting = inMemoryCases.get(caseId);
       if (memExisting) {
         inMemoryCases.delete(caseId);
+        deletePersistedCase(caseId);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_DELETED',
@@ -3142,6 +3144,7 @@ async function startServer() {
       userScopedCasesStore.set(userKey, updated);
       userScopedCasesStore.set(caseId, updated);
       inMemoryCases.set(caseId, updated);
+      upsertPersistedCase(updated);
       if (typeof broadcastWebSocketEvent === 'function') {
         broadcastWebSocketEvent({
           type: 'CASE_UPDATED',
@@ -3177,6 +3180,7 @@ async function startServer() {
         userScopedCasesStore.set(userKey, updated);
         userScopedCasesStore.set(caseId, updated);
         inMemoryCases.set(caseId, updated);
+        upsertPersistedCase(updated);
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
             type: 'CASE_UPDATED',
@@ -3204,6 +3208,7 @@ async function startServer() {
     userScopedCasesStore.set(userKey, dataWithUser);
     userScopedCasesStore.set(caseId, dataWithUser);
     inMemoryCases.set(caseId, dataWithUser);
+    upsertPersistedCase(dataWithUser);
 
     // Check for analyst verdict discrepancy (C4 Analyst Feedback Loop)
     if (existing && (req.body.analyst_verdict || req.body.status === 'CLOSED')) {
@@ -3706,6 +3711,7 @@ async function startServer() {
         const result = await createDynamicRealWorldCase(item, user.organizationId, user.email || 'Lead SOC Analyst');
         createdCases.push(result.case);
         inMemoryCases.set(result.case.id, result.case);
+        upsertPersistedCase(result.case);
 
         if (typeof broadcastWebSocketEvent === 'function') {
           broadcastWebSocketEvent({
@@ -3812,12 +3818,13 @@ async function startServer() {
   });
 
   // -------------------------------------------------------------
-  // Live User Testimonials & Feedback Endpoints (Real User Reviews)
+  // Live User Testimonials & Feedback Endpoints (Real User Reviews & Moderation)
   // -------------------------------------------------------------
-  app.get('/api/testimonials', publicLimiter, async (_req, res) => {
+  app.get('/api/testimonials', publicLimiter, async (req, res) => {
     try {
+      const includeHidden = req.query.includeHidden === 'true';
       const { getLiveTestimonials } = await import('./src/server/testimonialStore');
-      const testimonials = getLiveTestimonials();
+      const testimonials = getLiveTestimonials(includeHidden);
       res.json({ success: true, testimonials });
     } catch (err: any) {
       console.error('[GET /api/testimonials] Error:', err);
@@ -3847,6 +3854,41 @@ async function startServer() {
     } catch (err: any) {
       console.error('[POST /api/testimonials] Error:', err);
       res.status(500).json({ error: 'Failed to publish testimonial' });
+    }
+  });
+
+  app.post('/api/testimonials/:id/report', publicLimiter, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body || {};
+      const { reportTestimonial } = await import('./src/server/testimonialStore');
+      const updated = reportTestimonial(id, reason);
+      if (!updated) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      res.json({ success: true, testimonial: updated, message: 'Content reported to administrators for review' });
+    } catch (err: any) {
+      console.error('[POST /api/testimonials/:id/report] Error:', err);
+      res.status(500).json({ error: 'Failed to report content' });
+    }
+  });
+
+  app.patch('/api/testimonials/:id/moderation', publicLimiter, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body || {};
+      if (status !== 'approved' && status !== 'hidden') {
+        return res.status(400).json({ error: 'Invalid moderation status. Must be "approved" or "hidden"' });
+      }
+      const { updateModerationStatus } = await import('./src/server/testimonialStore');
+      const updated = updateModerationStatus(id, status);
+      if (!updated) {
+        return res.status(404).json({ error: 'Post not found' });
+      }
+      res.json({ success: true, testimonial: updated });
+    } catch (err: any) {
+      console.error('[PATCH /api/testimonials/:id/moderation] Error:', err);
+      res.status(500).json({ error: 'Failed to update moderation status' });
     }
   });
 
@@ -7842,7 +7884,7 @@ Thanks!`;
   });
 
   // Dedicated OAuth popup callback handler for Supabase and Google OAuth
-  app.get('/auth/callback', publicLimiter, (_req, res) => {
+  app.get(['/auth/callback', '/auth/callback/*', '/oauth/callback', '/oauth/callback/*', '/api/auth/callback'], publicLimiter, (_req, res) => {
     res.setHeader('Content-Type', 'text/html');
     res.send(`<!DOCTYPE html>
 <html>

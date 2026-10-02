@@ -13,6 +13,11 @@ export interface UserTestimonial {
   verified: boolean;
   verificationDigest: string;
   createdAt: string;
+  isReported?: boolean;
+  reportCount?: number;
+  reportReason?: string;
+  reportedAt?: string;
+  moderationStatus?: 'approved' | 'hidden';
 }
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -54,13 +59,43 @@ function saveTestimonialsToDisk(testimonials: UserTestimonial[]): boolean {
   }
 }
 
-export function getLiveTestimonials(): UserTestimonial[] {
+export function getLiveTestimonials(includeHidden: boolean = false): UserTestimonial[] {
   if (!isLoaded) {
     inMemoryTestimonials = loadTestimonialsFromDisk();
     isLoaded = true;
   }
+  const filtered = includeHidden 
+    ? inMemoryTestimonials 
+    : inMemoryTestimonials.filter(t => t.moderationStatus !== 'hidden');
   // Return sorted newest first
-  return [...inMemoryTestimonials].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function reportTestimonial(id: string, reason?: string): UserTestimonial | null {
+  if (!isLoaded) {
+    inMemoryTestimonials = loadTestimonialsFromDisk();
+    isLoaded = true;
+  }
+  const item = inMemoryTestimonials.find(t => t.id === id);
+  if (!item) return null;
+  item.isReported = true;
+  item.reportCount = (item.reportCount || 0) + 1;
+  item.reportReason = reason || item.reportReason || 'Inappropriate content flagged by user';
+  item.reportedAt = new Date().toISOString();
+  saveTestimonialsToDisk(inMemoryTestimonials);
+  return item;
+}
+
+export function updateModerationStatus(id: string, status: 'approved' | 'hidden'): UserTestimonial | null {
+  if (!isLoaded) {
+    inMemoryTestimonials = loadTestimonialsFromDisk();
+    isLoaded = true;
+  }
+  const item = inMemoryTestimonials.find(t => t.id === id);
+  if (!item) return null;
+  item.moderationStatus = status;
+  saveTestimonialsToDisk(inMemoryTestimonials);
+  return item;
 }
 
 export function addLiveTestimonial(data: {

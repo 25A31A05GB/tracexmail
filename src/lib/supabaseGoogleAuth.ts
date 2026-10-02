@@ -26,15 +26,17 @@ export function isRunningInIframe(): boolean {
  */
 export function signInWithGoogleDemoSession(): GoogleAuthResult {
   try {
+    const userEmail = 'jayramsappa537@gmail.com';
+    const stableId = 'usr_google_operator_primary';
     const demoUser = {
-      id: 'usr_google_' + Math.random().toString(36).substring(2, 9),
-      email: 'alex.vance.sec@gmail.com',
+      id: stableId,
+      email: userEmail,
       app_metadata: { provider: 'google', providers: ['google'] },
       user_metadata: {
-        full_name: 'Alex Vance (Google)',
+        full_name: 'Security Analyst (Google)',
         avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=128&fit=crop&crop=face',
-        name: 'Alex Vance',
-        email: 'alex.vance.sec@gmail.com',
+        name: 'Security Analyst',
+        email: userEmail,
         role: 'analyst'
       },
       email_confirmed_at: new Date().toISOString()
@@ -48,7 +50,7 @@ export function signInWithGoogleDemoSession(): GoogleAuthResult {
         id: demoUser.id,
         organization_id: 'org_acme_soc_01',
         role: 'analyst',
-        full_name: 'Alex Vance (Google Account)',
+        full_name: 'Security Analyst (Google Account)',
         email: demoUser.email,
         account_type: 'organization',
         email_verified: true,

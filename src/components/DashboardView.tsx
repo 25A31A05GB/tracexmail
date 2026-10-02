@@ -64,6 +64,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { Interactive3DTiltCard, CyberMatrixBackground3D } from './3d';
 import { useSession } from '../hooks/useSession';
+import { FeedbackModerationPanel } from './FeedbackModerationPanel';
 
 interface DashboardViewProps {
   onSelectAnalysis?: (analysis: EmailAnalysis) => void;
@@ -287,7 +288,18 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [casesList, setCasesList] = useState<EmailAnalysis[]>([]);
+  const [casesList, setCasesList] = useState<EmailAnalysis[]>(() => {
+    try {
+      const cached = localStorage.getItem('tracexmail_dashboard_cases_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((c: any) => mapBackendCaseToAnalysis(c, '', c.title || 'case_email.eml'));
+        }
+      }
+    } catch {}
+    return [];
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [chartType, setChartType] = useState<'AREA' | 'BAR' | 'PIE'>('AREA');
   const [selectedGeoCategory, setSelectedGeoCategory] = useState<'ALL' | 'BEC' | 'HARVESTING' | 'MALWARE' | 'EXPLOIT'>('ALL');
@@ -355,10 +367,24 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       if (Array.isArray(rawCases) && rawCases.length > 0) {
         const parsed = rawCases.map(c => mapBackendCaseToAnalysis(c, '', c.title || 'case_email.eml'));
         setCasesList(parsed);
+        try {
+          localStorage.setItem('tracexmail_dashboard_cases_cache', JSON.stringify(rawCases));
+        } catch {}
         if (!selectedAnalysisId || selectedAnalysisId === SAMPLE_ANALYSES[0]?.id) {
           setSelectedAnalysisId(parsed[0].id);
         }
       } else if (Array.isArray(rawCases) && rawCases.length === 0) {
+        // Fallback to cached cases if server temporarily returned empty
+        try {
+          const cached = localStorage.getItem('tracexmail_dashboard_cases_cache');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setCasesList(parsed.map((c: any) => mapBackendCaseToAnalysis(c, '', c.title || 'case_email.eml')));
+              return;
+            }
+          }
+        } catch {}
         setCasesList([]);
       }
     } catch (err) {
@@ -519,6 +545,22 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 <span>Minimize Dashboard</span>
               </>
             )}
+          </button>
+          <button
+            onClick={() => {
+              if (isMinimized) {
+                setIsMinimized(false);
+              }
+              setTimeout(() => {
+                const el = document.getElementById('community-feedback-moderation');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
+            }}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="Review flagged posts and toggle public visibility"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+            <span>Post Moderation</span>
           </button>
           <button
             onClick={fetchDashboardData}
@@ -712,6 +754,23 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
                 </div>
                 <div className="text-xs font-bold text-slate-200">Relationship Graph</div>
                 <div className="text-[10px] text-slate-400 mt-0.5">Entity &amp; IOC nexus</div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsMinimized(false);
+                  setTimeout(() => {
+                    const el = document.getElementById('community-feedback-moderation');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }, 100);
+                }}
+                className="p-3 rounded-lg bg-slate-950 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/80 text-left transition-all group cursor-pointer"
+              >
+                <div className="w-7 h-7 rounded-md bg-amber-950/60 border border-amber-800/60 flex items-center justify-center mb-2">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                </div>
+                <div className="text-xs font-bold text-slate-200">Post Moderation</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Toggle live / hide</div>
               </button>
             </div>
           </div>
@@ -2190,6 +2249,11 @@ export function DashboardView({ onSelectAnalysis, onNavigateToTab, onOpenWalkthr
       {/* Analyst Workstation & Network Intelligence Telemetry */}
       <div className="mt-6">
         <NetworkIntelligenceCard />
+      </div>
+
+      {/* Community Public Posts & Feedback Moderation Console */}
+      <div className="mt-6" id="community-feedback-moderation">
+        <FeedbackModerationPanel />
       </div>
     </div>
   )}

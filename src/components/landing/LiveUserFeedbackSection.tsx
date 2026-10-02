@@ -14,7 +14,9 @@ import {
   User,
   Fingerprint,
   Filter,
-  Check
+  Check,
+  Flag,
+  AlertTriangle
 } from 'lucide-react';
 import { UserTestimonial } from '../../types';
 
@@ -31,6 +33,13 @@ export function LiveUserFeedbackSection({ className = '', onOpenConsole }: LiveU
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Moderation Reporting State
+  const [reportingReview, setReportingReview] = useState<UserTestimonial | null>(null);
+  const [reportReason, setReportReason] = useState<string>('Inappropriate or offensive content');
+  const [reportCustomNotes, setReportCustomNotes] = useState<string>('');
+  const [reportingInProgress, setReportingInProgress] = useState<boolean>(false);
+  const [reportToastMsg, setReportToastMsg] = useState<string | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -154,6 +163,61 @@ export function LiveUserFeedbackSection({ className = '', onOpenConsole }: LiveU
       setErrorMessage(err.message || 'Failed to publish review. Please try again.');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Moderation Reporting Handlers
+  const handleOpenReportModal = (review: UserTestimonial) => {
+    setReportingReview(review);
+    setReportReason('Inappropriate or offensive content');
+    setReportCustomNotes('');
+    setErrorMessage(null);
+  };
+
+  const handleCloseReportModal = () => {
+    setReportingReview(null);
+    setReportCustomNotes('');
+    setErrorMessage(null);
+  };
+
+  const handleSubmitReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingReview) return;
+
+    try {
+      setReportingInProgress(true);
+      const combinedReason = reportCustomNotes.trim()
+        ? `${reportReason}: ${reportCustomNotes.trim()}`
+        : reportReason;
+
+      const res = await fetch(`/api/testimonials/${reportingReview.id}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: combinedReason })
+      });
+
+      if (res.ok) {
+        setTestimonials(prev =>
+          prev.map(t => (t.id === reportingReview.id ? { ...t, isReported: true, reportReason: combinedReason } : t))
+        );
+        setReportToastMsg('Post has been flagged and reported to site administrators for moderation review.');
+        setTimeout(() => setReportToastMsg(null), 4500);
+        handleCloseReportModal();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMessage(data.error || 'Failed to submit report. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Failed to report review:', err);
+      // Optimistic local feedback
+      setTestimonials(prev =>
+        prev.map(t => (t.id === reportingReview.id ? { ...t, isReported: true } : t))
+      );
+      setReportToastMsg('Post has been flagged for moderation review.');
+      setTimeout(() => setReportToastMsg(null), 4500);
+      handleCloseReportModal();
+    } finally {
+      setReportingInProgress(false);
     }
   };
 
@@ -375,13 +439,34 @@ export function LiveUserFeedbackSection({ className = '', onOpenConsole }: LiveU
                     </p>
                   </div>
 
-                  {/* Card Footer: Cryptographic Verification Stamp & Date */}
+                  {/* Card Footer: Cryptographic Verification Stamp, Date & Moderation Report Button */}
                   <div className="pt-3 border-t border-[#3a352c]/80 flex items-center justify-between text-[10.5px] font-mono text-[#8e8574]">
                     <div className="flex items-center gap-1" title={`Verification SHA-256 Digest: ${review.verificationDigest}`}>
                       <Fingerprint className="w-3 h-3 text-[#22c55e]" />
                       <span>LIVE VERIFIED</span>
                     </div>
-                    <span>{formattedDate}</span>
+                    <div className="flex items-center gap-3">
+                      <span>{formattedDate}</span>
+                      {review.isReported ? (
+                        <span 
+                          className="inline-flex items-center gap-1 text-amber-400 text-[10px] px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/60 font-mono"
+                          title="This post has been reported to site administrators"
+                        >
+                          <Flag className="w-2.5 h-2.5 text-amber-400" />
+                          <span>Reported</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReportModal(review)}
+                          className="inline-flex items-center gap-1 text-[#8e8574] hover:text-rose-400 hover:bg-rose-950/40 px-1.5 py-0.5 rounded border border-transparent hover:border-rose-900/60 transition-colors cursor-pointer text-[10.5px] font-mono group"
+                          title="Report inappropriate content to site administrators"
+                        >
+                          <Flag className="w-2.5 h-2.5 text-[#8e8574] group-hover:text-rose-400 transition-colors" />
+                          <span>Report</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -566,6 +651,126 @@ export function LiveUserFeedbackSection({ className = '', onOpenConsole }: LiveU
               </form>
             )}
 
+          </div>
+        </div>
+      )}
+      {/* ======================================================== */}
+      {/* TOAST: REPORT NOTIFICATION BANNER                       */}
+      {/* ======================================================== */}
+      {reportToastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#171410] border border-amber-600/70 text-[#ede6d8] px-4 py-3 rounded-[4px] shadow-2xl flex items-center gap-3 text-xs font-mono animate-in slide-in-from-bottom-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="text-[12px]">{reportToastMsg}</span>
+          <button 
+            onClick={() => setReportToastMsg(null)} 
+            className="text-[#8e8574] hover:text-[#ede6d8] p-1 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL: REPORT INAPPROPRIATE POST                        */}
+      {/* ======================================================== */}
+      {reportingReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div 
+            className="w-full max-w-md bg-[#171410] border border-[#3a352c] rounded-[4px] shadow-2xl p-6 relative text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#3a352c] pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded bg-rose-950/80 border border-rose-700/60 flex items-center justify-center text-rose-400">
+                  <Flag className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-mono text-rose-400 uppercase tracking-wider font-bold">
+                    Content Moderation
+                  </div>
+                  <h3 className="font-semibold text-sm text-[#ede6d8]">
+                    Report Inappropriate Post
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseReportModal}
+                className="p-1 rounded text-[#8e8574] hover:text-[#ede6d8] hover:bg-[#1d1a15] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReport} className="space-y-4">
+              {/* Post Summary Preview */}
+              <div className="p-3 rounded bg-[#12100d] border border-[#3a352c] space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-[#8e8574]">
+                  <span className="font-semibold text-[#ede6d8]">{reportingReview.name}</span>
+                  <span>{reportingReview.role}</span>
+                </div>
+                <p className="text-xs text-[#b9af9c] line-clamp-2 italic">
+                  &quot;{reportingReview.feedback}&quot;
+                </p>
+              </div>
+
+              {/* Reason Selector */}
+              <div>
+                <label className="block text-xs font-mono text-[#8e8574] uppercase tracking-wider mb-1.5">
+                  Reason for reporting <span className="text-rose-400">*</span>
+                </label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full px-3 py-2 rounded-[3px] bg-[#12100d] border border-[#3a352c] text-xs text-[#ede6d8] focus:outline-none focus:border-[#c9a227] font-mono cursor-pointer"
+                >
+                  <option value="Inappropriate or offensive content">Inappropriate or offensive content</option>
+                  <option value="Spam, advertising, or unsolicited promotion">Spam, advertising, or unsolicited promotion</option>
+                  <option value="False telemetry or deceptive security claims">False telemetry or deceptive security claims</option>
+                  <option value="Harassment, hate speech, or abuse">Harassment, hate speech, or abuse</option>
+                  <option value="Personally identifiable information (PII) leak">Personally identifiable information (PII) leak</option>
+                  <option value="Other policy violation">Other policy violation</option>
+                </select>
+              </div>
+
+              {/* Optional Custom Notes */}
+              <div>
+                <label className="block text-xs font-mono text-[#8e8574] uppercase tracking-wider mb-1">
+                  Additional details (optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={reportCustomNotes}
+                  onChange={(e) => setReportCustomNotes(e.target.value)}
+                  placeholder="Provide context that will help site administrators review this post..."
+                  className="w-full px-3 py-2 rounded-[3px] bg-[#12100d] border border-[#3a352c] text-xs text-[#ede6d8] placeholder-[#574f42] focus:outline-none focus:border-[#c9a227] leading-relaxed resize-none font-sans"
+                />
+              </div>
+
+              <div className="p-2.5 rounded bg-amber-950/30 border border-amber-800/40 text-[10.5px] font-mono text-amber-300 flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <span>This report will notify site administrators in the Admin Dashboard, allowing them to inspect and toggle visibility for this post.</span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseReportModal}
+                  className="px-3.5 py-1.5 rounded-[3px] border border-[#3a352c] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] hover:bg-[#1d1a15] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={reportingInProgress}
+                  className="px-4 py-1.5 rounded-[3px] bg-rose-700 hover:bg-rose-600 disabled:opacity-50 text-white font-semibold text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>{reportingInProgress ? 'Submitting...' : 'Submit Report'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

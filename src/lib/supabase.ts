@@ -22,27 +22,16 @@ const API_URL = (
 
 /**
  * Returns the canonical Google OAuth callback URL.
- * Routes through the deployed frontend/backend URL (https://tracexmail.vercel.app/auth/callback)
- * to ensure exact matching with the whitelist in the Supabase Dashboard and Google Cloud Console.
+ * Always resolves to the current active origin + /auth/callback so that authentication
+ * redirects back to this exact running app instance without 404 errors.
  */
 export function getGoogleOAuthRedirectUrl(): string {
   if (typeof window === 'undefined') {
     return `${clientAppUrl.replace(/\/$/, '')}/auth/callback`;
   }
 
-  // 1. If running on Vercel or custom production domain
-  if (window.location.origin.includes('vercel.app') || window.location.origin.includes('tracexmail.')) {
-    return `${window.location.origin}/auth/callback`;
-  }
-
-  // 2. If explicitly running on localhost
-  if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
-    return `${window.location.origin}/auth/callback`;
-  }
-
-  // 3. If running inside Google AI Studio container sandbox (*.run.app)
-  // Use the deployed production URL to match Supabase's allowed Redirect URIs
-  return `${clientAppUrl.replace(/\/$/, '')}/auth/callback`;
+  // Always use the active browser window origin so the user lands back in this exact app instance
+  return `${window.location.origin}/auth/callback`;
 }
 
 /**
