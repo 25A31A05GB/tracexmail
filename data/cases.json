@@ -279,5 +279,192 @@
         "details": "DMARC alignment verified"
       }
     }
+  },
+  {
+    "id": "case-1790962138931",
+    "user_id": "usr_jayramsappa537_gmail_com",
+    "user_email": "jayramsappa537@gmail.com",
+    "created_by": "usr_jayramsappa537_gmail_com",
+    "organization_id": "org_usr_jayramsappa537_gmail_com",
+    "title": "[ACTION REQUIRED] Corporate Multi-Factor Device Re-synchronization",
+    "description": "Analyzed RFC822 message submission (692 bytes) from file live_stream_1790962106553.eml. Statistical ML risk probability: 22.7%.",
+    "status": "QUARANTINED",
+    "severity": "CRITICAL",
+    "threat_score": 100,
+    "threat_score_breakdown": {
+      "total": 100,
+      "maxScore": 100,
+      "components": {
+        "authentication": {
+          "score": 25,
+          "max": 25,
+          "reasons": []
+        },
+        "domainRisk": {
+          "score": 23,
+          "max": 25,
+          "reasons": []
+        },
+        "infrastructureRisk": {
+          "score": 19,
+          "max": 20,
+          "reasons": []
+        },
+        "mlClassification": {
+          "score": 6,
+          "max": 20,
+          "reasons": []
+        },
+        "heuristics": {
+          "score": 8,
+          "max": 10,
+          "reasons": []
+        }
+      }
+    },
+    "classification": "Fraud-related",
+    "created_at": "2026-10-02T17:28:58.931Z",
+    "from_domain": "portal-sso-verify.net",
+    "origin_ip": "185.220.101.5",
+    "origin_country": "Germany",
+    "origin_asn": "AS60729",
+    "origin_asn_org": "Artikel10 e.V",
+    "infra_type": "TOR_EXIT_NODE",
+    "delivery_stage": "post-delivery-alert",
+    "deliveryStage": "post-delivery-alert",
+    "quarantine_action": "HOLD_QUARANTINED",
+    "quarantine_label": "TraceXMail-Quarantine",
+    "tags": [
+      "Ingested",
+      "Automated Forensic Analysis",
+      "Quarantined",
+      "Pre-Delivery Gate",
+      "Tor Relay",
+      "Authentication & Cryptographic Alignment",
+      "Domain Risk & Registration Intelligence"
+    ],
+    "assigned_user": "jayramsappa537@gmail.com",
+    "source": "gmail_ingest",
+    "ml_confidence": 0.226,
+    "phishing_probability": 0.2272,
+    "auth": {
+      "spf": {
+        "status": "FAIL",
+        "record": "Received-SPF: none (tracexmail.local: portal-sso-verify.net does not designate permitted sender hosts) client-ip=185.220.101.5;",
+        "ip": "185.220.101.5",
+        "domain": "portal-sso-verify.net",
+        "details": "SPF evaluated as FAIL"
+      },
+      "dkim": {
+        "status": "NONE",
+        "selector": "s1",
+        "domain": "portal-sso-verify.net",
+        "details": "DKIM signature evaluated as NONE"
+      },
+      "dmarc": {
+        "status": "FAIL",
+        "policy": "none",
+        "domain": "portal-sso-verify.net",
+        "details": "DMARC evaluated as FAIL (policy: none)"
+      },
+      "arc": {
+        "status": "NONE",
+        "details": "tracexmail.local;\r\n dkim=none (message not signed);\r\n spf=none (tracexmail.local: portal-sso-verify.net does not designate permitted sender hosts) smtp.mailfrom=helpdesk@portal-sso-verify.net\r\n smtp.helo=gateway.portal-sso-verify.net;\r\n dmarc=none header.from=portal-sso-verify.net;\r\n bimi=skipped (DMARC not enabled)"
+      }
+    },
+    "heuristics": [
+      {
+        "id": "h-authentication_alignment",
+        "title": "Authentication & Cryptographic Alignment",
+        "severity": "CRITICAL",
+        "description": "SPF validation hard-failed (-all rejected sending host IP); DMARC alignment policy failed",
+        "triggered": true
+      },
+      {
+        "id": "h-domain_risk_intelligence",
+        "title": "Domain Risk & Registration Intelligence",
+        "severity": "CRITICAL",
+        "description": "Domain portal-sso-verify.net does not exist in public authoritative DNS (NXDOMAIN); No Mail Exchanger (MX) records found in DNS",
+        "triggered": true
+      },
+      {
+        "id": "h-infrastructure_route_risk",
+        "title": "Transmission Route & Relay Infrastructure",
+        "severity": "CRITICAL",
+        "description": "Relay hop 185.220.101.5 flagged for anonymization / abuse score 95%",
+        "triggered": true
+      },
+      {
+        "id": "h-bec-learned",
+        "title": "Learned Business Email Compromise (BEC) Model Flag",
+        "severity": "HIGH",
+        "description": "Learned BEC classifier identified high payment alteration risk (71.1%). Primary signals: Urgent coercive language demanding expedited action; Display name claims corporate identity unaligned with sender.",
+        "triggered": true
+      },
+      {
+        "id": "h-llm-hypothesis",
+        "title": "Linguistic Hypothesis: authority impersonation, artificial urgency",
+        "severity": "MEDIUM",
+        "description": "[HYPOTHESIS] Model gemini-3.1-flash-lite inferred tone \"formal\" (confidence 95%). Techniques: authority_impersonation, artificial_urgency, credential_solicitation. Note: The tone is consistent with standard corporate IT communications, though the domain is suspicious.",
+        "triggered": true
+      }
+    ],
+    "why": {
+      "why": "Flagged with threat score 100/100 (CRITICAL, verdict SUSPICIOUS) due to detected threat vectors: Authentication Anomaly (+25 pts), Infrastructure & Relay Anomaly (+19 pts), Domain Intelligence Risk (+23 pts), Identity & Call-to-Action Heuristics (+8 pts), ML Content Lure Pattern (+6 pts).",
+      "evidence_chain": [
+        "1. Primary threat drivers: Authentication Anomaly (+25 pts), Infrastructure & Relay Anomaly (+19 pts), Domain Intelligence Risk (+23 pts), Identity & Call-to-Action Heuristics (+8 pts), ML Content Lure Pattern (+6 pts).",
+        "2. Authentication evaluation: SPF=FAIL, DKIM=NONE, DMARC=FAIL.",
+        "3. Triggered forensic heuristics: Authentication & Cryptographic Alignment; Domain Risk & Registration Intelligence; Transmission Route & Relay Infrastructure."
+      ],
+      "confidence": 0.7,
+      "limitation": "Authoritative multi-vector forensic evaluation."
+    },
+    "ai_narrative": {
+      "narrative": "Case ID 1790962138931 represents a high-confidence Business Email Compromise (BEC) attempt utilizing a deceptive, look-alike domain (portal-sso-verify.net) to harvest multi-factor authentication credentials. The email failed all cryptographic integrity checks (SPF/DKIM/DMARC) and originated from a high-risk German IP infrastructure, triggering a perfect 100/100 threat score. Immediate remediation is required, as the telemetry confirms this is a malicious credential harvesting campaign designed to bypass corporate security protocols.",
+      "model": "gemini-3.1-flash-lite",
+      "source": "TraceXMail Gemini AI Forensic Engine (gemini-3.1-flash-lite)",
+      "disclaimer": "AI-generated narrative summary based on deterministic forensic telemetry. Verify independently before regulatory or legal submission."
+    },
+    "aiNarrative": {
+      "narrative": "Case ID 1790962138931 represents a high-confidence Business Email Compromise (BEC) attempt utilizing a deceptive, look-alike domain (portal-sso-verify.net) to harvest multi-factor authentication credentials. The email failed all cryptographic integrity checks (SPF/DKIM/DMARC) and originated from a high-risk German IP infrastructure, triggering a perfect 100/100 threat score. Immediate remediation is required, as the telemetry confirms this is a malicious credential harvesting campaign designed to bypass corporate security protocols.",
+      "model": "gemini-3.1-flash-lite",
+      "source": "TraceXMail Gemini AI Forensic Engine (gemini-3.1-flash-lite)",
+      "disclaimer": "AI-generated narrative summary based on deterministic forensic telemetry. Verify independently before regulatory or legal submission."
+    },
+    "suggested_members": [
+      {
+        "email_id": "CASE-2026-0881",
+        "case_id": "CASE-2026-0881",
+        "subject": "Urgent: Wire Transfer Account Discrepancy",
+        "sender": "Chief Financial Officer <finance@executive-verify-auth.net>",
+        "relationship_strength": "STRONG",
+        "similarity_score": 0.5,
+        "reason": "Identical dedicated origin MTA relay IP 185.220.101.5 (Artikel10 e.V); Dispatched within 2 hours of each other (synchronized campaign delivery window)",
+        "shared_iocs": [
+          "IP: 185.220.101.5"
+        ],
+        "threat_score": 92,
+        "threat_verdict": "CRITICAL"
+      }
+    ],
+    "correlation_evidence": [
+      {
+        "rule": "SHARED_ORIGIN_IP",
+        "strength": "STRONG",
+        "description": "Identical dedicated origin MTA relay IP 185.220.101.5 (Artikel10 e.V)",
+        "value": "185.220.101.5",
+        "autoMergeEligible": true,
+        "iocType": "IP"
+      },
+      {
+        "rule": "SYNCHRONIZED_ATTACK_BURST",
+        "strength": "MEDIUM",
+        "description": "Dispatched within 2 hours of each other (synchronized campaign delivery window)",
+        "value": "2h",
+        "autoMergeEligible": false,
+        "iocType": "INFRASTRUCTURE"
+      }
+    ],
+    "correlation_count": 1
   }
 ]

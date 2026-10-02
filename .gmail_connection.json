@@ -1,0 +1,25 @@
+{
+  "orgId": "org_acme_soc_01",
+  "emailAddress": "jayramsappa537@gmail.com",
+  "isConnected": true,
+  "access_token_encrypted": "enc:aes-gcm:v1:35edee1afd02aeffbed53699:52ff7e9b9217aef441a951dcd61aea44:7a35ba8b47ead06f8c2daefa052877344e1ab89191c8",
+  "tokenExpiresAt": 1790965718510,
+  "lastRefreshedAt": "2026-10-02T17:28:38.511Z",
+  "quarantine": {
+    "enabled": true,
+    "threshold": 70,
+    "quarantineLabelName": "TraceXMail-Quarantine",
+    "removeInboxLabel": true,
+    "adminWebhookUrl": ""
+  },
+  "watch": {
+    "enabled": false,
+    "topicName": "projects/tracexmail-enterprise/topics/inbox-watch",
+    "subscription": "projects/tracexmail-enterprise/subscriptions/tracexmail-inbox-sub",
+    "active": false,
+    "expiration": null,
+    "historyId": null,
+    "lastPushReceivedAt": null
+  },
+  "updated_at": "2026-10-02T17:28:38.511Z"
+}
