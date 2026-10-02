@@ -112,9 +112,9 @@ export function UltimateBossAdminView({
 
   // System Stats State
   const [systemStats, setSystemStats] = useState({
-    totalUsers: 32,
+    totalUsers: 5,
     usersChangePct: '+14.2%',
-    activeUsers: 28,
+    activeUsers: 5,
     
     totalCasesScanned: 4892,
     investigationsChangePct: '+22.8%',
@@ -124,7 +124,7 @@ export function UltimateBossAdminView({
     healthScoreChangePct: '+1.4%',
     systemUptime: '99.99%',
     
-    totalReviews: 100,
+    totalReviews: 0,
     cpuUsage: '14.2%',
     memoryUsage: '342MB',
     ingestionRate: '124 EML/sec',
@@ -323,12 +323,27 @@ export function UltimateBossAdminView({
         emailMap.set(u.email.toLowerCase(), u);
       });
 
+      // Fetch live user reviews count
+      let reviewCount = 0;
+      try {
+        const revRes = await fetch('/api/testimonials');
+        if (revRes.ok) {
+          const revData = await revRes.json();
+          if (Array.isArray(revData.testimonials)) {
+            reviewCount = revData.testimonials.length;
+          }
+        }
+      } catch (revErr) {
+        console.warn('[UltimateBossAdmin] Error fetching testimonials count:', revErr);
+      }
+
       const allUsers = Array.from(emailMap.values());
       setUsers(allUsers);
       setSystemStats(prev => ({
         ...prev,
         totalUsers: allUsers.length,
-        activeUsers: allUsers.filter(u => u.status === 'ACTIVE').length
+        activeUsers: allUsers.filter(u => u.status === 'ACTIVE').length,
+        totalReviews: reviewCount
       }));
     } catch (err) {
       console.error('[UltimateBossAdmin] Error fetching directory:', err);

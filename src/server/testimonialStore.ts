@@ -38,16 +38,15 @@ function loadTestimonialsFromDisk(): UserTestimonial[] {
     if (fs.existsSync(TESTIMONIALS_FILE)) {
       const raw = fs.readFileSync(TESTIMONIALS_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
-    // Fallback: check primary data/user_testimonials.json
     const primaryFile = path.join(DATA_DIR, 'user_testimonials.json');
     if (fs.existsSync(primaryFile)) {
       const raw = fs.readFileSync(primaryFile, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -71,7 +70,7 @@ function saveTestimonialsToDisk(testimonials: UserTestimonial[]): boolean {
 }
 
 export function getLiveTestimonials(includeHidden: boolean = false): UserTestimonial[] {
-  if (!isLoaded || inMemoryTestimonials.length === 0) {
+  if (!isLoaded) {
     inMemoryTestimonials = loadTestimonialsFromDisk();
     isLoaded = true;
   }
