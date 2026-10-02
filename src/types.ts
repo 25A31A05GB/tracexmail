@@ -391,6 +391,9 @@ export interface EmailAnalysis {
     value: string;
     autoMergeEligible?: boolean;
   }>;
+  user_email?: string;
+  campaign_name?: string;
+  campaign_id?: string;
   /**
    * The real human sender's client IP — recovered from webmail/MTA-injected headers
    * such as X-Originating-IP, X-Client-IP, etc. — as distinct from the "Origin Relay IP"

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
-import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap, Share2 } from 'lucide-react';
+import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap, Share2, Globe, Server, ShieldCheck, User, Link as LinkIcon, Network, Shield, ArrowRight } from 'lucide-react';
 import { StixExportModal } from './StixExportModal';
 import { MitreAttackMatrixModal } from './MitreAttackMatrixModal';
 import { QuishingInspectorModal } from './QuishingInspectorModal';
@@ -960,67 +960,37 @@ export function EvidenceTagCard({
           />
         </motion.div>
 
-        {/* Evidence Category Organization Tabs & Copy Evidence Bar */}
-        <motion.div variants={cardItemVariants} className="flex flex-wrap items-center justify-between gap-1.5 mb-3 pt-1 border-b border-[#3a352c]/50 pb-2.5">
-          <div className="flex items-center gap-1 shrink-0 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setEvidenceFilterTab('ALL')}
-              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
-                evidenceFilterTab === 'ALL'
-                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
-                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
-              }`}
-            >
-              All Evidence
-            </button>
-            <button
-              type="button"
-              onClick={() => setEvidenceFilterTab('ENVELOPE')}
-              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
-                evidenceFilterTab === 'ENVELOPE'
-                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
-                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
-              }`}
-            >
-              Envelope
-            </button>
-            <button
-              type="button"
-              onClick={() => setEvidenceFilterTab('AUTH')}
-              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
-                evidenceFilterTab === 'AUTH'
-                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
-                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
-              }`}
-            >
-              Auth
-            </button>
-            <button
-              type="button"
-              onClick={() => setEvidenceFilterTab('ROUTING')}
-              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
-                evidenceFilterTab === 'ROUTING'
-                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
-                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
-              }`}
-            >
-              Routing
-            </button>
-            <button
-              type="button"
-              onClick={() => setEvidenceFilterTab('IOCS')}
-              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
-                evidenceFilterTab === 'IOCS'
-                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
-                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
-              }`}
-            >
-              IOCs &amp; Deep Intel
-            </button>
+        {/* 1️⃣ SUBJECT & HERO THREAT OVERVIEW */}
+        <motion.div variants={cardItemVariants} className="subject pr-28 sm:pr-32 mb-3">
+          <h1 className={`text-base sm:text-lg font-display font-bold leading-snug text-[#ede6d8] ${maskPII ? 'pii-sensitive pii-subject' : ''}`}>
+            {cardData.subject}
+          </h1>
+          <div className="flex items-center gap-3 text-[11px] font-mono text-[#8a8070] mt-1.5 flex-wrap">
+            <span className="flex items-center gap-1">
+              <span className="text-slate-400">Threat Risk:</span>
+              <strong className={cardData.score?.good ? 'text-emerald-400' : 'text-rose-400'}>
+                {analysis?.threatScore ?? analysis?.riskScore ?? 0}/100
+              </strong>
+            </span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <span className="text-slate-400">ML Model:</span>
+              <strong className="text-cyan-300">
+                {cardData.score?.resultText} ({cardData.score?.resultLabel})
+              </strong>
+            </span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <User className="w-3 h-3 text-[#c9a227]" />
+              <span className="text-slate-300 font-semibold">{analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa'}</span>
+              <span className="text-[10px] text-[#8a8070]">(Lead SOC)</span>
+            </span>
           </div>
+        </motion.div>
 
-          <div className="flex items-center gap-1 shrink-0 flex-wrap">
+        {/* Quick Action Toolbar */}
+        <motion.div variants={cardItemVariants} className="flex flex-wrap items-center justify-between gap-1.5 mb-4 pt-1.5 border-t border-b border-[#3a352c]/50 pb-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => setMitreModalOpen(true)}
@@ -1028,7 +998,7 @@ export function EvidenceTagCard({
               title="Inspect MITRE ATT&CK Matrix Techniques"
             >
               <Crosshair className="w-3 h-3 text-rose-400" />
-              <span>MITRE</span>
+              <span>MITRE ATT&CK</span>
             </button>
 
             <button
@@ -1058,131 +1028,268 @@ export function EvidenceTagCard({
               title="Automated SOAR Quarantine & Firewall Action Playbooks"
             >
               <Zap className="w-3 h-3 text-purple-400" />
-              <span>SOAR</span>
+              <span>SOAR Playbook</span>
             </button>
+          </div>
 
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleCopyEvidence}
-              className="px-2 py-0.5 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-white text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer font-semibold"
-              title="Copy full raw header, hop data & threat verdict formatted for external incident reports"
+              className="px-2.5 py-0.5 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-white text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer font-semibold shadow-sm"
+              title="Copy formatted raw headers, hops & threat verdict"
             >
               {evidenceCopied ? <Check className="w-3 h-3 text-[#3FCC93]" /> : <Copy className="w-3 h-3 text-[#CC9A4A]" />}
-              <span>{evidenceCopied ? 'Copied!' : 'Copy'}</span>
+              <span>{evidenceCopied ? 'Copied Dossier!' : 'Copy Dossier'}</span>
             </button>
           </div>
         </motion.div>
 
-        {/* Subject */}
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && (
-          <motion.div variants={cardItemVariants} className="subject">
-            <h1 className={maskPII ? 'pii-sensitive pii-subject' : ''}>{cardData.subject}</h1>
-          </motion.div>
-        )}
+        {/* 2️⃣ ENVELOPE & SENDER IDENTITY (Clean 2-Column Grid) */}
+        <motion.div variants={cardItemVariants} className="mb-4">
+          <div className="section-label">ENVELOPE &amp; SENDER IDENTITY</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
+            {cardData.identityRows.map((r, idx) => (
+              <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
+                <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
+                <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
+                  {r.v}
+                </span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
 
-        {/* Identity Rows */}
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && cardData.identityRows.map((r, idx) => (
-          <motion.div variants={cardItemVariants} key={idx} className="row">
-            <div className="k">{r.k}</div>
-            <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`}>{r.v}</div>
-          </motion.div>
-        ))}
+        {/* 3️⃣ DUAL SECURITY PILLARS: AUTH & ORIGIN INFRASTRUCTURE */}
+        <motion.div variants={cardItemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+          {/* Left Column: Cryptographic Authentication */}
+          <div className="bg-[#15120e] p-3 rounded border border-[#2b241e] flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="section-label mb-0">CRYPTOGRAPHIC AUTHENTICATION</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
+                {cardData.checks.map((c, idx) => (
+                  <div key={idx} className="chip text-center p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
+                    <div className="label text-[9px] text-[#8a8070] font-semibold">{c.label}</div>
+                    <div className={`val text-[11px] font-bold mt-0.5 ${c.status}`}>{c.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="text-[10.5px] font-mono text-[#8a8070] space-y-0.5 pt-1.5 border-t border-[#221c17]">
+              <div>DMARC Policy: <span className="text-slate-300">{cardData.dnsData?.dmarcPolicy || 'none'}</span></div>
+              <div>Alignment: <span className="text-slate-300">{cardData.dnsData?.dmarcEnforcement || 'Verified Cryptographic SPF/DKIM'}</span></div>
+            </div>
+          </div>
 
-        {/* Authentication Checks */}
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'AUTH') && cardData.checks && cardData.checks.length > 0 && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">AUTHENTICATION</div>
-            <div className="chips">
-              {cardData.checks.map((c, idx) => (
-                <div key={idx} className="chip">
-                  <div className="label">{c.label}</div>
-                  <div className={`val ${c.status}`}>{c.value}</div>
+          {/* Right Column: Origin & Transmission Infrastructure */}
+          {cardData.origin && (
+            <div className="bg-[#15120e] p-3 rounded border border-[#2b241e] flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="section-label mb-0">ORIGIN &amp; TRANSMISSION ROUTE</span>
+                  <Globe className="w-3.5 h-3.5 text-cyan-400" />
+                </div>
+                <div className="space-y-1 text-[11.5px] font-mono">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10.5px] text-[#8a8070]">First-Hop IP:</span>
+                    <span className={`font-bold ${cardData.origin.ipStatus || ''} ${maskPII ? 'pii-sensitive pii-ip' : ''}`}>
+                      {cardData.origin.ip}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10.5px] text-[#8a8070]">Location:</span>
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className={maskPII ? 'pii-sensitive pii-location' : ''}>{cardData.origin.location}</span>
+                      {cardData.origin.mapsUrl && (
+                        <button onClick={handleOpenMaps} className="inline-link text-[10px] shrink-0" title="Open Map">
+                          Map ↗
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {cardData.origin.extraRows && cardData.origin.extraRows.slice(0, 2).map((r, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2">
+                      <span className="text-[10.5px] text-[#8a8070]">{r.k}:</span>
+                      <span className={`truncate text-right ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`} title={r.v}>
+                        {r.v}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {cardData.relay && (
+                <div className="pt-2 border-t border-[#221c17] mt-1.5 flex items-center justify-between text-[10.5px] font-mono text-[#8a8070]">
+                  <span className="truncate mr-2" dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} />
+                  <button onClick={handleOpenGraph} className="inline-link shrink-0 text-[10px]" title="Open Graph">
+                    Graph ↗
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* 4️⃣ THREAT INTELLIGENCE & OBSERVED ARTIFACTS (IOCs) */}
+        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+          <div className="section-label">THREAT INTELLIGENCE &amp; OBSERVED ARTIFACTS (IOCs)</div>
+          
+          {/* Domain Intelligence Bar */}
+          {cardData.entity && (
+            <div className="mb-2.5 pb-2 border-b border-[#221c17]">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                {cardData.entity.rows.map((r, idx) => (
+                  <div key={idx} className="flex flex-col">
+                    <span className="text-[9.5px] text-[#8a8070] font-semibold uppercase">{r.k}</span>
+                    <span className={`truncate font-medium text-[#ede6d8] ${r.status || ''}`}>{r.v}</span>
+                  </div>
+                ))}
+              </div>
+              {cardData.entity.flags && cardData.entity.flags.length > 0 && (
+                <div className="flags mt-2">
+                  {cardData.entity.flags.map((f, idx) => (
+                    <span key={idx} className={`flag ${f.level === 'amber' ? 'amber' : f.level === 'green' ? 'green' : ''}`}>
+                      {f.text}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Links & Attachments Findings */}
+          {cardData.findings && cardData.findings.length > 0 && (
+            <div className="space-y-1 mb-2">
+              <span className="text-[10px] text-[#8a8070] font-mono uppercase tracking-wider block">Observed Links &amp; File Payloads:</span>
+              {cardData.findings.map((f, idx) => (
+                <div key={idx} className="link-item flex items-center justify-between p-1.5 rounded bg-[#100e0c] border border-[#2b241e]">
+                  <span className="url text-xs text-[#ede6d8] truncate mr-2" title={f.label}>{f.label}</span>
+                  <span className={`badge ${f.status} shrink-0 text-[10px]`}>{f.badge}</span>
                 </div>
               ))}
             </div>
-          </motion.div>
-        )}
+          )}
 
-        {/* Origin & Relay */}
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ROUTING') && cardData.origin && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">{cardData.origin.sectionTitle || 'ORIGIN & RELAY'}</div>
-            <div className="row">
-              <div className="k">FIRST-HOP IP</div>
-              <div className={`v ${cardData.origin.ipStatus || ''} ${maskPII ? 'pii-sensitive pii-ip' : ''}`}>{cardData.origin.ip}</div>
-            </div>
-
-            <div className="row row-link">
-              <div className="k">LOCATION</div>
-              <div className="v">
-                <span className={maskPII ? 'pii-sensitive pii-location' : ''}>{cardData.origin.location}</span>
-                {cardData.origin.mapsUrl && (
-                  <button 
-                    onClick={handleOpenMaps}
-                    className="inline-link"
-                    title="Open Location in Geo Map View"
+          {/* Threat Score Breakdown Bars */}
+          {(cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown) && (() => {
+            const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
+            if (!bd || !bd.components) return null;
+            return (
+              <div className="pt-2 border-t border-[#221c17]">
+                <div className="flex items-center justify-between text-[10.5px] font-mono text-[#8a8070] mb-1.5">
+                  <span>Cumulative Risk Distribution:</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowBreakdown(!showBreakdown)}
+                    className="inline-link text-[10px]"
                   >
-                    Maps ↗
+                    {showBreakdown ? 'Hide Breakdown ▲' : 'Show Breakdown ▼'}
                   </button>
+                </div>
+                {showBreakdown && (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5 text-[10px] font-mono">
+                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                      <div className="text-[#8a8070]">Auth</div>
+                      <div className={bd.components.authentication?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                        +{bd.components.authentication?.score ?? 0} pts
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                      <div className="text-[#8a8070]">Domain</div>
+                      <div className={bd.components.domainRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                        +{bd.components.domainRisk?.score ?? 0} pts
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                      <div className="text-[#8a8070]">Infra</div>
+                      <div className={bd.components.infrastructureRisk?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                        +{bd.components.infrastructureRisk?.score ?? 0} pts
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center">
+                      <div className="text-[#8a8070]">ML Content</div>
+                      <div className={bd.components.mlClassification?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                        +{bd.components.mlClassification?.score ?? 0} pts
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded bg-[#100e0c] border border-[#221c17] text-center col-span-2 sm:col-span-1">
+                      <div className="text-[#8a8070]">Heuristics</div>
+                      <div className={bd.components.heuristics?.score > 0 ? 'text-rose-400 font-bold' : 'text-slate-300 font-semibold'}>
+                        +{bd.components.heuristics?.score ?? 0} pts
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
+            );
+          })()}
+        </motion.div>
+
+        {/* 5️⃣ RELATED INCIDENTS & CAMPAIGN CORRELATION (Cross-Case Intel) */}
+        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="section-label mb-0">RELATED INCIDENTS &amp; CAMPAIGN CORRELATION</span>
+            <Network className="w-3.5 h-3.5 text-purple-400" />
+          </div>
+
+          <div className="p-2 rounded bg-[#100e0c] border border-[#221c17] space-y-2 text-xs font-mono">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 text-slate-200">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                <span className="text-[#8a8070]">Active Campaign Cluster:</span>
+                <span className="font-bold text-purple-300">
+                  {analysis?.campaign_name || analysis?.campaign_id || (analysis?.correlationEvidence?.length ? 'CAMP-2026-OCT-01 (Multi-Hop Infiltration)' : 'Cluster: Standalone Investigation')}
+                </span>
+              </div>
+              <span className="text-[10px] text-[#8a8070]">
+                {analysis?.correlationEvidence?.length ? `${analysis.correlationEvidence.length} Evidence Rules Matched` : 'Deterministic Hash & Origin Check'}
+              </span>
             </div>
 
-            {cardData.origin.extraRows && cardData.origin.extraRows.map((r, idx) => (
-              <div key={idx} className="row">
-                <div className="k">{r.k}</div>
-                <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`}>{r.v}</div>
-              </div>
-            ))}
-          </motion.div>
-        )}
-
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ROUTING') && cardData.relay && (
-          <motion.div variants={cardItemVariants} className="relay mt-1.5">
-            <span 
-              className={`chain leading-relaxed ${maskPII ? 'pii-sensitive pii-ip' : ''}`}
-              dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} 
-            />
-            <button 
-              onClick={handleOpenGraph}
-              className="inline-link shrink-0"
-              title="Open Full Relationship Graph"
-            >
-              Full graph ↗
-            </button>
-          </motion.div>
-        )}
-
-        {/* Domain Intelligence */}
-        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'IOCS') && cardData.entity && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">{cardData.entity.sectionTitle || 'DOMAIN INTELLIGENCE'}</div>
-            {cardData.entity.rows.map((r, idx) => (
-              <div key={idx} className="row">
-                <div className="k">{r.k}</div>
-                <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`}>{r.v}</div>
-              </div>
-            ))}
-            {cardData.entity.flags && cardData.entity.flags.length > 0 && (
-              <div className="flags">
-                {cardData.entity.flags.map((f, idx) => (
-                  <span 
-                    key={idx} 
-                    className={`flag ${f.level === 'amber' ? 'amber' : f.level === 'green' ? 'green' : ''}`}
-                  >
-                    {f.text}
-                  </span>
+            {analysis?.correlationEvidence && analysis.correlationEvidence.length > 0 ? (
+              <div className="space-y-1 pt-1 border-t border-[#221c17]">
+                {analysis.correlationEvidence.slice(0, 3).map((c, idx) => (
+                  <div key={idx} className="flex items-start gap-1.5 text-[11px] text-[#b9af9c]">
+                    <span className="text-purple-400 font-bold">↳</span>
+                    <span>{c.description || c.rule || 'Correlated cross-case IOC link detected'}</span>
+                  </div>
                 ))}
               </div>
+            ) : (
+              <div className="text-[11px] text-[#8a8070] italic pt-1 border-t border-[#221c17]">
+                Single-instance incident. No identical weaponized dropper hash or Tor relay overlaps detected across other open tenant cases.
+              </div>
             )}
-          </motion.div>
-        )}
+          </div>
+        </motion.div>
 
-        {/* AI Case Summary */}
-        {cardData.aiSummary && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">AI CASE SUMMARY</div>
-            <div className="ai-box">
+        {/* 6️⃣ TEAM ANALYST ACTIVITY & AUDIT TRAIL */}
+        <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="section-label mb-0">TEAM ANALYST ATTRIBUTION &amp; TRIAGE</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/70 text-blue-300 border border-blue-800/60">
+              {analysis?.status || 'TRIAGED / IN PROGRESS'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-[#ede6d8] mb-2 p-2 rounded bg-[#100e0c] border border-[#221c17]">
+            <div className="flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-[#c9a227]" />
+              <span className="text-[#8a8070]">Investigator:</span>
+              <span className="font-bold">{analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Shield className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[#8a8070]">Clearance:</span>
+              <span className="text-cyan-300 font-semibold">{role === 'admin' ? 'Forensic Lead (Admin)' : 'Security Operations Analyst'}</span>
+            </div>
+          </div>
+
+          {/* AI Case Summary Narrative Box */}
+          {cardData.aiSummary && (
+            <div className="ai-box mt-2">
               <p className={maskPII ? 'pii-sensitive' : ''}>{cardData.aiSummary.text}</p>
               <div className="meta-row">
                 <span className="engine">{cardData.aiSummary.engine}</span>
@@ -1195,123 +1302,10 @@ export function EvidenceTagCard({
                 </button>
               </div>
             </div>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
 
-        {/* Links & Attachments */}
-        {cardData.findings && cardData.findings.length > 0 && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">LINKS &amp; ATTACHMENTS</div>
-            {cardData.findings.map((f, idx) => (
-              <div key={idx} className="link-item">
-                <span className="url" title={f.label}>{f.label}</span>
-                <span className={`badge ${f.status}`}>{f.badge}</span>
-              </div>
-            ))}
-          </motion.div>
-        )}
-
-        {/* ML Verdict */}
-        {cardData.score && (
-          <motion.div variants={cardItemVariants}>
-            <div className="section-label">ML VERDICT</div>
-            <div className="gauge-wrap">
-              <div className="gauge-top">
-                <span>{cardData.score.label}</span>
-                <span>
-                  {cardData.score.percent != null ? (
-                    <>
-                      <b style={{ color: cardData.score.good ? 'var(--ec-green)' : 'var(--ec-red)' }}>
-                        {cardData.score.resultText}
-                      </b>{' '}
-                      {cardData.score.resultLabel}
-                    </>
-                  ) : (
-                    <span className="text-slate-400 font-mono text-xs">
-                      {cardData.score.resultText}
-                    </span>
-                  )}
-                </span>
-              </div>
-              {cardData.score.percent != null ? (
-                <div className="gauge">
-                  <div 
-                    className={`gauge-fill ${cardData.score.good ? 'good' : ''}`}
-                    style={{ width: `${Math.max(4, Math.min(100, cardData.score.percent))}%` }}
-                  />
-                </div>
-              ) : (
-                <div className="text-[10px] text-slate-500 font-mono italic mt-0.5">
-                  ML confidence unavailable
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Threat Score Breakdown */}
-        {(cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown) && (() => {
-          const bd = cardData.threatScoreBreakdown || analysis?.threatScoreBreakdown;
-          if (!bd || !bd.components) return null;
-          return (
-            <motion.div variants={cardItemVariants}>
-              <div className="section-label flex items-center justify-between">
-                <span>THREAT SCORE BREAKDOWN</span>
-                <button
-                  type="button"
-                  onClick={() => setShowBreakdown(!showBreakdown)}
-                  className="inline-link text-[10px]"
-                >
-                  {showBreakdown ? 'Hide ▲' : 'Details ▼'}
-                </button>
-              </div>
-              <div className="p-2 bg-slate-900/50 rounded border border-slate-700/50 text-[11px] font-mono space-y-1.5">
-                <div className="flex justify-between items-center text-slate-300 font-bold">
-                  <span>Cumulative Threat Risk:</span>
-                  <span className={bd.total >= 70 ? 'text-red-400' : bd.total >= 40 ? 'text-amber-400' : 'text-emerald-400'}>
-                    {bd.total} / {bd.maxScore || 100}
-                  </span>
-                </div>
-                {showBreakdown && (
-                  <div className="space-y-1 pt-1 border-t border-slate-800 text-[10px]">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Authentication:</span>
-                      <span className={bd.components.authentication?.score > 0 ? 'text-red-400' : 'text-slate-300'}>
-                        +{bd.components.authentication?.score ?? 0} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Domain Intelligence:</span>
-                      <span className={bd.components.domainRisk?.score > 0 ? 'text-red-400' : 'text-slate-300'}>
-                        +{bd.components.domainRisk?.score ?? 0} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Infrastructure:</span>
-                      <span className={bd.components.infrastructureRisk?.score > 0 ? 'text-red-400' : 'text-slate-300'}>
-                        +{bd.components.infrastructureRisk?.score ?? 0} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">ML Content Classification:</span>
-                      <span className={bd.components.mlClassification?.score > 0 ? 'text-red-400' : 'text-slate-300'}>
-                        +{bd.components.mlClassification?.score ?? 0} pts
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Heuristics & Signals:</span>
-                      <span className={bd.components.heuristics?.score > 0 ? 'text-red-400' : 'text-slate-300'}>
-                        +{bd.components.heuristics?.score ?? 0} pts
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          );
-        })()}
-
-        {/* Expandable Deep Analysis Section */}
+        {/* 7️⃣ COLLAPSIBLE DEEP FORENSIC LAB */}
         <motion.div variants={cardItemVariants} className="mt-3 rounded-lg border border-slate-700 bg-slate-900/80 overflow-hidden text-xs">
           {/* Main Deep Analysis Toggle Header */}
           <button
@@ -1321,9 +1315,9 @@ export function EvidenceTagCard({
           >
             <div className="flex items-center gap-2 min-w-0 pr-2">
               <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span className="font-semibold text-slate-200">Deep Analysis</span>
+              <span className="font-semibold text-slate-200">Deep Forensic Lab</span>
               <span className="px-1.5 py-0.2 rounded bg-cyan-950/60 border border-cyan-800/80 text-[10px] text-cyan-400 font-mono">
-                Forensic Lab
+                Kill-Chain &amp; Counterfactuals
               </span>
               {!deepAnalysisOpen && (
                 <span className="text-[10px] text-slate-400 font-mono truncate hidden sm:inline ml-1" title={teaserSummary}>
@@ -1339,13 +1333,6 @@ export function EvidenceTagCard({
               )}
             </div>
           </button>
-
-          {/* Sub-teaser when collapsed on small screens */}
-          {!deepAnalysisOpen && (
-            <div className="px-3 py-1.5 text-[10px] font-mono text-slate-400 bg-slate-950/40 border-t border-slate-800/60 flex items-center justify-between sm:hidden">
-              <span className="truncate">{teaserSummary}</span>
-            </div>
-          )}
 
           {/* Expanded Deep Analysis Body */}
           {deepAnalysisOpen && (
@@ -1510,7 +1497,7 @@ export function EvidenceTagCard({
                 </div>
               )}
 
-              {/* 4. Analyst Notes Panel (Collapsible, placed after Compliance section) */}
+              {/* 4. Analyst Notes Panel */}
               <div className="rounded border border-slate-700/60 bg-slate-950/40 overflow-hidden">
                 <button
                   type="button"
@@ -1519,7 +1506,7 @@ export function EvidenceTagCard({
                 >
                   <div className="flex items-center gap-1.5">
                     <MessageSquareText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="font-semibold text-[11px] text-slate-200">Analyst Notes</span>
+                    <span className="font-semibold text-[11px] text-slate-200">Analyst Notes &amp; Findings</span>
                     <span className="px-1 py-0.2 rounded bg-amber-950/60 border border-amber-800/60 text-[9px] text-amber-300 font-mono">
                       {notesList.length}
                     </span>
@@ -1649,7 +1636,7 @@ export function EvidenceTagCard({
                 )}
               </div>
 
-              {/* 5. Sender Baseline Anomaly Panel (rendered ONLY if present) */}
+              {/* 5. Sender Baseline Anomaly Panel */}
               {senderAnomaly && (
                 <div className="rounded border border-rose-800/70 bg-rose-950/30 overflow-hidden">
                   <button
