@@ -33,6 +33,7 @@ import {
   Zap,
   Mail,
   SlidersHorizontal,
+  Crown,
   X
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -59,6 +60,7 @@ export type NavTab =
   | 'gmail'
   | 'organization'
   | 'team'
+  | 'boss_admin'
   | 'settings';
 
 interface SidebarProps {
@@ -241,6 +243,7 @@ export function Sidebar({
   ];
 
   const adminNavItems: NavItem[] = [
+    { id: 'boss_admin', label: 'The Ultimate Boss', icon: Crown },
     { id: 'organization', label: 'Organization', icon: Building2 },
     { id: 'team', label: 'Team & access', icon: Users },
   ];

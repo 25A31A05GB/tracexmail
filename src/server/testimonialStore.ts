@@ -38,14 +38,22 @@ function loadTestimonialsFromDisk(): UserTestimonial[] {
     if (fs.existsSync(TESTIMONIALS_FILE)) {
       const raw = fs.readFileSync(TESTIMONIALS_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    // Fallback: check primary data/user_testimonials.json
+    const primaryFile = path.join(DATA_DIR, 'user_testimonials.json');
+    if (fs.existsSync(primaryFile)) {
+      const raw = fs.readFileSync(primaryFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed;
       }
     }
   } catch (err) {
     console.warn('[testimonialStore] Could not read user_testimonials.json from disk:', err);
   }
-  // No fake reviews: Return empty array if no user has posted yet
   return [];
 }
 
@@ -63,7 +71,7 @@ function saveTestimonialsToDisk(testimonials: UserTestimonial[]): boolean {
 }
 
 export function getLiveTestimonials(includeHidden: boolean = false): UserTestimonial[] {
-  if (!isLoaded) {
+  if (!isLoaded || inMemoryTestimonials.length === 0) {
     inMemoryTestimonials = loadTestimonialsFromDisk();
     isLoaded = true;
   }
