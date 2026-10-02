@@ -36,6 +36,7 @@ import {
 import { apiClient } from '../lib/api';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { UserRole } from '../hooks/useSession';
+import { OrgUserManagementSection } from './OrgUserManagementSection';
 import { 
   PrivacyConfig, 
   DEFAULT_PRIVACY_CONFIG, 
@@ -526,115 +527,13 @@ export function OrganizationView({
         </div>
       )}
 
-      {/* SECTION 2: TEAM ROSTER & ROLE DELEGATION */}
+      {/* SECTION 2: TEAM ROSTER, BULK & SINGLE USER PROVISIONING */}
       {activeSection === 'team' && (
         <div className="space-y-4 animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-serif font-bold text-base text-[#ede6d8]">
-                Team Directory &amp; RBAC Role Assignment
-              </h3>
-              <p className="text-xs text-[#8a8070]">
-                {role === 'admin'
-                  ? 'Assign and modify roles directly below. Changes take effect across active sessions immediately.'
-                  : 'Current organizational team roster. Administrative clearance required to modify privileges.'}
-              </p>
-            </div>
-
-            <button
-              onClick={fetchTeamMembers}
-              disabled={loadingTeam}
-              className="px-3 py-1.5 rounded-lg bg-[#1a1712] border border-[#3a352c] text-xs font-mono text-[#b9af9c] hover:text-[#ede6d8] flex items-center gap-1.5 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingTeam ? 'animate-spin' : ''}`} />
-              <span>Refresh Roster</span>
-            </button>
-          </div>
-
-          <div className="bg-[#14120f] border border-[#3a352c] rounded-xl overflow-hidden shadow-lg">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-sans">
-                <thead className="bg-[#110f0c] text-[#8a8070] font-mono uppercase text-[10px] border-b border-[#3a352c]">
-                  <tr>
-                    <th className="p-3.5">Operator</th>
-                    <th className="p-3.5">Email Address</th>
-                    <th className="p-3.5">Current Role</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 text-right">Role Delegation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#262119] text-[#b9af9c]">
-                  {teamMembers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-6 text-center text-[#8a8070]">
-                        {loadingTeam ? 'Loading verified team roster…' : 'No team members registered.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    teamMembers.map((member) => {
-                      const isCurrentUser = member.email === 'tracexmailofficial@gmail.com' || member.email === 'jayramsappa537@gmail.com';
-                      return (
-                        <tr key={member.id} className="hover:bg-[#1a1712]/50">
-                          <td className="p-3.5 font-medium text-[#ede6d8] flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-[#221e17] border border-[#3a352c] flex items-center justify-center font-mono font-bold text-amber-400 text-xs">
-                              {member.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-semibold">{member.name}</div>
-                              {isCurrentUser && (
-                                <span className="text-[9px] font-mono text-amber-400">OFFICIAL DPO / LEAD</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3.5 font-mono text-[#ede6d8]">{member.email}</td>
-                          <td className="p-3.5">
-                            <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-bold ${
-                              member.role === 'admin' 
-                                ? 'bg-amber-950/60 text-amber-300 border border-amber-800' 
-                                : member.role === 'analyst' 
-                                ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-800' 
-                                : 'bg-purple-950/60 text-purple-300 border border-purple-800'
-                            }`}>
-                              {member.role ? member.role.toUpperCase() : 'ANALYST'}
-                            </span>
-                          </td>
-                          <td className="p-3.5 font-mono text-[11px]">
-                            <span className="text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                              <span>{member.status || 'ACTIVE'}</span>
-                            </span>
-                          </td>
-                          <td className="p-3.5 text-right">
-                            {role === 'admin' ? (
-                              <div className="inline-flex items-center gap-1.5">
-                                <select
-                                  value={member.role || 'analyst'}
-                                  onChange={(e) => handleUpdateRole(member.id, e.target.value as UserRole)}
-                                  disabled={updatingMemberId === member.id}
-                                  className="bg-[#1c1813] border border-[#3a352c] text-[#ede6d8] text-xs font-mono rounded px-2 py-1 cursor-pointer focus:outline-none focus:border-amber-400 disabled:opacity-50"
-                                >
-                                  <option value="admin">Admin (Root)</option>
-                                  <option value="analyst">Analyst (SOC)</option>
-                                  <option value="read_only">Auditor (Read-Only)</option>
-                                </select>
-                                {updatingMemberId === member.id && (
-                                  <RefreshCw className="w-3 h-3 text-amber-400 animate-spin" />
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-[10px] font-mono text-[#8a8070] italic">
-                                Admin clearance required
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <OrgUserManagementSection
+            organizationId={organizationId}
+            currentUserRole={role}
+          />
         </div>
       )}
 

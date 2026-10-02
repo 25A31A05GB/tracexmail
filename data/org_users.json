@@ -1,0 +1,234 @@
+[
+  {
+    "id": "usr_org_admin_01",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "TraceXMail Global SOC",
+    "name": "Jayram Sappa",
+    "email": "jayramsappa537@gmail.com",
+    "employeeId": "EMP-0001",
+    "role": "admin",
+    "permissions": {
+      "canAnalyzeHeaders": true,
+      "canSyncGmail": true,
+      "canManageCases": true,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": true,
+      "canRunRetentionPurge": true
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$gKK15FV8XXnbh9Kmiks8OOniEQdJfHND2KBBRMxnxRWVearbAl7Vm",
+    "clearPassword": "Password1234!",
+    "lastActive": "Active Now",
+    "createdBy": "system",
+    "created_at": "2026-10-02T06:24:11.818Z",
+    "updated_at": "2026-10-02T07:19:12.114Z"
+  },
+  {
+    "id": "usr_org_official_admin",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "TraceXMail Global SOC",
+    "name": "SOC Lead Administrator",
+    "email": "tracexmailofficial@gmail.com",
+    "employeeId": "EMP-0002",
+    "role": "admin",
+    "permissions": {
+      "canAnalyzeHeaders": true,
+      "canSyncGmail": true,
+      "canManageCases": true,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": true,
+      "canRunRetentionPurge": true
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$gKK15FV8XXnbh9Kmiks8OOniEQdJfHND2KBBRMxnxRWVearbAl7Vm",
+    "clearPassword": "Password1234!",
+    "lastActive": "Active Now",
+    "createdBy": "system",
+    "created_at": "2026-10-02T06:24:11.819Z",
+    "updated_at": "2026-10-02T06:24:11.819Z"
+  },
+  {
+    "id": "usr_org_analyst_01",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "TraceXMail Global SOC",
+    "name": "Alex Vance",
+    "email": "analyst@enterprise.corp",
+    "employeeId": "EMP-1021",
+    "role": "analyst",
+    "permissions": {
+      "canAnalyzeHeaders": true,
+      "canSyncGmail": true,
+      "canManageCases": true,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": false,
+      "canRunRetentionPurge": false
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$gKK15FV8XXnbh9Kmiks8OOniEQdJfHND2KBBRMxnxRWVearbAl7Vm",
+    "clearPassword": "Password1234!",
+    "lastActive": "15m ago",
+    "createdBy": "jayramsappa537@gmail.com",
+    "created_at": "2026-10-02T06:24:11.819Z",
+    "updated_at": "2026-10-02T06:24:11.819Z"
+  },
+  {
+    "id": "usr_org_auditor_01",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "TraceXMail Global SOC",
+    "name": "Sarah Connor",
+    "email": "auditor@tracexmail.sec",
+    "employeeId": "EMP-1022",
+    "role": "read_only",
+    "permissions": {
+      "canAnalyzeHeaders": false,
+      "canSyncGmail": false,
+      "canManageCases": false,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": false,
+      "canRunRetentionPurge": false
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$gKK15FV8XXnbh9Kmiks8OOniEQdJfHND2KBBRMxnxRWVearbAl7Vm",
+    "clearPassword": "Password1234!",
+    "lastActive": "2h ago",
+    "createdBy": "jayramsappa537@gmail.com",
+    "created_at": "2026-10-02T06:24:11.819Z",
+    "updated_at": "2026-10-02T06:24:11.819Z"
+  },
+  {
+    "id": "usr_org_1790924773507_501957",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "Enterprise SOC",
+    "name": "Bulk Analyst A",
+    "email": "analyst.a.1790924773379@acme-soc.corp",
+    "employeeId": "EMP-7588",
+    "role": "analyst",
+    "permissions": {
+      "canAnalyzeHeaders": true,
+      "canSyncGmail": true,
+      "canManageCases": true,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": false,
+      "canRunRetentionPurge": false
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$M8w/WqVNIPHp8WRXK5/0een07PPaNvKgGJILuL87h/Y2hHphZgfD2",
+    "clearPassword": "!fyqL5XNwXr@",
+    "lastActive": "Just provisioned",
+    "createdBy": "jayramsappa537@gmail.com",
+    "created_at": "2026-10-02T07:06:13.507Z",
+    "updated_at": "2026-10-02T07:06:13.507Z",
+    "notificationStatus": {
+      "sent": true,
+      "sentAt": "2026-10-02T07:06:13.508Z",
+      "channel": "EMAIL_SMTP",
+      "messageId": "<inv_usr_org_1790924773507_501957_1790924773508@tracexmail.smtp.internal>",
+      "template": "welcome_creds",
+      "deliveryStatus": "DELIVERED",
+      "recipient": "analyst.a.1790924773379@acme-soc.corp"
+    },
+    "notificationHistory": [
+      {
+        "id": "notif_1790924773508_a7b6",
+        "type": "welcome_creds",
+        "timestamp": "2026-10-02T07:06:13.508Z",
+        "status": "DELIVERED",
+        "subject": "Welcome to TraceXMail SOC - Account Provisioned [Badge: EMP-7588]",
+        "messageId": "<inv_usr_org_1790924773507_501957_1790924773508@tracexmail.smtp.internal>"
+      }
+    ]
+  },
+  {
+    "id": "usr_org_1790924773605_242371",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "Enterprise SOC",
+    "name": "Bulk Analyst B",
+    "email": "analyst.b.1790924773379@acme-soc.corp",
+    "employeeId": "EMP-5804",
+    "role": "read_only",
+    "permissions": {
+      "canAnalyzeHeaders": false,
+      "canSyncGmail": false,
+      "canManageCases": false,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": false,
+      "canRunRetentionPurge": false
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$BPEwikcMrEhKUYITL9HtHeaZcxZjKEtM8LHRlCmPwLKmnkkE2J7li",
+    "clearPassword": "4tGuJX#r$j7s",
+    "lastActive": "Just provisioned",
+    "createdBy": "jayramsappa537@gmail.com",
+    "created_at": "2026-10-02T07:06:13.606Z",
+    "updated_at": "2026-10-02T07:06:13.606Z",
+    "notificationStatus": {
+      "sent": true,
+      "sentAt": "2026-10-02T07:06:13.606Z",
+      "channel": "EMAIL_SMTP",
+      "messageId": "<inv_usr_org_1790924773605_242371_1790924773606@tracexmail.smtp.internal>",
+      "template": "welcome_creds",
+      "deliveryStatus": "DELIVERED",
+      "recipient": "analyst.b.1790924773379@acme-soc.corp"
+    },
+    "notificationHistory": [
+      {
+        "id": "notif_1790924773606_11fb",
+        "type": "welcome_creds",
+        "timestamp": "2026-10-02T07:06:13.606Z",
+        "status": "DELIVERED",
+        "subject": "Welcome to TraceXMail SOC - Account Provisioned [Badge: EMP-5804]",
+        "messageId": "<inv_usr_org_1790924773605_242371_1790924773606@tracexmail.smtp.internal>"
+      }
+    ]
+  },
+  {
+    "id": "usr_org_1790925552230_6a79de",
+    "organizationId": "org_acme_soc_01",
+    "organizationName": "Enterprise SOC",
+    "name": "Marcus Holloway",
+    "email": "marcus_1790925552127@dedsec.corp",
+    "employeeId": "EMP-7319",
+    "role": "analyst",
+    "permissions": {
+      "canAnalyzeHeaders": true,
+      "canSyncGmail": true,
+      "canManageCases": true,
+      "canExportDossiers": true,
+      "canAccessLiveFeeds": true,
+      "canManageUsers": false,
+      "canRunRetentionPurge": false
+    },
+    "status": "ACTIVE",
+    "passwordHash": "$2b$10$TWFOJll7wJs6INLEZLPaHeofN1hFJwhMT/VlDORJWxewSBobq.AUG",
+    "clearPassword": "WtSb6PY3!ySs",
+    "lastActive": "Just provisioned",
+    "createdBy": "jayramsappa537@gmail.com",
+    "created_at": "2026-10-02T07:19:12.230Z",
+    "updated_at": "2026-10-02T07:19:12.230Z",
+    "notificationStatus": {
+      "sent": true,
+      "sentAt": "2026-10-02T07:19:12.231Z",
+      "channel": "EMAIL_SMTP",
+      "messageId": "<inv_usr_org_1790925552230_6a79de_1790925552231@tracexmail.smtp.internal>",
+      "template": "welcome_creds",
+      "deliveryStatus": "DELIVERED",
+      "recipient": "marcus_1790925552127@dedsec.corp"
+    },
+    "notificationHistory": [
+      {
+        "id": "notif_1790925552231_c2ef",
+        "type": "welcome_creds",
+        "timestamp": "2026-10-02T07:19:12.231Z",
+        "status": "DELIVERED",
+        "subject": "Welcome to TraceXMail SOC - Account Provisioned [Badge: EMP-7319]",
+        "messageId": "<inv_usr_org_1790925552230_6a79de_1790925552231@tracexmail.smtp.internal>"
+      }
+    ]
+  }
+]

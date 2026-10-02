@@ -26,7 +26,8 @@ import {
   Share2,
   FlaskConical,
   Trash2,
-  Radar
+  Radar,
+  Copy
 } from 'lucide-react';
 import { forensicApi, CaseItem } from '../lib/api';
 import { EmailAnalysis } from '../types';
@@ -34,6 +35,7 @@ import { SAMPLE_ANALYSES } from '../data/samples';
 import { useWebSocketAlerts } from '../hooks/useWebSocketAlerts';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { getStandardizedVerdict } from '../utils/verdict';
+import { formatEvidenceReport } from '../utils/formatEvidenceReport';
 import { UserRole, useSession } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { EvidenceTagCard } from './EvidenceTagCard';
@@ -82,6 +84,7 @@ export function CasesView({
   // Selected Case Detail Drawer/Modal
   const [selectedCaseDetail, setSelectedCaseDetail] = useState<any | null>(null);
   const [previewEvidenceAnalysis, setPreviewEvidenceAnalysis] = useState<EmailAnalysis | null>(null);
+  const [copiedCaseId, setCopiedCaseId] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [editingNotes, setEditingNotes] = useState<boolean>(false);
   const [notesDraft, setNotesDraft] = useState<string>('');
@@ -440,6 +443,24 @@ export function CasesView({
         setPreviewEvidenceAnalysis(mapped);
       }
     }
+  };
+
+  const handleCopyCaseEvidence = (caseItem: any) => {
+    let mappedAnalysis: EmailAnalysis | null = null;
+    if (caseItem.headers && caseItem.verdict && caseItem.auth) {
+      mappedAnalysis = caseItem;
+    } else {
+      const match = SAMPLE_ANALYSES.find((s) => s.id === (caseItem.id || caseItem.email_id));
+      if (match) {
+        mappedAnalysis = match;
+      } else {
+        mappedAnalysis = mapBackendCaseToAnalysis(caseItem);
+      }
+    }
+    const reportText = formatEvidenceReport(undefined, mappedAnalysis);
+    navigator.clipboard.writeText(reportText);
+    setCopiedCaseId(caseItem.id || caseItem.case_id || 'copied');
+    setTimeout(() => setCopiedCaseId(null), 2500);
   };
 
   const handleInspectCase = (caseItem: any) => {
@@ -1056,16 +1077,28 @@ export function CasesView({
 
                       <div className="flex items-center gap-1.5">
                         <button
+                          onClick={() => handleCopyCaseEvidence(c)}
+                          title="Copy raw header, hop data & threat verdict in a clean formatted text block"
+                          className="px-2 py-1 bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border border-amber-600/50 rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedCaseId === (c.id || c.case_id) ? (
+                            <Check className="w-3 h-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-amber-400" />
+                          )}
+                          <span>{copiedCaseId === (c.id || c.case_id) ? 'Copied' : 'Copy'}</span>
+                        </button>
+                        <button
                           onClick={() => handlePreviewEvidence(c)}
                           title="Inspect Evidence Card"
-                          className="px-2 py-1 bg-amber-950/80 text-amber-300 border border-amber-700/60 rounded text-[11px] font-semibold flex items-center gap-1"
+                          className="px-2 py-1 bg-amber-950/80 text-amber-300 border border-amber-700/60 rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer hover:bg-amber-900/70"
                         >
                           <Tag className="w-3 h-3" />
                           <span>Evidence</span>
                         </button>
                         <button
                           onClick={() => handleInspectCase(c)}
-                          className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded text-[11px] font-semibold flex items-center gap-1"
+                          className="px-2.5 py-1 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/40 rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
                         >
                           <span>Inspect</span>
                           <ArrowUpRight className="w-3 h-3" />
@@ -1318,6 +1351,18 @@ export function CasesView({
                                 <ChevronRight className="w-3 h-3" />
                               </button>
                             )}
+                            <button
+                              onClick={() => handleCopyCaseEvidence(c)}
+                              title="Copy raw header, hop data & threat verdict formatted for incident reports"
+                              className="px-2.5 py-1.5 bg-amber-950/50 hover:bg-amber-900/60 text-amber-300 border border-amber-600/50 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              {copiedCaseId === (c.id || c.case_id) ? (
+                                <Check className="w-3 h-3 text-emerald-400" />
+                              ) : (
+                                <Copy className="w-3 h-3 text-amber-400" />
+                              )}
+                              <span className="hidden sm:inline">{copiedCaseId === (c.id || c.case_id) ? 'Copied' : 'Copy Evidence'}</span>
+                            </button>
                             <button
                               onClick={() => handlePreviewEvidence(c)}
                               title="Inspect Forensic Evidence Tag Card"
@@ -1617,6 +1662,18 @@ export function CasesView({
               </div>
               
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleCopyCaseEvidence(selectedCaseDetail)}
+                  className="px-3 py-1.5 bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 rounded border border-amber-600/60 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Copy formatted evidence report with raw headers, hops & threat verdict"
+                >
+                  {copiedCaseId === (selectedCaseDetail.id || selectedCaseDetail.case_id) ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-amber-400" />
+                  )}
+                  <span>{copiedCaseId === (selectedCaseDetail.id || selectedCaseDetail.case_id) ? 'Copied Evidence' : 'Copy Evidence'}</span>
+                </button>
                 <button
                   onClick={() => handlePreviewEvidence(selectedCaseDetail)}
                   className="px-3 py-1.5 bg-amber-950 hover:bg-amber-800 text-amber-300 rounded border border-amber-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"

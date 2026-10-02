@@ -6,6 +6,22 @@ import { VitePWA } from 'vite-plugin-pwa';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    {
+      name: 'disable-hmr-websocket',
+      transform(code, id) {
+        if (id.includes('vite/dist/client/client.mjs') || id.includes('@vite/client')) {
+          return {
+            code: code
+              .replace(
+                /let wsTransport = createWebSocketModuleRunnerTransport\([\s\S]*?pingInterval: hmrTimeout\s*\}\);/g,
+                'let wsTransport = { connect: async () => {}, disconnect: async () => {}, send: () => {} };'
+              )
+              .replace(/console\.error\(`\[vite\] failed to connect[\s\S]*?throw e;/g, '/* hmr disabled */')
+              .replace(/console\.error\(\s*`\[vite\] failed to connect[\s\S]*?\);/g, '/* hmr notice ignored */')
+          };
+        }
+      }
+    },
     react(),
     tailwindcss(),
     VitePWA({

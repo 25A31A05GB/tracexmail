@@ -12,10 +12,13 @@ import {
   FileSearch,
   CheckCircle2,
   XCircle,
-  Hash
+  Hash,
+  Copy,
+  Check
 } from 'lucide-react';
 import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../../data/samples';
 import { EmailAnalysis } from '../../types';
+import { formatEvidenceReport } from '../../utils/formatEvidenceReport';
 
 interface ForensicEvidenceDossierProps {
   onExploreCase?: (index: number) => void;
@@ -27,7 +30,15 @@ export const ForensicEvidenceDossier: React.FC<ForensicEvidenceDossierProps> = (
   className = ''
 }) => {
   const [activeCaseIndex, setActiveCaseIndex] = useState<number>(0);
+  const [evidenceCopied, setEvidenceCopied] = useState<boolean>(false);
   const currentCase = SAMPLE_ANALYSES[activeCaseIndex] || SAMPLE_ANALYSES[0] || EMPTY_ANALYSIS;
+
+  const handleCopyDossierEvidence = () => {
+    const reportText = formatEvidenceReport(undefined, currentCase);
+    navigator.clipboard.writeText(reportText);
+    setEvidenceCopied(true);
+    setTimeout(() => setEvidenceCopied(false), 2500);
+  };
 
   const cases = [
     {
@@ -271,7 +282,16 @@ export const ForensicEvidenceDossier: React.FC<ForensicEvidenceDossierProps> = (
             <span className="truncate max-w-[200px]">{activeDossier.evidenceHash}</span>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+            <button
+              onClick={handleCopyDossierEvidence}
+              className="px-2.5 py-1.5 rounded-[3px] bg-[#1c1813] hover:bg-[#252019] text-[#c9a227] hover:text-[#ede6d8] border border-[#c9a227]/50 text-[11.5px] font-['IBM_Plex_Mono',monospace] font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow"
+              title="Copy formatted raw headers, hop traceroute & threat verdict for incident reports"
+            >
+              {evidenceCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#c9a227]" />}
+              <span>{evidenceCopied ? 'Report Copied!' : 'Copy Evidence'}</span>
+            </button>
+
             <div className={`px-2.5 py-1 rounded-[2px] font-['IBM_Plex_Mono',monospace] text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5 ${
               isMalicious
                 ? 'bg-[#b23a2e]/25 text-[#ff8d7d] border border-[#b23a2e]/60'

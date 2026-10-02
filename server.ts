@@ -134,6 +134,21 @@ import {
 } from './src/server/compliance';
 import { createAuthRouter } from './src/server/authRoutes';
 import { getAllStoredProfiles, getStoredProfile, saveStoredProfile } from './src/server/userProfileStore';
+import {
+  getOrgUsers,
+  findOrgUser,
+  createOrgUser,
+  bulkCreateOrgUsers,
+  updateOrgUser,
+  resetOrgUserPassword,
+  deleteOrgUser,
+  authenticateOrgUser,
+  generateSecurePassword,
+  resendOrgUserNotification,
+  dispatchUserInvitationNotification,
+  DEFAULT_PERMISSIONS_BY_ROLE,
+  type OrgUser
+} from './src/server/orgUserStore';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
@@ -6370,103 +6385,429 @@ Thanks!`;
     orgId: string;
   }> = [];
 
-  // Team & RBAC Management Endpoints (wired to profiles and team_invitations in Supabase)
-  app.get('/api/team/members', publicLimiter, async (_req, res) => {
-    const defaultRoster = [
-      { id: 'mem_001', name: 'Robert Simmons', email: 'r.simmons@acmedefense.sec', role: 'admin', status: 'ACTIVE', lastActive: 'Just now' },
-      { id: 'mem_002', name: 'Jane Lopez', email: 'j.lopez@acmedefense.sec', role: 'analyst', status: 'ACTIVE', lastActive: '12m ago' },
-      { id: 'mem_003', name: 'Thomas Adams', email: 't.adams@compliance-audit.org', role: 'read_only', status: 'ACTIVE', lastActive: '2h ago' },
-      { id: 'mem_004', name: 'Elena Rostova', email: 'e.rostova@acmedefense.sec', role: 'analyst', status: 'ACTIVE', lastActive: '1d ago' }
-    ];
+  // ============================================================================
+  // MULTI-TENANT ORGANIZATION USER MANAGEMENT & RBAC ENDPOINTS
+  // ============================================================================
 
-    const supabase = getSupabaseAdminClient();
-    if (!supabase) {
-      const activeProvisioned = provisionedEmployees.map(emp => ({
-        id: emp.id,
-        name: emp.name,
-        email: emp.email,
-        role: emp.role,
-        status: emp.status,
-        lastActive: 'Provisioned Active'
-      }));
-      return res.json([...activeProvisioned, ...memoryInvitations, ...defaultRoster]);
-    }
-
+  // 1. Get Organization Users (Strict Multi-Tenant Isolation - only returns members of this org)
+  app.get('/api/organization/users', authenticatedLimiter, requireAuth, async (req, res) => {
     try {
-      const [{ data: profiles, error: profErr }, { data: invitations, error: invErr }] = await Promise.all([
-        supabase.from('profiles').select('*').eq('organization_id', DEFAULT_ORG_ID),
-        supabase.from('team_invitations').select('*').eq('organization_id', DEFAULT_ORG_ID).eq('status', 'PENDING')
-      ]);
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const users = getOrgUsers(orgId);
 
-      const members: any[] = [];
-      
-      // Include any newly provisioned employees in memory
-      provisionedEmployees.forEach(emp => {
-        members.push({
-          id: emp.id,
-          name: emp.name,
-          email: emp.email,
-          role: emp.role,
-          status: emp.status,
-          lastActive: 'Provisioned Active'
-        });
+      return res.json({
+        organizationId: orgId,
+        totalMembers: users.length,
+        users: users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          employeeId: u.employeeId,
+          role: u.role,
+          permissions: u.permissions,
+          status: u.status,
+          clearPassword: caller.role === 'admin' ? u.clearPassword : undefined, // Handover recovery for admins
+          lastActive: u.lastActive,
+          createdBy: u.createdBy,
+          notificationStatus: u.notificationStatus,
+          created_at: u.created_at
+        }))
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Error fetching organization users:', err);
+      res.status(500).json({ error: err.message || 'Failed to fetch organization users' });
+    }
+  });
+
+  // 2. Single User Provisioning (Admin only)
+  app.post(['/api/organization/users/create', '/api/organization/users'], authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const { name, email, employeeId, role, password, permissions, sendNotification, notificationType, customMessage } = req.body || {};
+
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: 'A valid email address is required.' });
+      }
+
+      const { user, generatedPassword } = await createOrgUser({
+        organizationId: orgId,
+        organizationName: caller.organizationId ? 'Enterprise SOC' : 'TraceXMail Global SOC',
+        name: name || email.split('@')[0],
+        email: email.trim(),
+        employeeId: employeeId?.trim(),
+        role: role || 'analyst',
+        password: password,
+        permissions: permissions,
+        createdBy: caller.email
       });
 
-      if (profiles && profiles.length > 0) {
-        profiles.forEach(p => {
-          if (!members.some(m => m.email?.toLowerCase() === p.email?.toLowerCase())) {
-            members.push({
-              id: p.id,
-              name: p.full_name || p.email?.split('@')[0] || 'Security Operator',
-              email: p.email,
-              role: p.role || 'analyst',
-              status: 'ACTIVE',
-              lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : 'Active'
-            });
-          }
+      let notifStatus = undefined;
+      if (sendNotification !== false) {
+        notifStatus = dispatchUserInvitationNotification({
+          user,
+          generatedPassword,
+          template: notificationType || 'welcome_creds',
+          customMessage,
+          loginUrl: `${req.protocol}://${req.get('host')}`
         });
       }
 
-      // Merge resilient stored profiles
-      const storedProfiles = getAllStoredProfiles();
-      storedProfiles.forEach(sp => {
-        if (!members.some(m => m.email?.toLowerCase() === sp.email?.toLowerCase())) {
-          members.push({
-            id: sp.id,
-            name: sp.fullName,
-            email: sp.email,
-            role: sp.role,
-            status: 'ACTIVE',
-            lastActive: sp.updatedAt ? new Date(sp.updatedAt).toLocaleDateString() : 'Active'
-          });
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'CREATE_ORG_USER',
+        resource_type: 'user_management',
+        resource_id: user.id,
+        details: {
+          created_user_email: user.email,
+          employee_id: user.employeeId,
+          assigned_role: user.role,
+          permissions: user.permissions,
+          notification_sent: Boolean(notifStatus)
+        },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `User ${user.email} successfully provisioned.`,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          employeeId: user.employeeId,
+          role: user.role,
+          permissions: user.permissions,
+          status: user.status,
+          notificationStatus: notifStatus || user.notificationStatus,
+          created_at: user.created_at
+        },
+        credentials: {
+          email: user.email,
+          employeeId: user.employeeId,
+          password: generatedPassword,
+          role: user.role,
+          notificationStatus: notifStatus,
+          loginUrl: `${req.protocol}://${req.get('host')}`
         }
       });
+    } catch (err: any) {
+      console.error('[OrgAPI] Error creating user:', err);
+      res.status(400).json({ error: err.message || 'Failed to create organization user' });
+    }
+  });
 
-      if (members.length === 0) {
-        members.push(...defaultRoster);
+  // 3. Bulk User Provisioning (Admin only - CSV / Batch Table / Seat Generator)
+  app.post('/api/organization/users/bulk', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const { users, organizationName, sendNotifications, notificationType, customMessage } = req.body || {};
+
+      if (!Array.isArray(users) || users.length === 0) {
+        return res.status(400).json({ error: 'An array of user objects is required for bulk creation.' });
       }
 
-      if (invitations && invitations.length > 0) {
-        invitations.forEach(inv => {
-          members.push({
-            id: inv.id,
-            name: inv.email.split('@')[0],
-            email: inv.email,
-            role: inv.role,
-            status: 'PENDING',
-            lastActive: 'Invitation Dispatched'
-          });
-        });
-      } else {
-        // Include any memory invitations if DB table is unpopulated
-        members.unshift(...memoryInvitations);
+      if (users.length > 200) {
+        return res.status(400).json({ error: 'Bulk provisioning limit is 200 accounts per batch.' });
       }
 
+      const result = await bulkCreateOrgUsers(
+        orgId,
+        organizationName || 'Enterprise SOC',
+        users,
+        caller.email,
+        {
+          sendNotifications: sendNotifications !== false,
+          notificationType: notificationType || 'welcome_creds',
+          customMessage,
+          loginUrl: `${req.protocol}://${req.get('host')}`
+        }
+      );
+
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'BULK_CREATE_ORG_USERS',
+        resource_type: 'user_management',
+        details: {
+          requested_count: users.length,
+          created_count: result.createdCount,
+          failed_count: result.failedCount,
+          notifications_triggered: sendNotifications !== false
+        },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `Bulk provisioning complete: ${result.createdCount} created, ${result.failedCount} failed.`,
+        createdCount: result.createdCount,
+        failedCount: result.failedCount,
+        createdUsers: result.createdUsers,
+        errors: result.errors,
+        notificationsTriggered: sendNotifications !== false,
+        notificationType: notificationType || 'welcome_creds',
+        loginUrl: `${req.protocol}://${req.get('host')}`
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Bulk provisioning error:', err);
+      res.status(500).json({ error: err.message || 'Failed to process bulk user creation' });
+    }
+  });
+
+  // 3b. Resend Invitation / Notification Trigger (Admin only)
+  app.post('/api/organization/users/:id/resend-invite', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const userId = req.params.id;
+      const { template, customMessage } = req.body || {};
+
+      const result = await resendOrgUserNotification(orgId, userId, {
+        template: template || 'welcome_creds',
+        customMessage,
+        loginUrl: `${req.protocol}://${req.get('host')}`
+      });
+
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'RESEND_USER_INVITATION',
+        resource_type: 'user_management',
+        resource_id: userId,
+        details: {
+          recipient_email: result.user.email,
+          template: template || 'welcome_creds',
+          delivery_status: result.notificationStatus.deliveryStatus
+        },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `Invitation notification re-dispatched to ${result.user.email}.`,
+        notificationStatus: result.notificationStatus
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Error resending invitation:', err);
+      res.status(400).json({ error: err.message || 'Failed to resend invitation' });
+    }
+  });
+
+  // 4. Update Org User Role & Permissions (Admin only)
+  app.patch('/api/organization/users/:id', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const userId = req.params.id;
+      const { role, permissions, status, name, employeeId } = req.body || {};
+
+      const updated = await updateOrgUser(orgId, userId, {
+        role,
+        permissions,
+        status,
+        name,
+        employeeId
+      });
+
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'UPDATE_ORG_USER',
+        resource_type: 'user_management',
+        resource_id: userId,
+        details: {
+          updated_role: updated.role,
+          updated_status: updated.status,
+          permissions: updated.permissions
+        },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `Operator ${updated.email} updated successfully.`,
+        user: {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          employeeId: updated.employeeId,
+          role: updated.role,
+          permissions: updated.permissions,
+          status: updated.status,
+          updated_at: updated.updated_at
+        }
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Error updating user:', err);
+      res.status(400).json({ error: err.message || 'Failed to update user' });
+    }
+  });
+
+  // 5. Reset Org User Password (Admin only)
+  app.post('/api/organization/users/:id/reset-password', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const userId = req.params.id;
+      const { newPassword } = req.body || {};
+
+      const { user, newPassword: generatedPwd } = await resetOrgUserPassword(orgId, userId, newPassword);
+
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'RESET_USER_PASSWORD',
+        resource_type: 'user_management',
+        resource_id: userId,
+        details: { user_email: user.email },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `Password reset successfully for ${user.email}.`,
+        credentials: {
+          email: user.email,
+          employeeId: user.employeeId,
+          newPassword: generatedPwd,
+          loginUrl: `${req.protocol}://${req.get('host')}`
+        }
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Password reset error:', err);
+      res.status(400).json({ error: err.message || 'Failed to reset password' });
+    }
+  });
+
+  // 6. Delete / Revoke Org User (Admin only)
+  app.delete('/api/organization/users/:id', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const userId = req.params.id;
+
+      const deleted = await deleteOrgUser(orgId, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      await logAuditAction({
+        organization_id: orgId,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'REVOKE_ORG_USER',
+        resource_type: 'user_management',
+        resource_id: userId,
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: 'User revoked and removed from organization.',
+        userId
+      });
+    } catch (err: any) {
+      console.error('[OrgAPI] Delete user error:', err);
+      res.status(500).json({ error: err.message || 'Failed to delete user' });
+    }
+  });
+
+  // Legacy team roster compatibility endpoint (now scoped strictly to org users)
+  app.get('/api/team/members', publicLimiter, async (req, res) => {
+    try {
+      const orgId = (req as any).user?.organizationId || DEFAULT_ORG_ID;
+      const users = getOrgUsers(orgId);
+      const members = users.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        employeeId: u.employeeId,
+        role: u.role,
+        permissions: u.permissions,
+        status: u.status,
+        lastActive: u.lastActive || 'Active'
+      }));
       res.json(members);
     } catch (err: any) {
-      console.error('[TeamAPI] Error fetching team members:', err);
-      res.json([...memoryInvitations, ...defaultRoster]);
+      res.json([]);
     }
+  });
+
+  // Legacy employee create compatibility endpoint
+  app.post('/api/team/create-employee', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const caller = (req as AuthenticatedRequest).user!;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const { name, email, password, role, employeeId } = req.body || {};
+
+      const { user, generatedPassword } = await createOrgUser({
+        organizationId: orgId,
+        name: name || email?.split('@')[0],
+        email: email || '',
+        employeeId,
+        role: role || 'analyst',
+        password,
+        createdBy: caller.email
+      });
+
+      res.json({
+        status: 'success',
+        employee: {
+          id: user.id,
+          employeeId: user.employeeId,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          tempPassword: generatedPassword,
+          status: user.status,
+          created_at: user.created_at
+        }
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Failed to create employee' });
+    }
+  });
+
+  // Verify employee credentials during sign in
+  app.post('/api/team/verify-employee-auth', publicLimiter, (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ authenticated: false, error: 'Email and password required' });
+    }
+
+    const result = authenticateOrgUser(email, password);
+    if (result.authenticated && result.user) {
+      return res.json({
+        authenticated: true,
+        user: {
+          id: result.user.id,
+          employeeId: result.user.employeeId,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role,
+          permissions: result.user.permissions,
+          orgName: result.user.organizationName || 'Acme Cyber Defense SOC',
+          organizationId: result.user.organizationId
+        }
+      });
+    }
+
+    return res.status(401).json({ authenticated: false, error: 'Invalid operator credentials' });
   });
 
   // Update Team Member Role (Admin clearance required)
@@ -6479,48 +6820,9 @@ Thanks!`;
       }
 
       const caller = (req as AuthenticatedRequest).user!;
-      const supabase = getSupabaseAdminClient();
-      let updated = false;
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
 
-      // 1. Update in provisionedEmployees if present
-      const emp = provisionedEmployees.find(e => e.id === memberId || e.employeeId === memberId || e.email.toLowerCase() === memberId.toLowerCase());
-      if (emp) {
-        emp.role = role as any;
-        updated = true;
-      }
-
-      // 2. Update in stored profiles
-      const stored = getStoredProfile(memberId);
-      if (stored) {
-        await saveStoredProfile({ ...stored, role: role as any, updatedAt: new Date().toISOString() });
-        updated = true;
-      }
-
-      // 3. Update in Supabase profiles table
-      if (supabase) {
-        try {
-          const { error } = await supabase
-            .from('profiles')
-            .update({ role, updated_at: new Date().toISOString() })
-            .or(`id.eq.${memberId},email.eq.${memberId}`);
-          if (!error) updated = true;
-        } catch (err) {
-          console.warn('[TeamAPI] Supabase role update warning:', err);
-        }
-      }
-
-      // 4. Log immutable audit action
-      await logAuditAction({
-        organization_id: caller.organizationId || DEFAULT_ORG_ID,
-        user_id: caller.userId,
-        user_email: caller.email,
-        user_role: caller.role,
-        action: 'UPDATE_MEMBER_ROLE',
-        resource_type: 'team_member',
-        resource_id: memberId,
-        details: { member_id: memberId, new_role: role },
-        status: 'SUCCESS'
-      }, getSupabaseClient());
+      await updateOrgUser(orgId, memberId, { role: role as any });
 
       return res.json({
         status: 'success',
@@ -6539,35 +6841,9 @@ Thanks!`;
     try {
       const memberId = req.params.id;
       const caller = (req as AuthenticatedRequest).user!;
-      const supabase = getSupabaseAdminClient();
+      const orgId = caller.organizationId || DEFAULT_ORG_ID;
 
-      // 1. Remove from provisionedEmployees
-      const idx = provisionedEmployees.findIndex(e => e.id === memberId || e.employeeId === memberId || e.email.toLowerCase() === memberId.toLowerCase());
-      if (idx !== -1) {
-        provisionedEmployees.splice(idx, 1);
-      }
-
-      // 2. Remove from Supabase profiles if possible
-      if (supabase) {
-        try {
-          await supabase.from('profiles').delete().or(`id.eq.${memberId},email.eq.${memberId}`);
-        } catch (err) {
-          console.warn('[TeamAPI] Supabase delete member warning:', err);
-        }
-      }
-
-      // 3. Log audit action
-      await logAuditAction({
-        organization_id: caller.organizationId || DEFAULT_ORG_ID,
-        user_id: caller.userId,
-        user_email: caller.email,
-        user_role: caller.role,
-        action: 'REVOKE_TEAM_MEMBER',
-        resource_type: 'team_member',
-        resource_id: memberId,
-        details: { member_id: memberId },
-        status: 'SUCCESS'
-      }, getSupabaseClient());
+      await deleteOrgUser(orgId, memberId);
 
       return res.json({
         status: 'success',
@@ -6590,8 +6866,9 @@ Thanks!`;
           badge: 'ROOT CLEARANCE',
           description: 'Full organizational authority over tenant security, access delegation, and retention policies.',
           capabilities: [
-            'Invite and provision employee accounts',
-            'Assign and modify member roles (Admin, Analyst, Auditor)',
+            'Invite, single-create and bulk-provision employee accounts',
+            'Assign and modify member roles and granular module permissions',
+            'Reset operator credentials and export master onboarding manifests',
             'Execute NIST SP 800-86 retention and data purge actions',
             'Configure PII masking policies and emergency overrides',
             'Inspect immutable audit logs across all operators',
@@ -6610,7 +6887,7 @@ Thanks!`;
             'Live Gmail sync and automated threat quarantine triage',
             'Convert real-world threat feeds into active cases',
             'Export cryptographically signed PDF and Markdown dossiers',
-            'View team members and organizational privacy policies',
+            'View organization roster and compliance policies',
             'Cannot purge audit logs or change member roles'
           ]
         },
@@ -7126,6 +7403,7 @@ Thanks!`;
       server: { middlewareMode: true, allowedHosts: true, hmr: false },
       appType: 'spa',
     });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');

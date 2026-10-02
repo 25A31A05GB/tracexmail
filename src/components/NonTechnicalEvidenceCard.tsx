@@ -14,10 +14,12 @@ import {
   Sparkles,
   Check,
   Download,
-  Share2
+  Share2,
+  Copy
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { getStandardizedVerdict } from '../utils/verdict';
+import { formatEvidenceReport } from '../utils/formatEvidenceReport';
 
 interface NonTechnicalEvidenceCardProps {
   analysis: EmailAnalysis;
@@ -35,7 +37,19 @@ export function NonTechnicalEvidenceCard({
   onOpenSettings
 }: NonTechnicalEvidenceCardProps) {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [copiedEvidence, setCopiedEvidence] = useState<boolean>(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
+
+  const handleCopyEvidence = () => {
+    const reportText = formatEvidenceReport(undefined, analysis);
+    navigator.clipboard.writeText(reportText);
+    setCopiedEvidence(true);
+    setActionFeedback('Full raw header, hop data & threat verdict copied as formatted incident report!');
+    setTimeout(() => {
+      setCopiedEvidence(false);
+      setActionFeedback(null);
+    }, 4000);
+  };
 
   const stdVerdict = getStandardizedVerdict(analysis);
   const threatScore = stdVerdict.score;
@@ -262,24 +276,33 @@ export function NonTechnicalEvidenceCard({
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={handleCopyEvidence}
+            className="text-[11.5px] font-mono text-[#D3A039] hover:text-[#ede6d8] px-2.5 py-1 rounded bg-[#1D1712] border border-[#D3A039]/40 hover:border-[#D3A039] transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-semibold"
+            title="Copy formatted evidence report for incident responders"
+          >
+            {copiedEvidence ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-[#D3A039]" />}
+            <span>{copiedEvidence ? 'Evidence Copied!' : 'Copy Evidence'}</span>
+          </button>
+
           {onOpenNewModal && (
             <button
               onClick={onOpenNewModal}
-              className="text-[13.5px] text-[#9C9186] hover:text-[#EDE6DC] border-b border-[#2B241E] hover:border-[#9C9186] pb-0.5 transition-colors cursor-pointer bg-transparent"
+              className="text-[13px] text-[#9C9186] hover:text-[#EDE6DC] border-b border-[#2B241E] hover:border-[#9C9186] pb-0.5 transition-colors cursor-pointer bg-transparent hidden sm:inline-block"
             >
-              Check another email
+              Check another
             </button>
           )}
 
           {onSwitchToTechnical && (
             <button
               onClick={onSwitchToTechnical}
-              className="text-[12px] font-mono text-[#D3A039] hover:text-[#e4b554] px-2 py-1 rounded bg-[#1D1712] border border-[#2B241E] hover:border-[#D3A039]/50 transition-all cursor-pointer flex items-center gap-1"
+              className="text-[12px] font-mono text-[#EDE6DC] hover:text-[#D3A039] px-2 py-1 rounded bg-[#17130F] border border-[#2B241E] hover:border-[#D3A039]/50 transition-all cursor-pointer flex items-center gap-1"
               title="Switch to full forensic analyst console"
             >
               <Terminal className="w-3 h-3" />
-              <span>Analyst View</span>
+              <span className="hidden sm:inline">Analyst View</span>
             </button>
           )}
         </div>

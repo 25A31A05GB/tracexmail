@@ -10,6 +10,7 @@ import { generateAttackNarrative } from '../utils/attackNarrative';
 import { computeCounterfactuals, CounterfactualFactor } from '../utils/counterfactual';
 import { mapComplianceFlags, ComplianceFlag } from '../utils/complianceMapping';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
+import { formatEvidenceReport } from '../utils/formatEvidenceReport';
 import { apiFetch } from '../lib/api';
 import { useSession } from '../hooks/useSession';
 
@@ -429,6 +430,8 @@ export function EvidenceTagCard({
 }: EvidenceCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
+  const [evidenceCopied, setEvidenceCopied] = useState(false);
+  const [evidenceFilterTab, setEvidenceFilterTab] = useState<'ALL' | 'ENVELOPE' | 'AUTH' | 'ROUTING' | 'IOCS'>('ALL');
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [deepAnalysisOpen, setDeepAnalysisOpen] = useState(false);
   const [showAllCounterfactuals, setShowAllCounterfactuals] = useState(false);
@@ -683,11 +686,15 @@ export function EvidenceTagCard({
     }
   };
 
+  const handleCopyEvidence = () => {
+    const reportText = formatEvidenceReport(cardData, analysis);
+    navigator.clipboard.writeText(reportText);
+    setEvidenceCopied(true);
+    setTimeout(() => setEvidenceCopied(false), 2500);
+  };
+
   const handleCopySummary = () => {
-    const text = `TRACE-X EVIDENCE CARD: ${cardData.caseId}\nEvidence ID: ${cardData.evidenceId}\nTimestamp: ${cardData.timestamp}\nVerdict: ${cardData.verdict.text} (${cardData.verdict.scoreLabel})\nSubject: ${cardData.subject}\nChecks: ${cardData.checks.map(c => `${c.label}:${c.value}`).join(' | ')}\nOrigin: ${cardData.origin?.ip || ''} (${cardData.origin?.location || ''})\nSHA-256: ${cardData.footer?.hash || ''}\nSOC Action: ${cardData.footer?.action || ''}`;
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    handleCopyEvidence();
   };
 
   const handleOpenMaps = (e: React.MouseEvent) => {
@@ -836,13 +843,86 @@ export function EvidenceTagCard({
           />
         </motion.div>
 
-        {/* Subject */}
-        <motion.div variants={cardItemVariants} className="subject">
-          <h1>{cardData.subject}</h1>
+        {/* Evidence Category Organization Tabs & Copy Evidence Bar */}
+        <motion.div variants={cardItemVariants} className="flex flex-wrap items-center justify-between gap-1.5 mb-3 pt-1 border-b border-[#3a352c]/50 pb-2.5">
+          <div className="flex items-center gap-1 shrink-0 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setEvidenceFilterTab('ALL')}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
+                evidenceFilterTab === 'ALL'
+                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
+                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
+              }`}
+            >
+              All Evidence
+            </button>
+            <button
+              type="button"
+              onClick={() => setEvidenceFilterTab('ENVELOPE')}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
+                evidenceFilterTab === 'ENVELOPE'
+                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
+                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
+              }`}
+            >
+              Envelope
+            </button>
+            <button
+              type="button"
+              onClick={() => setEvidenceFilterTab('AUTH')}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
+                evidenceFilterTab === 'AUTH'
+                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
+                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
+              }`}
+            >
+              Auth
+            </button>
+            <button
+              type="button"
+              onClick={() => setEvidenceFilterTab('ROUTING')}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
+                evidenceFilterTab === 'ROUTING'
+                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
+                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
+              }`}
+            >
+              Routing
+            </button>
+            <button
+              type="button"
+              onClick={() => setEvidenceFilterTab('IOCS')}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-mono transition-colors cursor-pointer ${
+                evidenceFilterTab === 'IOCS'
+                  ? 'bg-[#CC9A4A] text-black font-bold shadow-sm'
+                  : 'bg-[#17130F] text-[#8a8070] hover:text-[#ede6d8] border border-[#2B241E]'
+              }`}
+            >
+              IOCs &amp; Deep Intel
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCopyEvidence}
+            className="px-2.5 py-1 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-white text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer shrink-0 font-semibold"
+            title="Copy full raw header, hop data & threat verdict formatted for external incident reports"
+          >
+            {evidenceCopied ? <Check className="w-3.5 h-3.5 text-[#3FCC93]" /> : <Copy className="w-3.5 h-3.5 text-[#CC9A4A]" />}
+            <span>{evidenceCopied ? 'Report Copied!' : 'Copy Evidence'}</span>
+          </button>
         </motion.div>
 
+        {/* Subject */}
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && (
+          <motion.div variants={cardItemVariants} className="subject">
+            <h1>{cardData.subject}</h1>
+          </motion.div>
+        )}
+
         {/* Identity Rows */}
-        {cardData.identityRows.map((r, idx) => (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && cardData.identityRows.map((r, idx) => (
           <motion.div variants={cardItemVariants} key={idx} className="row">
             <div className="k">{r.k}</div>
             <div className={`v ${r.status || ''}`}>{r.v}</div>
@@ -850,7 +930,7 @@ export function EvidenceTagCard({
         ))}
 
         {/* Authentication Checks */}
-        {cardData.checks && cardData.checks.length > 0 && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'AUTH') && cardData.checks && cardData.checks.length > 0 && (
           <motion.div variants={cardItemVariants}>
             <div className="section-label">AUTHENTICATION</div>
             <div className="chips">
@@ -865,7 +945,7 @@ export function EvidenceTagCard({
         )}
 
         {/* Origin & Relay */}
-        {cardData.origin && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ROUTING') && cardData.origin && (
           <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.origin.sectionTitle || 'ORIGIN & RELAY'}</div>
             <div className="row">
@@ -898,7 +978,7 @@ export function EvidenceTagCard({
           </motion.div>
         )}
 
-        {cardData.relay && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ROUTING') && cardData.relay && (
           <motion.div variants={cardItemVariants} className="relay mt-1.5">
             <span 
               className="chain leading-relaxed" 
@@ -915,7 +995,7 @@ export function EvidenceTagCard({
         )}
 
         {/* Domain Intelligence */}
-        {cardData.entity && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'IOCS') && cardData.entity && (
           <motion.div variants={cardItemVariants}>
             <div className="section-label">{cardData.entity.sectionTitle || 'DOMAIN INTELLIGENCE'}</div>
             {cardData.entity.rows.map((r, idx) => (
@@ -1510,12 +1590,12 @@ export function EvidenceTagCard({
               </button>
               <button
                 type="button"
-                onClick={handleCopySummary}
-                className="px-2.5 py-1 rounded bg-[#171B24] hover:bg-[#2B3140] border border-[#2B3140] text-[#F2EFE7] text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Copy Text Summary"
+                onClick={handleCopyEvidence}
+                className="px-2.5 py-1 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-[#F2EFE7] text-[11px] font-mono flex items-center gap-1.5 transition-colors cursor-pointer font-semibold shadow-sm"
+                title="Copy formatted raw headers, hops and threat verdict for external incident reports"
               >
-                {copied ? <Check className="w-3 h-3 text-[#3FCC93]" /> : <Copy className="w-3 h-3 text-[#CC9A4A]" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
+                {evidenceCopied ? <Check className="w-3 h-3 text-[#3FCC93]" /> : <Copy className="w-3 h-3 text-[#CC9A4A]" />}
+                <span>{evidenceCopied ? 'Copied Evidence!' : 'Copy Evidence'}</span>
               </button>
               <button
                 type="button"

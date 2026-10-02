@@ -27,6 +27,7 @@ import {
   saveStoredProfile,
   getStoredProfile
 } from './userProfileStore';
+import { authenticateOrgUser } from './orgUserStore';
 
 export type { OtpRecord, MagicLinkRecord, ResetTokenRecord };
 
@@ -296,7 +297,51 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const cleanPassword = String(password);
 
     try {
-      // 1. Check local resilient user accounts store
+      // 1. Check organization users registry (support both email and employeeId)
+      const orgAuth = authenticateOrgUser(cleanEmail, cleanPassword);
+      if (orgAuth.authenticated && orgAuth.user) {
+        resetFailedLoginCounters(ip, orgAuth.user.email);
+        const enclaveToken = signUserToken({
+          userId: orgAuth.user.id,
+          email: orgAuth.user.email,
+          organizationId: orgAuth.user.organizationId || DEFAULT_ORG_ID,
+          role: orgAuth.user.role
+        });
+
+        await logAuditAction({
+          organization_id: orgAuth.user.organizationId || DEFAULT_ORG_ID,
+          user_id: orgAuth.user.id,
+          user_email: orgAuth.user.email,
+          user_role: orgAuth.user.role,
+          action: 'AUTH_LOGIN_SUCCESS',
+          resource_type: 'auth',
+          details: {
+            auth_provider: 'organization_roster',
+            employee_id: orgAuth.user.employeeId,
+            permissions: orgAuth.user.permissions
+          },
+          ip_address: ip,
+          status: 'SUCCESS'
+        }).catch(err => console.warn('[AuthAudit] Failed logging login success:', err));
+
+        return res.json({
+          status: 'success',
+          token: enclaveToken,
+          user: {
+            id: orgAuth.user.id,
+            email: orgAuth.user.email,
+            role: orgAuth.user.role,
+            organizationId: orgAuth.user.organizationId || DEFAULT_ORG_ID,
+            organizationName: orgAuth.user.organizationName || 'Acme Cyber Defense SOC',
+            fullName: orgAuth.user.name,
+            employeeId: orgAuth.user.employeeId,
+            permissions: orgAuth.user.permissions,
+            emailVerified: true
+          }
+        });
+      }
+
+      // 2. Check local resilient user accounts store
       const localAccount = localUserAccounts.get(cleanEmail);
       if (localAccount && (bcrypt.compareSync(cleanPassword, localAccount.passwordHash) || cleanPassword === 'Password1234!' || cleanPassword === 'TraceXMail2026!')) {
         resetFailedLoginCounters(ip, cleanEmail);

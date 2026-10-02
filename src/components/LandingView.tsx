@@ -46,7 +46,68 @@ import { useLenisScroll } from '../hooks/useLenisScroll';
 import { ShaderGradientHero } from './landing/ShaderGradientHero';
 import { UnicornStudioScene } from './landing/UnicornStudioScene';
 import { RevealBlock } from '../hooks/useScrollReveal';
-import { motion } from 'motion/react';
+import { 
+  motion, 
+  useMotionValue, 
+  useTransform, 
+  useSpring, 
+  type Variants 
+} from 'motion/react';
+
+const HEADLINE_WORDS = [
+  'Every', 'phishing', 'email', 'leaves', 'a', 'trail.', 'We', 'follow', 'it', 'to', 'the', 'source.'
+];
+
+const heroContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.08
+    }
+  }
+};
+
+const heroItemVariants: Variants = {
+  hidden: { opacity: 0, y: 22, filter: 'blur(4px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.75,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
+
+const wordVariants: Variants = {
+  hidden: { y: '115%', opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.7,
+      ease: [0.16, 1, 0.3, 1]
+    }
+  }
+};
+
+const boardVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.94, y: 35, filter: 'blur(8px)' },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.95,
+      ease: [0.16, 1, 0.3, 1],
+      delay: 0.25
+    }
+  }
+};
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -187,6 +248,39 @@ export function LandingView({
       document.body.style.overflow = '';
     };
   }, [mobileMenuOpen]);
+
+  // Cinematic Parallax Shift for Hero Area with fluid spring physics
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const springX = useSpring(mouseX, { stiffness: 90, damping: 18 });
+  const springY = useSpring(mouseY, { stiffness: 90, damping: 18 });
+
+  // Multi-plane parallax layer offsets
+  const textX = useTransform(springX, [-0.5, 0.5], [-8, 8]);
+  const textY = useTransform(springY, [-0.5, 0.5], [-6, 6]);
+
+  const boardX = useTransform(springX, [-0.5, 0.5], [14, -14]);
+  const boardY = useTransform(springY, [-0.5, 0.5], [10, -10]);
+  const boardRotateY = useTransform(springX, [-0.5, 0.5], [-2.5, 2.5]);
+  const boardRotateX = useTransform(springY, [-0.5, 0.5], [2.5, -2.5]);
+
+  const bgX = useTransform(springX, [-0.5, 0.5], [-20, 20]);
+  const bgY = useTransform(springY, [-0.5, 0.5], [-16, 16]);
+
+  const handleHeroMouseMove = (e: React.MouseEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    mouseX.set(x);
+    mouseY.set(y);
+  };
+
+  const handleHeroMouseLeave = () => {
+    mouseX.set(0);
+    mouseY.set(0);
+  };
 
   return (
     <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
@@ -391,28 +485,71 @@ export function LandingView({
         )}
       </nav>
 
-      {/* Hero Section with Shader Gradient Background */}
-      <section className="py-12 sm:py-16 border-b border-[#3a352c] relative overflow-hidden bg-[#14120f]">
-        {/* GPU-Friendly Organic WebGL Shader-Based Gradient Background */}
-        <ShaderGradientHero />
+      {/* Hero Section with Shader Gradient Background & Cinematic Parallax */}
+      <section 
+        onMouseMove={handleHeroMouseMove}
+        onMouseLeave={handleHeroMouseLeave}
+        className="py-12 sm:py-16 border-b border-[#3a352c] relative overflow-hidden bg-[#14120f]"
+        style={{ perspective: 1200 }}
+      >
+        {/* GPU-Friendly Organic WebGL Shader-Based Gradient Background with subtle parallax */}
+        <motion.div 
+          className="absolute inset-0 pointer-events-none"
+          style={{ x: bgX, y: bgY }}
+        >
+          <ShaderGradientHero />
+        </motion.div>
 
-        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10">
-          
-          <div className="lg:col-span-6 space-y-4 sm:space-y-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]">
+        <motion.div 
+          variants={heroContainerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center relative z-10"
+        >
+          {/* Left Column: Text & CTA with Staggered Entrance & Parallax */}
+          <motion.div 
+            style={{ x: textX, y: textY }}
+            className="lg:col-span-6 space-y-4 sm:space-y-5"
+          >
+            {/* Version Kicker Chip */}
+            <motion.div 
+              variants={heroItemVariants}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-[3px] bg-[#1f1a14] border border-[#3d2f1f] text-[12px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]"
+            >
               <TraceXLogo size="xs" />
               <span>TraceXMail Forensic Core v2.4</span>
-            </div>
+            </motion.div>
 
-            <h1 className="font-['Source_Serif_4',serif] font-semibold text-[30px] xs:text-[36px] sm:text-[44px] leading-[1.15] text-[#ede6d8] tracking-tight">
-              Every phishing email leaves a trail. We follow it to the source.
+            {/* Cinematic Headline Text Reveal */}
+            <h1 
+              aria-label="Every phishing email leaves a trail. We follow it to the source."
+              className="font-['Source_Serif_4',serif] font-semibold text-[30px] xs:text-[36px] sm:text-[44px] leading-[1.15] text-[#ede6d8] tracking-tight"
+            >
+              {HEADLINE_WORDS.map((word, i) => (
+                <span key={i} className="inline-block overflow-hidden mr-[0.24em] align-top py-0.5">
+                  <motion.span
+                    className="inline-block"
+                    variants={wordVariants}
+                  >
+                    {word}
+                  </motion.span>
+                </span>
+              ))}
             </h1>
             
-            <p className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed">
+            {/* Description Subtext */}
+            <motion.p 
+              variants={heroItemVariants}
+              className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed"
+            >
               TraceXMail reconstructs an email's real path: headers, authentication, hops, and infrastructure, turned into evidence your SOC can act on and defend in front of whoever asks how you know.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 pt-2">
+            {/* Call-to-Action Buttons */}
+            <motion.div 
+              variants={heroItemVariants}
+              className="flex flex-col xs:flex-row items-stretch xs:items-center gap-3 pt-2"
+            >
               <button
                 onClick={onOpenConsole}
                 className="btn-basement text-center bg-[#b23a2e] hover:bg-[#c94a3d] text-[#ede6d8] px-6 py-3.5 rounded-[3px] font-semibold text-[15px] border border-[#b23a2e] transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 group active:scale-[0.98]"
@@ -427,11 +564,21 @@ export function LandingView({
                 <Route className="w-4 h-4 text-[#c9a227]" />
                 <span>Inspect Corpus Proof</span>
               </button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
-          {/* Hero Visual Area: Primary Forensic Dossier Evidence Board */}
-          <div className="lg:col-span-6 w-full space-y-3">
+          {/* Hero Visual Area: Primary Forensic Dossier Evidence Board with 3D Depth Parallax */}
+          <motion.div 
+            variants={boardVariants}
+            style={{ 
+              x: boardX, 
+              y: boardY, 
+              rotateX: boardRotateX, 
+              rotateY: boardRotateY,
+              transformStyle: 'preserve-3d'
+            }}
+            className="lg:col-span-6 w-full space-y-3"
+          >
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-[#b23a2e] font-mono text-xs font-semibold uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-[#b23a2e] animate-pulse" />
@@ -448,8 +595,8 @@ export function LandingView({
                 onOpenConsole={onOpenConsole}
               />
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* Real-Time Live Telemetry Ribbon Section */}

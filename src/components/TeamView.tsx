@@ -25,6 +25,7 @@ import {
 import { UserRole } from '../hooks/useSession';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { InviteMemberModal } from './InviteMemberModal';
+import { OrgUserManagementSection } from './OrgUserManagementSection';
 
 interface TeamMember {
   id: string;
@@ -523,132 +524,8 @@ export function TeamView() {
         </div>
       )}
 
-      {/* Team Roster Table */}
-      <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-sm overflow-hidden">
-        <div className="p-4 border-b border-[var(--line)] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-sm text-[var(--paper)]">Active Organization Employees &amp; Staff</h3>
-            <span className="text-[11px] font-mono px-2 py-0.2 rounded bg-[var(--ink)] text-[var(--paper-dim)] border border-[var(--line)]">
-              {team.length} accounts
-            </span>
-          </div>
-          <button
-            onClick={fetchTeamData}
-            disabled={loading}
-            className="flex items-center gap-1.5 text-xs text-[var(--paper-dim)] hover:text-[var(--paper)] transition-colors cursor-pointer px-2.5 py-1 rounded-[2px] bg-[var(--ink)] border border-[var(--line)]"
-            title="Refresh Roster from Database"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Sync Roster</span>
-          </button>
-        </div>
-
-        {/* Mobile View: Stacked Cards (< md) */}
-        <div className="block md:hidden divide-y divide-[var(--line)]">
-          {team.map((mem) => (
-            <div key={mem.id} className="p-3 space-y-2 text-xs">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-[var(--ink)] border border-[var(--line)] text-[10px] font-mono flex items-center justify-center text-[var(--paper-dim)]">
-                    {mem.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-medium text-[var(--paper)]">{mem.name}</div>
-                    <div className="text-[10px] font-mono text-[var(--slate)] font-bold">
-                      {mem.employeeId || `EMP-${mem.id.substring(0, 4).toUpperCase()}`}
-                    </div>
-                  </div>
-                </div>
-
-                <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-medium ${
-                  mem.role === 'admin' 
-                    ? 'bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[var(--stamp)]/40' 
-                    : mem.role === 'analyst' 
-                      ? 'bg-[rgba(127,163,186,0.2)] text-[var(--slate)] border border-[var(--slate)]/40' 
-                      : 'bg-[rgba(237,230,216,0.1)] text-[var(--paper-dim)] border border-[var(--line)]'
-                }`}>
-                  {mem.role.toUpperCase()}
-                </span>
-              </div>
-
-              <div className="font-mono text-[11px] text-[var(--paper)] truncate">
-                {mem.email}
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[var(--line)]">
-                <div className="flex items-center gap-2">
-                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
-                    mem.status === 'ACTIVE' 
-                      ? 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)]' 
-                      : 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)]'
-                  }`}>
-                    {mem.status}
-                  </span>
-                  <span className="font-mono text-[var(--paper-muted)]">{mem.lastActive}</span>
-                </div>
-                <span className="text-[10px] font-mono text-[var(--forensic-green)]">● Active</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop View: Table (>= md) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-[var(--ink)] text-[var(--paper-muted)] font-mono uppercase text-[10.5px] border-b border-[var(--line)]">
-              <tr>
-                <th className="p-3">Employee Name</th>
-                <th className="p-3">Employee ID</th>
-                <th className="p-3">Work Email</th>
-                <th className="p-3">Clearance Tier</th>
-                <th className="p-3">Database Status</th>
-                <th className="p-3">Activity</th>
-                <th className="p-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--line)] text-[var(--paper-dim)]">
-              {team.map((mem) => (
-                <tr key={mem.id} className="hover:bg-[rgba(237,230,216,0.03)]">
-                  <td className="p-3 font-medium text-[var(--paper)] flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-full bg-[var(--ink)] border border-[var(--line)] text-[10px] font-mono flex items-center justify-center text-[var(--paper-dim)]">
-                      {mem.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                    </div>
-                    <span>{mem.name}</span>
-                  </td>
-                  <td className="p-3 font-mono text-[var(--slate)] font-bold">
-                    {mem.employeeId || `EMP-${mem.id.substring(0, 4).toUpperCase()}`}
-                  </td>
-                  <td className="p-3 font-mono text-[var(--paper)]">{mem.email}</td>
-                  <td className="p-3">
-                    <span className={`font-mono text-[10px] px-2 py-0.5 rounded font-medium ${
-                      mem.role === 'admin' 
-                        ? 'bg-[rgba(201,162,39,0.2)] text-[var(--stamp)] border border-[var(--stamp)]/40' 
-                        : mem.role === 'analyst' 
-                          ? 'bg-[rgba(127,163,186,0.2)] text-[var(--slate)] border border-[var(--slate)]/40' 
-                          : 'bg-[rgba(237,230,216,0.1)] text-[var(--paper-dim)] border border-[var(--line)]'
-                    }`}>
-                      {mem.role.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
-                      mem.status === 'ACTIVE' 
-                        ? 'text-[var(--forensic-green)] bg-[rgba(72,169,117,0.15)]' 
-                        : 'text-[var(--stamp)] bg-[rgba(201,162,39,0.15)]'
-                    }`}>
-                      {mem.status}
-                    </span>
-                  </td>
-                  <td className="p-3 font-mono text-[var(--paper-muted)]">{mem.lastActive}</td>
-                  <td className="p-3 text-right">
-                    <span className="text-[10px] font-mono text-[var(--forensic-green)]">● Active</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Organization Operator Directory & Bulk/Single Management */}
+      <OrgUserManagementSection organizationId="org_acme_soc_01" currentUserRole="admin" />
 
       {/* Invite Member Modal */}
       <InviteMemberModal

@@ -94,7 +94,7 @@
 2.56.32.0/22|US|ripencc
 2.56.36.0/22|AE|ripencc
 2.56.40.0/22|CH|ripencc
-2.56.44.0/22|BZ|ripencc
+2.56.44.0/22|RO|ripencc
 2.56.48.0/22|RO|ripencc
 2.56.52.0/22|BG|ripencc
 2.56.56.0/22|NL|ripencc
@@ -306,7 +306,7 @@
 2.59.0.0/22|AE|ripencc
 2.59.4.0/22|IT|ripencc
 2.59.8.0/23|US|ripencc
-2.59.10.0/23|BZ|ripencc
+2.59.10.0/23|RO|ripencc
 2.59.12.0/23|RO|ripencc
 2.59.14.0/24|US|ripencc
 2.59.15.0/24|RO|ripencc
@@ -420,7 +420,9 @@
 2.152.77.0/24|ES|ripencc
 2.152.78.0/24|EE|ripencc
 2.152.79.0/24|DE|ripencc
-2.152.80.0/21|ES|ripencc
+2.152.80.0/22|FR|ripencc
+2.152.84.0/23|ES|ripencc
+2.152.86.0/23|PL|ripencc
 2.152.88.0/24|BG|ripencc
 2.152.89.0/24|ES|ripencc
 2.152.90.0/23|ES|ripencc
@@ -2040,7 +2042,7 @@
 5.253.62.0/24|RU|ripencc
 5.253.63.0/24|EE|ripencc
 5.253.64.0/22|BG|ripencc
-5.253.68.0/22|PS|ripencc
+5.253.68.0/22|IQ|ripencc
 5.253.72.0/22|FI|ripencc
 5.253.76.0/22|IM|ripencc
 5.253.80.0/22|SA|ripencc
@@ -2063,7 +2065,7 @@
 5.253.148.0/22|NL|ripencc
 5.253.152.0/22|FR|ripencc
 5.253.156.0/22|ES|ripencc
-5.253.160.0/22|BZ|ripencc
+5.253.160.0/22|RO|ripencc
 5.253.164.0/22|RU|ripencc
 5.253.168.0/22|GB|ripencc
 5.253.172.0/22|TR|ripencc
@@ -2777,7 +2779,7 @@
 31.99.153.0/24|GB|ripencc
 31.99.154.0/23|GB|ripencc
 31.99.156.0/22|GB|ripencc
-31.99.160.0/19|GB|ripencc
+31.99.160.0/19|AT|ripencc
 31.99.192.0/21|DE|ripencc
 31.99.200.0/21|DK|ripencc
 31.99.208.0/21|DE|ripencc
@@ -4433,7 +4435,8 @@
 37.205.56.0/21|GB|ripencc
 37.205.64.0/19|RU|ripencc
 37.205.96.0/20|HR|ripencc
-37.205.112.0/21|IQ|ripencc
+37.205.112.0/22|IQ|ripencc
+37.205.116.0/22|IQ|ripencc
 37.205.120.0/21|DK|ripencc
 37.205.128.0/17|IT|ripencc
 37.206.0.0/15|IT|ripencc
@@ -4818,7 +4821,7 @@
 45.9.20.0/24|GB|ripencc
 45.9.21.0/24|PL|ripencc
 45.9.22.0/24|GB|ripencc
-45.9.23.0/24|GB|ripencc
+45.9.23.0/24|GG|ripencc
 45.9.24.0/22|RU|ripencc
 45.9.28.0/22|UA|ripencc
 45.9.32.0/22|GE|ripencc
@@ -5051,6 +5054,3 @@
 45.12.72.0/22|RU|ripencc
 45.12.76.0/22|DE|ripencc
 45.12.80.0/22|LT|ripencc
-45.12.84.0/22|TR|ripencc
-45.12.88.0/22|SG|ripencc
-45.12.92.0/22|DE|ripencc
