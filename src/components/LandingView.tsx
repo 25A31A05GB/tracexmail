@@ -41,11 +41,12 @@ import { TraceXLogo } from './common/TraceXLogo';
 import { HeroEvidenceBoard } from './landing/HeroEvidenceBoard';
 import { LiveDynamicTelemetryRibbon } from './landing/LiveDynamicTelemetryRibbon';
 import { ContinuousForensicsNetworkLoop } from './landing/ContinuousForensicsNetworkLoop';
+import { HumanExplainerInteractive } from './landing/HumanExplainerInteractive';
 import { useLenisScroll } from '../hooks/useLenisScroll';
 import { ShaderGradientHero } from './landing/ShaderGradientHero';
-import { RiveInteractiveVisual } from './landing/RiveInteractiveVisual';
 import { UnicornStudioScene } from './landing/UnicornStudioScene';
 import { RevealBlock } from '../hooks/useScrollReveal';
+import { motion } from 'motion/react';
 
 interface LandingViewProps {
   onOpenConsole: () => void;
@@ -213,6 +214,10 @@ export function LandingView({
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
               <span>Threat Loop</span>
             </button>
+            <button data-scroll-to="plain-english-decrypter" onClick={() => scrollToSection('plain-english-decrypter')} className="text-[#c9a227] hover:text-[#f3cc52] font-semibold transition-colors bg-transparent border-none cursor-pointer link-basement flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span>Plain English</span>
+            </button>
             <button data-scroll-to="challenges-solution" onClick={() => scrollToSection('challenges-solution')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Why TraceXMail
             </button>
@@ -302,6 +307,15 @@ export function LandingView({
               >
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                 <span>Threat Intelligence Loop</span>
+              </button>
+              <button
+                type="button"
+                data-scroll-to="plain-english-decrypter"
+                onClick={() => { scrollToSection('plain-english-decrypter'); setMobileMenuOpen(false); }}
+                className="text-left text-amber-300 font-semibold py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center gap-2"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>Plain English Decoder</span>
               </button>
               <button
                 type="button"
@@ -416,29 +430,24 @@ export function LandingView({
             </div>
           </div>
 
-          {/* Hero Visual Area: Highlighted Evidence Board & Rive Interactive Sentinel */}
+          {/* Hero Visual Area: Primary Forensic Dossier Evidence Board */}
           <div className="lg:col-span-6 w-full space-y-3">
             <div className="flex items-center justify-between px-1">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[3px] bg-[#1a1712] border border-[#b23a2e]/40 shadow-sm">
+              <div className="flex items-center gap-2 text-[#b23a2e] font-mono text-xs font-semibold uppercase tracking-wider">
                 <span className="w-2 h-2 rounded-full bg-[#b23a2e] animate-pulse" />
-                <span className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#ff8d7d] uppercase tracking-wider font-semibold">
-                  PRIMARY FORENSIC DOSSIER • EVIDENCE BOARD
-                </span>
+                <span>PRIMARY FORENSIC DOSSIER • EVIDENCE BOARD</span>
               </div>
-              <span className="text-[11px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] hidden sm:inline">
+              <span className="text-[11px] font-mono text-[#8e8574] hidden sm:inline">
                 AUTHENTIC RECONSTRUCTION
               </span>
             </div>
 
-            <div className="relative rounded-[6px] p-1 bg-gradient-to-b from-[#3a352c] via-[#241f18] to-[#1a1712] shadow-2xl border border-[#b23a2e]/40">
+            <div className="relative rounded-[6px] p-1 bg-gradient-to-b from-[#3a352c] via-[#241f18] to-[#1a1712] shadow-2xl border border-[#3a352c]">
               <HeroEvidenceBoard
                 onExploreCase={handleCaseClick}
                 onOpenConsole={onOpenConsole}
               />
             </div>
-
-            {/* Rive Interactive Forensic UI Sentinel Module */}
-            <RiveInteractiveVisual onInteract={() => {}} />
           </div>
         </div>
       </section>
@@ -484,6 +493,16 @@ export function LandingView({
           <ContinuousForensicsNetworkLoop
             onOpenConsole={onOpenConsole}
             onExploreCase={handleCaseClick}
+          />
+        </div>
+      </section>
+
+      {/* Human-First Plain English Forensic Decrypter & Interactive Animation */}
+      <section id="plain-english-decrypter" className="py-14 sm:py-20 border-b border-[#3a352c] bg-[#14110d] relative overflow-hidden">
+        <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <HumanExplainerInteractive
+            onOpenConsole={onOpenConsole}
+            onSelectCase={onSelectCase}
           />
         </div>
       </section>
@@ -588,10 +607,19 @@ export function LandingView({
             {sampleCases.map((c) => {
               const isMalicious = c.threatScore >= 70;
               return (
-                <div
+                <motion.div
                   key={c.id}
                   onClick={() => handleCaseClick(c.index)}
-                  className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-all cursor-pointer group shadow-md"
+                  whileHover={{
+                    scale: 1.025,
+                    y: -4,
+                    boxShadow: isMalicious 
+                      ? '0 20px 40px -10px rgba(178,58,46,0.32), 0 0 24px rgba(178,58,46,0.18)'
+                      : '0 20px 40px -10px rgba(74,222,128,0.28), 0 0 24px rgba(74,222,128,0.14)',
+                    transition: { type: 'spring', stiffness: 380, damping: 24 }
+                  }}
+                  whileTap={{ scale: 0.99 }}
+                  className="card-basement bg-[#1d1a15] border border-[#3a352c] rounded-[4px] p-5 sm:p-6 flex flex-col justify-between hover:border-[#b9af9c] hover:bg-[#221e18] transition-colors cursor-pointer group shadow-md select-none"
                 >
                   <div className="space-y-3.5">
                     <div className="flex items-center justify-between gap-2 border-b border-[#3a352c]/70 pb-2.5">
@@ -649,7 +677,7 @@ export function LandingView({
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -786,40 +814,79 @@ export function LandingView({
 
 
 
-      {/* UNKNOWN IS A VALID RESULT - CENTERED EDITORIAL STATEMENT with Unicorn Studio Ambient Visual */}
+      {/* UNKNOWN IS A VALID RESULT - ASYMMETRIC EDITORIAL STATEMENT (Stamp on Left) */}
       <section className="py-20 sm:py-24 border-b border-[#3a352c] bg-[#14120f] relative overflow-hidden">
         {/* Unicorn Studio Interactive Cryptographic Scene */}
-        <div className="absolute inset-0 pointer-events-none opacity-45 z-0">
+        <div className="absolute inset-0 pointer-events-none opacity-40 z-0">
           <UnicornStudioScene projectId="tracexmail-cryptographic-matrix" />
         </div>
 
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <RevealBlock className="max-w-3xl mx-auto flex flex-col items-center text-center space-y-7">
+          <RevealBlock className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
             
-            {/* Centered Circular Badge */}
-            <div className="flex items-center justify-center">
-              <div className="w-40 h-40 sm:w-48 sm:h-48 rounded-full border-[3px] border-[#c9a227] p-1.5 flex items-center justify-center shadow-[0_0_35px_rgba(201,162,39,0.15)] bg-[#171410]">
-                <div className="w-full h-full rounded-full border border-[#c9a227]/40 bg-[#12100d] flex flex-col items-center justify-center text-center p-4">
-                  <span className="font-['IBM_Plex_Mono',monospace] text-[13px] sm:text-[14px] font-bold text-[#c9a227] tracking-wider leading-[1.35] uppercase">
-                    UNKNOWN<br />
-                    IS A VALID<br />
-                    RESULT
-                  </span>
+            {/* Left Column: Circular Stamp & Concentric Orbit Halo (Strictly Left-Aligned) */}
+            <div className="lg:col-span-4 flex justify-start items-center sm:items-start text-left">
+              <div className="relative group text-left">
+                {/* Ambient glow & orbit rings */}
+                <div className="absolute -inset-4 rounded-full bg-[radial-gradient(circle_at_center,rgba(201,162,39,0.18),transparent_70%)] blur-xl pointer-events-none" />
+                <svg className="absolute -inset-6 w-[calc(100%+48px)] h-[calc(100%+48px)] pointer-events-none opacity-30 animate-[spin_60s_linear_infinite]" viewBox="0 0 200 200">
+                  <circle cx="100" cy="100" r="92" fill="none" stroke="#c9a227" strokeWidth="0.8" strokeDasharray="3 6" />
+                </svg>
+
+                <div className="relative w-44 h-44 sm:w-52 sm:h-52 rounded-full border-[3px] border-[#c9a227] p-1.5 flex items-center justify-center shadow-[0_0_40px_rgba(201,162,39,0.2)] bg-[#171410] transition-transform duration-500 group-hover:scale-105">
+                  <div className="w-full h-full rounded-full border border-[#c9a227]/40 bg-[#12100d] flex flex-col items-center justify-center text-center p-4">
+                    <span className="font-mono text-[13.5px] sm:text-[15px] font-bold text-[#c9a227] tracking-widest leading-[1.35] uppercase">
+                      UNKNOWN<br />
+                      IS A VALID<br />
+                      RESULT
+                    </span>
+                    <span className="w-6 h-0.5 bg-[#c9a227]/60 my-2 rounded-full" />
+                    <span className="font-mono text-[9.5px] text-[#b9af9c] tracking-wider uppercase">
+                      NIST SP 800-86
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Centered Copy */}
-            <div className="space-y-3.5 max-w-[720px] flex flex-col items-center">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#c9a227]/10 border border-[#c9a227]/30 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] uppercase font-bold tracking-wider">
-                Epistemological Rigor
+            {/* Right Column: Editorial Copy & Deterministic Principles */}
+            <div className="lg:col-span-8 space-y-4 text-left">
+              <div className="flex items-center gap-2 text-[#c9a227] font-mono text-xs font-semibold uppercase tracking-wider">
+                <Scale className="w-3.5 h-3.5 text-[#c9a227]" />
+                <span>Epistemological Rigor</span>
+                <span aria-hidden="true" className="text-[#574823]">·</span>
+                <span className="text-[#8e8574]">Zero-Hallucination Standard</span>
               </div>
-              <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] lg:text-[40px] text-[#ede6d8] leading-[1.18]">
+
+              <h2 className="font-['Source_Serif_4',serif] font-semibold text-[28px] sm:text-[36px] lg:text-[40px] text-[#ede6d8] leading-[1.18] tracking-tight [text-wrap:balance]">
                 Deterministic Integrity: We Refuse Manufactured Confidence
               </h2>
-              <p className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed max-w-[680px]">
+
+              <p className="text-[#b9af9c] text-[15px] sm:text-[16.5px] leading-relaxed max-w-2xl">
                 When cryptographic signatures or network telemetry are inconclusive, TraceXMail declares &quot;Inconclusive / Unknown&quot; rather than hallucinating statistical probabilities that crumble under regulatory deposition or adversarial scrutiny.
               </p>
+
+              {/* 3 Core Evidentiary Safeguards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#3a352c]/70 text-xs">
+                <div className="space-y-1">
+                  <div className="font-mono text-[#c9a227] font-bold text-[11px] uppercase">01. Cryptographic Truth</div>
+                  <p className="text-[#8e8574] text-[11.5px] leading-snug">
+                    Zero speculative inferences. Every flag requires RFC &amp; DNS proof.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-mono text-[#22c55e] font-bold text-[11px] uppercase">02. Defensible Custody</div>
+                  <p className="text-[#8e8574] text-[11.5px] leading-snug">
+                    SHA-256 immutable hashes formatted for court-admissible audit trails.
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <div className="font-mono text-[#60a5fa] font-bold text-[11px] uppercase">03. Separation of Duties</div>
+                  <p className="text-[#8e8574] text-[11.5px] leading-snug">
+                    Role-based redaction protects PII while preserving header integrity.
+                  </p>
+                </div>
+              </div>
             </div>
 
           </RevealBlock>

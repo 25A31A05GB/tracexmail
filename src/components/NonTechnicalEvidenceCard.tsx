@@ -305,10 +305,21 @@ export function NonTechnicalEvidenceCard({
           </motion.div>
         )}
 
-        {/* Verdict Box */}
+        {/* Verdict Box with tactile Framer Motion spring scale-up and shadow increase */}
         <motion.div 
           variants={itemVariants}
-          className={`rounded-[14px] p-7 mb-7 transition-all border ${
+          whileHover={{
+            scale: 1.018,
+            y: -3,
+            boxShadow: isMalicious 
+              ? '0 24px 48px -12px rgba(193,68,58,0.32), 0 0 25px rgba(193,68,58,0.18)' 
+              : isSuspicious 
+              ? '0 24px 48px -12px rgba(211,160,57,0.32), 0 0 25px rgba(211,160,57,0.18)' 
+              : '0 24px 48px -12px rgba(74,222,128,0.28), 0 0 25px rgba(74,222,128,0.15)',
+            transition: { type: 'spring', stiffness: 360, damping: 25 }
+          }}
+          whileTap={{ scale: 0.995 }}
+          className={`rounded-[14px] p-7 mb-7 transition-all border cursor-default select-text ${
             isMalicious 
               ? 'bg-[rgba(193,68,58,0.14)] border-[#F2CACA]/80 text-[#EDE6DC]' 
               : isSuspicious 
@@ -477,32 +488,50 @@ export function NonTechnicalEvidenceCard({
           </summary>
 
           <div className="p-4 sm:p-4.5 pt-1 border-t border-[#2B241E]">
-            {/* Tech Chips Grid */}
+            {/* Tech Chips Grid with Plain-English Metaphors */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 my-4">
-              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center">
-                <div className="text-[11.5px] text-[#9C9186] mb-1 font-mono">SPF</div>
-                <div className={`text-[14px] font-bold font-mono ${
+              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center transition-all hover:border-[#D3A039]/40">
+                <div className="text-[11.5px] text-[#9C9186] font-mono font-bold flex items-center justify-center gap-1">
+                  <span>SPF</span>
+                  <span className="text-[10px] text-[#D3A039] font-sans font-normal">(Digital ID Card)</span>
+                </div>
+                <div className={`text-[14px] font-bold font-mono mt-1 ${
                   spfStatus === 'PASS' ? 'text-[#4ADE80]' : 'text-[#D3564A]'
                 }`}>
                   {spfStatus}
                 </div>
+                <div className="text-[10.5px] text-[#8a8070] mt-0.5">
+                  {spfStatus === 'PASS' ? 'Sender is authorized by domain' : 'Unauthorized sender computer'}
+                </div>
               </div>
 
-              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center">
-                <div className="text-[11.5px] text-[#9C9186] mb-1 font-mono">DKIM</div>
-                <div className={`text-[14px] font-bold font-mono ${
+              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center transition-all hover:border-[#D3A039]/40">
+                <div className="text-[11.5px] text-[#9C9186] font-mono font-bold flex items-center justify-center gap-1">
+                  <span>DKIM</span>
+                  <span className="text-[10px] text-[#D3A039] font-sans font-normal">(Tamper Seal)</span>
+                </div>
+                <div className={`text-[14px] font-bold font-mono mt-1 ${
                   dkimStatus === 'PASS' ? 'text-[#4ADE80]' : 'text-[#D3564A]'
                 }`}>
                   {dkimStatus}
                 </div>
+                <div className="text-[10.5px] text-[#8a8070] mt-0.5">
+                  {dkimStatus === 'PASS' ? 'Cryptographic signature intact' : 'Signature missing or tampered'}
+                </div>
               </div>
 
-              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center sm:col-span-2 lg:col-span-1">
-                <div className="text-[11.5px] text-[#9C9186] mb-1 font-mono">DMARC</div>
-                <div className={`text-[14px] font-bold font-mono ${
+              <div className="bg-[#0E0B09] border border-[#2B241E] rounded-[9px] p-3 text-center sm:col-span-2 lg:col-span-1 transition-all hover:border-[#D3A039]/40">
+                <div className="text-[11.5px] text-[#9C9186] font-mono font-bold flex items-center justify-center gap-1">
+                  <span>DMARC</span>
+                  <span className="text-[10px] text-[#D3A039] font-sans font-normal">(Policy Rule)</span>
+                </div>
+                <div className={`text-[14px] font-bold font-mono mt-1 ${
                   dmarcStatus === 'PASS' ? 'text-[#4ADE80]' : dmarcStatus === 'REJECT' || dmarcStatus === 'FAIL' ? 'text-[#D3564A]' : 'text-[#D3A039]'
                 }`}>
                   {dmarcStatus}
+                </div>
+                <div className="text-[10.5px] text-[#8a8070] mt-0.5">
+                  {dmarcStatus === 'PASS' ? 'Verified domain alignment' : 'Fails anti-spoofing policy'}
                 </div>
               </div>
             </div>

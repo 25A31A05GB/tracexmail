@@ -336,12 +336,13 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             {activeStep >= 1 && (
               <motion.div
                 className="relative -translate-x-1/2 -translate-y-2"
-                initial={{ opacity: 0, y: -45, scale: 0.7, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, scale: 1, rotate: -4 }}
-                transition={{ duration: 0.45, type: 'spring', damping: 12, stiffness: 180 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94, rotate: 0, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, rotate: -4, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(2px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
                 onMouseEnter={() => setHoveredCard(1)}
                 onMouseLeave={() => setHoveredCard(null)}
-                whileHover={{ scale: 1.07, rotate: -2, zIndex: 40 }}
+                whileHover={{ scale: 1.07, rotate: -2, y: -4, zIndex: 40, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
               >
                 {/* Red Pushpin with Impact Ring */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
@@ -390,12 +391,13 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             {activeStep >= 2 && (
               <motion.div
                 className="relative -translate-x-1/2 -translate-y-2"
-                initial={{ opacity: 0, y: -45, scale: 0.7, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, scale: 1, rotate: 3 }}
-                transition={{ duration: 0.45, type: 'spring', damping: 12, stiffness: 180 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94, rotate: 0, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, rotate: 3, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(2px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
                 onMouseEnter={() => setHoveredCard(2)}
                 onMouseLeave={() => setHoveredCard(null)}
-                whileHover={{ scale: 1.07, rotate: 5, zIndex: 40 }}
+                whileHover={{ scale: 1.07, rotate: 5, y: -4, zIndex: 40, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
               >
                 {/* Red Pushpin with Impact Ring */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
@@ -443,12 +445,13 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             {activeStep >= 3 && (
               <motion.div
                 className="relative -translate-x-1/2 -translate-y-2"
-                initial={{ opacity: 0, y: -45, scale: 0.7, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, scale: 1, rotate: -2 }}
-                transition={{ duration: 0.45, type: 'spring', damping: 12, stiffness: 180 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94, rotate: 0, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, rotate: -2, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(2px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
                 onMouseEnter={() => setHoveredCard(3)}
                 onMouseLeave={() => setHoveredCard(null)}
-                whileHover={{ scale: 1.07, rotate: 0, zIndex: 40 }}
+                whileHover={{ scale: 1.07, rotate: 0, y: -4, zIndex: 40, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
               >
                 {/* Red Pushpin with Impact Ring */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
@@ -496,12 +499,13 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
             {activeStep >= 4 && (
               <motion.div
                 className="relative -translate-x-1/2 -translate-y-2"
-                initial={{ opacity: 0, y: -45, scale: 0.7, rotate: 0 }}
-                animate={{ opacity: 1, y: 0, scale: 1, rotate: 2.5 }}
-                transition={{ duration: 0.45, type: 'spring', damping: 12, stiffness: 180 }}
+                initial={{ opacity: 0, y: 32, scale: 0.94, rotate: 0, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, rotate: 2.5, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(2px)' }}
+                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
                 onMouseEnter={() => setHoveredCard(4)}
                 onMouseLeave={() => setHoveredCard(null)}
-                whileHover={{ scale: 1.07, rotate: 4, zIndex: 40 }}
+                whileHover={{ scale: 1.07, rotate: 4, y: -4, zIndex: 40, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } }}
               >
                 {/* Red Pushpin with Impact Ring */}
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center pointer-events-none">
@@ -545,9 +549,10 @@ export const HeroEvidenceBoard: React.FC<HeroEvidenceBoardProps> = ({
           {activeStep >= 5 && (
             <motion.div
               className="absolute bottom-[12px] sm:bottom-[24px] right-[16px] sm:right-[40px] z-20 pointer-events-none"
-              initial={{ opacity: 0, scale: 3.0, rotate: -45 }}
-              animate={{ opacity: 1, scale: 1, rotate: -11 }}
-              transition={{ duration: 0.38, type: 'spring', damping: 9, stiffness: 240 }}
+              initial={{ opacity: 0, y: 40, scale: 1.8, rotate: -35, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, rotate: -11, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 20, scale: 0.95, filter: 'blur(2px)' }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             >
               <div className="relative w-[100px] xs:w-[118px] sm:w-[138px] h-[100px] xs:h-[118px] sm:h-[138px] rounded-full border-[3px] sm:border-[3.5px] border-[#b23a2e]/90 p-1 flex items-center justify-center shadow-[0_0_22px_rgba(178,58,46,0.45)] backdrop-blur-[0.5px]">
                 <div className="w-full h-full rounded-full border-[1.5px] border-[#b23a2e]/75 border-dashed flex flex-col items-center justify-center text-center p-1.5 sm:p-2">

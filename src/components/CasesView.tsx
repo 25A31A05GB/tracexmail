@@ -1806,8 +1806,12 @@ export function CasesView({
                   {(selectedCaseDetail.members || []).map((m: any, idx: number) => (
                     <motion.div 
                       key={m.id || idx} 
-                      whileHover={{ scale: 1.01 }}
-                      transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                      whileHover={{ 
+                        scale: 1.015,
+                        y: -2,
+                        boxShadow: '0 12px 24px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(204, 154, 74, 0.35)'
+                      }}
+                      transition={{ type: 'spring', stiffness: 350, damping: 24 }}
                       className="evidence-card p-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors"
                     >
                       <div className="min-w-0">
@@ -1865,8 +1869,12 @@ export function CasesView({
                     {selectedCaseDetail.suggested_members.map((sug: any, idx: number) => (
                       <motion.div 
                         key={sug.email_id || idx} 
-                        whileHover={{ scale: 1.01 }}
-                        transition={{ duration: 0.2, ease: [0.2, 0.8, 0.25, 1] }}
+                        whileHover={{ 
+                          scale: 1.015,
+                          y: -2,
+                          boxShadow: '0 12px 24px -4px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(204, 154, 74, 0.35)'
+                        }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 24 }}
                         className="evidence-card p-3 flex items-center justify-between hover:bg-amber-950/30 transition-colors"
                       >
                         <div className="min-w-0">

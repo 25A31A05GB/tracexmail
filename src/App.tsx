@@ -64,6 +64,7 @@ import { AcceptInviteView } from './components/AcceptInviteView';
 import { MagicLinkVerifyView } from './components/MagicLinkVerifyView';
 import { LegalPage, LegalPageType } from './components/LegalPage';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
+import { ForensicOfflineModeBanner } from './components/common/ForensicOfflineModeBanner';
 import { NotFoundView } from './components/NotFoundView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
@@ -1169,8 +1170,13 @@ export default function App() {
                 />
               )}
 
-              {effectiveTab === 'organization' && role === 'admin' && (
-                <OrganizationView organizationId={organizationId || 'org_acme_soc_01'} />
+              {effectiveTab === 'organization' && (
+                <OrganizationView 
+                  organizationId={organizationId || 'org_acme_soc_01'} 
+                  role={role}
+                  accountType={accountType}
+                  onSwitchRole={switchRole}
+                />
               )}
 
               {effectiveTab === 'team' && role === 'admin' && (
@@ -1464,6 +1470,9 @@ export default function App() {
           unlocking={workspaceUnlocking}
         />
       )}
+
+      {/* Global Offline Investigation Mode & Service Worker Sync Banner */}
+      <ForensicOfflineModeBanner onOpenLocalSamples={() => setActiveTab('cases')} />
 
       {/* Global Cookie & Privacy Transparency Banner */}
       <CookieConsentBanner onNavigateToLegal={(type) => navigateToPath('/' + type)} />

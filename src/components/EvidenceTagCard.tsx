@@ -720,18 +720,31 @@ export function EvidenceTagCard({
       opacity: 0, 
       y: 28,
       scale: 0.97,
-      rotateX: 3
+      rotateX: 3,
+      boxShadow: '0 16px 32px -8px rgba(0, 0, 0, 0.65), 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)'
     },
     visible: {
       opacity: 1, 
       y: 0,
       scale: 1,
       rotateX: 0,
+      boxShadow: '0 16px 32px -8px rgba(0, 0, 0, 0.65), 0 4px 12px -2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)',
       transition: {
         duration: 0.45,
         ease: [0.16, 1, 0.3, 1],
         staggerChildren: 0.04,
         delayChildren: 0.05
+      }
+    },
+    hover: {
+      scale: 1.018,
+      y: -4,
+      boxShadow: '0 28px 60px -12px rgba(0, 0, 0, 0.88), 0 18px 30px -6px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(204, 154, 74, 0.45), 0 0 28px -2px rgba(204, 154, 74, 0.22)',
+      transition: {
+        type: 'spring',
+        stiffness: 360,
+        damping: 24,
+        mass: 0.8
       }
     }
   };
@@ -780,6 +793,12 @@ export function EvidenceTagCard({
       variants={cardContainerVariants}
       initial="hidden"
       animate="visible"
+      whileHover="hover"
+      whileTap={{
+        scale: 0.995,
+        y: -1,
+        transition: { duration: 0.1 }
+      }}
     >
       {/* Subtle Holographic Laser Sweep on Load */}
       <motion.div

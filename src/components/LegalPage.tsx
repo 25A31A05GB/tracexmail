@@ -332,7 +332,7 @@ export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }
           <div>
             <span className="font-bold text-[#ede6d8] font-['Fraunces',serif]">TraceXMail Forensic Intelligence Platform</span>
             <span className="block mt-0.5 text-[11px] text-[#8a8070]">
-              &copy; {new Date().getFullYear()} TraceXMail. All rights reserved. &bull; Lead Maintainer &amp; DPO: Jayram Sappa (<a href="mailto:jayramsappa537@gmail.com" className="text-[#b9af9c] hover:underline">jayramsappa537@gmail.com</a>) &bull; Canonical Origin: <a href="https://tracexmail.vercel.app" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">https://tracexmail.vercel.app</a>
+              &copy; {new Date().getFullYear()} TraceXMail. All rights reserved. &bull; Lead Maintainer &amp; DPO: Jayram Sappa (<a href="mailto:tracexmailofficial@gmail.com" className="text-[#b9af9c] hover:underline">tracexmailofficial@gmail.com</a>) &bull; Canonical Origin: <a href="https://tracexmail.vercel.app" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">https://tracexmail.vercel.app</a>
             </span>
           </div>
 
@@ -454,7 +454,7 @@ function PrivacyContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
         </p>
         <div className="p-3.5 bg-[#120f0c] border border-[#2d271f] rounded font-mono text-xs text-[#ede6d8] space-y-1">
           <div><strong className="text-white">Data Controller / Lead Maintainer:</strong> Jayram Sappa</div>
-          <div><strong className="text-white">Direct Compliance Desk:</strong> <a href="mailto:jayramsappa537@gmail.com" className="text-amber-400 hover:underline">jayramsappa537@gmail.com</a></div>
+          <div><strong className="text-white">Direct Compliance Desk:</strong> <a href="mailto:tracexmailofficial@gmail.com" className="text-amber-400 hover:underline">tracexmailofficial@gmail.com</a></div>
           <div><strong className="text-white">Applicable Standards:</strong> EU GDPR (Regulation EU 2016/679), UK Data Protection Act 2018, California Consumer Privacy Act (CCPA / CPRA), and NIST SP 800-53 Rev 5.</div>
         </div>
       </Section>
@@ -576,7 +576,7 @@ function PrivacyContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
         </p>
         <ul className="list-disc pl-5 space-y-1.5 text-xs text-[#ede6d8]">
           <li><strong>Right of Access &amp; Portability (Art. 15 &amp; 20):</strong> Export your complete case files, dossiers, and audit trails in standardized JSON, PDF, and RFC 822 formats.</li>
-          <li><strong>Right to Erasure / Deletion (Art. 17 &amp; CCPA):</strong> Request immediate account deletion and telemetry purging by emailing <a href="mailto:jayramsappa537@gmail.com" className="text-amber-400 hover:underline">jayramsappa537@gmail.com</a>.</li>
+          <li><strong>Right to Erasure / Deletion (Art. 17 &amp; CCPA):</strong> Request immediate account deletion and telemetry purging by emailing <a href="mailto:tracexmailofficial@gmail.com" className="text-amber-400 hover:underline">tracexmailofficial@gmail.com</a>.</li>
           <li><strong>Right to Rectification (Art. 16):</strong> Update your account profile and authentication credentials via the Account Settings console.</li>
           <li><strong>Right to Restrict Processing (Art. 18):</strong> Pause automated scanning and continuous Gmail synchronization at any time with one click.</li>
         </ul>
@@ -594,7 +594,7 @@ function PrivacyContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
         </p>
         <div className="bg-[#120f0c] p-4 rounded-md border border-[#2d271f] text-xs font-mono space-y-1.5 mt-2">
           <div><strong className="text-[#ede6d8]">Data Protection Officer (DPO):</strong> Jayram Sappa</div>
-          <div><strong className="text-[#ede6d8]">DPO Direct Email:</strong> <a href="mailto:jayramsappa537@gmail.com" className="text-amber-400">jayramsappa537@gmail.com</a></div>
+          <div><strong className="text-[#ede6d8]">DPO Direct Email:</strong> <a href="mailto:tracexmailofficial@gmail.com" className="text-amber-400">tracexmailofficial@gmail.com</a></div>
           <div><strong className="text-[#ede6d8]">Lead Architect:</strong> Full-Stack Security &amp; Forensic Systems</div>
           <div><strong className="text-[#ede6d8]">Official Website:</strong> <a href="https://tracexmail.vercel.app" target="_blank" rel="noreferrer" className="text-amber-400">https://tracexmail.vercel.app</a></div>
         </div>
@@ -1107,8 +1107,8 @@ function DomainsContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
           <div className="border-t border-[#241f19] pt-2">
             <span className="text-[#8a8070] block text-[11px]">Developer Contact Email:</span>
             <div className="flex items-center justify-between text-white mt-1">
-              <span>jayramsappa537@gmail.com</span>
-              <button onClick={() => onCopy('jayramsappa537@gmail.com', 'g_dev')} className="text-amber-400 hover:underline text-[11px] cursor-pointer">
+              <span>tracexmailofficial@gmail.com</span>
+              <button onClick={() => onCopy('tracexmailofficial@gmail.com', 'g_dev')} className="text-amber-400 hover:underline text-[11px] cursor-pointer">
                 {copiedKey === 'g_dev' ? 'Copied!' : 'Copy'}
               </button>
             </div>
@@ -1144,7 +1144,7 @@ function SecurityContent({ filter, onCopy, copiedKey }: { filter?: string; onCop
 
         <div className="p-4 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2 text-xs font-mono mt-3">
           <div className="text-white font-bold text-sm">Security Vulnerability Disclosure Desk:</div>
-          <div>Primary Email: <a href="mailto:jayramsappa537@gmail.com" className="text-amber-400">jayramsappa537@gmail.com</a></div>
+          <div>Primary Email: <a href="mailto:tracexmailofficial@gmail.com" className="text-amber-400">tracexmailofficial@gmail.com</a></div>
           <div>Acknowledgment SLA: <strong>Within 24 business hours</strong></div>
           <div>Remediation Target: <strong>Within 7 business days</strong> for critical severity findings</div>
           <div className="text-[#8a8070] text-[11px] font-sans pt-2 border-t border-[#262118]">
@@ -1212,12 +1212,12 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
             <div className="text-base font-bold text-white font-['Fraunces',serif]">Jayram Sappa</div>
             <div className="text-xs text-[#b9af9c]">Full-Stack Security &amp; Forensic Systems Engineer</div>
             <div className="pt-2 flex items-center justify-between">
-              <a href="mailto:jayramsappa537@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
-                jayramsappa537@gmail.com
+              <a href="mailto:tracexmailofficial@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
+                tracexmailofficial@gmail.com
               </a>
               <button
                 type="button"
-                onClick={() => onCopy('jayramsappa537@gmail.com', 'c_dev')}
+                onClick={() => onCopy('tracexmailofficial@gmail.com', 'c_dev')}
                 className="text-[11px] font-mono text-[#8a8070] hover:text-white cursor-pointer"
               >
                 {copiedKey === 'c_dev' ? 'Copied' : 'Copy'}
@@ -1230,12 +1230,12 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
             <div className="text-base font-bold text-white font-['Fraunces',serif]">Data Protection Office</div>
             <div className="text-xs text-[#b9af9c]">GDPR, CCPA &amp; Google OAuth Verification</div>
             <div className="pt-2 flex items-center justify-between">
-              <a href="mailto:jayramsappa537@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
-                jayramsappa537@gmail.com
+              <a href="mailto:tracexmailofficial@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
+                tracexmailofficial@gmail.com
               </a>
               <button
                 type="button"
-                onClick={() => onCopy('jayramsappa537@gmail.com', 'c_dpo')}
+                onClick={() => onCopy('tracexmailofficial@gmail.com', 'c_dpo')}
                 className="text-[11px] font-mono text-[#8a8070] hover:text-white cursor-pointer"
               >
                 {copiedKey === 'c_dpo' ? 'Copied' : 'Copy'}

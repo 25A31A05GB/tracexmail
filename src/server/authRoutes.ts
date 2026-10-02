@@ -109,6 +109,17 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     updatedAt: new Date().toISOString()
   },
   {
+    id: 'usr_official_admin',
+    email: 'tracexmailofficial@gmail.com',
+    passwordHash: defaultPasswordHash,
+    fullName: 'Jayram Sappa',
+    orgName: 'TraceXMail Cyber Defense SOC',
+    role: 'admin',
+    accountType: 'organization',
+    emailVerified: true,
+    updatedAt: new Date().toISOString()
+  },
+  {
     id: 'usr_user_jayram',
     email: 'jayramsappa537@gmail.com',
     passwordHash: defaultPasswordHash,

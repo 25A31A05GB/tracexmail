@@ -3,6 +3,23 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register Service Worker for offline forensics asset caching and instant updates in production
+if (import.meta.env.PROD && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  const updateSW = registerSW({
+    onNeedRefresh() {
+      console.log('[TraceXMail ServiceWorker] New forensic engine build available. Ready for hot-reload.');
+      updateSW(true);
+    },
+    onOfflineReady() {
+      console.log('[TraceXMail ServiceWorker] Essential offline assets cached. Offline investigation mode engaged.');
+    },
+    onRegisterError(error) {
+      console.warn('[TraceXMail ServiceWorker] Registration notice:', error);
+    }
+  });
+}
 
 // Global handler for Vite dynamic chunk preload errors across all deployments
 if (typeof window !== 'undefined') {

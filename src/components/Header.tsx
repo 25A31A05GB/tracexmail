@@ -40,6 +40,7 @@ import { UserRole } from '../hooks/useSession';
 import { AutoRefreshControl } from './AutoRefreshControl';
 import { LogOut, Keyboard, Command } from 'lucide-react';
 import { TraceXLogo3D } from './3d/TraceXLogo3D';
+import { PWAInstallButton } from './common/PWAInstallButton';
 
 interface HeaderProps {
   currentAnalysis: EmailAnalysis;
@@ -396,6 +397,9 @@ export function Header({
           )}
         </div>
 
+        {/* In-App PWA Install Button (Automatic Suppression when Installed) */}
+        <PWAInstallButton className="hidden lg:inline-flex" />
+
         {/* Forensic Dossier & Executive Compliance Report Button (Visible on sm+) */}
         {onOpenReportModal && (
           <button
@@ -446,6 +450,15 @@ export function Header({
             <span className="hidden md:inline text-xs font-semibold text-[#f4efe6] capitalize max-w-[100px] truncate">
               {sessionUser?.email ? sessionUser.email.split('@')[0] : (role === 'admin' ? 'Admin' : 'Analyst')}
             </span>
+            <span className={`hidden sm:inline-block text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border uppercase ${
+              role === 'admin' 
+                ? 'bg-amber-950/60 border-amber-600/70 text-amber-300' 
+                : role === 'read_only' 
+                  ? 'bg-slate-900 border-slate-700 text-slate-300' 
+                  : 'bg-emerald-950/60 border-emerald-600/70 text-emerald-400'
+            }`}>
+              {role === 'admin' ? 'SOC ADMIN' : role === 'read_only' ? 'AUDITOR' : 'ANALYST'}
+            </span>
             <ChevronDown className={`w-3 h-3 text-[#9d9282] transition-transform duration-150 ${userDropdownOpen ? 'rotate-180 text-amber-400' : ''}`} />
           </button>
 
@@ -461,9 +474,11 @@ export function Header({
                   <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded border ${
                     role === 'admin' 
                       ? 'bg-amber-950/50 border-amber-700/60 text-amber-300' 
-                      : 'bg-emerald-950/50 border-emerald-700/60 text-emerald-400'
+                      : role === 'read_only'
+                        ? 'bg-slate-900 border-slate-700 text-slate-300'
+                        : 'bg-emerald-950/50 border-emerald-700/60 text-emerald-400'
                   }`}>
-                    {role === 'admin' ? 'GOLD (ADMIN)' : role === 'analyst' ? 'STEEL (ANALYST)' : 'AUDITOR'}
+                    {role === 'admin' ? 'GOLD (ADMIN)' : role === 'analyst' ? 'STEEL (ANALYST)' : 'AUDITOR (READ-ONLY)'}
                   </span>
                 </div>
                 <div className="truncate text-[#ede6d8] font-bold text-[12.5px] mt-1 font-sans">
@@ -476,6 +491,51 @@ export function Header({
                   </span>
                 </div>
               </div>
+
+              {/* RBAC Role Clearance Selector */}
+              {onSwitchRole && (
+                <div className="py-2 px-3.5 bg-[#14120e]">
+                  <div className="text-[10px] font-mono text-[#8a8070] uppercase mb-1.5 flex items-center justify-between">
+                    <span>RBAC Clearance Level:</span>
+                    <span className="text-[9.5px] text-amber-400 font-bold uppercase">{role}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => { onSwitchRole('admin'); setUserDropdownOpen(false); }}
+                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
+                        role === 'admin'
+                          ? 'bg-amber-950/80 border-amber-500 text-amber-300 font-bold'
+                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
+                      }`}
+                    >
+                      Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { onSwitchRole('analyst'); setUserDropdownOpen(false); }}
+                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
+                        role === 'analyst'
+                          ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 font-bold'
+                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
+                      }`}
+                    >
+                      Analyst
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { onSwitchRole('read_only'); setUserDropdownOpen(false); }}
+                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
+                        role === 'read_only'
+                          ? 'bg-slate-800 border-slate-500 text-slate-200 font-bold'
+                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
+                      }`}
+                    >
+                      Auditor
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* 2. Account Settings & 3. Preferences */}
               <div className="py-1">

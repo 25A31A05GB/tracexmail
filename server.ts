@@ -133,7 +133,7 @@ import {
   type AuthenticatedRequest
 } from './src/server/compliance';
 import { createAuthRouter } from './src/server/authRoutes';
-import { getAllStoredProfiles, getStoredProfile } from './src/server/userProfileStore';
+import { getAllStoredProfiles, getStoredProfile, saveStoredProfile } from './src/server/userProfileStore';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import {
   handleGetNetworkInfo,
@@ -6469,6 +6469,169 @@ Thanks!`;
     }
   });
 
+  // Update Team Member Role (Admin clearance required)
+  app.patch('/api/team/members/:id/role', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      const { role } = req.body || {};
+      if (!role || !['admin', 'analyst', 'read_only'].includes(role)) {
+        return res.status(400).json({ error: 'Valid role (admin, analyst, or read_only) is required.' });
+      }
+
+      const caller = (req as AuthenticatedRequest).user!;
+      const supabase = getSupabaseAdminClient();
+      let updated = false;
+
+      // 1. Update in provisionedEmployees if present
+      const emp = provisionedEmployees.find(e => e.id === memberId || e.employeeId === memberId || e.email.toLowerCase() === memberId.toLowerCase());
+      if (emp) {
+        emp.role = role as any;
+        updated = true;
+      }
+
+      // 2. Update in stored profiles
+      const stored = getStoredProfile(memberId);
+      if (stored) {
+        await saveStoredProfile({ ...stored, role: role as any, updatedAt: new Date().toISOString() });
+        updated = true;
+      }
+
+      // 3. Update in Supabase profiles table
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ role, updated_at: new Date().toISOString() })
+            .or(`id.eq.${memberId},email.eq.${memberId}`);
+          if (!error) updated = true;
+        } catch (err) {
+          console.warn('[TeamAPI] Supabase role update warning:', err);
+        }
+      }
+
+      // 4. Log immutable audit action
+      await logAuditAction({
+        organization_id: caller.organizationId || DEFAULT_ORG_ID,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'UPDATE_MEMBER_ROLE',
+        resource_type: 'team_member',
+        resource_id: memberId,
+        details: { member_id: memberId, new_role: role },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: `Team member role successfully updated to ${role}.`,
+        memberId,
+        role
+      });
+    } catch (err: any) {
+      console.error('[TeamAPI] Error updating member role:', err);
+      res.status(500).json({ error: err?.message || 'Failed to update member role' });
+    }
+  });
+
+  // Delete / Revoke Team Member (Admin clearance required)
+  app.delete('/api/team/members/:id', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+      const memberId = req.params.id;
+      const caller = (req as AuthenticatedRequest).user!;
+      const supabase = getSupabaseAdminClient();
+
+      // 1. Remove from provisionedEmployees
+      const idx = provisionedEmployees.findIndex(e => e.id === memberId || e.employeeId === memberId || e.email.toLowerCase() === memberId.toLowerCase());
+      if (idx !== -1) {
+        provisionedEmployees.splice(idx, 1);
+      }
+
+      // 2. Remove from Supabase profiles if possible
+      if (supabase) {
+        try {
+          await supabase.from('profiles').delete().or(`id.eq.${memberId},email.eq.${memberId}`);
+        } catch (err) {
+          console.warn('[TeamAPI] Supabase delete member warning:', err);
+        }
+      }
+
+      // 3. Log audit action
+      await logAuditAction({
+        organization_id: caller.organizationId || DEFAULT_ORG_ID,
+        user_id: caller.userId,
+        user_email: caller.email,
+        user_role: caller.role,
+        action: 'REVOKE_TEAM_MEMBER',
+        resource_type: 'team_member',
+        resource_id: memberId,
+        details: { member_id: memberId },
+        status: 'SUCCESS'
+      }, getSupabaseClient());
+
+      return res.json({
+        status: 'success',
+        message: 'Team member revoked successfully.',
+        memberId
+      });
+    } catch (err: any) {
+      console.error('[TeamAPI] Error revoking member:', err);
+      res.status(500).json({ error: err?.message || 'Failed to revoke team member' });
+    }
+  });
+
+  // Authoritative RBAC Capability Matrix
+  app.get('/api/organization/rbac-matrix', publicLimiter, (_req, res) => {
+    res.json({
+      roles: [
+        {
+          id: 'admin',
+          name: 'SOC Administrator',
+          badge: 'ROOT CLEARANCE',
+          description: 'Full organizational authority over tenant security, access delegation, and retention policies.',
+          capabilities: [
+            'Invite and provision employee accounts',
+            'Assign and modify member roles (Admin, Analyst, Auditor)',
+            'Execute NIST SP 800-86 retention and data purge actions',
+            'Configure PII masking policies and emergency overrides',
+            'Inspect immutable audit logs across all operators',
+            'Full case investigation, triage, and deletion',
+            'Configure Gmail API and Slack webhook integrations'
+          ]
+        },
+        {
+          id: 'analyst',
+          name: 'SOC Lead Analyst',
+          badge: 'OPERATIONAL CLEARANCE',
+          description: 'Forensic investigator clearance to triage inbound emails, deconstruct hops, and generate reports.',
+          capabilities: [
+            'Upload RFC 822 emails and inspect mail envelopes',
+            'Analyze IP routing, DNS, SPF, DKIM, and DMARC headers',
+            'Live Gmail sync and automated threat quarantine triage',
+            'Convert real-world threat feeds into active cases',
+            'Export cryptographically signed PDF and Markdown dossiers',
+            'View team members and organizational privacy policies',
+            'Cannot purge audit logs or change member roles'
+          ]
+        },
+        {
+          id: 'read_only',
+          name: 'Compliance Auditor',
+          badge: 'READ-ONLY AUDIT CLEARANCE',
+          description: 'Independent oversight clearance for regulatory compliance, chain-of-custody, and legal audits.',
+          capabilities: [
+            'Read-only access to all case dossiers and evidence vaults',
+            'Verify SHA-256 chain-of-custody seals and cryptographic signatures',
+            'Inspect immutable compliance audit trail without modification access',
+            'Review PII masking enforcement and compliance standards (NIST/GDPR/ISO)',
+            'Generate compliance exports and audit verification proofs',
+            'Strictly blocked from mutating cases, uploading emails, or altering settings'
+          ]
+        }
+      ]
+    });
+  });
+
   // Provision new Employee Account with credentials (ID & Password) for Organization
   app.post('/api/team/create-employee', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req, res) => {
     const { name, email, password, role, employeeId, organizationId } = req.body || {};
@@ -6960,7 +7123,7 @@ Thanks!`;
   // Serve static files in production / Vite in dev
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true, allowedHosts: true },
+      server: { middlewareMode: true, allowedHosts: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -6974,8 +7137,15 @@ Thanks!`;
 
   const server = http.createServer(app);
 
-  // WebSocket Server for Real-Time Alerts
-  const wss = new WebSocketServer({ noServer: true });
+  // WebSocket Server for Real-Time Alerts & Dev Tooling
+  const wss = new WebSocketServer({ 
+    noServer: true,
+    handleProtocols: (protocols) => {
+      if (protocols.has('vite-hmr')) return 'vite-hmr';
+      const first = Array.from(protocols)[0];
+      return first || false;
+    }
+  });
   const activeSockets = new Set<WebSocket>();
 
   broadcastWebSocketEvent = (eventData: any) => {
@@ -7054,13 +7224,15 @@ Thanks!`;
 
   // Handle WebSocket Upgrade
   server.on('upgrade', (request, socket, head) => {
-    const pathname = request.url || '';
-    if (pathname.startsWith('/ws')) {
+    try {
       wss.handleUpgrade(request, socket, head, (ws) => {
         wss.emit('connection', ws, request);
       });
-    } else {
-      socket.destroy();
+    } catch (err: any) {
+      console.warn('[WebSocket Upgrade Warning]', err?.message);
+      try {
+        socket.destroy();
+      } catch {}
     }
   });
 

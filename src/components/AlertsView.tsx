@@ -89,11 +89,11 @@ export function AlertsView({
   const [expandedPayloadId, setExpandedPayloadId] = useState<string | null>(null);
   const [deliveryLogs, setDeliveryLogs] = useState<any[]>([]);
 
-  // Load Real-World Threat Feeds
+  // Load Real-World Threat Feeds (Live CISA KEV + OpenPhish zero-day stream)
   const loadRealWorldFeeds = async () => {
     try {
       setLoadingFeeds(true);
-      const res = await forensicApi.getRealWorldThreatFeeds();
+      const res = await forensicApi.getRealWorldThreatFeeds(true);
       if (res && res.feeds) {
         setRealWorldFeeds(res.feeds);
       }

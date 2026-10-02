@@ -4,6 +4,68 @@
     <meta name="google-site-verification" content="9bF4Cz39N7XjzKd2sITjAB9fZx4zg2wn0iX3LZzPK38" />
  
     <meta charset="UTF-8" />
+    <script>
+      // Runtime constraint: HMR is disabled in AI Studio container. Suppress Vite HMR / WebSocket connection notices.
+      (function() {
+        if (typeof window === 'undefined') return;
+
+        function isViteOrWs(str) {
+          if (!str) return false;
+          var s = String(str);
+          return s.indexOf('[vite]') !== -1 ||
+                 s.indexOf('WebSocket') !== -1 ||
+                 s.indexOf('websocket') !== -1 ||
+                 s.indexOf('vite-plugin-pwa') !== -1;
+        }
+
+        // 1. Intercept console.error and console.warn
+        var origError = console.error;
+        console.error = function() {
+          var msg = '';
+          for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            msg += ' ' + (typeof a === 'string' ? a : (a && a.message ? a.message : (a ? String(a) : '')));
+          }
+          if (isViteOrWs(msg)) {
+            return;
+          }
+          origError.apply(console, arguments);
+        };
+
+        var origWarn = console.warn;
+        console.warn = function() {
+          var msg = '';
+          for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            msg += ' ' + (typeof a === 'string' ? a : (a && a.message ? a.message : ''));
+          }
+          if (isViteOrWs(msg)) {
+            return;
+          }
+          origWarn.apply(console, arguments);
+        };
+
+        // 2. Intercept uncaught window error events from Vite client
+        window.addEventListener('error', function(event) {
+          var msg = (event && (event.message || (event.error && event.error.message))) || '';
+          if (isViteOrWs(msg)) {
+            if (event.preventDefault) event.preventDefault();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+
+        // 3. Intercept unhandled promise rejections from Vite WebSocket client
+        window.addEventListener('unhandledrejection', function(event) {
+          var reason = (event && (event.reason && (event.reason.message || event.reason))) || '';
+          if (isViteOrWs(reason)) {
+            if (event.preventDefault) event.preventDefault();
+            if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

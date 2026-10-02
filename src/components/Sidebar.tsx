@@ -40,6 +40,7 @@ import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
 import { UserRole } from '../hooks/useSession';
 import { Sparkles, Building2 as OrgIcon, ShieldCheck, Keyboard } from 'lucide-react';
 import { TraceXLogo3D } from './3d/TraceXLogo3D';
+import { PWAInstallButton } from './common/PWAInstallButton';
 
 export type NavTab = 
   | 'dashboard'
@@ -573,16 +574,18 @@ export function Sidebar({
             )}
           </div>
 
-          {/* Admin Navigation Section (Visible ONLY for admin role in Organization Mode) */}
-          {role === 'admin' && accountType === 'organization' && (
+          {/* Organization & RBAC Section (Visible for Organization Mode) */}
+          {accountType === 'organization' && (
             <div className="space-y-1 pt-2 border-t border-[#3a352c]/50">
               {!isDesktopCollapsed && (
                 <div className="px-3 pb-1 text-[10px] font-mono font-medium text-[#c9a227] uppercase tracking-wider flex items-center justify-between">
-                  <span>Admin &amp; Employees</span>
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">ROOT</span>
+                  <span>Organization &amp; RBAC</span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-[#c9a227]/20 text-[#c9a227] font-mono">
+                    {role === 'admin' ? 'ROOT' : 'RBAC'}
+                  </span>
                 </div>
               )}
-              {adminNavItems.map((item) => {
+              {adminNavItems.filter(item => item.id === 'organization' || role === 'admin').map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
                 return (
@@ -793,6 +796,13 @@ export function Sidebar({
                   <kbd className="text-[9px] text-amber-400/90 font-mono">?</kbd>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* In-App PWA Install Option */}
+          {!isDesktopCollapsed && (
+            <div className="pt-1">
+              <PWAInstallButton variant="full" className="w-full justify-center" />
             </div>
           )}
 

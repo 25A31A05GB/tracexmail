@@ -196,7 +196,7 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
             <span>•</span>
             <a href="/security" className="text-[#8a8070] hover:text-[#ede6d8] transition-colors no-underline">Security</a>
             <span>•</span>
-            <a href="mailto:jayramsappa537@gmail.com" className="text-[#e87063] hover:underline no-underline">jayramsappa537@gmail.com</a>
+            <a href="mailto:tracexmailofficial@gmail.com" className="text-[#e87063] hover:underline no-underline">tracexmailofficial@gmail.com</a>
           </div>
         </div>
       </footer>

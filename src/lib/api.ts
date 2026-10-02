@@ -648,9 +648,9 @@ export const forensicApi = {
     return res.data;
   },
 
-  // Real-World Threat Feeds
-  getRealWorldThreatFeeds: async (): Promise<{ status: string; count: number; feeds: any[]; sources: string[]; last_synced: string }> => {
-    const res = await apiClient.get('/threat-feeds/real-world');
+  // Real-World Threat Feeds (Live CISA KEV + OpenPhish zero-hour stream)
+  getRealWorldThreatFeeds: async (live: boolean = true): Promise<{ status: string; count: number; feeds: any[]; sources: string[]; last_synced: string; isSimulated?: boolean }> => {
+    const res = await apiClient.get('/threat-feeds/real-world' + (live ? '?live=true' : ''));
     return res.data;
   },
 
@@ -661,6 +661,16 @@ export const forensicApi = {
 
   convertThreatFeedToCase: async (threatId: string): Promise<any> => {
     const res = await apiClient.post('/threat-feeds/convert-to-case', { threat_id: threatId });
+    return res.data;
+  },
+
+  updateTeamMemberRole: async (memberId: string, role: string): Promise<any> => {
+    const res = await apiClient.patch(`/team/members/${memberId}/role`, { role });
+    return res.data;
+  },
+
+  deleteTeamMember: async (memberId: string): Promise<any> => {
+    const res = await apiClient.delete(`/team/members/${memberId}`);
     return res.data;
   },
 

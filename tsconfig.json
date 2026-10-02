@@ -16,7 +16,8 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "types": ["vite/client", "vite-plugin-pwa/client"]
   },
   "include": ["src", "server.ts", "scripts", "migrations", "vite.config.ts"]
 }
