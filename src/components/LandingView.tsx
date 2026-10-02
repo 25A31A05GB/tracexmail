@@ -46,6 +46,7 @@ import { useLenisScroll } from '../hooks/useLenisScroll';
 import { ShaderGradientHero } from './landing/ShaderGradientHero';
 import { UnicornStudioScene } from './landing/UnicornStudioScene';
 import { RevealBlock } from '../hooks/useScrollReveal';
+import { LiveUserFeedbackSection } from './landing/LiveUserFeedbackSection';
 import { 
   motion, 
   useMotionValue, 
@@ -327,6 +328,10 @@ export function LandingView({
             <button data-scroll-to="team" onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Team
             </button>
+            <button data-scroll-to="reviews" onClick={() => scrollToSection('reviews')} className="text-[#c9a227] hover:text-[#ede6d8] font-semibold transition-colors bg-transparent border-none cursor-pointer link-basement flex items-center gap-1">
+              <span>Reviews</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+            </button>
             <button data-scroll-to="faq" onClick={() => scrollToSection('faq')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               FAQ
             </button>
@@ -450,6 +455,15 @@ export function LandingView({
                 className="text-left text-[#ede6d8] py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center"
               >
                 Team &amp; Creators
+              </button>
+              <button
+                type="button"
+                data-scroll-to="reviews"
+                onClick={() => { scrollToSection('reviews'); setMobileMenuOpen(false); }}
+                className="text-left text-[#c9a227] font-semibold py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center justify-between"
+              >
+                <span>Live Practitioner Reviews</span>
+                <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
               </button>
               <button
                 type="button"
@@ -1220,6 +1234,9 @@ export function LandingView({
           </div>
         </div>
       </section>
+
+      {/* Live Practitioner Reviews & Community Feedback Section - NO FAKE REVIEWS */}
+      <LiveUserFeedbackSection onOpenConsole={onOpenConsole} />
 
       {/* FAQ Section - CENTERED */}
       <section id="faq" className="py-16 sm:py-20 border-b border-[#3a352c] bg-[#14120f]">

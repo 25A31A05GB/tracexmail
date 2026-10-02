@@ -605,4 +605,17 @@ export interface WorkspaceLockState {
   lockReason: 'inactivity' | 'manual' | 'policy';
 }
 
+export interface UserTestimonial {
+  id: string;
+  name: string;
+  role: string;
+  organization?: string;
+  rating: number;
+  feedback: string;
+  impactMetric?: string;
+  verified: boolean;
+  verificationDigest: string;
+  createdAt: string;
+}
+
 

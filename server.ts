@@ -3811,6 +3811,45 @@ async function startServer() {
     res.status(201).json(newCorrection);
   });
 
+  // -------------------------------------------------------------
+  // Live User Testimonials & Feedback Endpoints (Real User Reviews)
+  // -------------------------------------------------------------
+  app.get('/api/testimonials', publicLimiter, async (_req, res) => {
+    try {
+      const { getLiveTestimonials } = await import('./src/server/testimonialStore');
+      const testimonials = getLiveTestimonials();
+      res.json({ success: true, testimonials });
+    } catch (err: any) {
+      console.error('[GET /api/testimonials] Error:', err);
+      res.status(500).json({ error: 'Failed to retrieve testimonials' });
+    }
+  });
+
+  app.post('/api/testimonials', publicLimiter, async (req, res) => {
+    try {
+      const { name, role, organization, rating, feedback, impactMetric } = req.body || {};
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ error: 'Name or Analyst handle is required' });
+      }
+      if (!feedback || typeof feedback !== 'string' || !feedback.trim()) {
+        return res.status(400).json({ error: 'Review or feedback text is required' });
+      }
+      const { addLiveTestimonial } = await import('./src/server/testimonialStore');
+      const newTestimonial = addLiveTestimonial({
+        name,
+        role: role || 'Security Practitioner',
+        organization,
+        rating: Number(rating) || 5,
+        feedback,
+        impactMetric
+      });
+      res.status(201).json({ success: true, testimonial: newTestimonial });
+    } catch (err: any) {
+      console.error('[POST /api/testimonials] Error:', err);
+      res.status(500).json({ error: 'Failed to publish testimonial' });
+    }
+  });
+
   app.post('/api/cases/:caseId/emails', publicLimiter, async (req, res) => {
     const caseId = req.params.caseId;
     const emailIds: string[] = Array.isArray(req.body?.email_ids) ? req.body.email_ids : [];
