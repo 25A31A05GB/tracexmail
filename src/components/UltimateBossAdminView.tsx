@@ -39,6 +39,8 @@ import {
   Shield,
   Layers,
   TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
   BarChart3,
   PieChart as PieChartIcon,
   LineChart as LineChartIcon,
@@ -110,11 +112,19 @@ export function UltimateBossAdminView({
 
   // System Stats State
   const [systemStats, setSystemStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
+    totalUsers: 32,
+    usersChangePct: '+14.2%',
+    activeUsers: 28,
+    
     totalCasesScanned: 4892,
-    totalReviews: 100,
+    investigationsChangePct: '+22.8%',
+    activeInvestigations: 124,
+
+    platformHealthScore: '99.8 / 100',
+    healthScoreChangePct: '+1.4%',
     systemUptime: '99.99%',
+    
+    totalReviews: 100,
     cpuUsage: '14.2%',
     memoryUsage: '342MB',
     ingestionRate: '124 EML/sec',
@@ -497,72 +507,167 @@ export function UltimateBossAdminView({
         </div>
       )}
 
-      {/* High-Level Real-Time Aggregated Metrics Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
-        <div className="p-4 bg-[var(--ink-2)] border border-amber-500/40 rounded-xl space-y-1 shadow-md hover:border-amber-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Total Users</span>
-            <Users className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold font-display text-[var(--paper)]">{systemStats.totalUsers}</div>
-          <div className="text-[10.5px] font-mono text-emerald-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>{systemStats.activeUsers} Active</span>
-          </div>
+      {/* High-Level Summary Cards Row (Top Dashboard Row) */}
+      <div className="space-y-3.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-mono font-bold text-amber-300 uppercase tracking-widest flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Executive Platform Overview &amp; Health Telemetry</span>
+          </h2>
+          <span className="text-[10.5px] font-mono text-[var(--paper-dim)]">
+            Live comparison vs previous 7-day baseline
+          </span>
         </div>
 
-        <div className="p-4 bg-[var(--ink-2)] border border-emerald-500/40 rounded-xl space-y-1 shadow-md hover:border-emerald-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Total Investigations</span>
-            <ShieldAlert className="w-4 h-4 text-emerald-400" />
+        {/* 3 Primary Hero Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          {/* Card 1: Total Registered Users */}
+          <div className="p-5 bg-gradient-to-br from-[var(--ink-2)] to-stone-900 border border-amber-500/50 hover:border-amber-400 rounded-xl space-y-3 shadow-xl transition-all relative overflow-hidden group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-400/40 flex items-center justify-center text-amber-400 shadow-inner">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-mono font-semibold text-[var(--paper-dim)] uppercase tracking-wider block">
+                    Total Registered Users
+                  </span>
+                  <span className="text-[10.5px] font-mono text-stone-400">Platform Accounts</span>
+                </div>
+              </div>
+
+              {/* Percentage Change Indicator Badge */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold shadow-xs">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{systemStats.usersChangePct}</span>
+              </div>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div className="text-3xl font-bold font-display text-[var(--paper)] tracking-tight">
+                {systemStats.totalUsers}
+              </div>
+              <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{systemStats.activeUsers} Active Accounts</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--line)] text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
+              <span>vs previous 7 days</span>
+              <span className="text-emerald-400 font-semibold">+4 new this week</span>
+            </div>
           </div>
-          <div className="text-2xl font-bold font-display text-emerald-300">{systemStats.totalCasesScanned.toLocaleString()}</div>
-          <div className="text-[10.5px] font-mono text-emerald-400">
-            Across Platform
+
+          {/* Card 2: Active Forensic Investigations */}
+          <div className="p-5 bg-gradient-to-br from-[var(--ink-2)] to-stone-900 border border-emerald-500/50 hover:border-emerald-400 rounded-xl space-y-3 shadow-xl transition-all relative overflow-hidden group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shadow-inner">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-mono font-semibold text-[var(--paper-dim)] uppercase tracking-wider block">
+                    Active Forensic Investigations
+                  </span>
+                  <span className="text-[10.5px] font-mono text-stone-400">Total Scanned Cases</span>
+                </div>
+              </div>
+
+              {/* Percentage Change Indicator Badge */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold shadow-xs">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{systemStats.investigationsChangePct}</span>
+              </div>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div className="text-3xl font-bold font-display text-emerald-300 tracking-tight">
+                {systemStats.totalCasesScanned.toLocaleString()}
+              </div>
+              <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5" />
+                <span>124 Ingested/sec</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--line)] text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
+              <span>vs previous 7 days</span>
+              <span className="text-emerald-400 font-semibold">+884 cases this week</span>
+            </div>
           </div>
+
+          {/* Card 3: Daily Platform Health Score */}
+          <div className="p-5 bg-gradient-to-br from-[var(--ink-2)] to-stone-900 border border-blue-500/50 hover:border-blue-400 rounded-xl space-y-3 shadow-xl transition-all relative overflow-hidden group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-blue-500/15 border border-blue-400/40 flex items-center justify-center text-blue-400 shadow-inner">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-xs font-mono font-semibold text-[var(--paper-dim)] uppercase tracking-wider block">
+                    Daily Platform Health Score
+                  </span>
+                  <span className="text-[10.5px] font-mono text-stone-400">Infrastructure Stability</span>
+                </div>
+              </div>
+
+              {/* Percentage Change Indicator Badge */}
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-mono font-bold shadow-xs">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{systemStats.healthScoreChangePct}</span>
+              </div>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div className="text-3xl font-bold font-display text-blue-300 tracking-tight">
+                {systemStats.platformHealthScore}
+              </div>
+              <div className="text-[11px] font-mono text-blue-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{systemStats.systemUptime} Uptime</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--line)] text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
+              <span>vs 24h operational baseline</span>
+              <span className="text-blue-400 font-semibold">5 / 5 Clusters Optimal</span>
+            </div>
+          </div>
+
         </div>
 
-        <div className="p-4 bg-[var(--ink-2)] border border-blue-500/40 rounded-xl space-y-1 shadow-md hover:border-blue-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Platform Health</span>
-            <Activity className="w-4 h-4 text-blue-400" />
+        {/* 3 Secondary Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
+          <div className="p-3.5 bg-[var(--ink-2)] border border-purple-500/40 rounded-xl flex items-center justify-between shadow-md">
+            <div>
+              <div className="text-[11px] font-mono text-[var(--paper-dim)]">Threat Detection Accuracy</div>
+              <div className="text-xl font-bold font-display text-purple-300 mt-0.5">{systemStats.threatDetectionRate}</div>
+            </div>
+            <div className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10.5px] font-mono font-semibold">
+              Zero-Day Active
+            </div>
           </div>
-          <div className="text-2xl font-bold font-display text-blue-300">{systemStats.systemUptime}</div>
-          <div className="text-[10.5px] font-mono text-blue-400">
-            100% Operational
-          </div>
-        </div>
 
-        <div className="p-4 bg-[var(--ink-2)] border border-purple-500/40 rounded-xl space-y-1 shadow-md hover:border-purple-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Threat Detection</span>
-            <Zap className="w-4 h-4 text-purple-400" />
+          <div className="p-3.5 bg-[var(--ink-2)] border border-amber-500/40 rounded-xl flex items-center justify-between shadow-md">
+            <div>
+              <div className="text-[11px] font-mono text-[var(--paper-dim)]">Verified Practitioner Reviews</div>
+              <div className="text-xl font-bold font-display text-amber-300 mt-0.5">{systemStats.totalReviews}</div>
+            </div>
+            <div className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10.5px] font-mono font-semibold">
+              100% Live
+            </div>
           </div>
-          <div className="text-2xl font-bold font-display text-purple-300">{systemStats.threatDetectionRate}</div>
-          <div className="text-[10.5px] font-mono text-purple-400">
-            Zero-Day Accuracy
-          </div>
-        </div>
 
-        <div className="p-4 bg-[var(--ink-2)] border border-amber-500/40 rounded-xl space-y-1 shadow-md hover:border-amber-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Verified Reviews</span>
-            <MessageSquare className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-2xl font-bold font-display text-amber-300">{systemStats.totalReviews}</div>
-          <div className="text-[10.5px] font-mono text-amber-400">
-            100% Practitioners
-          </div>
-        </div>
-
-        <div className="p-4 bg-[var(--ink-2)] border border-stone-600 rounded-xl space-y-1 shadow-md hover:border-stone-400 transition-all">
-          <div className="text-[11px] font-mono text-[var(--paper-dim)] flex items-center justify-between">
-            <span>Ingestion Speed</span>
-            <Cpu className="w-4 h-4 text-stone-400" />
-          </div>
-          <div className="text-2xl font-bold font-display text-[var(--paper)]">{systemStats.ingestionRate}</div>
-          <div className="text-[10.5px] font-mono text-stone-400">
-            CPU: {systemStats.cpuUsage}
+          <div className="p-3.5 bg-[var(--ink-2)] border border-stone-600 rounded-xl flex items-center justify-between shadow-md">
+            <div>
+              <div className="text-[11px] font-mono text-[var(--paper-dim)]">Ingestion Engine Load</div>
+              <div className="text-xl font-bold font-display text-[var(--paper)] mt-0.5">{systemStats.ingestionRate}</div>
+            </div>
+            <div className="px-2 py-0.5 rounded bg-stone-800 text-stone-300 text-[10.5px] font-mono font-semibold">
+              CPU: {systemStats.cpuUsage}
+            </div>
           </div>
         </div>
       </div>

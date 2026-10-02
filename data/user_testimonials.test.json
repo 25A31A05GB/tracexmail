@@ -1,5 +1,42 @@
 [
   {
+    "id": "rev_1790964629977_ovtuet",
+    "name": "Disputed Reviewer",
+    "role": "Analyst",
+    "rating": 3,
+    "feedback": "This post is under active review.",
+    "verified": true,
+    "verificationDigest": "d0bd1428410891add8d16b6a601d6b4bbf2626b1feb3a6589fdba38165552972",
+    "createdAt": "2026-10-02T18:10:29.977Z",
+    "moderationStatus": "approved"
+  },
+  {
+    "id": "rev_1790964629975_ok6lrz",
+    "name": "Suspect User",
+    "role": "Spammer",
+    "rating": 1,
+    "feedback": "Buy cheap watches and fake pills at spam-site.com!",
+    "verified": true,
+    "verificationDigest": "548199406e536dc0a3f5a798024fc991afea4d850869437ac14c013852b48748",
+    "createdAt": "2026-10-02T18:10:29.975Z",
+    "isReported": true,
+    "reportCount": 1,
+    "reportReason": "Spam, advertising, or unsolicited promotion",
+    "reportedAt": "2026-10-02T18:10:29.975Z"
+  },
+  {
+    "id": "rev_1790964629972_v3f6my",
+    "name": "Agent Mulder",
+    "role": "Forensic Lead",
+    "organization": "CyberGov",
+    "rating": 5,
+    "feedback": "Excellent email header parsing and RFC 822 decoding capabilities.",
+    "impactMetric": "-75% Triage Time",
+    "verified": true,
+    "verificationDigest": "616b0772ec69eaacf95d5c51aa4b636e4f409db3abbb7d1b6db97ab8c76f1ec3",
+    "createdAt": "2026-10-02T18:10:29.972Z"
+  },
+  {
     "id": "rev_1790964375254_sp88wv",
     "name": "Disputed Reviewer",
     "role": "Analyst",
