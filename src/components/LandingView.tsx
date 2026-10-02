@@ -283,10 +283,10 @@ export function LandingView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0">
+    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0 pt-16">
       
-      {/* Top Header Navigation */}
-      <nav className="sticky top-0 z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c]">
+      {/* Top Header Navigation: Fixed to top and visible while scrolling */}
+      <nav className="fixed top-0 left-0 right-0 w-full z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c] shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core" />
