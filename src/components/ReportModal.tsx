@@ -28,7 +28,12 @@ import {
   UserCheck,
   BookOpen,
   Database,
-  Tag
+  Tag,
+  Shield,
+  Cpu,
+  Sparkles,
+  RefreshCw,
+  Layers
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { sha256Sync } from '../utils/crypto';
@@ -59,6 +64,7 @@ interface ReportModalProps {
 
 export type ReportTab = 
   | 'evidence_card'
+  | 'soc_report'
   | 'institutional'
   | 'legal'
   | 'incident_response'
@@ -72,6 +78,39 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
   const [activeTab, setActiveTab] = useState<ReportTab>('evidence_card');
   const [enforceMasking, setEnforceMasking] = useState(privacyConfig.maskingEnabled);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [socReport, setSocReport] = useState<any>((analysis as any)?.soc_report || (analysis as any)?.socReport || null);
+  const [generatingSocReport, setGeneratingSocReport] = useState(false);
+  const [socReportError, setSocReportError] = useState<string | null>(null);
+  const [copiedRuleKey, setCopiedRuleKey] = useState<string | null>(null);
+
+  const handleGenerateSocReport = async () => {
+    if (!analysis?.id) return;
+    setGeneratingSocReport(true);
+    setSocReportError(null);
+    try {
+      const res = await fetch(`/api/cases/${encodeURIComponent(analysis.id)}/soc-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analysis)
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}: Failed to generate SOC report`);
+      }
+      const data = await res.json();
+      setSocReport(data);
+    } catch (err: any) {
+      setSocReportError(err?.message || 'Error generating SOC report');
+    } finally {
+      setGeneratingSocReport(false);
+    }
+  };
+
+  const handleCopyRule = (ruleText: string, key: string) => {
+    navigator.clipboard.writeText(ruleText);
+    setCopiedRuleKey(key);
+    setTimeout(() => setCopiedRuleKey(null), 2500);
+  };
 
   if (!isOpen) return null;
 
@@ -349,6 +388,17 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
               <span>Evidence Tag Flashcard</span>
             </button>
             <button
+              onClick={() => setActiveTab('soc_report')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'soc_report'
+                  ? 'border-indigo-400 text-indigo-300 bg-indigo-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5 text-indigo-400" />
+              <span>SOC Report (AI Tier-3)</span>
+            </button>
+            <button
               onClick={() => setActiveTab('institutional')}
               className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
                 activeTab === 'institutional'
@@ -469,6 +519,258 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                   onClose();
                 }}
               />
+            </div>
+          )}
+
+          {/* TAB: GEMINI SOC ANALYST REPORT */}
+          {activeTab === 'soc_report' && (
+            <div className="space-y-6">
+              {/* Header Banner with Generation Trigger & Review Disclaimer */}
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-950/80 border border-indigo-700/80 flex items-center justify-center text-indigo-400">
+                    <Sparkles className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider font-mono">
+                        Automated SOC Tier-3 Incident Report
+                      </h3>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-950/80 text-purple-300 border border-purple-800/80 flex items-center gap-1">
+                        <ShieldAlert className="w-3 h-3 text-purple-400" />
+                        AI-generated, analyst review required
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Grounding strictly derived from observed sending infrastructure, RFC headers, and verified IOC telemetry.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateSocReport}
+                    disabled={generatingSocReport}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${generatingSocReport ? 'animate-spin' : ''}`} />
+                    <span>{generatingSocReport ? 'Synthesizing...' : socReport ? 'Regenerate Report' : 'Generate SOC Report'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {socReportError && (
+                <div className="p-3 bg-rose-950/40 border border-rose-800 rounded-lg text-xs text-rose-300 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{socReportError}</span>
+                </div>
+              )}
+
+              {!socReport && !generatingSocReport && (
+                <div className="py-12 text-center rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-indigo-950/40 border border-indigo-800/60 flex items-center justify-center mx-auto text-indigo-400">
+                    <Cpu className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-200">No Tier-3 SOC Report Generated Yet</h4>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Click "Generate SOC Report" to synthesize an AI incident brief, attribution hypothesis, remediation playbook, and defensive rules from this case's telemetry.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGenerateSocReport}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Generate SOC Analyst Report
+                  </button>
+                </div>
+              )}
+
+              {generatingSocReport && (
+                <div className="py-16 text-center rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-4">
+                  <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold text-slate-200">Synthesizing SOC Forensic Report with Gemini...</div>
+                    <div className="text-xs text-slate-400 font-mono">
+                      Evaluating envelope headers • Extracting observed sending infrastructure • Formulating defensive rules
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {socReport && !generatingSocReport && (
+                <div className="space-y-6">
+                  {/* Executive Summary */}
+                  <div className="p-5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-indigo-400" />
+                        Executive Summary
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-400">
+                        Model: <span className="text-indigo-300 font-semibold">{socReport.metadata?.modelUsed}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-sans">
+                      {socReport.executiveSummary}
+                    </p>
+                  </div>
+
+                  {/* Threat Actor & Attribution Hypothesis */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-amber-300 font-mono flex items-center gap-1.5">
+                        <ShieldAlert className="w-4 h-4 text-amber-400" />
+                        Threat Actor Profile
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {socReport.threatActorProfile}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-bold uppercase tracking-wider text-cyan-300 font-mono flex items-center gap-1.5">
+                          <Compass className="w-4 h-4 text-cyan-400" />
+                          Attribution Hypothesis
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                          socReport.attributionHypothesis?.confidence === 'HIGH'
+                            ? 'bg-emerald-950 border-emerald-700 text-emerald-300'
+                            : socReport.attributionHypothesis?.confidence === 'MEDIUM'
+                            ? 'bg-amber-950 border-amber-700 text-amber-300'
+                            : 'bg-slate-800 border-slate-700 text-slate-300'
+                        }`}>
+                          {socReport.attributionHypothesis?.confidence} CONFIDENCE
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {socReport.attributionHypothesis?.hypothesisText}
+                      </p>
+                      {socReport.attributionHypothesis?.evidenceIds?.length > 0 && (
+                        <div className="text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800">
+                          Evidence Reference IDs: <span className="text-blue-300">{socReport.attributionHypothesis.evidenceIds.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Defensive Rules Generator with One-Click Copy */}
+                  <div className="p-5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-emerald-300 font-mono flex items-center gap-1.5">
+                        <Terminal className="w-4 h-4 text-emerald-400" />
+                        Verified Defensive Rule Packages (PowerShell, Snort, Postfix)
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">Grounding: Evidence IOCs Only</span>
+                    </div>
+
+                    {/* M365 PowerShell */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+                        <span className="font-bold text-slate-200">1. Microsoft 365 Exchange Transport Rule (PowerShell):</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRule(socReport.defensiveRules?.m365MailFlowRule || '', 'm365')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[11px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedRuleKey === 'm365' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedRuleKey === 'm365' ? 'Copied!' : 'Copy Rule'}</span>
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap">
+                        {socReport.defensiveRules?.m365MailFlowRule || '# Rule not available'}
+                      </pre>
+                    </div>
+
+                    {/* Snort / Suricata Rule */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+                        <span className="font-bold text-slate-200">2. Snort / Suricata Network Signature:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRule(socReport.defensiveRules?.snortOrSuricataRule || '', 'snort')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[11px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedRuleKey === 'snort' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedRuleKey === 'snort' ? 'Copied!' : 'Copy Rule'}</span>
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-amber-300 overflow-x-auto whitespace-pre-wrap">
+                        {socReport.defensiveRules?.snortOrSuricataRule || '# Rule not available'}
+                      </pre>
+                    </div>
+
+                    {/* Postfix Block */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+                        <span className="font-bold text-slate-200">3. Postfix Access / MTA Access Rule:</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyRule(socReport.defensiveRules?.postfixBlock || '', 'postfix')}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[11px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                        >
+                          {copiedRuleKey === 'postfix' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedRuleKey === 'postfix' ? 'Copied!' : 'Copy Rule'}</span>
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre-wrap">
+                        {socReport.defensiveRules?.postfixBlock || '# Rule not available'}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Remediation Playbook (Ordered Steps) */}
+                  <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="text-xs font-bold uppercase tracking-wider text-rose-300 font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                      <ShieldCheck className="w-4 h-4 text-rose-400" />
+                      Ordered Remediation Playbook
+                    </div>
+                    <div className="space-y-2.5">
+                      {socReport.remediationPlaybook?.map((step: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-slate-900/90 border border-slate-800/80 rounded-lg flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 text-xs font-mono font-bold flex items-center justify-center text-slate-200 shrink-0">
+                            {step.stepNumber || idx + 1}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-slate-100">{step.title}</span>
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                                step.priority === 'CRITICAL' ? 'bg-rose-950 border border-rose-700 text-rose-300' :
+                                step.priority === 'HIGH' ? 'bg-amber-950 border border-amber-700 text-amber-300' :
+                                'bg-slate-800 border border-slate-700 text-slate-300'
+                              }`}>
+                                {step.priority}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-1 leading-relaxed">{step.action}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* MITRE ATT&CK Mapping */}
+                  <div className="p-5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                    <div className="text-xs font-bold uppercase tracking-wider text-purple-300 font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                      <Layers className="w-4 h-4 text-purple-400" />
+                      MITRE ATT&amp;CK Technique Mappings
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {socReport.mitreAttacks?.map((m: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-purple-300">{m.id}</span>
+                            <span className="text-[10px] text-slate-400 font-mono uppercase">{m.tactic}</span>
+                          </div>
+                          <div className="font-semibold text-slate-200">{m.name}</div>
+                          <p className="text-[11px] text-slate-400 leading-snug">{m.explanation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

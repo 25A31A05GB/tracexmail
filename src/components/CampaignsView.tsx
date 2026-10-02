@@ -19,7 +19,12 @@ import {
   Eye,
   X,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Cpu,
+  Check,
+  ShieldAlert,
+  Compass
 } from 'lucide-react';
 import { forensicApi, CampaignItem, CampaignTimelineResponse, TimelineEvent } from '../lib/api';
 
@@ -29,8 +34,12 @@ export function CampaignsView() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [campaignDetail, setCampaignDetail] = useState<any | null>(null);
   const [timelineData, setTimelineData] = useState<CampaignTimelineResponse | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'relationships' | 'graph'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'relationships' | 'graph' | 'ai_narrative'>('overview');
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
+  const [runningAiDetect, setRunningAiDetect] = useState<boolean>(false);
+  const [generatingNarrative, setGeneratingNarrative] = useState<boolean>(false);
+  const [aiNarrativeData, setAiNarrativeData] = useState<any | null>(null);
+  const [aiNarrativeError, setAiNarrativeError] = useState<string | null>(null);
 
   // Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -38,6 +47,49 @@ export function CampaignsView() {
   const [newThreatActor, setNewThreatActor] = useState<string>('');
   const [newTargetIndustry, setNewTargetIndustry] = useState<string>('');
   const [newNotes, setNewNotes] = useState<string>('');
+
+  const handleRunAiDetection = async () => {
+    setRunningAiDetect(true);
+    try {
+      const res = await fetch('/api/campaigns/ai-detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.campaigns) && data.campaigns.length > 0) {
+          setCampaigns(data.campaigns);
+        }
+      }
+    } catch (e) {
+      console.warn('[AiCampaign] Live detection error:', e);
+    } finally {
+      setRunningAiDetect(false);
+    }
+  };
+
+  const handleGenerateCampaignNarrative = async (cluster: any) => {
+    if (!cluster?.id) return;
+    setGeneratingNarrative(true);
+    setAiNarrativeError(null);
+    try {
+      const res = await fetch(`/api/campaigns/${encodeURIComponent(cluster.id)}/ai-narrative`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cluster, memberCases: campaignDetail?.members || [] })
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to synthesize AI narrative');
+      }
+      const data = await res.json();
+      setAiNarrativeData(data);
+    } catch (err: any) {
+      setAiNarrativeError(err.message || 'Error generating AI campaign narrative');
+    } finally {
+      setGeneratingNarrative(false);
+    }
+  };
 
   const fetchCampaigns = async () => {
     setLoading(true);
@@ -244,7 +296,16 @@ export function CampaignsView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={handleRunAiDetection}
+            disabled={runningAiDetect}
+            className="px-3.5 py-2 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-700 text-indigo-300 text-xs font-semibold rounded-lg flex items-center gap-2 cursor-pointer shadow-sm transition-colors disabled:opacity-50"
+            title="Execute Gemini AI Campaign Detection across all incident cases"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-indigo-400 ${runningAiDetect ? 'animate-spin' : ''}`} />
+            <span>{runningAiDetect ? 'Correlating with AI...' : 'Run AI Campaign Detection'}</span>
+          </button>
           <button
             onClick={fetchCampaigns}
             disabled={loading}
@@ -330,14 +391,23 @@ export function CampaignsView() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 flex-wrap">
               <button
                 onClick={() => setActiveTab('overview')}
                 className={`px-3 py-1.5 rounded text-xs font-mono font-semibold transition-colors cursor-pointer ${
                   activeTab === 'overview' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                Overview & Members
+                Overview &amp; Members
+              </button>
+              <button
+                onClick={() => setActiveTab('ai_narrative')}
+                className={`px-3 py-1.5 rounded text-xs font-mono font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'ai_narrative' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                AI Narrative &amp; TTPs
               </button>
               <button
                 onClick={() => setActiveTab('timeline')}
@@ -527,6 +597,153 @@ export function CampaignsView() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* TAB: AI CAMPAIGN NARRATIVE & TTPS */}
+              {activeTab === 'ai_narrative' && (
+                <div className="space-y-6">
+                  {/* Action Banner */}
+                  <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-indigo-950/80 border border-indigo-700/80 flex items-center justify-center text-indigo-400">
+                        <Sparkles className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider font-mono">
+                            Gemini AI Campaign Narrative Synthesis
+                          </h3>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-purple-950/80 text-purple-300 border border-purple-800/80 flex items-center gap-1">
+                            <ShieldAlert className="w-3 h-3 text-purple-400" />
+                            AI-generated, analyst review required
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Synthesizes campaign flight paths, shared TTPs, and adversary objectives strictly over verifiable deterministic linkages.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateCampaignNarrative(campaignDetail?.campaign || campaigns.find(c => c.id === selectedCampaignId))}
+                      disabled={generatingNarrative}
+                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${generatingNarrative ? 'animate-spin' : ''}`} />
+                      <span>{generatingNarrative ? 'Synthesizing Narrative...' : aiNarrativeData ? 'Regenerate Narrative' : 'Generate AI Narrative'}</span>
+                    </button>
+                  </div>
+
+                  {aiNarrativeError && (
+                    <div className="p-3 bg-rose-950/40 border border-rose-800 rounded-lg text-xs text-rose-300 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span>{aiNarrativeError}</span>
+                    </div>
+                  )}
+
+                  {!aiNarrativeData && !generatingNarrative && (
+                    <div className="py-12 text-center rounded-xl bg-slate-900/40 border border-slate-800 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-indigo-950/40 border border-indigo-800/60 flex items-center justify-center mx-auto text-indigo-400">
+                        <Cpu className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-200">No AI Campaign Narrative Generated Yet</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Click "Generate AI Narrative" to have Gemini analyze the deterministic evidence cluster and formulate an adversary flight path and TTP profile.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateCampaignNarrative(campaignDetail?.campaign || campaigns.find(c => c.id === selectedCampaignId))}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                      >
+                        Generate AI Narrative
+                      </button>
+                    </div>
+                  )}
+
+                  {generatingNarrative && (
+                    <div className="py-16 text-center rounded-xl bg-slate-900/40 border border-slate-800 space-y-4">
+                      <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold text-slate-200">Analyzing Campaign IOC Graph with Gemini...</div>
+                        <div className="text-xs text-slate-400 font-mono">
+                          Correlating attack vectors • Formulating shared TTPs • Generating narrative
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {aiNarrativeData && !generatingNarrative && (
+                    <div className="space-y-6">
+                      {/* Campaign Narrative Card */}
+                      <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                          <div className="text-xs font-bold uppercase tracking-wider text-indigo-300 font-mono flex items-center gap-1.5">
+                            <FileText className="w-4 h-4 text-indigo-400" />
+                            Campaign Narrative &amp; Flight Path
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                              aiNarrativeData.confidence === 'HIGH'
+                                ? 'bg-emerald-950 border-emerald-700 text-emerald-300'
+                                : aiNarrativeData.confidence === 'MEDIUM'
+                                ? 'bg-amber-950 border-amber-700 text-amber-300'
+                                : 'bg-slate-800 border-slate-700 text-slate-300'
+                            }`}>
+                              {aiNarrativeData.confidence} CONFIDENCE
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              Model: {aiNarrativeData.metadata?.modelUsed}
+                            </span>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-sans">
+                          {aiNarrativeData.campaignNarrative}
+                        </p>
+                      </div>
+
+                      {/* Likely Objective & Attribution Explanation */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <div className="text-xs font-bold uppercase tracking-wider text-amber-300 font-mono flex items-center gap-1.5">
+                            <Compass className="w-4 h-4 text-amber-400" />
+                            Likely Adversary Objective
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                            {aiNarrativeData.likelyObjective}
+                          </p>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <div className="text-xs font-bold uppercase tracking-wider text-cyan-300 font-mono flex items-center gap-1.5">
+                            <Shield className="w-4 h-4 text-cyan-400" />
+                            Campaign Linkage Reasoning
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            {aiNarrativeData.explanation}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Shared TTPs */}
+                      <div className="p-5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                        <div className="text-xs font-bold uppercase tracking-wider text-purple-300 font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                          <Layers className="w-4 h-4 text-purple-400" />
+                          Observed Campaign TTPs (Techniques, Tactics &amp; Procedures)
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {aiNarrativeData.sharedTtps?.map((ttp: string, idx: number) => (
+                            <div key={idx} className="p-3 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-purple-200 flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                              <span>{ttp}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

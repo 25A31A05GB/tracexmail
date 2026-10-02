@@ -431,6 +431,8 @@ export interface EvidenceCardData {
     text: string;
     status: 'bad' | 'warn' | 'good' | string;
     scoreLabel: string;
+    severity?: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO' | string;
+    severityLabel?: string;
   };
   subject: string;
   identityRows: Array<{

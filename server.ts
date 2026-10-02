@@ -36,6 +36,10 @@ import {
   MAXMIND_COPYRIGHT_NOTICE,
   MAXMIND_LICENSE_NOTICE
 } from './src/server/intelligence';
+import { queryOtxIndicator, getOtxStatus, enrichCaseWithOtx, isOtxConfigured } from './src/server/otxService';
+import { generateSocReport, validateAndSanitizeSocReport } from './src/server/socReportService';
+import { generateCampaignNarrative, detectCampaignsWithAi } from './src/server/aiCampaignService';
+import { queryIpThreatIntel, queryDomainThreatIntel, queryUrlThreatIntel } from './src/server/threatIntelService';
 import {
   classifyEmailContent,
   classifyEmailForensics,
@@ -2751,6 +2755,120 @@ async function startServer() {
     });
   });
 
+  // --- Gemini SOC Analyst Report Endpoints ---
+  app.post('/api/cases/:caseId/soc-report', publicLimiter, async (req, res) => {
+    const caseId = req.params.caseId;
+    const supabase = getSupabaseClient();
+    let targetCase: any = inMemoryCases.get(caseId);
+
+    if (!targetCase && supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
+        if (data) targetCase = data;
+      } catch {}
+    }
+
+    // Also check demo/seed cases or req.body if still not found
+    if (!targetCase) {
+      targetCase = Array.from(inMemoryCases.values()).find(c => c.id === caseId) || null;
+    }
+
+    if (!targetCase && req.body && (req.body.hops || req.body.from || req.body.subject)) {
+      targetCase = req.body;
+    }
+
+    if (!targetCase) {
+      return res.status(404).json({ error: `Case '${caseId}' not found for SOC report generation.` });
+    }
+
+    try {
+      const caseAnalysis = targetCase.raw_analysis || targetCase;
+      const socReport = await generateSocReport(caseAnalysis);
+
+      // Persist on case object
+      targetCase.soc_report = socReport;
+      targetCase.socReport = socReport;
+      inMemoryCases.set(caseId, targetCase);
+
+      // Persist to Supabase if configured
+      if (supabase) {
+        try {
+          await supabase.from('cases').update({ soc_report: socReport }).eq('id', caseId);
+        } catch (dbErr) {
+          console.warn('[Supabase] Could not update cases.soc_report column:', dbErr);
+        }
+
+        try {
+          await supabase.from('soc_reports').insert([{
+            id: `soc_rep_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            case_id: caseId,
+            organization_id: targetCase.organization_id || 'org_default',
+            created_by_email: targetCase.user_email || 'soc-analyst@tracexmail.internal',
+            model_used: socReport.metadata.modelUsed,
+            prompt_version: socReport.metadata.promptVersion,
+            report_data: socReport,
+            created_at: new Date().toISOString()
+          }]);
+        } catch (repErr) {
+          console.warn('[Supabase] Could not insert into soc_reports table:', repErr);
+        }
+
+        // Record in audit log
+        try {
+          await supabase.from('compliance_audit_logs').insert([{
+            id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            event_type: 'SOC_REPORT_GENERATED',
+            case_id: caseId,
+            actor_email: targetCase.user_email || 'soc-analyst@tracexmail.internal',
+            details: {
+              model: socReport.metadata.modelUsed,
+              promptVersion: socReport.metadata.promptVersion,
+              evidenceLineageHash: socReport.metadata.evidenceLineageHash,
+              confidence: socReport.attributionHypothesis.confidence
+            },
+            created_at: new Date().toISOString()
+          }]);
+        } catch {}
+      }
+
+      res.json(socReport);
+    } catch (err: any) {
+      console.error(`[SocReport] Error synthesizing report for case ${caseId}:`, err);
+      res.status(500).json({ error: err.message || 'Failed to generate SOC analyst report' });
+    }
+  });
+
+  app.get('/api/cases/:caseId/soc-report', publicLimiter, async (req, res) => {
+    const caseId = req.params.caseId;
+    const supabase = getSupabaseClient();
+    let targetCase: any = inMemoryCases.get(caseId);
+
+    if (!targetCase && supabase) {
+      try {
+        const { data } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
+        if (data) targetCase = data;
+      } catch {}
+    }
+
+    if (targetCase?.soc_report || targetCase?.socReport) {
+      return res.json(targetCase.soc_report || targetCase.socReport);
+    }
+
+    if (req.query.generate === 'true' && targetCase) {
+      try {
+        const socReport = await generateSocReport(targetCase.raw_analysis || targetCase);
+        targetCase.soc_report = socReport;
+        targetCase.socReport = socReport;
+        inMemoryCases.set(caseId, targetCase);
+        return res.json(socReport);
+      } catch (err: any) {
+        return res.status(500).json({ error: err.message || 'Failed to generate SOC report' });
+      }
+    }
+
+    res.status(404).json({ error: 'SOC report not yet generated for this case. Call POST to generate.' });
+  });
+
   // Dedicated Related Incidents Endpoints (supports both ID lookup and raw analysis evaluation)
   app.get('/api/emails/:emailId/related-incidents', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
@@ -4380,6 +4498,104 @@ async function startServer() {
     });
   });
 
+  // Dedicated AI Campaign Detection endpoint (Requires >= 2 cases)
+  app.post('/api/campaigns/ai-detect', publicLimiter, async (req, res) => {
+    let casesToAnalyze = req.body?.cases;
+
+    if (!Array.isArray(casesToAnalyze) || casesToAnalyze.length === 0) {
+      const supabase = getSupabaseClient();
+      let allCases = Array.from(inMemoryCases.values());
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('cases').select('*');
+          if (data && data.length > 0) allCases = data;
+        } catch {}
+      }
+      casesToAnalyze = allCases;
+    }
+
+    if (!Array.isArray(casesToAnalyze) || casesToAnalyze.length < 2) {
+      return res.status(400).json({
+        error: 'At least 2 cases are required for campaign detection and correlation.',
+        providedCount: Array.isArray(casesToAnalyze) ? casesToAnalyze.length : 0
+      });
+    }
+
+    try {
+      const result = await detectCampaignsWithAi(casesToAnalyze);
+      res.json(result);
+    } catch (err: any) {
+      console.error('[AiCampaign] Detection error:', err);
+      res.status(500).json({ error: err.message || 'Failed to detect campaigns with AI' });
+    }
+  });
+
+  // Dedicated AI Narrative for a Specific Campaign
+  app.post('/api/campaigns/:campaignId/ai-narrative', publicLimiter, async (req, res) => {
+    const campaignId = req.params.campaignId;
+    let cluster = req.body?.cluster;
+    let memberCases = req.body?.memberCases;
+
+    if (!cluster) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data: cData } = await supabase.from('campaigns').select('*').eq('id', campaignId).maybeSingle();
+          if (cData) {
+            cluster = {
+              id: cData.id,
+              name: cData.name,
+              threatActor: cData.threat_actor || 'Unattributed Threat Group',
+              totalEmails: cData.total_emails || 0,
+              memberEmailIds: Array.isArray(cData.member_email_ids)
+                ? cData.member_email_ids
+                : (typeof cData.member_email_ids === 'string' ? JSON.parse(cData.member_email_ids || '[]') : []),
+              sharedEvidence: Array.isArray(cData.shared_evidence)
+                ? cData.shared_evidence
+                : (typeof cData.shared_evidence === 'string' ? JSON.parse(cData.shared_evidence || '[]') : []),
+              firstSeen: cData.first_seen || new Date().toISOString(),
+              lastSeen: cData.last_seen || new Date().toISOString(),
+              status: cData.status || 'ACTIVE',
+              targetIndustry: cData.target_industry || 'Enterprise',
+              notes: cData.notes || ''
+            };
+          }
+        } catch {}
+      }
+    }
+
+    if (!cluster || !Array.isArray(cluster.memberEmailIds) || cluster.memberEmailIds.length < 2) {
+      return res.status(400).json({
+        error: 'AI narrative synthesis requires a campaign cluster with at least 2 linked cases.',
+        memberCount: cluster?.memberEmailIds?.length || 0
+      });
+    }
+
+    try {
+      const narrative = await generateCampaignNarrative(cluster, memberCases);
+
+      // Persist in campaign_ai_narratives table if Supabase is connected
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          await supabase.from('campaign_ai_narratives').insert([{
+            id: `narr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            campaign_id: campaignId,
+            model_used: narrative.metadata.modelUsed,
+            prompt_version: 'campaign_narrative_v1.0',
+            narrative_data: narrative,
+            created_at: new Date().toISOString()
+          }]);
+        } catch {}
+      }
+
+      res.json(narrative);
+    } catch (err: any) {
+      console.error(`[AiCampaign] Narrative error for ${campaignId}:`, err);
+      res.status(500).json({ error: err.message || 'Failed to synthesize AI campaign narrative' });
+    }
+  });
+
   app.get('/api/campaigns/:campaignId/timeline', publicLimiter, async (req, res) => {
     const supabase = getSupabaseClient();
     if (!supabase) {
@@ -5020,6 +5236,16 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
+  // Dedicated AlienVault OTX DirectConnect endpoint
+  app.get('/api/intelligence/otx/:type/:indicator', publicLimiter, async (req, res) => {
+    try {
+      const result = await queryOtxIndicator(req.params.type, req.params.indicator);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to query OTX threat intelligence' });
+    }
+  });
+
   app.get('/api/intelligence/status', publicLimiter, (_req, res) => {
     const rateLimit = providerRateLimiter.getUsage('maxmind-geolite');
     const mmdbPath = process.env.MAXMIND_CITY_DB_PATH || path.join(process.cwd(), 'data', 'maxmind', 'GeoLite2-City.mmdb');
@@ -5034,6 +5260,8 @@ Link: https://verify-auth-portal.net/login`;
         copyright: MAXMIND_COPYRIGHT_NOTICE,
         license: MAXMIND_LICENSE_NOTICE
       },
+      otx: getOtxStatus(),
+      virustotal: getVirusTotalStatus(),
       rateLimits: {
         'maxmind-geolite': {
           dailyUsed: rateLimit.count,

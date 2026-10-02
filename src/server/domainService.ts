@@ -349,7 +349,7 @@ export async function resolveDomainIntelligence(rawDomain?: string): Promise<Dom
   // 3. Query Real RDAP Registry
   const rdapData = isNxDomain ? null : await fetchRealRdap(domain);
 
-  const registrar = rdapData?.registrar || (typoInfo.isLegitimateBrand ? 'Brand Registrar (Secured)' : (isNxDomain ? 'Unregistered / NXDOMAIN' : 'Domain Registrar'));
+  const registrar = rdapData?.registrar || null;
   const createdDate = rdapData?.creationDate;
   const expirationDate = rdapData?.expirationDate;
   const domainAgeDays = rdapData?.domainAgeDays;

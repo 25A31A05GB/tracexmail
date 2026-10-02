@@ -716,6 +716,10 @@
 .evidence-card .tab .caseid { font-size: 13px; letter-spacing: 0.02em; color: var(--ec-text-dim); font-weight: 500; }
 .evidence-card .tab .caseid b { color: var(--ec-accent); font-weight: 700; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .evidence-card .tab .meta { font-size: 12px; color: var(--ec-text-dim); font-weight: 500; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.evidence-card .tab .evidence-severity-badge {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
 
 .evidence-card .body { padding: 16px 20px 14px; position: relative; }
 

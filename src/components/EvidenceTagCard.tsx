@@ -334,7 +334,9 @@ export function mapAnalysisToEvidenceCardData(analysis: EmailAnalysis): Evidence
     verdict: {
       text: stampWord,
       status: stampStatus,
-      scoreLabel: trustScoreLabel
+      scoreLabel: trustScoreLabel,
+      severity: stdVerdict.severity,
+      severityLabel: stdVerdict.severityLabel
     },
     subject: subjectDisplay,
     identityRows,
@@ -469,7 +471,7 @@ export function EvidenceTagCard({
     caseId: 'NO-CASE-SELECTED',
     evidenceId: 'EVD-PENDING',
     timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC',
-    verdict: { text: 'PENDING', status: 'good', scoreLabel: 'N/A' },
+    verdict: { text: 'PENDING', status: 'good', scoreLabel: 'N/A', severity: 'LOW', severityLabel: 'LOW RISK' },
     subject: 'No Email Evidence Loaded',
     identityRows: [
       { k: 'FROM', v: 'Awaiting Ingestion', status: '' },
@@ -731,6 +733,28 @@ export function EvidenceTagCard({
 
   const stampClass = cardData.verdict.status === 'good' ? 'good' : cardData.verdict.status === 'warn' ? 'warn' : '';
 
+  // Derive visual severity level and styling for rapid situational awareness
+  const severityLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' = (() => {
+    if (cardData.verdict.severity) {
+      const s = cardData.verdict.severity.toUpperCase();
+      if (s === 'CRITICAL' || s === 'HIGH' || s === 'MEDIUM' || s === 'LOW') {
+        return s as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+      }
+    }
+    const verdictText = (cardData.verdict.text || '').toUpperCase();
+    const verdictStatus = cardData.verdict.status;
+    if (verdictText.includes('CRITICAL') || verdictText.includes('FRAUD') || verdictText.includes('MALICIOUS') || verdictText.includes('IMPERSONAT')) {
+      return 'CRITICAL';
+    }
+    if (verdictText.includes('PHISH') || verdictStatus === 'bad') {
+      return 'HIGH';
+    }
+    if (verdictText.includes('SUSPICIOUS') || verdictText.includes('UNCERTAIN') || verdictStatus === 'warn') {
+      return 'MEDIUM';
+    }
+    return 'LOW';
+  })();
+
   const cardContainerVariants: Variants = {
     hidden: { 
       opacity: 0, 
@@ -826,12 +850,53 @@ export function EvidenceTagCard({
 
       {/* Folder Tab Header */}
       <motion.div variants={cardItemVariants} className="tab flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="caseid">
             CASE <b>{cardData.caseId}</b>
           </div>
           <div className="meta">
             {cardData.evidenceId} · {cardData.timestamp}
+          </div>
+
+          {/* Visual 'Severity' Indicator Badge for Rapid Situational Awareness */}
+          <div 
+            className={`evidence-severity-badge inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] text-[11px] font-mono font-semibold tracking-wider uppercase border shadow-sm transition-all select-none ${
+              severityLevel === 'CRITICAL'
+                ? 'bg-rose-950/75 border-rose-600/70 text-rose-300 shadow-rose-950/40'
+                : severityLevel === 'HIGH'
+                ? 'bg-orange-950/75 border-orange-600/70 text-orange-300 shadow-orange-950/40'
+                : severityLevel === 'MEDIUM'
+                ? 'bg-amber-950/75 border-amber-600/70 text-amber-300 shadow-amber-950/40'
+                : 'bg-emerald-950/75 border-emerald-600/70 text-emerald-300 shadow-emerald-950/40'
+            }`}
+            title={`Threat Verdict Severity: ${severityLevel} (${cardData.verdict.severityLabel || cardData.verdict.text})`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span
+                className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  severityLevel === 'CRITICAL'
+                    ? 'bg-rose-400'
+                    : severityLevel === 'HIGH'
+                    ? 'bg-orange-400'
+                    : severityLevel === 'MEDIUM'
+                    ? 'bg-amber-400'
+                    : 'bg-emerald-400'
+                }`}
+              />
+              <span
+                className={`relative inline-flex rounded-full h-2 w-2 ${
+                  severityLevel === 'CRITICAL'
+                    ? 'bg-rose-500'
+                    : severityLevel === 'HIGH'
+                    ? 'bg-orange-500'
+                    : severityLevel === 'MEDIUM'
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+              />
+            </span>
+            <span className="opacity-70 text-[9.5px] font-normal tracking-wide text-slate-400">SEV:</span>
+            <span>{severityLevel}</span>
           </div>
         </div>
 
