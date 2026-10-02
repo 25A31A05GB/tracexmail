@@ -615,3 +615,160 @@ export async function exportEvidenceAsPdf(
   generateDirectPdfReport(options?.analysis, targetPdfName, options);
 }
 
+/**
+ * Escapes values for standard RFC 4180 CSV compliance.
+ */
+function escapeCsv(val: any): string {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""');
+  return `"${str}"`;
+}
+
+/**
+ * Exports complete forensic dossier and telemetry as a structured JSON file.
+ */
+export function exportEvidenceAsJson(analysis?: EmailAnalysis, options?: ExportEvidenceOptions): void {
+  const caseId = options?.caseId || analysis?.id || 'case-' + Date.now();
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-' + Date.now();
+  const filename = options?.filename || `${caseId}_${evidenceId}_forensic_dossier.json`;
+
+  const exportPayload = {
+    metadata: {
+      schemaVersion: '2.5.0',
+      exportedAt: new Date().toISOString(),
+      platform: 'TraceXMail Enterprise Forensic Platform',
+      caseId,
+      evidenceId,
+      tamperEvidentSha256: analysis?.sha256Hash || analysis?.sha256 || null,
+      chainOfCustody: 'VERIFIED_LEGAL_EVIDENCE'
+    },
+    threatOverview: {
+      verdict: analysis?.threatVerdict || analysis?.verdict || 'UNKNOWN',
+      threatScore: analysis?.threatScore ?? analysis?.riskScore ?? 0,
+      classification: analysis?.classification || analysis?.raw_classification || 'UNKNOWN',
+      assignedAnalyst: analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa',
+      status: analysis?.status || 'TRIAGED',
+      campaignCluster: analysis?.campaign_name || analysis?.campaign_id || null
+    },
+    emailIdentity: {
+      subject: analysis?.headers?.subject || analysis?.subject || '',
+      from: analysis?.headers?.from || analysis?.from || '',
+      fromEmail: analysis?.headers?.fromEmail || '',
+      to: analysis?.headers?.to || analysis?.to || '',
+      date: analysis?.headers?.date || analysis?.date || '',
+      messageId: analysis?.headers?.messageId || analysis?.messageId || '',
+      returnPath: analysis?.headers?.returnPath || analysis?.returnPath || '',
+      replyTo: analysis?.headers?.replyTo || analysis?.replyTo || '',
+      xMailer: analysis?.headers?.xMailer || null,
+      contentType: analysis?.headers?.contentType || null
+    },
+    authentication: {
+      spf: analysis?.authResults?.spf || analysis?.auth?.spf || null,
+      dkim: analysis?.authResults?.dkim || analysis?.auth?.dkim || null,
+      dmarc: analysis?.authResults?.dmarc || analysis?.auth?.dmarc || null
+    },
+    transmissionAndOrigin: {
+      realSenderIp: analysis?.realSenderIp || null,
+      firstHopIp: analysis?.hops?.[0]?.fromIp || null,
+      firstHopLocation: analysis?.hops?.[0] ? `${analysis.hops[0].city || ''}, ${analysis.hops[0].country || ''}`.trim() : null,
+      firstHopAsn: analysis?.hops?.[0]?.asn || null,
+      firstHopIsp: analysis?.hops?.[0]?.isp || analysis?.hops?.[0]?.org || null,
+      reverseDns: analysis?.hops?.[0]?.reverseDns || null,
+      totalHopsCount: analysis?.hops?.length || 0,
+      hops: analysis?.hops || []
+    },
+    threatBreakdown: analysis?.threatScoreBreakdown || null,
+    domainIntelligence: analysis?.domain_intelligence || analysis?.domainIntelligence || null,
+    observedIocs: {
+      urls: analysis?.urls || [],
+      attachments: analysis?.attachments || []
+    },
+    correlationEvidence: analysis?.correlationEvidence || [],
+    aiForensicNarrative: analysis?.aiNarrative || analysis?.ai_narrative || null,
+    rawHeaders: analysis?.rawHeaders || null
+  };
+
+  const jsonStr = JSON.stringify(exportPayload, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+  downloadBlob(blob, filename);
+}
+
+/**
+ * Exports key forensic fields as standard RFC 4180 CSV for spreadsheet and local reporting.
+ */
+export function exportEvidenceAsCsv(analysis?: EmailAnalysis, options?: ExportEvidenceOptions): void {
+  const caseId = options?.caseId || analysis?.id || 'case-' + Date.now();
+  const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-' + Date.now();
+  const filename = options?.filename || `${caseId}_${evidenceId}_forensic_summary.csv`;
+
+  const headers = [
+    'Case ID',
+    'Evidence ID',
+    'Date Preserved (UTC)',
+    'Subject',
+    'Verdict',
+    'Threat Score',
+    'Classification',
+    'Assigned Analyst',
+    'Status',
+    'Campaign Cluster',
+    'Sender (From)',
+    'Recipient (To)',
+    'Return-Path',
+    'Reply-To',
+    'Message-ID',
+    'SPF Status',
+    'DKIM Status',
+    'DMARC Status',
+    'DMARC Policy',
+    'Origin IP',
+    'Origin Location',
+    'Origin ASN',
+    'Origin ISP',
+    'Real Sender IP',
+    'Total Relay Hops',
+    'Observed URLs Count',
+    'Observed Attachments Count',
+    'SHA256 Hash'
+  ];
+
+  const firstHop = analysis?.hops?.[0];
+  const originLoc = firstHop ? [firstHop.city, firstHop.region, firstHop.country].filter(Boolean).join(', ') : 'N/A';
+
+  const row = [
+    caseId,
+    evidenceId,
+    new Date().toISOString(),
+    analysis?.headers?.subject || analysis?.subject || 'N/A',
+    analysis?.threatVerdict || analysis?.verdict || 'UNKNOWN',
+    analysis?.threatScore ?? analysis?.riskScore ?? 0,
+    analysis?.classification || 'UNKNOWN',
+    analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa',
+    analysis?.status || 'TRIAGED',
+    analysis?.campaign_name || analysis?.campaign_id || 'Standalone',
+    analysis?.headers?.from || analysis?.from || 'N/A',
+    analysis?.headers?.to || analysis?.to || 'N/A',
+    analysis?.headers?.returnPath || analysis?.returnPath || 'N/A',
+    analysis?.headers?.replyTo || analysis?.replyTo || 'N/A',
+    analysis?.headers?.messageId || analysis?.messageId || 'N/A',
+    analysis?.authResults?.spf?.status || analysis?.auth?.spf?.status || 'N/A',
+    analysis?.authResults?.dkim?.status || analysis?.auth?.dkim?.status || 'N/A',
+    analysis?.authResults?.dmarc?.status || analysis?.auth?.dmarc?.status || 'N/A',
+    analysis?.authResults?.dmarc?.policy || analysis?.domain_intelligence?.dns?.dmarc_policy || 'N/A',
+    firstHop?.fromIp || 'N/A',
+    originLoc,
+    firstHop?.asn || 'N/A',
+    firstHop?.isp || firstHop?.org || 'N/A',
+    analysis?.realSenderIp?.ip || 'N/A',
+    analysis?.hops?.length || 0,
+    analysis?.urls?.length || 0,
+    analysis?.attachments?.length || 0,
+    analysis?.sha256Hash || analysis?.sha256 || 'N/A'
+  ];
+
+  const csvContent = '\uFEFF' + [headers.map(escapeCsv).join(','), row.map(escapeCsv).join(',')].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, filename);
+}
+
+
