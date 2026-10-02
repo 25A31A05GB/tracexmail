@@ -100,4 +100,37 @@ describe('classifyEmailForensics', () => {
     expect(result.threatScore).toBeLessThanOrEqual(100);
     expect(result.threatScoreBreakdown.total).toBe(result.threatScore);
   });
+
+  it('correctly treats authentic Google/Gmail and accounts.google.com as legitimate and NOT typosquats', () => {
+    const result = classifyEmailForensics({
+      from: '"Google Security" <no-reply@accounts.google.com>',
+      fromDomain: 'accounts.google.com',
+      to: 'jayramsappa537@gmail.com',
+      subject: 'Security alert for your linked Google Account',
+      bodyText: 'A new sign-in was detected on your Google Account from Chrome on Linux.',
+      returnPath: '3vWBcThQKCksab-cd.efg.hij@gaia.bounces.google.com',
+      auth: {
+        spf: { status: 'PASS' },
+        dkim: { status: 'PASS' },
+        dmarc: { status: 'PASS', policy: 'reject' }
+      },
+      hops: [
+        { fromIp: '209.85.220.41', isPrivate: false, isTor: false, abuseScore: 0 }
+      ],
+      domainIntelligence: {
+        status: 'active',
+        is_newly_registered: false,
+        domain_age_days: 8000,
+        dns: {
+          spf: 'v=spf1 include:_spf.google.com ~all',
+          dmarc: 'v=DMARC1; p=reject;'
+        }
+      }
+    });
+
+    expect(result.threatScore).toBeLessThan(35);
+    expect(result.verdict).toBe('LEGITIMATE');
+    expect(result.threatScoreBreakdown.components.domainRisk.score).toBe(0);
+    expect(result.threatScoreBreakdown.components.authentication.score).toBe(0);
+  });
 });

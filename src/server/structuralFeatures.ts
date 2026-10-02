@@ -265,7 +265,10 @@ export function evaluateStructuralIdentity(input: {
     }
 
     // Check lookalike patterns in domain name (e.g. paypal-security.com, verify-docusign.net)
-    if (fromDomain && !b.legitimateDomains.includes(fromDomain)) {
+    const isAuthenticBrandDomain = b.legitimateDomains.some(ld =>
+      fromDomain === ld || fromDomain.endsWith('.' + ld)
+    );
+    if (fromDomain && !isAuthenticBrandDomain) {
       if (
         fromDomain.includes(`${b.id}-`) ||
         fromDomain.includes(`-${b.id}`) ||
@@ -287,8 +290,16 @@ export function evaluateStructuralIdentity(input: {
     structuralTokens.push('feat_reply_to_mismatch');
   }
 
-  // 5. Return-Path Mismatch
-  const isReturnPathMismatch = Boolean(returnDomain && fromDomain && returnDomain !== fromDomain);
+  // 5. Return-Path Mismatch (Excludes legitimate ESP bounce infrastructure like Google gaia.bounces / Microsoft prod.outlook)
+  const isEspBounceAligned = Boolean(
+    (fromDomain === 'gmail.com' || fromDomain.endsWith('.google.com') || fromDomain === 'google.com') &&
+    (returnDomain.endsWith('.google.com') || returnDomain === 'google.com' || returnDomain === 'gmail.com')
+  ) || Boolean(
+    (fromDomain === 'outlook.com' || fromDomain.endsWith('.microsoft.com') || fromDomain === 'microsoft.com') &&
+    (returnDomain.endsWith('.outlook.com') || returnDomain.endsWith('.microsoft.com') || returnDomain.endsWith('.office365.com'))
+  );
+
+  const isReturnPathMismatch = Boolean(returnDomain && fromDomain && returnDomain !== fromDomain && !isEspBounceAligned);
   if (isReturnPathMismatch) {
     structuralTokens.push('feat_return_path_mismatch');
   }

@@ -43,9 +43,16 @@ export function analyzeTyposquatting(domain: string): {
 } {
   const cleanDomain = domain.toLowerCase().trim();
 
-  // Check if this domain IS the authentic enterprise domain
+  // Check if this domain IS the authentic enterprise domain (or an authentic subdomain/apex)
+  const apex = extractApexDomain(cleanDomain);
   for (const b of ENTERPRISE_BRANDS) {
-    if (b.domains.includes(cleanDomain)) {
+    const isAuthentic = b.domains.some(d =>
+      cleanDomain === d ||
+      cleanDomain.endsWith('.' + d) ||
+      apex === d ||
+      (d.includes('.') && apex.endsWith('.' + d))
+    );
+    if (isAuthentic) {
       return {
         isTyposquat: false,
         targetBrand: undefined,
