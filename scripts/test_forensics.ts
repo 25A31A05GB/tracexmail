@@ -229,7 +229,31 @@ Received: from client.internal.lan (unknown [192.168.10.50]) by mail-relay.strip
   console.log('\n[Group 10: Deep Analysis Pure Synthesis Engines]');
 
   // 1. Attack Narrative Synthesis
-  const irsSample = SAMPLE_ANALYSES.find(s => s.id === 'sample-irs-fraud') || SAMPLE_ANALYSES[0];
+  const maliciousWireSample: any = {
+    id: 'sample-wire-fraud',
+    headers: {
+      from: '"Chief Executive Officer" <ceo@company-acquisition.cc>',
+      fromEmail: 'ceo@company-acquisition.cc',
+      subject: 'URGENT: Confidential Escrow Wire Transfer Mandate',
+      returnPath: 'bounce@compromised-relay.net',
+      replyTo: 'wire-desk@gmail.com'
+    },
+    auth: {
+      spf: { status: 'FAIL' },
+      dkim: { status: 'FAIL' },
+      dmarc: { status: 'REJECT' }
+    },
+    threatScore: 92,
+    classification: 'BEC_WIRE_FRAUD',
+    riskScore: 92,
+    heuristics: [
+      { id: 'h-dmarc', title: 'DMARC Enforcement Reject', severity: 'CRITICAL', score: 30 },
+      { id: 'h-reply-to', title: 'Reply-To Diversion', severity: 'HIGH', score: 25 },
+      { id: 'h-bec-financial', title: 'Financial Wire Exfiltration', severity: 'CRITICAL', score: 35 }
+    ]
+  };
+
+  const irsSample = SAMPLE_ANALYSES.find(s => s.id === 'sample-irs-fraud') || maliciousWireSample;
   const cleanLegitAnalysis = {
     headers: {
       from: '"Tech Newsletter" <news@tech-insights.io>',
@@ -278,7 +302,7 @@ Received: from client.internal.lan (unknown [192.168.10.50]) by mail-relay.strip
   assert(Array.isArray(emptyCf) && emptyCf.length === 0, 'Graceful empty array on null counterfactual input');
 
   // 3. Compliance Flag Mapping
-  const citibankSample = SAMPLE_ANALYSES.find(s => s.id === 'sample-citibank-wire') || irsSample;
+  const citibankSample = SAMPLE_ANALYSES.find(s => s.id === 'sample-citibank-wire') || maliciousWireSample;
   const citibankFlags = mapComplianceFlags(citibankSample);
   assert(Array.isArray(citibankFlags) && citibankFlags.length > 0, 'Regulatory breach flags mapped for financial/wire phish');
   assert(citibankFlags.some(f => f.regime.includes('CERT-In')), 'CERT-In mandatory reporting flag triggered for high severity phish');

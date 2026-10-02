@@ -1,7 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
-import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2 } from 'lucide-react';
+import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap } from 'lucide-react';
+import { StixExportModal } from './StixExportModal';
+import { MitreAttackMatrixModal } from './MitreAttackMatrixModal';
+import { QuishingInspectorModal } from './QuishingInspectorModal';
+import { SoarActionModal } from './SoarActionModal';
 import { sha256Sync, generateEvidenceId } from '../utils/crypto';
 import { resolveOrigin, formatOriginLocation, formatOriginIp } from '../utils/originResolution';
 import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
@@ -442,6 +446,11 @@ export function EvidenceTagCard({
   const [senderAnomalyOpen, setSenderAnomalyOpen] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
+  const [maskPII, setMaskPII] = useState<boolean>(false);
+  const [stixModalOpen, setStixModalOpen] = useState(false);
+  const [mitreModalOpen, setMitreModalOpen] = useState(false);
+  const [quishingModalOpen, setQuishingModalOpen] = useState(false);
+  const [soarModalOpen, setSoarModalOpen] = useState(false);
 
   // User session context for RBAC & ownership checks
   const { user, role } = useSession();
@@ -796,7 +805,7 @@ export function EvidenceTagCard({
     <motion.div 
       ref={cardRef}
       id="card"
-      className="evidence-card relative select-text overflow-hidden"
+      className={`evidence-card relative select-text overflow-hidden ${maskPII ? 'mask-pii' : ''}`}
       variants={cardContainerVariants}
       initial="hidden"
       animate="visible"
@@ -816,17 +825,42 @@ export function EvidenceTagCard({
       />
 
       {/* Folder Tab Header */}
-      <motion.div variants={cardItemVariants} className="tab">
-        <div className="caseid">
-          CASE <b>{cardData.caseId}</b>
+      <motion.div variants={cardItemVariants} className="tab flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="caseid">
+            CASE <b>{cardData.caseId}</b>
+          </div>
+          <div className="meta">
+            {cardData.evidenceId} · {cardData.timestamp}
+          </div>
         </div>
-        <div className="meta">
-          {cardData.evidenceId} · {cardData.timestamp}
-        </div>
+
+        {/* Small 'Mask PII' Toggle Inside Evidence Card Header */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMaskPII(!maskPII);
+          }}
+          className={`px-2 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+            maskPII
+              ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#CC9A4A] font-semibold shadow-sm'
+              : 'bg-[#12161F] border-[#2B241E] text-[#8a8070] hover:text-[#ede6d8] hover:border-[#574f42]'
+          }`}
+          title={
+            maskPII
+              ? 'PII Masking Active (CSS blur applied to sensitive names & IPs). Click to unmask.'
+              : 'Click to mask PII (dynamically blurs sensitive names, emails, and IP addresses in the card body)'
+          }
+        >
+          {maskPII ? <EyeOff className="w-3 h-3 text-[#CC9A4A]" /> : <Eye className="w-3 h-3 text-[#8a8070]" />}
+          <span>Mask PII</span>
+          <span className={`w-1.5 h-1.5 rounded-full ${maskPII ? 'bg-[#CC9A4A] animate-pulse' : 'bg-[#574f42]'}`} />
+        </button>
       </motion.div>
 
       {/* Main Body */}
-      <div className="body relative">
+      <div className={`body relative ${maskPII ? 'mask-pii' : ''}`}>
         {/* Rubber-Stamp Verdict Badge with Ink Slam Animation */}
         <motion.div 
           variants={stampVariants} 
@@ -903,21 +937,63 @@ export function EvidenceTagCard({
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCopyEvidence}
-            className="px-2.5 py-1 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-white text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer shrink-0 font-semibold"
-            title="Copy full raw header, hop data & threat verdict formatted for external incident reports"
-          >
-            {evidenceCopied ? <Check className="w-3.5 h-3.5 text-[#3FCC93]" /> : <Copy className="w-3.5 h-3.5 text-[#CC9A4A]" />}
-            <span>{evidenceCopied ? 'Report Copied!' : 'Copy Evidence'}</span>
-          </button>
+          <div className="flex items-center gap-1 shrink-0 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setMitreModalOpen(true)}
+              className="px-2 py-0.5 rounded bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer"
+              title="Inspect MITRE ATT&CK Matrix Techniques"
+            >
+              <Crosshair className="w-3 h-3 text-rose-400" />
+              <span>MITRE</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStixModalOpen(true)}
+              className="px-2 py-0.5 rounded bg-[#17130F] hover:bg-[#2B241E] border border-[#2B241E] text-[#EDE6DC] text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer"
+              title="Export STIX 2.1 & OpenIOC Threat Intel Bundle"
+            >
+              <FileCode className="w-3 h-3 text-[#D3A039]" />
+              <span>STIX 2.1</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setQuishingModalOpen(true)}
+              className="px-2 py-0.5 rounded bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/50 text-amber-300 text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer"
+              title="Optical QR Code (Quishing) Phishing Scanner"
+            >
+              <QrCode className="w-3 h-3 text-amber-400" />
+              <span>Quishing</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSoarModalOpen(true)}
+              className="px-2 py-0.5 rounded bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/50 text-purple-300 text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer"
+              title="Automated SOAR Quarantine & Firewall Action Playbooks"
+            >
+              <Zap className="w-3 h-3 text-purple-400" />
+              <span>SOAR</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyEvidence}
+              className="px-2 py-0.5 rounded bg-[#CC9A4A]/20 hover:bg-[#CC9A4A]/30 border border-[#CC9A4A]/60 text-[#CC9A4A] hover:text-white text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer font-semibold"
+              title="Copy full raw header, hop data & threat verdict formatted for external incident reports"
+            >
+              {evidenceCopied ? <Check className="w-3 h-3 text-[#3FCC93]" /> : <Copy className="w-3 h-3 text-[#CC9A4A]" />}
+              <span>{evidenceCopied ? 'Copied!' : 'Copy'}</span>
+            </button>
+          </div>
         </motion.div>
 
         {/* Subject */}
         {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && (
           <motion.div variants={cardItemVariants} className="subject">
-            <h1>{cardData.subject}</h1>
+            <h1 className={maskPII ? 'pii-sensitive pii-subject' : ''}>{cardData.subject}</h1>
           </motion.div>
         )}
 
@@ -925,7 +1001,7 @@ export function EvidenceTagCard({
         {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ENVELOPE') && cardData.identityRows.map((r, idx) => (
           <motion.div variants={cardItemVariants} key={idx} className="row">
             <div className="k">{r.k}</div>
-            <div className={`v ${r.status || ''}`}>{r.v}</div>
+            <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`}>{r.v}</div>
           </motion.div>
         ))}
 
@@ -950,13 +1026,13 @@ export function EvidenceTagCard({
             <div className="section-label">{cardData.origin.sectionTitle || 'ORIGIN & RELAY'}</div>
             <div className="row">
               <div className="k">FIRST-HOP IP</div>
-              <div className={`v ${cardData.origin.ipStatus || ''}`}>{cardData.origin.ip}</div>
+              <div className={`v ${cardData.origin.ipStatus || ''} ${maskPII ? 'pii-sensitive pii-ip' : ''}`}>{cardData.origin.ip}</div>
             </div>
 
             <div className="row row-link">
               <div className="k">LOCATION</div>
               <div className="v">
-                <span>{cardData.origin.location}</span>
+                <span className={maskPII ? 'pii-sensitive pii-location' : ''}>{cardData.origin.location}</span>
                 {cardData.origin.mapsUrl && (
                   <button 
                     onClick={handleOpenMaps}
@@ -972,7 +1048,7 @@ export function EvidenceTagCard({
             {cardData.origin.extraRows && cardData.origin.extraRows.map((r, idx) => (
               <div key={idx} className="row">
                 <div className="k">{r.k}</div>
-                <div className={`v ${r.status || ''}`}>{r.v}</div>
+                <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`}>{r.v}</div>
               </div>
             ))}
           </motion.div>
@@ -981,7 +1057,7 @@ export function EvidenceTagCard({
         {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'ROUTING') && cardData.relay && (
           <motion.div variants={cardItemVariants} className="relay mt-1.5">
             <span 
-              className="chain leading-relaxed" 
+              className={`chain leading-relaxed ${maskPII ? 'pii-sensitive pii-ip' : ''}`}
               dangerouslySetInnerHTML={{ __html: cardData.relay.chain }} 
             />
             <button 
@@ -1001,7 +1077,7 @@ export function EvidenceTagCard({
             {cardData.entity.rows.map((r, idx) => (
               <div key={idx} className="row">
                 <div className="k">{r.k}</div>
-                <div className={`v ${r.status || ''}`}>{r.v}</div>
+                <div className={`v ${r.status || ''} ${maskPII ? 'pii-sensitive' : ''}`}>{r.v}</div>
               </div>
             ))}
             {cardData.entity.flags && cardData.entity.flags.length > 0 && (
@@ -1024,7 +1100,7 @@ export function EvidenceTagCard({
           <motion.div variants={cardItemVariants}>
             <div className="section-label">AI CASE SUMMARY</div>
             <div className="ai-box">
-              <p>{cardData.aiSummary.text}</p>
+              <p className={maskPII ? 'pii-sensitive' : ''}>{cardData.aiSummary.text}</p>
               <div className="meta-row">
                 <span className="engine">{cardData.aiSummary.engine}</span>
                 <button 
@@ -1621,12 +1697,42 @@ export function EvidenceTagCard({
 
           {/* Render Card */}
           {cardHtml}
+
+          {/* Advanced Modals */}
+          {stixModalOpen && analysis && (
+            <StixExportModal analysis={analysis} onClose={() => setStixModalOpen(false)} />
+          )}
+          {mitreModalOpen && (
+            <MitreAttackMatrixModal analysis={analysis} onClose={() => setMitreModalOpen(false)} />
+          )}
+          {quishingModalOpen && (
+            <QuishingInspectorModal analysis={analysis} onClose={() => setQuishingModalOpen(false)} />
+          )}
+          {soarModalOpen && analysis && (
+            <SoarActionModal analysis={analysis} onClose={() => setSoarModalOpen(false)} />
+          )}
         </div>
       </motion.div>
     );
   }
 
-  return cardHtml;
+  return (
+    <>
+      {cardHtml}
+      {stixModalOpen && analysis && (
+        <StixExportModal analysis={analysis} onClose={() => setStixModalOpen(false)} />
+      )}
+      {mitreModalOpen && (
+        <MitreAttackMatrixModal analysis={analysis} onClose={() => setMitreModalOpen(false)} />
+      )}
+      {quishingModalOpen && (
+        <QuishingInspectorModal analysis={analysis} onClose={() => setQuishingModalOpen(false)} />
+      )}
+      {soarModalOpen && analysis && (
+        <SoarActionModal analysis={analysis} onClose={() => setSoarModalOpen(false)} />
+      )}
+    </>
+  );
 }
 
 // Alias exports for flexibility

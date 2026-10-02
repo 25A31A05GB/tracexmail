@@ -871,6 +871,31 @@
 .evidence-card .verdictline b { color: var(--ec-red); letter-spacing: 0.03em; font-size: 12px; font-weight: 800; }
 .evidence-card .verdictline b.good { color: var(--ec-green); }
 
+/* Mask PII Dynamic CSS Blur Effect */
+.evidence-card.mask-pii .pii-sensitive,
+.evidence-card .body.mask-pii .pii-sensitive,
+.evidence-card.mask-pii .pii-name,
+.evidence-card.mask-pii .pii-ip,
+.evidence-card.mask-pii .pii-email,
+.evidence-card.mask-pii .pii-location,
+.evidence-card.mask-pii .pii-subject {
+  filter: blur(4.5px);
+  user-select: none;
+  transition: filter 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+}
+
+.evidence-card.mask-pii .pii-sensitive:hover,
+.evidence-card .body.mask-pii .pii-sensitive:hover,
+.evidence-card.mask-pii .pii-name:hover,
+.evidence-card.mask-pii .pii-ip:hover,
+.evidence-card.mask-pii .pii-email:hover,
+.evidence-card.mask-pii .pii-location:hover,
+.evidence-card.mask-pii .pii-subject:hover {
+  filter: blur(0px);
+  user-select: text;
+}
+
 /* Leaflet dark theme map tweaks */
 .leaflet-container {
   background: #0b0f19 !important;
