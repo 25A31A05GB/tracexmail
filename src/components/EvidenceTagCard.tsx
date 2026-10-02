@@ -1,11 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'motion/react';
 import { EmailAnalysis, EvidenceCardData } from '../types';
-import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap } from 'lucide-react';
+import { Printer, Copy, Check, ExternalLink, X, Tag, ChevronDown, ChevronUp, AlertCircle, AlertTriangle, Scale, ShieldAlert, CheckCircle2, Crosshair, Sparkles, AlertOctagon, FileText, Image as ImageIcon, Loader2, MessageSquareText, Plus, Trash2, Eye, EyeOff, FileCode, QrCode, Zap, Share2 } from 'lucide-react';
 import { StixExportModal } from './StixExportModal';
 import { MitreAttackMatrixModal } from './MitreAttackMatrixModal';
 import { QuishingInspectorModal } from './QuishingInspectorModal';
 import { SoarActionModal } from './SoarActionModal';
+import { ShareCaseModal } from './ShareCaseModal';
 import { sha256Sync, generateEvidenceId } from '../utils/crypto';
 import { resolveOrigin, formatOriginLocation, formatOriginIp } from '../utils/originResolution';
 import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
@@ -449,6 +450,7 @@ export function EvidenceTagCard({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
   const [maskPII, setMaskPII] = useState<boolean>(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
   const [stixModalOpen, setStixModalOpen] = useState(false);
   const [mitreModalOpen, setMitreModalOpen] = useState(false);
   const [quishingModalOpen, setQuishingModalOpen] = useState(false);
@@ -900,28 +902,44 @@ export function EvidenceTagCard({
           </div>
         </div>
 
-        {/* Small 'Mask PII' Toggle Inside Evidence Card Header */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setMaskPII(!maskPII);
-          }}
-          className={`px-2 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
-            maskPII
-              ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#CC9A4A] font-semibold shadow-sm'
-              : 'bg-[#12161F] border-[#2B241E] text-[#8a8070] hover:text-[#ede6d8] hover:border-[#574f42]'
-          }`}
-          title={
-            maskPII
-              ? 'PII Masking Active (CSS blur applied to sensitive names & IPs). Click to unmask.'
-              : 'Click to mask PII (dynamically blurs sensitive names, emails, and IP addresses in the card body)'
-          }
-        >
-          {maskPII ? <EyeOff className="w-3 h-3 text-[#CC9A4A]" /> : <Eye className="w-3 h-3 text-[#8a8070]" />}
-          <span>Mask PII</span>
-          <span className={`w-1.5 h-1.5 rounded-full ${maskPII ? 'bg-[#CC9A4A] animate-pulse' : 'bg-[#574f42]'}`} />
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Share Case Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShareModalOpen(true);
+            }}
+            className="px-2.5 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border bg-[#12161F] border-[#22364a] text-[#7fa3ba] hover:text-[#edf4fa] hover:border-[#4a759c] hover:bg-[#182330] shadow-sm"
+            title="Generate secure, temporary link for internal team collaboration"
+          >
+            <Share2 className="w-3 h-3 text-[#6d9bbd]" />
+            <span>Share Case</span>
+          </button>
+
+          {/* Small 'Mask PII' Toggle Inside Evidence Card Header */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMaskPII(!maskPII);
+            }}
+            className={`px-2 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+              maskPII
+                ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#CC9A4A] font-semibold shadow-sm'
+                : 'bg-[#12161F] border-[#2B241E] text-[#8a8070] hover:text-[#ede6d8] hover:border-[#574f42]'
+            }`}
+            title={
+              maskPII
+                ? 'PII Masking Active (CSS blur applied to sensitive names & IPs). Click to unmask.'
+                : 'Click to mask PII (dynamically blurs sensitive names, emails, and IP addresses in the card body)'
+            }
+          >
+            {maskPII ? <EyeOff className="w-3 h-3 text-[#CC9A4A]" /> : <Eye className="w-3 h-3 text-[#8a8070]" />}
+            <span>Mask PII</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${maskPII ? 'bg-[#CC9A4A] animate-pulse' : 'bg-[#574f42]'}`} />
+          </button>
+        </div>
       </motion.div>
 
       {/* Main Body */}
@@ -1764,6 +1782,18 @@ export function EvidenceTagCard({
           {cardHtml}
 
           {/* Advanced Modals */}
+          {shareModalOpen && (
+            <ShareCaseModal
+              isOpen={shareModalOpen}
+              onClose={() => setShareModalOpen(false)}
+              caseId={cardData.caseId}
+              evidenceId={cardData.evidenceId}
+              subject={cardData.subject}
+              verdict={cardData.verdict.text}
+              severity={severityLevel}
+              threatScore={analysis?.threatScore ?? analysis?.riskScore}
+            />
+          )}
           {stixModalOpen && analysis && (
             <StixExportModal analysis={analysis} onClose={() => setStixModalOpen(false)} />
           )}
@@ -1784,6 +1814,18 @@ export function EvidenceTagCard({
   return (
     <>
       {cardHtml}
+      {shareModalOpen && (
+        <ShareCaseModal
+          isOpen={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          caseId={cardData.caseId}
+          evidenceId={cardData.evidenceId}
+          subject={cardData.subject}
+          verdict={cardData.verdict.text}
+          severity={severityLevel}
+          threatScore={analysis?.threatScore ?? analysis?.riskScore}
+        />
+      )}
       {stixModalOpen && analysis && (
         <StixExportModal analysis={analysis} onClose={() => setStixModalOpen(false)} />
       )}
