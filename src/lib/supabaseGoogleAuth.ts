@@ -24,10 +24,10 @@ export function isRunningInIframe(): boolean {
  * Helper to simulate a Google authenticated session when Supabase credentials
  * are not yet provisioned in a sandbox environment.
  */
-export function signInWithGoogleDemoSession(): GoogleAuthResult {
+export function signInWithGoogleDemoSession(customEmail?: string): GoogleAuthResult {
   try {
-    const userEmail = 'jayramsappa537@gmail.com';
-    const stableId = 'usr_google_operator_primary';
+    const userEmail = (customEmail || 'user@tracexmail.sec').toLowerCase().trim();
+    const stableId = `usr_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const demoUser = {
       id: stableId,
       email: userEmail,

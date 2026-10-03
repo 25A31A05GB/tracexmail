@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Mail, 
@@ -16,6 +16,7 @@ import {
   Server
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { GoogleAuthButton } from './GoogleAuthButton';
 
 interface ConnectGmailModalProps {
   isOpen: boolean;
@@ -36,6 +37,12 @@ export function ConnectGmailModal({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUserEmail) {
+      setEmailInput(currentUserEmail);
+    }
+  }, [currentUserEmail, isOpen]);
 
   if (!isOpen) return null;
 
@@ -263,10 +270,39 @@ export function ConnectGmailModal({
 
           {/* TAB 2: Direct Token Mode */}
           {activeTab === 'token' && (
-            <div className="space-y-3 pt-1">
+            <div className="space-y-4 pt-1">
+              {/* Option A: Direct Google OAuth Popup Button */}
+              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-2.5">
+                <span className="font-bold text-amber-300 flex items-center gap-1.5 font-mono">
+                  <Globe className="w-4 h-4 text-amber-400" />
+                  <span>Option A: Interactive Google OAuth Popup</span>
+                </span>
+                <p className="text-[11px] text-[#b9af9c] font-sans leading-relaxed">
+                  Click below to open the standard Google Authentication popup and authorize your mailbox:
+                </p>
+                <GoogleAuthButton
+                  id="connect-modal-google-auth-btn"
+                  mode="continue"
+                  variant="primary"
+                  onSuccess={(user) => {
+                    const userEmail = user?.email || effectiveEmail;
+                    setSuccessMsg(`Google Account authorized for ${userEmail}! Initializing sync...`);
+                    onConnected(userEmail);
+                    setTimeout(() => onClose(), 1200);
+                  }}
+                  onError={(err) => setErrorMsg(err)}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 my-1 text-xs text-[#3a352c]">
+                <div className="flex-1 h-px bg-[#2c261e]" />
+                <span className="font-mono text-[10px] text-[#8a8070]">OR MANUAL TOKEN</span>
+                <div className="flex-1 h-px bg-[#2c261e]" />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-[11px] text-[#9d9282] uppercase tracking-wider font-semibold block">
-                  Google OAuth Access Token (<code className="text-amber-300">ya29...</code>)
+                  Option B: Google OAuth Access Token (<code className="text-amber-300">ya29...</code>)
                 </label>
                 <textarea
                   value={accessTokenInput}

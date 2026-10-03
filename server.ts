@@ -359,7 +359,7 @@ gmailEvents.on('sync_cycle_completed', (payload) => {
 gmailEvents.on('inbound_mail_push', async (data) => {
   if (data?.rawEmail) {
     try {
-      const email = (data.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+      const email = (data.emailAddress || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
       const profile = getStoredProfile(email);
       const userId = data.userId || profile?.id || `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const orgId = data.organizationId || profile?.organizationId || `org_${userId}`;
@@ -432,7 +432,7 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     const deliveryStage = queueItem.deliveryStage || 'pre-delivery-hold';
     const filename = `gmail_auto_queue_${queueItem.messageId || Date.now()}.eml`;
 
-    const targetEmail = (queueItem.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+    const targetEmail = (queueItem.emailAddress || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
     const profile = getStoredProfile(targetEmail);
     const userId = queueItem.userId || profile?.id || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const orgId = queueItem.organizationId || profile?.organizationId || `org_${userId}`;
@@ -1317,7 +1317,7 @@ async function parseRawEmailToAnalysis(
   const deliveryStage = options?.deliveryStage || quarantineOutcome.deliveryStage;
 
   const newId = `case-${Date.now()}`;
-  const effectiveUserEmail = (options?.userEmail || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+  const effectiveUserEmail = (options?.userEmail || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
   const effectiveProfile = effectiveUserEmail ? getStoredProfile(effectiveUserEmail) : null;
   const effectiveUserId = options?.userId || effectiveProfile?.id || (effectiveUserEmail ? `usr_${effectiveUserEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined);
   const effectiveOrgId = options?.organizationId || effectiveProfile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
@@ -2106,7 +2106,7 @@ async function startServer() {
 
   // Core Helper: Materializes all ingested/synced Gmail emails into cases and scopes them to the user
   function syncAllGmailIngestedMailsToCases(userContext?: { userId?: string; email?: string; organizationId?: string }) {
-    const effectiveEmail = (userContext?.email || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
+    const effectiveEmail = (userContext?.email || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
     const profile = getStoredProfile(effectiveEmail);
     const effectiveUserId = userContext?.userId || profile?.id || `usr_${effectiveEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const effectiveOrgId = userContext?.organizationId || profile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
