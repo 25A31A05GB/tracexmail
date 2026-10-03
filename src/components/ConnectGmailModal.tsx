@@ -284,6 +284,7 @@ export function ConnectGmailModal({
                   id="connect-modal-google-auth-btn"
                   mode="continue"
                   variant="primary"
+                  scopes="https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify"
                   onSuccess={(user) => {
                     const userEmail = user?.email || effectiveEmail;
                     setSuccessMsg(`Google Account authorized for ${userEmail}! Initializing sync...`);
