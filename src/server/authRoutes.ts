@@ -27,7 +27,7 @@ import {
   saveStoredProfile,
   getStoredProfile
 } from './userProfileStore';
-import { authenticateOrgUser, findOrgUser } from './orgUserStore';
+import { authenticateOrgUser } from './orgUserStore';
 
 export type { OtpRecord, MagicLinkRecord, ResetTokenRecord };
 
@@ -540,16 +540,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       const supabaseAdmin = getSupabaseAdminClient();
       const supabase = getSupabaseClient();
 
-      // Check if user already exists in local accounts or orgUserStore
-      const existingLocal = findOrgUser(cleanEmail) || SEED_ACCOUNTS.some(a => a.email.toLowerCase() === cleanEmail);
-      if (existingLocal) {
-        return res.status(409).json({
-          error: 'An account with this email address already exists. Please log in instead.',
-          code: 'USER_ALREADY_EXISTS',
-          user_exists: true
-        });
-      }
-
       if (supabase) {
         const { data, error } = await supabase.auth.signUp({
           email: cleanEmail,
@@ -574,12 +564,13 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             });
           }
 
-          // If the account already exists, inform the user and request login
+          // If the account already exists, DO NOT leak account existence.
+          // Return the exact same confirmation response as a new signup.
           if (errMsg.includes('already registered') || errMsg.includes('already exists') || errMsg.includes('user already in use')) {
-            return res.status(409).json({
-              error: 'An account with this email address already exists. Please log in instead.',
-              code: 'USER_ALREADY_EXISTS',
-              user_exists: true
+            return res.status(200).json({
+              status: 'success',
+              message: 'Verification link dispatched. Please check your email to confirm your account.',
+              email: cleanEmail
             });
           }
 
@@ -2255,32 +2246,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       supabaseAnonKey: isConfigured ? supabaseAnonKey : '',
       authMode: isConfigured ? 'supabase_jwt' : 'enclave_local'
     });
-  });
-
-  /**
-   * GET /api/auth/check-exists?email=...
-   * Check if a user account already exists before allowing signup
-   */
-  router.get('/check-exists', async (req: Request, res: Response) => {
-    const email = String(req.query.email || '').trim().toLowerCase();
-    if (!email) return res.json({ exists: false });
-
-    const existingLocal = findOrgUser(email) || SEED_ACCOUNTS.some(a => a.email.toLowerCase() === email);
-    if (existingLocal) {
-      return res.json({ exists: true, message: 'User already exists.' });
-    }
-
-    const supabaseAdmin = getSupabaseAdminClient();
-    if (supabaseAdmin) {
-      try {
-        const { data } = await supabaseAdmin.from('profiles').select('id, email').eq('email', email).maybeSingle();
-        if (data) {
-          return res.json({ exists: true, message: 'User already exists.' });
-        }
-      } catch {}
-    }
-
-    return res.json({ exists: false });
   });
 
   return router;

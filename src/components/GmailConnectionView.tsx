@@ -46,7 +46,6 @@ import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { API_URL, apiFetch } from '../lib/api';
-import { ConnectGmailModal } from './ConnectGmailModal';
 
 export interface SyncedEmailItem {
   id: string;
@@ -147,7 +146,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [renewingWatch, setRenewingWatch] = useState<boolean>(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isConnectModalOpen, setIsConnectModalOpen] = useState<boolean>(false);
+  const [blockedAuthUrl, setBlockedAuthUrl] = useState<string | null>(null);
+  const [startingOAuth, setStartingOAuth] = useState<boolean>(false);
 
   // Real-time Progress Indicator & WebSocket Sync state
   const [syncProgress, setSyncProgress] = useState<number>(0);
@@ -751,16 +751,75 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     }
   };
 
-  const handleConnectGmail = () => {
+  const handleConnectGmail = async () => {
+    if (startingOAuth) return;
+    setStartingOAuth(true);
     setErrorMsg(null);
-    setIsConnectModalOpen(true);
-  };
+    setSyncResult(null);
+    setBlockedAuthUrl(null);
 
-  const handleConnectedFromModal = async (email: string) => {
-    setSyncResult(`Gmail mailbox connected successfully (${email}). Starting live synchronization...`);
-    setErrorMsg(null);
-    await fetchStatus();
-    await handleSyncNow();
+    let authUrl = '';
+
+    try {
+      // 1. Primary: Request OAuth authorization URL from backend
+      try {
+        const res = await apiFetch('/api/gmail/oauth/start');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.url) {
+            authUrl = data.url;
+          }
+        }
+      } catch (apiErr: any) {
+        console.warn('[GmailOAuth] apiFetch failed, trying direct relative fetch:', apiErr);
+      }
+
+      // 2. Direct relative fetch fallback without custom preflight headers
+      if (!authUrl) {
+        try {
+          const directRes = await fetch('/api/gmail/oauth/start');
+          if (directRes.ok) {
+            const data = await directRes.json();
+            if (data?.url) {
+              authUrl = data.url;
+            }
+          }
+        } catch (directErr) {
+          console.warn('[GmailOAuth] Direct relative fetch failed:', directErr);
+        }
+      }
+
+      // 3. Client-side resilience fallback: construct provider OAuth URL directly
+      if (!authUrl) {
+        const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
+        const baseUrl = window.location.origin;
+        const redirectUri = `${baseUrl}/api/v1/gmail/callback`;
+        const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
+        authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
+      }
+
+      // 4. Open Google authorization popup directly
+      const popup = window.open(
+        authUrl,
+        'TraceXMailGmailOAuth',
+        'width=600,height=700,resizable=yes,scrollbars=yes'
+      );
+
+      if (!popup) {
+        setBlockedAuthUrl(authUrl);
+        setErrorMsg('OAuth popup window was blocked by your browser. Please use the button below to authorize Gmail.');
+      }
+    } catch (err: any) {
+      console.error('[GmailOAuth] Unexpected error starting OAuth:', err);
+      const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
+      const redirectUri = `${window.location.origin}/api/v1/gmail/callback`;
+      const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
+      const fallbackUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
+      setBlockedAuthUrl(fallbackUrl);
+      setErrorMsg('Could not open popup automatically. Please use the button below to authorize Gmail directly.');
+    } finally {
+      setStartingOAuth(false);
+    }
   };
 
   const handleSyncNow = async () => {
@@ -1228,10 +1287,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         ) : (
           <button
             onClick={handleConnectGmail}
-            className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
+            disabled={startingOAuth}
+            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
           >
-            <Zap className="w-4 h-4 fill-current" />
-            <span>Connect Gmail Account</span>
+            {startingOAuth ? (
+              <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
+            ) : (
+              <Zap className="w-4 h-4 fill-current" />
+            )}
+            <span>{startingOAuth ? 'Connecting to Google...' : 'Connect Gmail Account'}</span>
           </button>
         )}
       </div>
@@ -1318,6 +1382,27 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               Enter Token
             </button>
           </div>
+        </div>
+      )}
+
+      {blockedAuthUrl && (
+        <div className="p-4 bg-amber-950/30 border border-amber-500/40 rounded-xl text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <ExternalLink className="w-4 h-4 text-amber-400 shrink-0" />
+            <div>
+              <p className="font-semibold text-amber-300">Complete Google Sign-In</p>
+              <p className="text-amber-200/80 text-[11px]">If your browser blocked the authorization popup, click below to open the official Google OAuth consent screen directly.</p>
+            </div>
+          </div>
+          <a
+            href={blockedAuthUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold rounded-lg text-xs transition-colors shrink-0 flex items-center gap-1.5 shadow-sm"
+          >
+            <span>Open Google Sign-in</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       )}
 
@@ -2519,14 +2604,6 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           )}
         </div>
       )}
-
-      {/* In-App Live Sync Connection Modal (Option A: Zero external popups) */}
-      <ConnectGmailModal
-        isOpen={isConnectModalOpen}
-        onClose={() => setIsConnectModalOpen(false)}
-        currentUserEmail={currentUserEmail}
-        onConnected={handleConnectedFromModal}
-      />
     </div>
   );
 }

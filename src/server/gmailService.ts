@@ -2061,19 +2061,8 @@ export async function saveGmailConnectionToDb(params: {
   const supabase = getSupabaseAdminClient();
 
   state.isConnected = params.isConnected ?? true;
-  state.authExpired = false;
-  state.authError = undefined;
   state.emailAddress = params.emailAddress;
-  if (params.accessToken) {
-    state.accessToken = params.accessToken;
-    if (params.accessToken.startsWith('soc_') || params.accessToken.startsWith('enclave_') || state.activeScopes.length === 0) {
-      state.activeScopes = [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/gmail.modify',
-        'https://www.googleapis.com/auth/userinfo.email'
-      ];
-    }
-  }
+  if (params.accessToken) state.accessToken = params.accessToken;
   if (params.refreshToken) state.refreshToken = params.refreshToken;
   if (params.expiresInSeconds) {
     state.tokenExpiresAt = Date.now() + params.expiresInSeconds * 1000;
