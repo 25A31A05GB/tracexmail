@@ -69,6 +69,9 @@ import axios from 'axios';
 import {
   getGmailStatus,
   getGmailAccessToken,
+  setRuntimeGoogleOAuthCredentials,
+  getGoogleClientId,
+  getGoogleClientSecret,
   updateQuarantineConfig,
   updateWatchConfig,
   handlePubSubPush,
@@ -5576,23 +5579,34 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  // 2a-2. Toggle OAuth Scope Simulation (for testing degraded or missing permissions)
-  app.post('/api/gmail/oauth/toggle-scope', authenticatedLimiter, (req, res) => {
+  // 2a-3. Set or retrieve Google OAuth Client ID & Secret
+  app.post('/api/gmail/oauth/credentials', authenticatedLimiter, (req, res) => {
     try {
-      const { scope, granted } = req.body;
-      if (!scope) {
-        return res.status(400).json({ status: 'error', error: 'Missing scope parameter' });
+      const { client_id, client_secret } = req.body || {};
+      if (!client_id || !client_secret) {
+        return res.status(400).json({ status: 'error', error: 'client_id and client_secret are required.' });
       }
-      toggleOAuthScopeSimulation(scope, Boolean(granted));
-      const currentStatus = getGmailStatus();
+      const result = setRuntimeGoogleOAuthCredentials(client_id, client_secret);
       res.json({
         status: 'ok',
-        message: `Scope ${scope} simulation set to ${Boolean(granted) ? 'GRANTED' : 'REVOKED'}`,
-        oauth_scopes: currentStatus.oauth_scopes
+        message: 'Google Client ID and Client Secret updated successfully.',
+        client_id: result.clientId,
+        configured: true
       });
     } catch (err: any) {
       res.status(500).json({ status: 'error', error: err.message });
     }
+  });
+
+  app.get('/api/gmail/oauth/credentials', (req, res) => {
+    const clientId = getGoogleClientId();
+    const hasSecret = Boolean(getGoogleClientSecret());
+    res.json({
+      status: 'ok',
+      configured: Boolean(clientId && hasSecret),
+      client_id: clientId ? `${clientId.slice(0, 12)}...` : null,
+      has_secret: hasSecret
+    });
   });
 
   // 2b. Gmail OAuth Callback Route (/api/v1/gmail/callback)
