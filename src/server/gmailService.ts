@@ -266,30 +266,10 @@ export function getIngestionQueue(): IngestionQueueItem[] {
   return ingestionQueue;
 }
 
-let runtimeClientId: string | null = null;
-let runtimeClientSecret: string | null = null;
-
-export function setRuntimeGoogleOAuthCredentials(clientId: string, clientSecret: string) {
-  runtimeClientId = clientId.trim();
-  runtimeClientSecret = clientSecret.trim();
-  process.env.GOOGLE_CLIENT_ID = runtimeClientId;
-  process.env.GOOGLE_CLIENT_SECRET = runtimeClientSecret;
-  state.oauthConfigured = true;
-  return { clientId: runtimeClientId, configured: true };
-}
-
-export function getGoogleClientId(): string {
-  return runtimeClientId || process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || '';
-}
-
-export function getGoogleClientSecret(): string {
-  return runtimeClientSecret || process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET || '';
-}
-
 // In-Memory State
 const state: GmailServiceState = {
   isConnected: Boolean(process.env.GMAIL_USER_EMAIL && process.env.GMAIL_ACCESS_TOKEN),
-  oauthConfigured: Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID || runtimeClientId),
+  oauthConfigured: Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID),
   authExpired: false,
   authError: null,
   emailAddress: process.env.GMAIL_USER_EMAIL || null,

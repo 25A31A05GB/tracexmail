@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   X, 
   Mail, 
@@ -16,7 +16,6 @@ import {
   Server
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
-import { GoogleAuthButton } from './GoogleAuthButton';
 
 interface ConnectGmailModalProps {
   isOpen: boolean;
@@ -31,57 +30,12 @@ export function ConnectGmailModal({
   currentUserEmail = '',
   onConnected
 }: ConnectGmailModalProps) {
-  const [activeTab, setActiveTab] = useState<'token' | 'stream' | 'enterprise'>('token');
+  const [activeTab, setActiveTab] = useState<'stream' | 'token' | 'enterprise'>('stream');
   const [emailInput, setEmailInput] = useState<string>(currentUserEmail || '');
   const [accessTokenInput, setAccessTokenInput] = useState<string>('');
-  const [clientIdInput, setClientIdInput] = useState<string>('');
-  const [clientSecretInput, setClientSecretInput] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (currentUserEmail) {
-      setEmailInput(currentUserEmail);
-    }
-  }, [currentUserEmail, isOpen]);
-
-  const handleSaveClientCredentials = async () => {
-    if (!clientIdInput.trim() || !clientSecretInput.trim()) {
-      setErrorMsg('Please enter both Google Client ID and Client Secret.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    try {
-      const res = await apiFetch('/api/gmail/oauth/credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: clientIdInput.trim(),
-          client_secret: clientSecretInput.trim()
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to configure Google Client Credentials.');
-      }
-
-      setSuccessMsg('Google Client ID & Secret successfully saved and activated!');
-      setClientIdInput('');
-      setClientSecretInput('');
-      await onConnected(effectiveEmail);
-      setTimeout(() => onClose(), 1200);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error saving Google Client credentials.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -192,18 +146,6 @@ export function ConnectGmailModal({
         {/* Tab selection */}
         <div className="flex border-b border-[#2c261e] bg-[#100e0b] px-4 pt-2 gap-2 text-xs font-mono overflow-x-auto">
           <button
-            onClick={() => { setActiveTab('token'); setErrorMsg(null); }}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
-              activeTab === 'token'
-                ? 'border-amber-400 text-amber-300 font-bold'
-                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5 text-amber-400" />
-            <span>Sign in with Google OAuth (Primary)</span>
-          </button>
-
-          <button
             onClick={() => { setActiveTab('stream'); setErrorMsg(null); }}
             className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
               activeTab === 'stream'
@@ -212,7 +154,19 @@ export function ConnectGmailModal({
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>1-Click Live Ingestion Stream</span>
+            <span>1-Click Live Stream (Recommended)</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('token'); setErrorMsg(null); }}
+            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
+              activeTab === 'token'
+                ? 'border-amber-400 text-amber-300 font-bold'
+                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>Direct Google OAuth Token</span>
           </button>
 
           <button
@@ -309,85 +263,10 @@ export function ConnectGmailModal({
 
           {/* TAB 2: Direct Token Mode */}
           {activeTab === 'token' && (
-            <div className="space-y-4 pt-1">
-              {/* Option A: Direct Google OAuth Popup Button */}
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-2.5">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5 font-mono">
-                  <Globe className="w-4 h-4 text-amber-400" />
-                  <span>Option A: Interactive Google OAuth Popup</span>
-                </span>
-                <p className="text-[11px] text-[#b9af9c] font-sans leading-relaxed">
-                  Click below to open the standard Google Authentication popup and authorize your mailbox:
-                </p>
-                <GoogleAuthButton
-                  id="connect-modal-google-auth-btn"
-                  mode="continue"
-                  variant="primary"
-                  scopes="https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify"
-                  onSuccess={(user) => {
-                    const userEmail = user?.email || effectiveEmail;
-                    setSuccessMsg(`Google Account authorized for ${userEmail}! Initializing sync...`);
-                    onConnected(userEmail);
-                    setTimeout(() => onClose(), 1200);
-                  }}
-                  onError={(err) => setErrorMsg(err)}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 my-1 text-xs text-[#3a352c]">
-                <div className="flex-1 h-px bg-[#2c261e]" />
-                <span className="font-mono text-[10px] text-[#8a8070]">OR CUSTOM GOOGLE CLIENT CREDENTIALS</span>
-                <div className="flex-1 h-px bg-[#2c261e]" />
-              </div>
-
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-3">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5 font-mono">
-                  <Key className="w-4 h-4 text-amber-400" />
-                  <span>Option C: Connect Google Client ID &amp; Secret Key</span>
-                </span>
-                
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-[10.5px] text-[#9d9282] uppercase tracking-wider block mb-1">
-                      Google OAuth Client ID
-                    </label>
-                    <input
-                      type="text"
-                      value={clientIdInput}
-                      onChange={(e) => setClientIdInput(e.target.value)}
-                      placeholder="1234567890-xyz.apps.googleusercontent.com"
-                      className="w-full px-3 py-2 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245] font-mono text-[11px]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10.5px] text-[#9d9282] uppercase tracking-wider block mb-1">
-                      Google OAuth Client Secret
-                    </label>
-                    <input
-                      type="password"
-                      value={clientSecretInput}
-                      onChange={(e) => setClientSecretInput(e.target.value)}
-                      placeholder="GOCSPX-xxxxxxxxxxxxxxxxxxxx"
-                      className="w-full px-3 py-2 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245] font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSaveClientCredentials}
-                  disabled={isSubmitting || !clientIdInput.trim() || !clientSecretInput.trim()}
-                  className="w-full py-2 px-3 bg-[#26201a] hover:bg-[#332b22] border border-amber-500/40 text-amber-300 font-bold rounded text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 mt-1"
-                >
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  <span>Save &amp; Activate Google Client Credentials</span>
-                </button>
-              </div>
-
+            <div className="space-y-3 pt-1">
               <div className="space-y-1.5">
                 <label className="text-[11px] text-[#9d9282] uppercase tracking-wider font-semibold block">
-                  Option B: Google OAuth Access Token (<code className="text-amber-300">ya29...</code>)
+                  Google OAuth Access Token (<code className="text-amber-300">ya29...</code>)
                 </label>
                 <textarea
                   value={accessTokenInput}

@@ -69,9 +69,6 @@ import axios from 'axios';
 import {
   getGmailStatus,
   getGmailAccessToken,
-  setRuntimeGoogleOAuthCredentials,
-  getGoogleClientId,
-  getGoogleClientSecret,
   updateQuarantineConfig,
   updateWatchConfig,
   handlePubSubPush,
@@ -362,7 +359,7 @@ gmailEvents.on('sync_cycle_completed', (payload) => {
 gmailEvents.on('inbound_mail_push', async (data) => {
   if (data?.rawEmail) {
     try {
-      const email = (data.emailAddress || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
+      const email = (data.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
       const profile = getStoredProfile(email);
       const userId = data.userId || profile?.id || `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const orgId = data.organizationId || profile?.organizationId || `org_${userId}`;
@@ -435,7 +432,7 @@ gmailEvents.on('email_queued_for_analysis', async (queueItem: IngestionQueueItem
     const deliveryStage = queueItem.deliveryStage || 'pre-delivery-hold';
     const filename = `gmail_auto_queue_${queueItem.messageId || Date.now()}.eml`;
 
-    const targetEmail = (queueItem.emailAddress || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
+    const targetEmail = (queueItem.emailAddress || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
     const profile = getStoredProfile(targetEmail);
     const userId = queueItem.userId || profile?.id || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const orgId = queueItem.organizationId || profile?.organizationId || `org_${userId}`;
@@ -1320,7 +1317,7 @@ async function parseRawEmailToAnalysis(
   const deliveryStage = options?.deliveryStage || quarantineOutcome.deliveryStage;
 
   const newId = `case-${Date.now()}`;
-  const effectiveUserEmail = (options?.userEmail || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
+  const effectiveUserEmail = (options?.userEmail || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
   const effectiveProfile = effectiveUserEmail ? getStoredProfile(effectiveUserEmail) : null;
   const effectiveUserId = options?.userId || effectiveProfile?.id || (effectiveUserEmail ? `usr_${effectiveUserEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined);
   const effectiveOrgId = options?.organizationId || effectiveProfile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
@@ -2109,7 +2106,7 @@ async function startServer() {
 
   // Core Helper: Materializes all ingested/synced Gmail emails into cases and scopes them to the user
   function syncAllGmailIngestedMailsToCases(userContext?: { userId?: string; email?: string; organizationId?: string }) {
-    const effectiveEmail = (userContext?.email || getGmailStatus()?.email_address || 'user@tracexmail.sec').toLowerCase().trim();
+    const effectiveEmail = (userContext?.email || getGmailStatus()?.email_address || 'jayramsappa537@gmail.com').toLowerCase().trim();
     const profile = getStoredProfile(effectiveEmail);
     const effectiveUserId = userContext?.userId || profile?.id || `usr_${effectiveEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const effectiveOrgId = userContext?.organizationId || profile?.organizationId || (effectiveUserId ? `org_${effectiveUserId}` : 'org_default');
@@ -5579,34 +5576,23 @@ Link: https://verify-auth-portal.net/login`;
     }
   });
 
-  // 2a-3. Set or retrieve Google OAuth Client ID & Secret
-  app.post('/api/gmail/oauth/credentials', authenticatedLimiter, (req, res) => {
+  // 2a-2. Toggle OAuth Scope Simulation (for testing degraded or missing permissions)
+  app.post('/api/gmail/oauth/toggle-scope', authenticatedLimiter, (req, res) => {
     try {
-      const { client_id, client_secret } = req.body || {};
-      if (!client_id || !client_secret) {
-        return res.status(400).json({ status: 'error', error: 'client_id and client_secret are required.' });
+      const { scope, granted } = req.body;
+      if (!scope) {
+        return res.status(400).json({ status: 'error', error: 'Missing scope parameter' });
       }
-      const result = setRuntimeGoogleOAuthCredentials(client_id, client_secret);
+      toggleOAuthScopeSimulation(scope, Boolean(granted));
+      const currentStatus = getGmailStatus();
       res.json({
         status: 'ok',
-        message: 'Google Client ID and Client Secret updated successfully.',
-        client_id: result.clientId,
-        configured: true
+        message: `Scope ${scope} simulation set to ${Boolean(granted) ? 'GRANTED' : 'REVOKED'}`,
+        oauth_scopes: currentStatus.oauth_scopes
       });
     } catch (err: any) {
       res.status(500).json({ status: 'error', error: err.message });
     }
-  });
-
-  app.get('/api/gmail/oauth/credentials', (req, res) => {
-    const clientId = getGoogleClientId();
-    const hasSecret = Boolean(getGoogleClientSecret());
-    res.json({
-      status: 'ok',
-      configured: Boolean(clientId && hasSecret),
-      client_id: clientId ? `${clientId.slice(0, 12)}...` : null,
-      has_secret: hasSecret
-    });
   });
 
   // 2b. Gmail OAuth Callback Route (/api/v1/gmail/callback)

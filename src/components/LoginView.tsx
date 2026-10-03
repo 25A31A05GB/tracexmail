@@ -351,8 +351,30 @@ export function LoginView({
           </span>
         </div>
 
-        <div className="text-[var(--paper-dim)] text-[13.5px] mb-5">
+        <div className="text-[var(--paper-dim)] text-[13.5px] mb-3">
           Access email threat analysis, route tracing, and investigation reports.
+        </div>
+
+        {/* Boss Admin Official Credentials Banner */}
+        <div className="mb-4 p-3 rounded bg-amber-950/30 border border-amber-500/50 text-xs text-amber-200 space-y-1.5 font-mono">
+          <div className="flex items-center justify-between font-bold text-amber-300">
+            <span>⚡ Official Boss Admin Access</span>
+            <span className="text-[10px] bg-amber-500/20 px-1.5 py-0.5 rounded border border-amber-400/40">SUPER ADMIN</span>
+          </div>
+          <div className="text-[11px] text-[#dcd1be] flex items-center justify-between">
+            <span>Email: <code className="text-amber-300">admin@tracexmail.official</code></span>
+            <span>Pass: <code className="text-amber-300">TraceXBoss2026!</code></span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setEmail('admin@tracexmail.official');
+              setPassword('TraceXBoss2026!');
+            }}
+            className="w-full mt-1 py-1 px-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 rounded text-[11px] font-sans font-semibold transition-colors cursor-pointer text-center"
+          >
+            Auto-fill Boss Admin Credentials
+          </button>
         </div>
 
         {errorMsg && (
