@@ -31,7 +31,7 @@ export function ConnectGmailModal({
   currentUserEmail = '',
   onConnected
 }: ConnectGmailModalProps) {
-  const [activeTab, setActiveTab] = useState<'stream' | 'token' | 'enterprise'>('stream');
+  const [activeTab, setActiveTab] = useState<'token' | 'stream' | 'enterprise'>('token');
   const [emailInput, setEmailInput] = useState<string>(currentUserEmail || '');
   const [accessTokenInput, setAccessTokenInput] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -153,6 +153,18 @@ export function ConnectGmailModal({
         {/* Tab selection */}
         <div className="flex border-b border-[#2c261e] bg-[#100e0b] px-4 pt-2 gap-2 text-xs font-mono overflow-x-auto">
           <button
+            onClick={() => { setActiveTab('token'); setErrorMsg(null); }}
+            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
+              activeTab === 'token'
+                ? 'border-amber-400 text-amber-300 font-bold'
+                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <span>Sign in with Google OAuth (Primary)</span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab('stream'); setErrorMsg(null); }}
             className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
               activeTab === 'stream'
@@ -161,19 +173,7 @@ export function ConnectGmailModal({
             }`}
           >
             <Zap className="w-3.5 h-3.5" />
-            <span>1-Click Live Stream (Recommended)</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('token'); setErrorMsg(null); }}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
-              activeTab === 'token'
-                ? 'border-amber-400 text-amber-300 font-bold'
-                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <Key className="w-3.5 h-3.5" />
-            <span>Direct Google OAuth Token</span>
+            <span>1-Click Live Ingestion Stream</span>
           </button>
 
           <button
