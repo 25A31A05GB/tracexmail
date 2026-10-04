@@ -452,6 +452,7 @@ export function EvidenceTagCard({
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [maskPII, setMaskPII] = useState<boolean>(false);
   const [hideLoggedInUserMailbox, setHideLoggedInUserMailbox] = useState<boolean>(false);
+  const [hiddenEnvelopeKeys, setHiddenEnvelopeKeys] = useState<string[]>([]);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [stixModalOpen, setStixModalOpen] = useState(false);
   const [mitreModalOpen, setMitreModalOpen] = useState(false);
@@ -1216,24 +1217,61 @@ export function EvidenceTagCard({
         {/* 1️⃣ PILLAR 1: SENDER & ENVELOPE IDENTITY */}
         {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'SENDER') && (
           <motion.div variants={cardItemVariants} className="mb-4">
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
               <span className="section-label mb-0 flex items-center gap-1.5 text-blue-300">
                 <Mail className="w-3.5 h-3.5 text-blue-400" />
                 <span>1. SENDER &amp; ENVELOPE IDENTITY</span>
               </span>
-              <span className="text-[10px] font-mono text-[#8a8070]">Header Audit</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sensitiveKeys = ['TO', 'RETURN-PATH', 'REPLY-TO'];
+                    const allHidden = sensitiveKeys.every(k => hiddenEnvelopeKeys.includes(k));
+                    if (allHidden) {
+                      setHiddenEnvelopeKeys(prev => prev.filter(k => !sensitiveKeys.includes(k)));
+                    } else {
+                      setHiddenEnvelopeKeys(prev => Array.from(new Set([...prev, ...sensitiveKeys])));
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1c202c] hover:bg-[#282e40] text-amber-300 border border-[#30384c] flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Toggle hiding Return-Path, Reply-To, and To recipient headers"
+                >
+                  <EyeOff className="w-3 h-3 text-amber-400" />
+                  <span>{['TO', 'RETURN-PATH', 'REPLY-TO'].every(k => hiddenEnvelopeKeys.includes(k)) ? 'Show Envelope Headers' : 'Hide Return-Path / Reply-To / To'}</span>
+                </button>
+                <span className="text-[10px] font-mono text-[#8a8070]">Header Audit</span>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
               {cardData.identityRows.map((r, idx) => {
                 const isUserEmail = user?.email && r.v.toLowerCase().includes(user.email.toLowerCase());
+                const isExplicitlyHidden = hiddenEnvelopeKeys.includes(r.k);
                 const isToRow = r.k === 'TO';
-                const displayVal = (hideLoggedInUserMailbox && (isUserEmail || isToRow))
-                  ? '[HIDDEN LOGGED-IN MAILBOX]'
-                  : r.v;
+                const isReturnPath = r.k === 'RETURN-PATH';
+                const isReplyTo = r.k === 'REPLY-TO';
+                
+                const isRowHidden = isExplicitlyHidden || (hideLoggedInUserMailbox && (isUserEmail || isToRow || isReturnPath || isReplyTo));
+                const displayVal = isRowHidden ? `[HIDDEN ${r.k}]` : r.v;
+
                 return (
-                  <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
-                    <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
-                    <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={displayVal}>
+                  <div key={idx} className="flex items-baseline justify-between gap-2 py-1 border-b border-[#221c17] last:border-none group">
+                    <div className="flex items-center gap-1 shrink-0 w-28">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHiddenEnvelopeKeys(prev => 
+                            prev.includes(r.k) ? prev.filter(k => k !== r.k) : [...prev, r.k]
+                          );
+                        }}
+                        className="p-0.5 text-[#5e5445] hover:text-amber-400 transition-colors cursor-pointer"
+                        title={isRowHidden ? `Show ${r.k} value on evidence card` : `Hide ${r.k} value from evidence card`}
+                      >
+                        {isRowHidden ? <Eye className="w-3 h-3 text-amber-400" /> : <EyeOff className="w-3 h-3 opacity-60 group-hover:opacity-100" />}
+                      </button>
+                      <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold tracking-wider">{r.k}:</span>
+                    </div>
+                    <span className={`truncate text-right flex-1 ${isRowHidden ? 'text-amber-400 font-bold italic' : (r.status || '')} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={displayVal}>
                       {displayVal}
                     </span>
                   </div>

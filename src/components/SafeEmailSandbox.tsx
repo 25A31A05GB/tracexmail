@@ -23,6 +23,7 @@ interface SafeEmailSandboxProps {
 
 export function SafeEmailSandbox({ analysis, className = '' }: SafeEmailSandboxProps) {
   const [viewMode, setViewMode] = useState<'sanitized' | 'threat_overlays' | 'raw_body'>('sanitized');
+  const [hideEnvelope, setHideEnvelope] = useState<boolean>(false);
 
   const subject = analysis?.subject || analysis?.headers?.subject || '(No Subject)';
   const from = analysis?.from || analysis?.headers?.from || 'Unknown Sender';
@@ -303,9 +304,19 @@ export function SafeEmailSandbox({ analysis, className = '' }: SafeEmailSandboxP
 
             {/* Email Header Telemetry */}
             <div className="p-4 bg-[#161a26] border-b border-slate-800/80 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="font-bold text-white text-sm">{subject}</div>
-                <span className="text-[11px] font-mono text-slate-400">{date}</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHideEnvelope(!hideEnvelope)}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Toggle hiding Return-Path, Reply-To, and To recipient headers from sandbox"
+                  >
+                    <span>{hideEnvelope ? 'Show Envelope' : 'Hide Return-Path / Reply-To / To'}</span>
+                  </button>
+                  <span className="text-[11px] font-mono text-slate-400">{date}</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono pt-1">
@@ -315,16 +326,22 @@ export function SafeEmailSandbox({ analysis, className = '' }: SafeEmailSandboxP
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">To:</span>
-                  <span className="text-slate-200 break-all">{to}</span>
+                  <span className={`break-all ${hideEnvelope ? 'text-amber-400 font-bold italic' : 'text-slate-200'}`}>
+                    {hideEnvelope ? '[HIDDEN RECIPIENT MAILBOX]' : to}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-slate-400">Return-Path:</span>
-                  <span className="text-amber-300 truncate">{returnPath}</span>
+                  <span className={`truncate ${hideEnvelope ? 'text-amber-400 font-bold italic' : 'text-amber-300'}`}>
+                    {hideEnvelope ? '[HIDDEN RETURN-PATH]' : returnPath}
+                  </span>
                 </div>
                 {replyTo && (
                   <div className="flex items-center gap-2 text-[11px]">
                     <span className="text-slate-400">Reply-To:</span>
-                    <span className="text-purple-300 truncate">{replyTo}</span>
+                    <span className={`truncate ${hideEnvelope ? 'text-amber-400 font-bold italic' : 'text-purple-300'}`}>
+                      {hideEnvelope ? '[HIDDEN REPLY-TO]' : replyTo}
+                    </span>
                   </div>
                 )}
               </div>
