@@ -439,15 +439,14 @@ export function EvidenceTagCard({
   const [copied, setCopied] = useState(false);
   const [evidenceCopied, setEvidenceCopied] = useState(false);
   const [evidenceFilterTab, setEvidenceFilterTab] = useState<'ALL' | 'SENDER' | 'DOMAIN' | 'IP' | 'INFRA' | 'INDICATOR' | 'CAMPAIGN' | 'LAB'>('ALL');
-  const [viewMode, setViewMode] = useState<'compact' | 'detailed'>('compact');
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [deepAnalysisOpen, setDeepAnalysisOpen] = useState(false);
   const [showAllCounterfactuals, setShowAllCounterfactuals] = useState(false);
-  const [attackStoryOpen, setAttackStoryOpen] = useState(false);
-  const [counterfactualsOpen, setCounterfactualsOpen] = useState(false);
-  const [complianceOpen, setComplianceOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
-  const [senderAnomalyOpen, setSenderAnomalyOpen] = useState(false);
+  const [attackStoryOpen, setAttackStoryOpen] = useState(true);
+  const [counterfactualsOpen, setCounterfactualsOpen] = useState(true);
+  const [complianceOpen, setComplianceOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(true);
+  const [senderAnomalyOpen, setSenderAnomalyOpen] = useState(true);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
@@ -933,42 +932,6 @@ export function EvidenceTagCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* View Mode Toggle: Compact Summary vs Full Dossier */}
-          <div className="inline-flex rounded-[4px] bg-[#0d1117] p-0.5 border border-[#22364a]">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setViewMode('compact');
-              }}
-              className={`px-2 py-0.5 rounded-[3px] text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer ${
-                viewMode === 'compact'
-                  ? 'bg-[#CC9A4A]/30 text-[#EDE6DC] font-bold border border-[#CC9A4A]/70 shadow-sm'
-                  : 'text-[#8a9bb0] hover:text-[#ede6d8]'
-              }`}
-              title="Compact Executive Summary (high-impact highlights, clean layout)"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>Summary</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setViewMode('detailed');
-              }}
-              className={`px-2 py-0.5 rounded-[3px] text-[10.5px] font-mono flex items-center gap-1 transition-all cursor-pointer ${
-                viewMode === 'detailed'
-                  ? 'bg-[#182a3d] text-cyan-300 font-bold border border-cyan-500/70 shadow-sm'
-                  : 'text-[#8a9bb0] hover:text-[#ede6d8]'
-              }`}
-              title="Full Forensic Dossier (all 7 pillars, raw headers, DNS & compliance)"
-            >
-              <Layers className="w-3 h-3 text-cyan-400" />
-              <span>Full Dossier</span>
-            </button>
-          </div>
-
           {/* Export JSON / CSV Dropdown */}
           <div className="relative inline-block text-left">
             <button
@@ -1191,162 +1154,39 @@ export function EvidenceTagCard({
         </motion.div>
 
         {/* 🧭 CONSTELLATION PILLAR QUICK FILTER & NAVIGATION STRIP */}
-        {viewMode === 'detailed' && (
-          <motion.div variants={cardItemVariants} className="flex items-center gap-1 overflow-x-auto pb-1 mb-3.5 scrollbar-none text-[10px] font-mono border-b border-[#2b241e]/70">
-            {[
-              { id: 'ALL', label: 'All Evidence', icon: Layers },
-              { id: 'SENDER', label: '1. Sender', icon: Mail },
-              { id: 'DOMAIN', label: '2. Domain', icon: Globe },
-              { id: 'IP', label: '3. Origin IP', icon: Server },
-              { id: 'INFRA', label: '4. Infra', icon: Network },
-              { id: 'INDICATOR', label: '5. Indicators', icon: LinkIcon },
-              { id: 'CAMPAIGN', label: '6. Campaign', icon: Share2 },
-              { id: 'LAB', label: '7. Deep Lab', icon: Sparkles }
-            ].map(p => {
-              const Icon = p.icon;
-              const active = evidenceFilterTab === p.id;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setEvidenceFilterTab(p.id as any)}
-                  className={`px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer border ${
-                    active
-                      ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#EDE6DC] font-bold shadow-sm'
-                      : 'bg-[#12161F] border-[#222b3a] text-[#8a9bb0] hover:text-[#ede6d8] hover:border-[#384960]'
-                  }`}
-                >
-                  <Icon className={`w-3 h-3 ${active ? 'text-[#CC9A4A]' : 'text-[#627a94]'}`} />
-                  <span>{p.label}</span>
-                </button>
-              );
-            })}
-          </motion.div>
-        )}
-
-        {/* 🌟 EXECUTIVE SUMMARY MODE (COMPACT & SCANNABLE) */}
-        {viewMode === 'compact' && (
-          <motion.div variants={cardItemVariants} className="space-y-3.5 mb-4">
-            {/* Quick Threat & Authenticity Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-              {/* Box 1: Sender Authenticity */}
-              <div className="p-3 bg-[#15120e] rounded border border-[#2b241e] space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-mono font-bold text-blue-300">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Sender Legitimacy</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400">{cardData.entity?.rows?.find(r => r.k === 'DOMAIN')?.v || 'Domain'}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-1 text-center font-mono">
-                  {cardData.checks.map((c, i) => (
-                    <div key={i} className="p-1 rounded bg-[#0d0b09] border border-[#221c17]">
-                      <div className="text-[9px] text-slate-400">{c.label}</div>
-                      <div className={`text-[10.5px] font-bold ${c.status}`}>{c.value}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-[11px] font-mono text-slate-300 truncate">
-                  <span className="text-slate-400">From: </span>
-                  <span className={maskPII ? 'pii-sensitive' : ''}>{cardData.identityRows.find(r => r.k === 'FROM')?.v || 'N/A'}</span>
-                </div>
-              </div>
-
-              {/* Box 2: Origin & Infrastructure */}
-              <div className="p-3 bg-[#15120e] rounded border border-[#2b241e] space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-mono font-bold text-emerald-300">
-                  <span className="flex items-center gap-1.5">
-                    <Server className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Origin Infrastructure</span>
-                  </span>
-                  <span className="text-[10px] text-slate-400">{analysis?.hops?.length || 1} Relay Hops</span>
-                </div>
-                <div className="p-1.5 rounded bg-[#0d0b09] border border-[#221c17] text-[11px] font-mono space-y-0.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">IP:</span>
-                    <span className="font-bold text-white">{cardData.origin?.ip || 'Unresolved'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Location:</span>
-                    <span className="text-slate-200 truncate max-w-[150px]">{cardData.origin?.location || 'Unknown'}</span>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-[10.5px] font-mono">
-                  <button
-                    type="button"
-                    onClick={handleOpenMaps}
-                    className="text-amber-400 hover:text-amber-300 underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Globe className="w-3 h-3" />
-                    <span>View Geo Location</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenGraph}
-                    className="text-cyan-400 hover:text-cyan-300 underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Network className="w-3 h-3" />
-                    <span>Hop Traceroute</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Box 3: Top Red Flags */}
-              <div className="p-3 bg-[#15120e] rounded border border-[#2b241e] space-y-2">
-                <div className="flex items-center justify-between text-[11px] font-mono font-bold text-amber-300">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Primary Red Flags</span>
-                  </span>
-                  <span className="text-[10px] text-rose-400 font-bold">{(analysis?.heuristics || []).filter(h => h.triggered).length} Triggered</span>
-                </div>
-                <div className="space-y-1 max-h-[72px] overflow-y-auto">
-                  {(analysis?.heuristics || [])
-                    .filter(h => h.triggered)
-                    .slice(0, 3)
-                    .map((h, i) => (
-                      <div key={i} className="text-[10.5px] font-mono text-rose-300 flex items-center gap-1.5 truncate">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                        <span className="truncate">{h.title || h.description}</span>
-                      </div>
-                    ))}
-                  {(analysis?.heuristics || []).filter(h => h.triggered).length === 0 && (
-                    <div className="text-[10.5px] font-mono text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                      <span>No critical threat indicators detected</span>
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('detailed')}
-                  className="w-full py-1 text-center text-[10.5px] font-mono bg-[#1c2430] hover:bg-[#253245] text-cyan-300 rounded transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <span>Explore Full 7-Pillar Dossier →</span>
-                </button>
-              </div>
-            </div>
-
-            {/* AI Incident Analysis Brief */}
-            {cardData.aiSummary && (
-              <div className="p-3 bg-[#111620] rounded border border-[#23354a] text-xs space-y-1">
-                <div className="flex items-center justify-between text-[10.5px] font-mono text-cyan-300 font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>AI Forensic Summary &amp; SOC Recommendation</span>
-                  </span>
-                  <span className="text-[9.5px] text-slate-400">{cardData.aiSummary.engine}</span>
-                </div>
-                <p className="text-[#c6d7e8] leading-relaxed text-[11.5px] font-sans">
-                  {cardData.aiSummary.text}
-                </p>
-              </div>
-            )}
-          </motion.div>
-        )}
+        <motion.div variants={cardItemVariants} className="flex items-center gap-1 overflow-x-auto pb-1 mb-3.5 scrollbar-none text-[10px] font-mono border-b border-[#2b241e]/70">
+          {[
+            { id: 'ALL', label: 'All Evidence', icon: Layers },
+            { id: 'SENDER', label: '1. Sender', icon: Mail },
+            { id: 'DOMAIN', label: '2. Domain', icon: Globe },
+            { id: 'IP', label: '3. Origin IP', icon: Server },
+            { id: 'INFRA', label: '4. Infra', icon: Network },
+            { id: 'INDICATOR', label: '5. Indicators', icon: LinkIcon },
+            { id: 'CAMPAIGN', label: '6. Campaign', icon: Share2 },
+            { id: 'LAB', label: '7. Deep Lab', icon: Sparkles }
+          ].map(p => {
+            const Icon = p.icon;
+            const active = evidenceFilterTab === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setEvidenceFilterTab(p.id as any)}
+                className={`px-2 py-0.5 rounded flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer border ${
+                  active
+                    ? 'bg-[#CC9A4A]/25 border-[#CC9A4A] text-[#EDE6DC] font-bold shadow-sm'
+                    : 'bg-[#12161F] border-[#222b3a] text-[#8a9bb0] hover:text-[#ede6d8] hover:border-[#384960]'
+                }`}
+              >
+                <Icon className={`w-3 h-3 ${active ? 'text-[#CC9A4A]' : 'text-[#627a94]'}`} />
+                <span>{p.label}</span>
+              </button>
+            );
+          })}
+        </motion.div>
 
         {/* 1️⃣ PILLAR 1: SENDER & ENVELOPE IDENTITY */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'SENDER') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'SENDER') && (
           <motion.div variants={cardItemVariants} className="mb-4">
             <div className="flex items-center justify-between mb-1.5">
               <span className="section-label mb-0 flex items-center gap-1.5 text-blue-300">
@@ -1369,7 +1209,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 2️⃣ PILLAR 2: DOMAIN & CRYPTOGRAPHIC AUTHENTICATION */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'DOMAIN') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'DOMAIN') && (
           <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
             <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
               <span className="section-label mb-0 flex items-center gap-1.5 text-indigo-300">
@@ -1432,7 +1272,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 3️⃣ PILLAR 3: IP & TRANSMISSION ORIGIN */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'IP') && cardData.origin && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'IP') && cardData.origin && (
           <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
             <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
               <span className="section-label mb-0 flex items-center gap-1.5 text-cyan-300">
@@ -1479,7 +1319,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 4️⃣ PILLAR 4: INFRASTRUCTURE & RELAY ROUTE */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INFRA') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INFRA') && (
           <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
             <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
               <span className="section-label mb-0 flex items-center gap-1.5 text-purple-300">
@@ -1516,7 +1356,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 5️⃣ PILLAR 5: THREAT INDICATORS & OBSERVED IOCs */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INDICATOR') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'INDICATOR') && (
           <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
             <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
               <span className="section-label mb-0 flex items-center gap-1.5 text-rose-300">
@@ -1602,7 +1442,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 6️⃣ PILLAR 6: CAMPAIGN CORRELATION & SOC ATTRIBUTION */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'CAMPAIGN') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'CAMPAIGN') && (
           <motion.div variants={cardItemVariants} className="mb-4 bg-[#15120e] p-3 rounded border border-[#2b241e]">
             <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#221c17]">
               <span className="section-label mb-0 flex items-center gap-1.5 text-fuchsia-300">
@@ -1674,7 +1514,7 @@ export function EvidenceTagCard({
         )}
 
         {/* 7️⃣ PILLAR 7: DEEP FORENSIC LAB & REGULATORY AUDIT */}
-        {viewMode === 'detailed' && (evidenceFilterTab === 'ALL' || evidenceFilterTab === 'LAB') && (
+        {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'LAB') && (
           <motion.div variants={cardItemVariants} className="rounded-lg border border-slate-800 bg-slate-900/60 overflow-hidden mb-3">
             <button
               type="button"
