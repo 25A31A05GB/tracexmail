@@ -96,10 +96,22 @@ export async function signInWithGoogleOAuth(options?: { scopes?: string }): Prom
   const inIframe = isRunningInIframe();
   const callbackUrl = getGoogleOAuthRedirectUrl();
   const anonKey = getSupabaseAnonKey();
-  const requestedScopes = options?.scopes || 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/userinfo.email';
+  const isGmailSync = Boolean(options?.scopes && options.scopes.includes('gmail'));
+  const requestedScopes = options?.scopes || 'openid email profile';
+
+  const queryParams: Record<string, string> = {
+    ...(anonKey ? { apikey: anonKey } : {})
+  };
+
+  if (isGmailSync) {
+    queryParams.access_type = 'offline';
+    queryParams.prompt = 'consent';
+  } else {
+    queryParams.prompt = 'select_account';
+  }
 
   try {
-    console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl, 'scopes:', requestedScopes);
+    console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl, 'scopes:', requestedScopes, 'isGmailSync:', isGmailSync);
 
     // Request OAuth authorization URL with skipBrowserRedirect so we can sanitize
     // and guarantee the `apikey` query parameter is present for Supabase's Kong gateway.
@@ -109,11 +121,7 @@ export async function signInWithGoogleOAuth(options?: { scopes?: string }): Prom
         redirectTo: callbackUrl,
         scopes: requestedScopes,
         skipBrowserRedirect: true,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-          ...(anonKey ? { apikey: anonKey } : {})
-        }
+        queryParams
       }
     });
 

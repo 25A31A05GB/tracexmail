@@ -424,6 +424,9 @@ export function SignupView({
                 }}
                 onError={(err) => setErrorMsg(err)}
               />
+              <p className="text-[10.5px] text-[var(--paper-muted)] mt-1.5 text-center leading-relaxed font-sans">
+                If Google shows <span className="text-[var(--paper)] font-medium">"Google hasn't verified this app"</span>: click <strong className="text-[var(--gold)]">Advanced</strong> &rarr; <strong className="text-[var(--gold)]">Go to TraceXMail</strong>.
+              </p>
             </div>
 
             <div className="flex items-center gap-3 my-3 text-xs text-[var(--line)]">

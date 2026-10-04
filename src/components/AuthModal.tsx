@@ -458,19 +458,24 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
               </div>
 
               {/* Google OAuth Option */}
-              <GoogleAuthButton
-                id="modal-google-auth-btn"
-                mode={mode === 'signup' ? 'signup' : 'continue'}
-                variant="primary"
-                onSuccess={async () => {
-                  setSuccessMessage('Signed in with Google successfully.');
-                  await initializeSession();
-                  setTimeout(() => {
-                    onClose();
-                  }, 800);
-                }}
-                onError={(err) => setErrorMessage(err)}
-              />
+              <div>
+                <GoogleAuthButton
+                  id="modal-google-auth-btn"
+                  mode={mode === 'signup' ? 'signup' : 'continue'}
+                  variant="primary"
+                  onSuccess={async () => {
+                    setSuccessMessage('Signed in with Google successfully.');
+                    await initializeSession();
+                    setTimeout(() => {
+                      onClose();
+                    }, 800);
+                  }}
+                  onError={(err) => setErrorMessage(err)}
+                />
+                <p className="text-[10.5px] text-slate-400 mt-1.5 text-center leading-relaxed font-sans">
+                  If Google shows <span className="text-slate-200 font-medium">"Google hasn't verified this app"</span>: click <strong className="text-cyan-400">Advanced</strong> &rarr; <strong className="text-cyan-400">Go to TraceXMail</strong>.
+                </p>
+              </div>
 
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
                 <div className="flex-1 h-px bg-slate-800" />

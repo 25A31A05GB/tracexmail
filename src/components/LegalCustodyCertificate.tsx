@@ -18,12 +18,13 @@ import { sha256Sync } from '../utils/crypto';
 
 interface LegalCustodyCertificateProps {
   analysis: EmailAnalysis;
+  hideLoggedInUserMailbox?: boolean;
   className?: string;
 }
 
-export function LegalCustodyCertificate({ analysis, className = '' }: LegalCustodyCertificateProps) {
+export function LegalCustodyCertificate({ analysis, hideLoggedInUserMailbox = false, className = '' }: LegalCustodyCertificateProps) {
   const [copiedHash, setCopiedHash] = useState(false);
-  const [examinerName, setExaminerName] = useState('Senior Digital Forensics Examiner');
+  const [examinerName, setExaminerName] = useState(() => hideLoggedInUserMailbox ? '[ANONYMIZED EXAMINER ACCOUNT]' : 'Senior Digital Forensics Examiner');
   const [organization, setOrganization] = useState('Enterprise Incident Response Unit');
   const [isEditing, setIsEditing] = useState(false);
 

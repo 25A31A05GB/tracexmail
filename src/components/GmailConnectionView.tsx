@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
+import { GoogleVerificationGuideModal } from './GoogleVerificationGuideModal';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { API_URL, apiFetch } from '../lib/api';
 
@@ -152,6 +153,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [blockedAuthUrl, setBlockedAuthUrl] = useState<string | null>(null);
   const [startingOAuth, setStartingOAuth] = useState<boolean>(false);
+  const [showVerificationGuide, setShowVerificationGuide] = useState<boolean>(false);
 
   // Real-time Progress Indicator & WebSocket Sync state
   const [syncProgress, setSyncProgress] = useState<number>(0);
@@ -1361,6 +1363,14 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               <span>{simulating ? 'Testing...' : 'Simulate Test Threat'}</span>
             </button>
             <button
+              onClick={() => setShowVerificationGuide(true)}
+              className="bg-[#201c17] hover:bg-[#2b251e] text-[#a89d8d] hover:text-[#ede6d8] border border-[#383126] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Open Google OAuth Verification submission checklist"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Verification Guide</span>
+            </button>
+            <button
               onClick={() => handleDisconnect({ force: false, skipConfirm: false })}
               disabled={syncing || disconnecting}
               className="bg-[#201c17] hover:bg-red-950/40 hover:text-red-300 border border-[#383126] hover:border-red-800/60 text-[#a89d8d] px-3 py-2 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
@@ -1371,20 +1381,37 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
             </button>
           </div>
         ) : (
-          <button
-            onClick={handleConnectGmail}
-            disabled={startingOAuth}
-            className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
-          >
-            {startingOAuth ? (
-              <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
-            ) : (
-              <Zap className="w-4 h-4 fill-current" />
-            )}
-            <span>{startingOAuth ? 'Connecting to Google...' : 'Connect Gmail Account'}</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <button
+              onClick={() => setShowVerificationGuide(true)}
+              className="bg-[#201c17] hover:bg-[#2b251e] text-[#a89d8d] hover:text-[#ede6d8] border border-[#383126] px-3.5 py-2.5 rounded-xl text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Open Google OAuth Verification submission checklist"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>Verification Guide</span>
+            </button>
+            <button
+              onClick={handleConnectGmail}
+              disabled={startingOAuth}
+              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 px-5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 cursor-pointer shadow-sm transition-all shrink-0"
+            >
+              {startingOAuth ? (
+                <Loader2 className="w-4 h-4 animate-spin text-stone-950" />
+              ) : (
+                <Zap className="w-4 h-4 fill-current" />
+              )}
+              <span>{startingOAuth ? 'Connecting to Google...' : 'Connect Gmail Account'}</span>
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Google OAuth Verification Submission Modal */}
+      <GoogleVerificationGuideModal
+        isOpen={showVerificationGuide}
+        onClose={() => setShowVerificationGuide(false)}
+        userEmail={status?.email_address || currentUserEmail || 'jayramsappa537@gmail.com'}
+      />
 
       {/* Real-time Sync Progress Indicator Bar */}
       {(syncing || syncCompletedAnim) && (
@@ -1518,6 +1545,103 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         <div className="p-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl text-emerald-200 text-xs flex items-center gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{directTokenSuccess}</span>
+        </div>
+      )}
+
+      {/* Live Sync Master Control Strip & Real Gmail In-Thread Report Info */}
+      {status?.is_connected && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Box 1: Live Sync Controller */}
+          <div className="p-4 bg-[#14120f] border border-amber-500/30 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isPollingStopped ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isPollingStopped ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                </span>
+                <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">
+                  {isPollingStopped ? 'Live Ingestion Paused' : 'Live Ingestion Active & Monitoring'}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#201c17] text-[#a89d8d] border border-[#383126]">
+                {isPollingStopped ? 'Manual Mode' : 'Push & Poll Stream'}
+              </span>
+            </div>
+
+            <p className="text-[11.5px] text-[#a89d8d] leading-relaxed">
+              {isPollingStopped 
+                ? 'Automated background scanning is currently paused. No background requests are being dispatched to Google API.' 
+                : 'TraceXMail is actively monitoring your mailbox for incoming emails, performing pre-delivery evaluation on arrival.'}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              {isPollingStopped ? (
+                <button
+                  type="button"
+                  onClick={resumeQueuePolling}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Resume Live Sync</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopQueuePolling}
+                  className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/60 text-amber-200 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Pause Live Sync</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSyncNow}
+                disabled={syncing}
+                className="px-3 py-1.5 bg-[#26211a] hover:bg-[#322c22] border border-[#443c30] text-[#ede6d8] rounded-lg text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? 'Syncing...' : 'Sync Now (Force Pull)'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Box 2: Where to find reports in real Gmail */}
+          <div className="p-4 bg-[#14120f] border border-blue-500/30 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-300 uppercase tracking-wider">
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>Real Gmail Mailbox Report Location</span>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Auto-Synced</span>
+              </span>
+            </div>
+
+            <div className="text-[11.5px] text-[#a89d8d] leading-relaxed space-y-1 font-sans">
+              <p>
+                <b>Where is the report in your Gmail app?</b>
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#c6d7e8]">
+                <li>Quarantined emails are moved to the red <code className="text-rose-300 font-mono">TraceXMail-Quarantine</code> label in your Gmail sidebar.</li>
+                <li>The forensic investigation briefing is attached as an <b>in-thread reply message</b> directly inside the email conversation.</li>
+              </ul>
+            </div>
+
+            <div className="pt-1 flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleSyncQuarantineReports}
+                disabled={syncingReports}
+                className="px-3 py-1.5 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-600/60 text-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              >
+                <FileText className={`w-3.5 h-3.5 text-blue-400 ${syncingReports ? 'animate-spin' : ''}`} />
+                <span>{syncingReports ? 'Syncing Reports...' : 'Sync & Insert Reports to Gmail'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

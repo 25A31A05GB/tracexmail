@@ -451,6 +451,7 @@ export function EvidenceTagCard({
   const [exportingImage, setExportingImage] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [maskPII, setMaskPII] = useState<boolean>(false);
+  const [hideLoggedInUserMailbox, setHideLoggedInUserMailbox] = useState<boolean>(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [stixModalOpen, setStixModalOpen] = useState(false);
   const [mitreModalOpen, setMitreModalOpen] = useState(false);
@@ -1047,6 +1048,29 @@ export function EvidenceTagCard({
             <span>Mask PII</span>
             <span className={`w-1.5 h-1.5 rounded-full ${maskPII ? 'bg-[#CC9A4A] animate-pulse' : 'bg-[#574f42]'}`} />
           </button>
+
+          {/* Mailbox: Logged-in User Account Hide Toggle */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHideLoggedInUserMailbox(!hideLoggedInUserMailbox);
+            }}
+            className={`px-2 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+              hideLoggedInUserMailbox
+                ? 'bg-indigo-950/80 border-indigo-500 text-indigo-300 font-semibold shadow-sm'
+                : 'bg-[#12161F] border-[#2B241E] text-[#8a8070] hover:text-[#ede6d8] hover:border-[#574f42]'
+            }`}
+            title={
+              hideLoggedInUserMailbox
+                ? 'Logged-in user account mailbox is hidden on evidence card. Click to show.'
+                : 'Click to hide logged-in user account mailbox from evidence card display and exports'
+            }
+          >
+            {hideLoggedInUserMailbox ? <EyeOff className="w-3 h-3 text-indigo-400" /> : <Eye className="w-3 h-3 text-[#8a8070]" />}
+            <span>Mailbox: {hideLoggedInUserMailbox ? 'Logged-in Account Hidden' : 'Logged-in Account Visible'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${hideLoggedInUserMailbox ? 'bg-indigo-400 animate-pulse' : 'bg-[#574f42]'}`} />
+          </button>
         </div>
       </motion.div>
 
@@ -1090,7 +1114,11 @@ export function EvidenceTagCard({
             <span>·</span>
             <span className="flex items-center gap-1">
               <User className="w-3 h-3 text-[#c9a227]" />
-              <span className="text-slate-300 font-semibold">{analysis?.assigned_user || analysis?.assignedUser || analysis?.user_email || 'Jayaram Sappa'}</span>
+              <span className="text-slate-300 font-semibold">
+                {hideLoggedInUserMailbox
+                  ? '[HIDDEN LOGGED-IN ACCOUNT]'
+                  : (analysis?.assigned_user || analysis?.assignedUser || user?.email || 'Jayaram Sappa')}
+              </span>
               <span className="text-[10px] text-[#8a8070]">(Lead SOC)</span>
             </span>
           </div>
@@ -1196,14 +1224,21 @@ export function EvidenceTagCard({
               <span className="text-[10px] font-mono text-[#8a8070]">Header Audit</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
-              {cardData.identityRows.map((r, idx) => (
-                <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
-                  <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
-                  <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
-                    {r.v}
-                  </span>
-                </div>
-              ))}
+              {cardData.identityRows.map((r, idx) => {
+                const isUserEmail = user?.email && r.v.toLowerCase().includes(user.email.toLowerCase());
+                const isToRow = r.k === 'TO';
+                const displayVal = (hideLoggedInUserMailbox && (isUserEmail || isToRow))
+                  ? '[HIDDEN LOGGED-IN MAILBOX]'
+                  : r.v;
+                return (
+                  <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
+                    <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
+                    <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={displayVal}>
+                      {displayVal}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}

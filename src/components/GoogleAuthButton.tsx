@@ -6,6 +6,7 @@ import { googleSignIn } from '../lib/firebaseClient';
 export interface GoogleAuthButtonProps {
   mode?: 'signin' | 'signup' | 'continue';
   variant?: 'primary' | 'secondary' | 'compact' | 'landing';
+  scopes?: string;
   onSuccess?: (user?: any) => void;
   onError?: (error: string) => void;
   className?: string;
@@ -70,7 +71,9 @@ export function GoogleAuthButton({
     try {
       // 1. Primary: Use provisioned Google Workspace Firebase Auth with Gmail defense scopes
       try {
-        const { user, accessToken } = await googleSignIn();
+        const authRes: any = await googleSignIn();
+        const user = authRes?.user || authRes?.data?.user;
+        const accessToken = authRes?.accessToken || authRes?.data?.accessToken || '';
         if (user && user.email) {
           const localSession = {
             token: accessToken,
