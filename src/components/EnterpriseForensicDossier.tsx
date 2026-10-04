@@ -63,22 +63,7 @@ export function EnterpriseForensicDossier({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
-          {/* Mailbox Logged-in User Account Privacy Toggle */}
-          <button
-            type="button"
-            onClick={() => setHideUserAccount(!hideUserAccount)}
-            className={`px-2.5 py-1.5 rounded-lg border font-mono text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-              hideUserAccount
-                ? 'bg-amber-950/80 border-amber-500 text-amber-300 shadow-sm'
-                : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-            }`}
-            title="Mailbox Privacy Option: Toggle hiding logged-in user account from evidence card"
-          >
-            <span className="text-slate-400">Mailbox:</span>
-            <span>{hideUserAccount ? 'Logged-in Account Hidden' : 'Logged-in Account Visible'}</span>
-          </button>
-
+        <div className="flex items-center gap-2 self-start md:self-auto">
           {onOpenReportModal && (
             <button
               type="button"
