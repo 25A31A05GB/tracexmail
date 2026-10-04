@@ -33,7 +33,10 @@ import {
   Cpu,
   Sparkles,
   RefreshCw,
-  Layers
+  Layers,
+  Users,
+  Crosshair,
+  Zap
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { sha256Sync } from '../utils/crypto';
@@ -54,6 +57,11 @@ import { getStandardizedVerdict } from '../utils/verdict';
 import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
 import { generateForensicPdfDossier } from '../utils/pdfDossierGenerator';
 import { extractRealSenderIp, formatRealSenderIp, formatRealSenderLocation } from '../utils/realSenderIp';
+import { SafeEmailSandbox } from './SafeEmailSandbox';
+import { BlastRadiusMatrix } from './BlastRadiusMatrix';
+import { MitreAttackDossier } from './MitreAttackDossier';
+import { SoarPlaybookConsole } from './SoarPlaybookConsole';
+import { LegalCustodyCertificate } from './LegalCustodyCertificate';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -64,6 +72,11 @@ interface ReportModalProps {
 
 export type ReportTab = 
   | 'evidence_card'
+  | 'sandbox_view'
+  | 'blast_radius'
+  | 'mitre_attack'
+  | 'soar_playbook'
+  | 'legal_custody'
   | 'soc_report'
   | 'institutional'
   | 'legal'
@@ -388,6 +401,61 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
               <span>Evidence Tag Flashcard</span>
             </button>
             <button
+              onClick={() => setActiveTab('sandbox_view')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'sandbox_view'
+                  ? 'border-rose-500 text-rose-300 bg-rose-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5 text-rose-400" />
+              <span>Safe Email Sandbox</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('blast_radius')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'blast_radius'
+                  ? 'border-indigo-400 text-indigo-300 bg-indigo-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Blast Radius &amp; Telemetry</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('mitre_attack')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'mitre_attack'
+                  ? 'border-red-400 text-red-300 bg-red-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Crosshair className="w-3.5 h-3.5 text-red-400" />
+              <span>MITRE ATT&amp;CK Matrix</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('soar_playbook')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'soar_playbook'
+                  ? 'border-amber-400 text-amber-300 bg-amber-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
+              <span>1-Click SOAR Playbook</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('legal_custody')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'legal_custody'
+                  ? 'border-teal-400 text-teal-300 bg-teal-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Scale className="w-3.5 h-3.5 text-teal-400" />
+              <span>FRE 902 Certificate</span>
+            </button>
+            <button
               onClick={() => setActiveTab('soc_report')}
               className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
                 activeTab === 'soc_report'
@@ -520,6 +588,31 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
                 }}
               />
             </div>
+          )}
+
+          {/* TAB: SANITIZED EMAIL SANDBOX & THREAT OVERLAYS */}
+          {activeTab === 'sandbox_view' && (
+            <SafeEmailSandbox analysis={analysis} />
+          )}
+
+          {/* TAB: BLAST RADIUS & CLICK TELEMETRY */}
+          {activeTab === 'blast_radius' && (
+            <BlastRadiusMatrix analysis={analysis} />
+          )}
+
+          {/* TAB: MITRE ATT&CK MATRIX & DIAMOND MODEL */}
+          {activeTab === 'mitre_attack' && (
+            <MitreAttackDossier analysis={analysis} />
+          )}
+
+          {/* TAB: 1-CLICK SOAR CONTAINMENT PLAYBOOK */}
+          {activeTab === 'soar_playbook' && (
+            <SoarPlaybookConsole analysis={analysis} />
+          )}
+
+          {/* TAB: FRE 902 / ISO 27037 LEGAL CERTIFICATE */}
+          {activeTab === 'legal_custody' && (
+            <LegalCustodyCertificate analysis={analysis} />
           )}
 
           {/* TAB: GEMINI SOC ANALYST REPORT */}

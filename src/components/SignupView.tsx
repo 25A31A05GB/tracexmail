@@ -38,6 +38,7 @@ export function SignupView({
   const [resending, setResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [userExistsError, setUserExistsError] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToLogin;
@@ -66,6 +67,7 @@ export function SignupView({
 
     setLoading(true);
     setErrorMsg(null);
+    setUserExistsError(false);
     setSuccessMsg(null);
     setResendStatus(null);
 
@@ -75,6 +77,22 @@ export function SignupView({
     const effectiveName = fullName.trim() || cleanEmail.split('@')[0];
 
     try {
+      // 0. Pre-check if email already exists
+      try {
+        const checkRes = await fetch(`/api/auth/check-exists?email=${encodeURIComponent(cleanEmail)}`);
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (checkData.exists) {
+            setUserExistsError(true);
+            setErrorMsg(`An account with email address '${cleanEmail}' already exists. Please log in instead.`);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (checkErr) {
+        console.warn('[SignupView] Check-exists preflight notice:', checkErr);
+      }
+
       const redirectUrl = window.location.origin;
 
       // 1. Register with Supabase if configured
@@ -100,9 +118,13 @@ export function SignupView({
             setLoading(false);
             return;
           }
-          if (!errMsg.includes('already registered') && !errMsg.includes('already exists') && !errMsg.includes('user already in use')) {
-            console.warn('[SignupView] Supabase signUp notice:', error.message);
+          if (errMsg.includes('already registered') || errMsg.includes('already exists') || errMsg.includes('user already in use')) {
+            setUserExistsError(true);
+            setErrorMsg(`An account with email address '${cleanEmail}' already exists. Please log in instead.`);
+            setLoading(false);
+            return;
           }
+          console.warn('[SignupView] Supabase signUp notice:', error.message);
         } else {
           // If Supabase auto-confirmed session
           if (data.session && data.user?.email_confirmed_at) {
@@ -127,7 +149,7 @@ export function SignupView({
 
       // 2. Also register in local/enclave backend and dispatch verification magic link
       try {
-        await fetch('/api/auth/register', {
+        const regRes = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -139,6 +161,14 @@ export function SignupView({
             accountType
           })
         });
+
+        const regData = await regRes.json().catch(() => ({}));
+        if (regRes.status === 409 || regData?.user_exists || regData?.code === 'USER_ALREADY_EXISTS') {
+          setUserExistsError(true);
+          setErrorMsg(`An account registered to '${cleanEmail}' already exists. Please log in instead.`);
+          setLoading(false);
+          return;
+        }
       } catch (srvErr) {
         console.warn('[SignupView] Backend registration notice:', srvErr);
       }
@@ -321,7 +351,30 @@ export function SignupView({
               Start analyzing email security, verifying sender authenticity, and uncovering threats.
             </div>
 
-            {errorMsg && (
+            {userExistsError && (
+              <div className="mb-4 p-4 rounded bg-[#1f1911] border border-amber-500/60 text-amber-200 text-xs space-y-3 shadow-md animate-in fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-bold text-amber-300 text-sm">Account Already Exists</div>
+                    <p className="text-[#dcd1be] font-sans text-xs leading-relaxed">
+                      An account registered to <span className="font-mono text-amber-300 font-semibold">{email}</span> already exists in our system. You do not need to register again.
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={onBackToLogin}
+                    className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs rounded transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <span>Proceed to Sign In →</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!userExistsError && errorMsg && (
               <div className="mb-4 p-3 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--thread)]" />
                 <div className="leading-relaxed font-sans">{errorMsg}</div>

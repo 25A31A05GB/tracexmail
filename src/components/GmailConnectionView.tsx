@@ -40,7 +40,8 @@ import {
   Layers,
   Loader2,
   Square,
-  Play
+  Play,
+  X
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
@@ -91,6 +92,9 @@ interface QuarantineConfig {
   quarantine_label: string;
   remove_inbox_label: boolean;
   admin_webhook_url: string;
+  auto_insert_report_note?: boolean;
+  report_style?: 'full_briefing' | 'compact_alert';
+  include_auth_details?: boolean;
 }
 
 interface QuarantineLog {
@@ -173,6 +177,19 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [quarantineThreshold, setQuarantineThreshold] = useState<number>(70);
   const [quarantineLabel, setQuarantineLabel] = useState<string>('TraceXMail-Quarantine');
   const [adminWebhookUrl, setAdminWebhookUrl] = useState<string>('');
+  const [autoInsertReportNote, setAutoInsertReportNote] = useState<boolean>(true);
+  const [reportStyle, setReportStyle] = useState<'full_briefing' | 'compact_alert'>('full_briefing');
+  const [includeAuthDetails, setIncludeAuthDetails] = useState<boolean>(true);
+  const [showReportPreviewModal, setShowReportPreviewModal] = useState<boolean>(false);
+  const [previewReportData, setPreviewReportData] = useState<{
+    snippet?: string;
+    htmlBody?: string;
+    plainText?: string;
+    rfcHeaders?: string[];
+  } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false);
+  const [testingReportNote, setTestingReportNote] = useState<boolean>(false);
+  const [testReportResult, setTestReportResult] = useState<string | null>(null);
   const [savingConfig, setSavingConfig] = useState<boolean>(false);
   const [configSuccess, setConfigSuccess] = useState<string | null>(null);
 
@@ -556,6 +573,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         setQuarantineThreshold(data.quarantine.threshold);
         setQuarantineLabel(data.quarantine.quarantine_label);
         setAdminWebhookUrl(data.quarantine.admin_webhook_url || '');
+        if (typeof data.quarantine.auto_insert_report_note === 'boolean') {
+          setAutoInsertReportNote(data.quarantine.auto_insert_report_note);
+        }
+        if (data.quarantine.report_style) {
+          setReportStyle(data.quarantine.report_style);
+        }
+        if (typeof data.quarantine.include_auth_details === 'boolean') {
+          setIncludeAuthDetails(data.quarantine.include_auth_details);
+        }
       }
       if (data.watch?.topic_name) {
         setTopicName(data.watch.topic_name);
@@ -693,12 +719,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
           threshold: quarantineThreshold,
           quarantineLabelName: quarantineLabel,
           removeInboxLabel: true,
-          adminWebhookUrl
+          adminWebhookUrl,
+          autoInsertReportNote,
+          reportStyle,
+          includeAuthDetails
         })
       });
 
       if (res.ok) {
-        setConfigSuccess('Quarantine gate & threshold settings saved successfully.');
+        setConfigSuccess('Quarantine gate & in-thread report settings saved successfully.');
         setTimeout(() => setConfigSuccess(null), 4000);
         fetchStatus();
       } else {
@@ -708,6 +737,63 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       setErrorMsg('Error saving configuration: ' + err.message);
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  const handlePreviewReportNote = async (customParams?: any) => {
+    setLoadingPreview(true);
+    try {
+      const res = await apiFetch('/api/gmail/preview-report-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threatScore: customParams?.threatScore ?? quarantineThreshold,
+          verdict: customParams?.verdict || 'MALICIOUS_PHISH',
+          subject: customParams?.subject || 'URGENT: Executive Wire Transfer Authorization Notice',
+          reportStyle,
+          includeAuthDetails,
+          ...customParams
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.preview) {
+        setPreviewReportData(data.preview);
+        setShowReportPreviewModal(true);
+      } else {
+        setErrorMsg('Failed to generate report note preview.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Error previewing report: ' + err.message);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
+  const handleTestReportNote = async () => {
+    setTestingReportNote(true);
+    setTestReportResult(null);
+    try {
+      const res = await apiFetch('/api/gmail/test-report-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threatScore: 88,
+          verdict: 'MALICIOUS_PHISH',
+          subject: 'TEST BRIEFING: TraceXMail In-Thread Quarantine Verification'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTestReportResult(data.message || 'Test report note successfully verified!');
+        setTimeout(() => setTestReportResult(null), 6000);
+        fetchStatus();
+      } else {
+        setErrorMsg(data.error || 'Failed to dispatch test report note.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Error sending test report note: ' + err.message);
+    } finally {
+      setTestingReportNote(false);
     }
   };
 
@@ -2469,6 +2555,97 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                 </div>
               </div>
 
+              {/* In-Thread Report Briefing inside Gmail */}
+              <div className="p-3.5 bg-[#1b1712] border border-amber-600/30 rounded-lg space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>In-Thread Security Report (Kept inside Gmail Message)</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
+                          users.messages.insert
+                        </span>
+                      </h5>
+                      <p className="text-[11px] text-slate-400">
+                        Automatically writes a permanent forensic briefing card directly into the Gmail thread alongside the flagged email.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoInsertReportNote}
+                      onChange={(e) => setAutoInsertReportNote(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                {autoInsertReportNote && (
+                  <div className="space-y-3 pt-2 border-t border-[#3a352c] text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1">Report Card Layout</label>
+                        <select
+                          value={reportStyle}
+                          onChange={(e) => setReportStyle(e.target.value as any)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-500"
+                        >
+                          <option value="full_briefing">Full Forensic Dossier (HTML Card + Threat Breakdown)</option>
+                          <option value="compact_alert">Compact SOC Notice (Condensed Alert)</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col justify-center">
+                        <label className="flex items-center gap-2 cursor-pointer mt-3 sm:mt-4">
+                          <input
+                            type="checkbox"
+                            checked={includeAuthDetails}
+                            onChange={(e) => setIncludeAuthDetails(e.target.checked)}
+                            className="rounded border-slate-700 text-amber-500 focus:ring-0"
+                          />
+                          <span className="text-slate-300 text-[11px]">Include SPF / DKIM / DMARC authentication breakdown</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#2e2922]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handlePreviewReportNote()}
+                          disabled={loadingPreview}
+                          className="px-3 py-1.5 bg-[#252019] hover:bg-[#322c22] border border-[#4a4235] text-amber-300 rounded text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{loadingPreview ? 'Loading Preview...' : 'Preview Gmail Report Card'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTestReportNote}
+                          disabled={testingReportNote}
+                          className="px-3 py-1.5 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-200 rounded text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Send className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>{testingReportNote ? 'Sending...' : 'Send Test Report to Gmail'}</span>
+                        </button>
+                      </div>
+
+                      {testReportResult && (
+                        <span className="text-emerald-400 text-[11px] font-medium flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          {testReportResult}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                 {configSuccess && (
                   <span className="text-emerald-400 text-xs font-semibold flex items-center gap-1">
@@ -2602,6 +2779,101 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* In-Thread Report Preview Modal */}
+      {showReportPreviewModal && previewReportData && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-150">
+          <div className="bg-[#14110d] border border-[#443c30] rounded-xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 bg-[#1b1712] border-b border-[#3a352c] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Gmail In-Thread Report Preview</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      users.messages.insert
+                    </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Exact security briefing card kept permanently inside the recipient's Gmail conversation thread.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowReportPreviewModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Close Preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 overflow-y-auto space-y-4 text-xs">
+              {/* Inbox Snippet Preview */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Gmail Inbox Snippet (Preview Line)
+                </label>
+                <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 font-mono text-[11px] truncate flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span className="truncate">{previewReportData.snippet}</span>
+                </div>
+              </div>
+
+              {/* Rendered HTML Briefing Card Preview */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  In-Thread HTML Security Card
+                </label>
+                <div className="border border-slate-700 rounded-lg overflow-hidden bg-white text-slate-900 shadow-sm">
+                  {previewReportData.htmlBody ? (
+                    <div
+                      dangerouslySetInnerHTML={{ __html: previewReportData.htmlBody }}
+                      className="p-2 max-h-[380px] overflow-y-auto"
+                    />
+                  ) : (
+                    <pre className="p-3 font-mono text-xs whitespace-pre-wrap bg-slate-900 text-slate-200">
+                      {previewReportData.plainText}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 bg-[#1b1712] border-t border-[#3a352c] flex items-center justify-between gap-3">
+              <div className="text-[11px] text-slate-400">
+                Stored via <span className="font-mono text-amber-300">users.messages.insert</span> without sending external emails.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReportPreviewModal(false)}
+                  className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer transition-colors"
+                >
+                  Close Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleTestReportNote();
+                    setShowReportPreviewModal(false);
+                  }}
+                  disabled={testingReportNote}
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send Sample Note to Mailbox</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

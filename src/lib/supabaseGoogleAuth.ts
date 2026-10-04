@@ -24,10 +24,10 @@ export function isRunningInIframe(): boolean {
  * Helper to simulate a Google authenticated session when Supabase credentials
  * are not yet provisioned in a sandbox environment.
  */
-export function signInWithGoogleDemoSession(): GoogleAuthResult {
+export function signInWithGoogleDemoSession(customEmail?: string): GoogleAuthResult {
   try {
-    const userEmail = 'jayramsappa537@gmail.com';
-    const stableId = 'usr_google_operator_primary';
+    const userEmail = (customEmail || 'user@tracexmail.sec').toLowerCase().trim();
+    const stableId = `usr_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const demoUser = {
       id: stableId,
       email: userEmail,
@@ -79,8 +79,9 @@ export function signInWithGoogleDemoSession(): GoogleAuthResult {
 /**
  * Initiates Supabase Google OAuth sign-in.
  * Handles both iframe-safe popup mode and top-level redirect mode.
+ * Supports requesting explicit Gmail scanning scopes.
  */
-export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
+export async function signInWithGoogleOAuth(options?: { scopes?: string }): Promise<GoogleAuthResult> {
   // Try to dynamically ensure client configuration before failing
   await ensureSupabaseClient();
 
@@ -95,9 +96,10 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
   const inIframe = isRunningInIframe();
   const callbackUrl = getGoogleOAuthRedirectUrl();
   const anonKey = getSupabaseAnonKey();
+  const requestedScopes = options?.scopes || 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify';
 
   try {
-    console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl);
+    console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl, 'scopes:', requestedScopes);
 
     // Request OAuth authorization URL with skipBrowserRedirect so we can sanitize
     // and guarantee the `apikey` query parameter is present for Supabase's Kong gateway.
@@ -105,6 +107,7 @@ export async function signInWithGoogleOAuth(): Promise<GoogleAuthResult> {
       provider: 'google',
       options: {
         redirectTo: callbackUrl,
+        scopes: requestedScopes,
         skipBrowserRedirect: true,
         queryParams: {
           access_type: 'offline',

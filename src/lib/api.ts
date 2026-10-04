@@ -638,6 +638,17 @@ export const forensicApi = {
     return res.data;
   },
 
+  updateCaseTags: async (caseId: string, tags: string[]): Promise<{ status: string; case_id?: string; tags: string[] }> => {
+    try {
+      const res = await apiClient.post(`/cases/${caseId}/tags`, { tags });
+      return res.data;
+    } catch (err) {
+      // Fallback to PATCH /cases/:caseId
+      const patchRes = await apiClient.patch(`/cases/${caseId}`, { tags });
+      return { status: 'success', case_id: caseId, tags: patchRes.data?.tags || tags };
+    }
+  },
+
   triageCase: async (caseId: string, payload: { status?: string; severity?: string; tags?: string[]; assigned_user?: string; analyst_notes?: string; analyst_verdict?: string }): Promise<any> => {
     const res = await apiClient.post(`/cases/${caseId}/triage`, payload);
     return res.data;

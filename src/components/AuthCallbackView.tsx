@@ -68,7 +68,7 @@ export function AuthCallbackView({ onNavigateHome }: AuthCallbackViewProps) {
 
         // 4. If Supabase is not configured or in sandbox fallback, establish local session
         if (!authenticatedUser) {
-          const userEmail = searchParams.get('email') || 'jayramsappa537@gmail.com';
+          const userEmail = searchParams.get('email') || 'user@tracexmail.sec';
           const localUser = {
             id: 'usr_google_authenticated',
             email: userEmail,

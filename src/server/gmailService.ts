@@ -104,6 +104,9 @@ export interface QuarantineConfig {
   quarantineLabelName: string; // e.g. 'TraceXMail-Quarantine'
   removeInboxLabel: boolean;
   adminWebhookUrl: string;
+  autoInsertReportNote?: boolean;
+  reportStyle?: 'full_briefing' | 'compact_alert';
+  includeAuthDetails?: boolean;
 }
 
 export interface WatchConfig {
@@ -301,7 +304,10 @@ const state: GmailServiceState = {
     threshold: 70,
     quarantineLabelName: 'TraceXMail-Quarantine',
     removeInboxLabel: true,
-    adminWebhookUrl: process.env.SOC_ADMIN_WEBHOOK_URL || ''
+    adminWebhookUrl: process.env.SOC_ADMIN_WEBHOOK_URL || '',
+    autoInsertReportNote: true,
+    reportStyle: 'full_briefing',
+    includeAuthDetails: true
   },
   metrics: {
     totalIngested: 0,
@@ -419,7 +425,10 @@ export function getGmailStatus(userEmail?: string) {
       threshold: state.quarantine.threshold,
       quarantine_label: state.quarantine.quarantineLabelName,
       remove_inbox_label: state.quarantine.removeInboxLabel,
-      admin_webhook_url: state.quarantine.adminWebhookUrl
+      admin_webhook_url: state.quarantine.adminWebhookUrl,
+      auto_insert_report_note: state.quarantine.autoInsertReportNote !== false,
+      report_style: state.quarantine.reportStyle || 'full_briefing',
+      include_auth_details: state.quarantine.includeAuthDetails !== false
     },
     metrics: {
       total_ingested: state.metrics.totalIngested,
@@ -441,6 +450,9 @@ export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId:
   if (config.quarantineLabelName) state.quarantine.quarantineLabelName = config.quarantineLabelName;
   if (typeof config.removeInboxLabel === 'boolean') state.quarantine.removeInboxLabel = config.removeInboxLabel;
   if (typeof config.adminWebhookUrl === 'string') state.quarantine.adminWebhookUrl = config.adminWebhookUrl;
+  if (typeof config.autoInsertReportNote === 'boolean') state.quarantine.autoInsertReportNote = config.autoInsertReportNote;
+  if (config.reportStyle) state.quarantine.reportStyle = config.reportStyle;
+  if (typeof config.includeAuthDetails === 'boolean') state.quarantine.includeAuthDetails = config.includeAuthDetails;
 
   const supabase = getSupabaseAdminClient();
   if (supabase) {
@@ -1027,9 +1039,11 @@ export function buildQuarantineReportNotePayload(params: {
   heuristics?: Array<{ id?: string; title?: string; severity?: string; description?: string }>;
   whyNarrative?: string;
 }) {
+  const rawSummary = params.reportSummary || 'High threat risk anomalies flagged by enterprise mail defense policies.';
+  const reportSummaryText = rawSummary.trim();
   let cleanReason = (params.topReason || '').trim();
-  if (!cleanReason && params.reportSummary) {
-    const firstLine = params.reportSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
+  if (!cleanReason && rawSummary) {
+    const firstLine = rawSummary.split('\n')[0].replace(/^[•\s*-]+/, '').trim();
     cleanReason = firstLine;
   }
   if (!cleanReason) {
@@ -1057,7 +1071,7 @@ export function buildQuarantineReportNotePayload(params: {
     `Timestamp:        ${new Date().toUTCString()}`,
     '',
     'FORENSIC SUMMARY & ANOMALIES:',
-    params.reportSummary.trim(),
+    reportSummaryText,
     ...(params.whyNarrative ? ['', 'ANALYST REASONING:', params.whyNarrative.trim()] : []),
     ...(params.auth ? [
       '',
@@ -1178,7 +1192,7 @@ export function buildQuarantineReportNotePayload(params: {
           Forensic Indicators & Threat Findings
         </div>
         <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; font-size: 13px; color: #334155; line-height: 1.6; white-space: pre-line; margin-bottom: 24px;">
-          ${params.reportSummary.trim()}
+          ${reportSummaryText}
         </div>
 
         <!-- Action Button -->
@@ -1258,6 +1272,42 @@ export function buildQuarantineReportNotePayload(params: {
     selfEmail,
     noteMessageId
   };
+}
+
+/**
+ * Generates a realistic sample in-thread quarantine report payload for preview and live mailbox testing.
+ */
+export function generateSampleQuarantineReportPayload(overrides?: Partial<Parameters<typeof buildQuarantineReportNotePayload>[0]>) {
+  const caseId = overrides?.caseId || `CASE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+  const threatScore = typeof overrides?.threatScore === 'number' ? overrides.threatScore : 88;
+  const verdict = overrides?.verdict || 'MALICIOUS_PHISH';
+  const subject = overrides?.subject || 'URGENT: Outstanding Invoice #INV-92819 Settlement Required';
+  const reportSummary = overrides?.reportSummary || [
+    '• High Threat Risk: Spoofed executive sender display name with unaligned return-path.',
+    '• BEC Linguistic Alert: High urgency language requesting unauthorized wire transfer change.',
+    '• Newly Registered Domain: Sender MX host registered < 72 hours ago.',
+    '• Cryptographic Failure: SPF failed for origin IP 198.51.100.44; DMARC policy=reject triggered.'
+  ].join('\n');
+
+  return buildQuarantineReportNotePayload({
+    subject,
+    reportSummary,
+    caseId,
+    threatScore,
+    verdict,
+    senderEmail: overrides?.senderEmail || state.emailAddress || 'security@tracexmail.internal',
+    topReason: 'Urgent Wire Transfer Phishing Anomaly Detected',
+    originIp: overrides?.originIp || '198.51.100.44',
+    originCountry: overrides?.originCountry || 'United States',
+    auth: overrides?.auth || {
+      spf: { status: 'FAIL', details: 'IP 198.51.100.44 is not authorized by domain SPF record' },
+      dkim: { status: 'FAIL', details: 'No valid DKIM signature found in headers' },
+      dmarc: { status: 'FAIL', policy: 'reject' },
+      arc: { status: 'NONE' }
+    },
+    whyNarrative: overrides?.whyNarrative || 'The inbound message exhibits classic Business Email Compromise (BEC) patterns combined with fraudulent banking instructions and broken cryptographic sender authentication.',
+    ...overrides
+  });
 }
 
 /**

@@ -5,6 +5,7 @@ import { signInWithGoogleOAuth, signInWithGoogleDemoSession } from '../lib/supab
 export interface GoogleAuthButtonProps {
   mode?: 'signin' | 'signup' | 'continue';
   variant?: 'primary' | 'secondary' | 'compact' | 'landing';
+  scopes?: string;
   onSuccess?: (user?: any) => void;
   onError?: (error: string) => void;
   className?: string;
@@ -40,6 +41,7 @@ export function GoogleGLogo({ className = "w-4 h-4" }: { className?: string }) {
 export function GoogleAuthButton({
   mode = 'signin',
   variant = 'primary',
+  scopes,
   onSuccess,
   onError,
   className = '',
@@ -67,7 +69,7 @@ export function GoogleAuthButton({
 
     setLoading(true);
     try {
-      const res = await signInWithGoogleOAuth();
+      const res = await signInWithGoogleOAuth({ scopes });
 
       if (res.success) {
         if (onSuccess) {

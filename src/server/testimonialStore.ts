@@ -42,10 +42,17 @@ function loadTestimonialsFromDisk(): UserTestimonial[] {
         return parsed;
       }
     }
+    const primaryFile = path.join(DATA_DIR, 'user_testimonials.json');
+    if (fs.existsSync(primaryFile)) {
+      const raw = fs.readFileSync(primaryFile, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
   } catch (err) {
     console.warn('[testimonialStore] Could not read user_testimonials.json from disk:', err);
   }
-  // No fake reviews: Return empty array if no user has posted yet
   return [];
 }
 

@@ -86,6 +86,7 @@ import {
   insertQuarantineReportNote,
   backfillQuarantineReportNotes,
   buildQuarantineReportNotePayload,
+  generateSampleQuarantineReportPayload,
   syncGmailConnectionFromDb,
   ensureGmailLabel,
   ensureFreshAccessToken,
@@ -3257,6 +3258,77 @@ async function startServer() {
     res.json(data);
   });
 
+  // Dedicated Case Tags Persistence Endpoint
+  app.post('/api/cases/:caseId/tags', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
+    const supabase = getSupabaseClient();
+    const user = (req as AuthenticatedRequest).user!;
+    const { caseId } = req.params;
+    let newTags: string[] = Array.isArray(req.body?.tags) ? req.body.tags : [];
+    
+    // Normalize and sanitize tags: deduplicate and trim
+    newTags = Array.from(new Set(newTags.map((t: string) => String(t).trim()).filter(Boolean)));
+
+    const userKey = `${caseId}__${user.userId || user.email}`;
+    let existing = userScopedCasesStore.get(userKey) || userScopedCasesStore.get(caseId) || BASELINE_SAMPLE_CASES.get(caseId) || inMemoryCases.get(caseId);
+
+    if (!existing) {
+      existing = {
+        id: caseId,
+        title: req.body?.title || `Forensic Case ${caseId}`,
+        status: 'OPEN',
+        severity: 'HIGH',
+        threat_score: 75,
+        created_at: new Date().toISOString(),
+        tags: []
+      };
+    }
+
+    const updated = {
+      ...existing,
+      tags: newTags,
+      updated_at: new Date().toISOString(),
+      user_id: user.userId,
+      user_email: user.email,
+      organizationId: user.organizationId
+    };
+
+    userScopedCasesStore.set(userKey, updated);
+    userScopedCasesStore.set(caseId, updated);
+    inMemoryCases.set(caseId, updated);
+    upsertPersistedCase(updated);
+
+    if (supabase) {
+      try {
+        await supabase.from('cases').update({
+          tags: newTags,
+          updated_at: new Date().toISOString()
+        }).eq('id', caseId);
+      } catch (dbErr) {
+        console.warn(`[CaseTags] Supabase update fallback:`, dbErr);
+      }
+    }
+
+    if (typeof broadcastWebSocketEvent === 'function') {
+      broadcastWebSocketEvent({
+        type: 'CASE_UPDATED',
+        case: updated,
+        caseId,
+        tags: newTags,
+        userId: user.userId,
+        userEmail: user.email,
+        organizationId: user.organizationId,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      status: 'success',
+      case_id: caseId,
+      tags: newTags,
+      message: `Tags successfully persisted for case ${caseId}`
+    });
+  });
+
   // Dynamic Fast Triage Case Status Transition
   app.post('/api/cases/:caseId/triage', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req, res) => {
     const supabase = getSupabaseClient();
@@ -6177,6 +6249,107 @@ Link: https://verify-auth-portal.net/login`;
       });
     } catch (err: any) {
       console.error('[DispatchReport] Error:', err);
+      res.status(500).json({ status: 'error', error: err.message });
+    }
+  });
+
+  // 6b.3 Endpoint: Preview In-Thread Forensic Report Note
+  app.post('/api/gmail/preview-report-note', publicLimiter, (req, res) => {
+    try {
+      const { caseId, subject, threatScore, verdict, reportSummary, auth, originIp, whyNarrative } = req.body || {};
+      const payload = generateSampleQuarantineReportPayload({
+        caseId,
+        subject,
+        threatScore: typeof threatScore === 'number' ? threatScore : 88,
+        verdict: verdict || 'MALICIOUS_PHISH',
+        reportSummary,
+        auth,
+        originIp,
+        whyNarrative
+      });
+
+      res.json({
+        status: 'ok',
+        preview: {
+          snippet: payload.snippetLine,
+          plainText: payload.bodyText,
+          htmlBody: payload.htmlBody,
+          rfcHeaders: payload.rfcHeaders,
+          senderEmail: payload.selfEmail,
+          noteMessageId: payload.noteMessageId
+        }
+      });
+    } catch (err: any) {
+      console.error('[PreviewReportNote] Error:', err);
+      res.status(500).json({ status: 'error', error: err.message });
+    }
+  });
+
+  // 6b.4 Endpoint: Send Test Report Note to Connected Gmail Mailbox
+  app.post('/api/gmail/test-report-note', authenticatedLimiter, async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+      const effectiveToken = bearerToken || storedToken;
+
+      const isLiveToken = Boolean(
+        effectiveToken &&
+        !effectiveToken.startsWith('mock_') &&
+        !effectiveToken.startsWith('enclave_')
+      );
+
+      const sampleCaseId = `CASE-TEST-${Date.now().toString(36).toUpperCase()}`;
+      const sampleSubject = req.body?.subject || 'TEST BRIEFING: TraceXMail In-Thread Quarantine Verification';
+      const sampleThreatScore = req.body?.threatScore ?? 88;
+      const sampleVerdict = req.body?.verdict || 'MALICIOUS_PHISH';
+
+      if (isLiveToken && effectiveToken) {
+        const inserted = await insertQuarantineReportNote({
+          accessToken: effectiveToken,
+          subject: sampleSubject,
+          reportSummary: [
+            '• Verification Test: TraceXMail live in-thread reporting simulation.',
+            '• Threat Simulation: Simulated high risk credential phishing heuristic (Score 88/100).',
+            '• Mailbox Retention: Verified that briefing card is stored directly inside Gmail thread.'
+          ].join('\n'),
+          caseId: sampleCaseId,
+          threatScore: sampleThreatScore,
+          verdict: sampleVerdict,
+          topReason: 'TraceXMail In-Thread Report Verification Test',
+          alsoSendToInbox: true
+        });
+
+        return res.json({
+          status: 'success',
+          mode: 'live_gmail',
+          case_id: sampleCaseId,
+          message: 'Test forensic report note was successfully inserted into your Gmail mailbox! Check your Gmail inbox/TraceXMail-Quarantine label.',
+          inserted
+        });
+      }
+
+      // If in sandbox mode without live OAuth token, generate simulated success with full preview
+      const preview = generateSampleQuarantineReportPayload({
+        caseId: sampleCaseId,
+        subject: sampleSubject,
+        threatScore: sampleThreatScore,
+        verdict: sampleVerdict
+      });
+
+      return res.json({
+        status: 'success',
+        mode: 'sandbox_simulation',
+        case_id: sampleCaseId,
+        message: 'Sandbox verification passed! (To write directly to a real Google mailbox, connect your Gmail account above).',
+        preview: {
+          snippet: preview.snippetLine,
+          htmlBody: preview.htmlBody
+        }
+      });
+    } catch (err: any) {
+      console.error('[TestReportNote] Error:', err);
       res.status(500).json({ status: 'error', error: err.message });
     }
   });

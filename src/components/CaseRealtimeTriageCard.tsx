@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Users, 
   ShieldAlert, 
@@ -9,19 +9,26 @@ import {
   ArrowRight, 
   Radio, 
   Clock,
-  UserCheck
+  UserCheck,
+  Plus,
+  X
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
+import { getTagColorClasses } from './CaseTagManager';
 
 interface CaseRealtimeTriageCardProps {
   analysis: EmailAnalysis;
   onNavigateToCases?: (caseId?: string) => void;
+  onTagsUpdated?: (tags: string[]) => void;
+  onOpenTagManager?: () => void;
   className?: string;
 }
 
 export function CaseRealtimeTriageCard({
   analysis,
   onNavigateToCases,
+  onTagsUpdated,
+  onOpenTagManager,
   className = ''
 }: CaseRealtimeTriageCardProps) {
   const caseId = analysis.id || analysis.evidenceId;
@@ -121,16 +128,37 @@ export function CaseRealtimeTriageCard({
       )}
 
       {/* Tags */}
-      {tags.length > 0 && (
-        <div className="mb-3 flex items-center gap-1.5 flex-wrap">
+      <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <Tag className="w-3 h-3 text-slate-400 shrink-0" />
-          {tags.map((t, idx) => (
-            <span key={idx} className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-300">
-              #{t}
-            </span>
-          ))}
+          {tags.length > 0 ? (
+            tags.map((t, idx) => {
+              const colors = getTagColorClasses(t);
+              return (
+                <span 
+                  key={idx} 
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-mono font-medium ${colors.bg} ${colors.border} ${colors.text}`}
+                >
+                  <span className={`w-1 h-1 rounded-full ${colors.dot}`} />
+                  <span>#{t}</span>
+                </span>
+              );
+            })
+          ) : (
+            <span className="text-[11px] text-slate-500 font-mono italic">No custom tags assigned</span>
+          )}
         </div>
-      )}
+        {onOpenTagManager && (
+          <button
+            type="button"
+            onClick={onOpenTagManager}
+            className="text-[10px] font-mono text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Manage Tags</span>
+          </button>
+        )}
+      </div>
 
       {/* Recent Notes Stream */}
       {(notes.length > 0 || primaryNote) && (

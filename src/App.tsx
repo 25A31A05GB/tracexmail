@@ -58,6 +58,7 @@ const KeyboardShortcutsModal = lazyWithRetry(() => import('./components/Keyboard
 // Authentication and onboarding views directly imported to guarantee single-instance React runtime stability
 import { LoginView } from './components/LoginView';
 import { SignupView } from './components/SignupView';
+import { UltimateBossAdminView } from './components/UltimateBossAdminView';
 import { ForgotPasswordView } from './components/ForgotPasswordView';
 import { ResetPasswordView } from './components/ResetPasswordView';
 import { AcceptInviteView } from './components/AcceptInviteView';
@@ -1182,6 +1183,16 @@ export default function App() {
                   onBroadcastTestAlert={broadcastTestAlert}
                   onReconnectWs={reconnectWs}
                 />
+              )}
+
+              {effectiveTab === 'boss_admin' && (
+                <div className="flex-1 p-6 overflow-y-auto">
+                  <UltimateBossAdminView
+                    currentUserEmail={user?.email || session?.user?.email}
+                    currentUserRole={role}
+                    onSwitchToTab={(tab) => setActiveTab(tab as NavTab)}
+                  />
+                </div>
               )}
 
               {effectiveTab === 'organization' && (

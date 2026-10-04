@@ -58,6 +58,8 @@ import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
 import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
 import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
+import { CaseTagManager } from './CaseTagManager';
+import { EnterpriseForensicDossier } from './EnterpriseForensicDossier';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -325,6 +327,26 @@ export function OverviewView({
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
+  const [caseTags, setCaseTags] = useState<string[]>(() => {
+    return Array.isArray(analysis?.tags) ? [...analysis.tags] : [];
+  });
+
+  // Sync caseTags when analysis prop updates
+  useEffect(() => {
+    if (Array.isArray(analysis?.tags)) {
+      setCaseTags([...analysis.tags]);
+    }
+  }, [analysis?.id, analysis?.tags]);
+
+  const handleTagsUpdated = (updatedTags: string[]) => {
+    setCaseTags(updatedTags);
+    if (onSelectAnalysis) {
+      onSelectAnalysis({
+        ...analysis,
+        tags: updatedTags
+      });
+    }
+  };
 
   useEffect(() => {
     if (userPersona === 'non_technical') {
@@ -753,7 +775,7 @@ export function OverviewView({
         </div>
 
         <NonTechnicalEvidenceCard
-          analysis={analysis}
+          analysis={{ ...analysis, tags: caseTags }}
           onOpenNewModal={onOpenNewModal}
           onOpenReportModal={onOpenReportModal}
           onSwitchToTechnical={() => {
@@ -846,6 +868,20 @@ export function OverviewView({
                 <span className="text-blue-300">{analysis.assigned_user || analysis.assignedUser}</span>
               </span>
             )}
+
+            {/* Case Tags Quick Access Button */}
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById('case-tag-manager');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
+              className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#1E212A] hover:bg-[#2A2E3B] text-amber-300 border border-[#3A3F4E] flex items-center gap-1 transition-colors cursor-pointer"
+              title="Click to jump to Case Tags & Labels manager"
+            >
+              <Tag className="w-3 h-3 text-amber-400" />
+              <span>{caseTags.length} {caseTags.length === 1 ? 'Tag' : 'Tags'}</span>
+            </button>
 
             <span className="text-emerald-400 flex items-center gap-1.5 font-medium ml-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
@@ -1008,10 +1044,26 @@ export function OverviewView({
         />
       </div>
 
+      {/* Case Labels & Custom Forensic Tags Section */}
+      <div className="mb-6">
+        <CaseTagManager
+          analysis={{ ...analysis, tags: caseTags }}
+          onTagsUpdated={handleTagsUpdated}
+        />
+      </div>
+
+      {/* Enterprise Incident Dossier: Sandbox Detonation, Blast Radius, MITRE & SOAR */}
+      <div className="mb-6">
+        <EnterpriseForensicDossier
+          analysis={{ ...analysis, tags: caseTags }}
+          onOpenReportModal={onOpenReportModal}
+        />
+      </div>
+
       {/* Main View Rendering */}
       {overviewMode === 'card' ? (
         <ForensicCaseTwoPanel
-          analysis={analysis}
+          analysis={{ ...analysis, tags: caseTags }}
           evidenceCardData={evidenceCardData}
           effectiveHash={effectiveHash}
           isTechnicalExpanded={isTechnicalExpanded}
@@ -1028,8 +1080,13 @@ export function OverviewView({
           <div className="col-span-12 xl:col-span-7 2xl:col-span-8 space-y-6">
             {/* Real-Time SOC Case Triage & Team Collaboration Banner */}
             <CaseRealtimeTriageCard
-              analysis={analysis}
+              analysis={{ ...analysis, tags: caseTags }}
               onNavigateToCases={onNavigateToCases}
+              onTagsUpdated={handleTagsUpdated}
+              onOpenTagManager={() => {
+                const el = document.getElementById('case-tag-manager');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }}
             />
 
             {/* Evidence Vault & Chain of Custody Immutable Ledger Banner */}

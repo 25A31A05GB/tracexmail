@@ -2,7 +2,7 @@
   {
     "id": "CASE-2026-0881",
     "organization_id": "org_acme_soc_01",
-    "user_id": "usr_analyst_lead",
+    "user_id": "usr_analyst_acmedefense_sec",
     "user_email": "analyst@acmedefense.sec",
     "created_by": "usr_analyst_lead",
     "title": "Urgent: Wire Transfer Account Discrepancy",
@@ -21,14 +21,13 @@
     "origin_asn": "AS200548",
     "origin_asn_org": "Relay Transit Network Ltd",
     "infra_type": "BOTNET_INDICATOR",
-    "created_at": "2026-10-02T15:08:28.943Z",
+    "created_at": "2026-10-04T11:37:36.718Z",
     "assigned_user": "Lead SOC Analyst",
     "tags": [
       "BEC",
-      "Impersonation",
-      "Critical Risk",
-      "Wire Transfer",
-      "DKIM Fail"
+      "Executive Impersonation",
+      "Wire Transfer Fraud",
+      "VIP Target"
     ],
     "source": "inbound_analysis",
     "is_demo": false,
@@ -36,7 +35,7 @@
       "subject": "Urgent: Wire Transfer Account Discrepancy",
       "from": "Chief Financial Officer <finance@executive-verify-auth.net>",
       "to": "accounting@acmedefense.sec",
-      "date": "Fri, 02 Oct 2026 15:08:28 GMT",
+      "date": "Sun, 04 Oct 2026 11:37:36 GMT",
       "messageId": "<cfo-wire-99128@executive-verify-auth.net>",
       "replyTo": "cfo-private-desk@protonmail.ch"
     },
@@ -89,7 +88,9 @@
         "title": "Urgent Financial Coercion Keywords",
         "severity": "HIGH"
       }
-    ]
+    ],
+    "updated_at": "2026-10-04T13:37:37.680Z",
+    "organizationId": "org_usr_analyst_acmedefense_sec"
   },
   {
     "id": "CASE-2026-0882",
