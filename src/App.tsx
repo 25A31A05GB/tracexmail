@@ -180,9 +180,16 @@ export default function App() {
     let authSub: any = null;
     if (isSupabaseConfigured && supabase) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-        if (event === 'PASSWORD_RECOVERY') {
+        const hash = window.location.hash || '';
+        const search = window.location.search || '';
+        const isRecoveryActive = hash.includes('type=recovery') || 
+                                 search.includes('type=recovery') || 
+                                 hash.startsWith('#reset-password') || 
+                                 hash.includes('reset-password');
+
+        if (event === 'PASSWORD_RECOVERY' || isRecoveryActive) {
           setAuthView('reset-password');
-        } else if (event === 'SIGNED_IN' && newSession) {
+        } else if (event === 'SIGNED_IN' && newSession && !isRecoveryActive) {
           if (typeof window !== 'undefined' && (window.location.search.includes('code=') || window.location.hash.includes('access_token='))) {
             window.history.replaceState({}, document.title, window.location.pathname);
           }

@@ -1521,6 +1521,103 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         </div>
       )}
 
+      {/* Live Sync Master Control Strip & Real Gmail In-Thread Report Info */}
+      {status?.is_connected && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* Box 1: Live Sync Controller */}
+          <div className="p-4 bg-[#14120f] border border-amber-500/30 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isPollingStopped ? 'bg-amber-400' : 'bg-emerald-400'}`} />
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isPollingStopped ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                </span>
+                <span className="font-mono text-xs font-bold text-white uppercase tracking-wider">
+                  {isPollingStopped ? 'Live Ingestion Paused' : 'Live Ingestion Active & Monitoring'}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#201c17] text-[#a89d8d] border border-[#383126]">
+                {isPollingStopped ? 'Manual Mode' : 'Push & Poll Stream'}
+              </span>
+            </div>
+
+            <p className="text-[11.5px] text-[#a89d8d] leading-relaxed">
+              {isPollingStopped 
+                ? 'Automated background scanning is currently paused. No background requests are being dispatched to Google API.' 
+                : 'TraceXMail is actively monitoring your mailbox for incoming emails, performing pre-delivery evaluation on arrival.'}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              {isPollingStopped ? (
+                <button
+                  type="button"
+                  onClick={resumeQueuePolling}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Resume Live Sync</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={stopQueuePolling}
+                  className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/60 text-amber-200 rounded-lg text-xs font-bold font-mono flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                  <span>Pause Live Sync</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSyncNow}
+                disabled={syncing}
+                className="px-3 py-1.5 bg-[#26211a] hover:bg-[#322c22] border border-[#443c30] text-[#ede6d8] rounded-lg text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${syncing ? 'animate-spin' : ''}`} />
+                <span>{syncing ? 'Syncing...' : 'Sync Now (Force Pull)'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Box 2: Where to find reports in real Gmail */}
+          <div className="p-4 bg-[#14120f] border border-blue-500/30 rounded-xl space-y-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-300 uppercase tracking-wider">
+                <Mail className="w-3.5 h-3.5 text-blue-400" />
+                <span>Real Gmail Mailbox Report Location</span>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Auto-Synced</span>
+              </span>
+            </div>
+
+            <div className="text-[11.5px] text-[#a89d8d] leading-relaxed space-y-1 font-sans">
+              <p>
+                <b>Where is the report in your Gmail app?</b>
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#c6d7e8]">
+                <li>Quarantined emails are moved to the red <code className="text-rose-300 font-mono">TraceXMail-Quarantine</code> label in your Gmail sidebar.</li>
+                <li>The forensic investigation briefing is attached as an <b>in-thread reply message</b> directly inside the email conversation.</li>
+              </ul>
+            </div>
+
+            <div className="pt-1 flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleSyncQuarantineReports}
+                disabled={syncingReports}
+                className="px-3 py-1.5 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-600/60 text-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              >
+                <FileText className={`w-3.5 h-3.5 text-blue-400 ${syncingReports ? 'animate-spin' : ''}`} />
+                <span>{syncingReports ? 'Syncing Reports...' : 'Sync & Insert Reports to Gmail'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Automated Ingestion Queue & Immediate Forensic Triage Card */}
       <div className="p-4 bg-[#14120f] border border-[#3a352c] rounded-xl space-y-3.5 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-2">
