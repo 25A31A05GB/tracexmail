@@ -96,7 +96,7 @@ export async function signInWithGoogleOAuth(options?: { scopes?: string }): Prom
   const inIframe = isRunningInIframe();
   const callbackUrl = getGoogleOAuthRedirectUrl();
   const anonKey = getSupabaseAnonKey();
-  const requestedScopes = options?.scopes || 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.settings.basic https://www.googleapis.com/auth/userinfo.email';
+  const requestedScopes = options?.scopes || 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 
   try {
     console.log('[Supabase Google Auth] Initiating OAuth flow. inIframe:', inIframe, 'callbackUrl:', callbackUrl, 'scopes:', requestedScopes);
