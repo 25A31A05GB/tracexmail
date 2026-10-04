@@ -227,8 +227,14 @@ export interface EvidenceVaultRecord {
 
 export interface RealSenderIpInfo {
   ip: string | null;
-  /** Which header the IP was recovered from, e.g. "X-Originating-IP" */
+  /** Which header the IP was recovered from, e.g. "X-Originating-IP", "Received (ESMTPSA)" */
   ipSource: string | null;
+  originClassification?: 'AUTHENTICATED_MUA_CLIENT' | 'EXPLICIT_HEADER_STAMPED' | 'DIRECT_SMTP_EGRESS' | 'WEBMAIL_MASKED_DATACENTER' | 'INTRANET_PRIVATE_RFC1918';
+  clientSoftware?: string | null;
+  timezoneOffset?: string | null;
+  timezoneAnomaly?: boolean;
+  privacyMaskingActive?: boolean;
+  privacyProviderNotice?: string | null;
   city: string | null;
   region: string | null;
   country: string | null;

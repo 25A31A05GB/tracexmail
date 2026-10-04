@@ -1529,6 +1529,7 @@ export function OverviewView({
         <GeoTracerUtility 
           hops={safeHops} 
           originHop={effectiveOriginHop} 
+          realSenderIp={analysis.realSenderIp}
           className="my-2"
         />
 

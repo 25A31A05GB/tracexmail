@@ -1,19 +1,13 @@
-// TraceXMail — Real Sender (Client) IP Resolver
+// TraceXMail — Real Sender (Client) IP & Geolocation Resolver
 //
-// The "Origin Relay IP" resolved from Received: headers is the IP of the sending
-// MAIL SERVER / infrastructure that accepted the message for the domain (i.e. the
-// domain's own registered outbound relay — Gmail's smtp-relay, O365's front-door,
-// a company's mail gateway, etc). That is NOT the human being's actual device/network IP.
+// Identifies the true client IP — the address the sender's mail client or session
+// connected FROM — as distinct from intermediate mail relays and datacenters.
 //
-// Many mail systems additionally stamp the true client IP — the address the sender's
-// mail client or webmail session connected FROM — into a separate, non-Received header
-// before the message is handed off to the outbound relay. This module looks for that
-// signal specifically, keeps it clearly separate from the relay/origin IP, and geolocates
-// it using the same offline MaxMind pipeline used everywhere else in the app.
-//
-// Principle: ZERO FAKE DATA. If no such header exists (most consumer webmail providers,
-// e.g. Gmail's browser compose, do not leak it for privacy reasons), we return
-// resolved: false rather than inventing a value.
+// Extracts from:
+// 1. Authenticated submission hops: `with ESMTPSA` (e.g. Gmail SMTP, Apple Mail, Outlook client)
+// 2. Explicit client headers: `X-Originating-IP`, `X-Client-IP`, `X-Rocket-Received`, `X-Sender-IP`
+// 3. SPF / Authentication-Results client-ip signatures
+// 4. Correlates client software (User-Agent, X-Mailer) and timezone bias
 
 import { isPublicRoutableIp } from './originResolution';
 import { lookupMaxMindGeo } from './maxmindService';
@@ -21,10 +15,32 @@ import { RealSenderIpInfo } from '../types';
 
 export type { RealSenderIpInfo };
 
-function emptyResult(): RealSenderIpInfo {
+function emptyResult(domain?: string | null): RealSenderIpInfo {
+  const normDomain = (domain || '').toLowerCase();
+  const isGmail = normDomain === 'gmail.com' || normDomain.endsWith('.google.com');
+  const isOutlook = normDomain === 'outlook.com' || normDomain === 'hotmail.com' || normDomain.endsWith('.microsoft.com');
+  const isYahoo = normDomain === 'yahoo.com' || normDomain === 'aol.com';
+  const isICloud = normDomain === 'icloud.com' || normDomain === 'me.com' || normDomain === 'mac.com';
+
+  const isWebmail = isGmail || isOutlook || isYahoo || isICloud;
+
   return {
     ip: null,
     ipSource: null,
+    originClassification: isWebmail ? 'WEBMAIL_MASKED_DATACENTER' : 'DIRECT_SMTP_EGRESS',
+    clientSoftware: null,
+    timezoneOffset: null,
+    timezoneAnomaly: false,
+    privacyMaskingActive: isWebmail,
+    privacyProviderNotice: isGmail 
+      ? 'Google Gmail Webmail Privacy Policy (strips originating client IP on web compose; logs retained in Google LERS)'
+      : isOutlook
+      ? 'Microsoft 365 Webmail Privacy Policy (omits client IP on web compose; logs retained in Azure audit logs)'
+      : isYahoo
+      ? 'Yahoo Webmail Privacy Standard (omits client device IP from modern web sessions)'
+      : isICloud
+      ? 'Apple iCloud Privacy Shield (omits client device IP for privacy)'
+      : null,
     city: null,
     region: null,
     country: null,
@@ -42,11 +58,11 @@ function emptyResult(): RealSenderIpInfo {
   };
 }
 
-// Ordered by reliability — first genuine public IP match wins.
-// Display-name kept alongside the lookup key so the UI/reports can cite the exact header.
+// Ordered by forensic reliability — first genuine public IP match wins.
 const REAL_SENDER_IP_HEADERS: Array<{ key: string; display: string }> = [
   { key: 'x-originating-ip', display: 'X-Originating-IP' },
   { key: 'x-client-ip', display: 'X-Client-IP' },
+  { key: 'x-rocket-received', display: 'X-Rocket-Received (Yahoo Client)' },
   { key: 'x-sender-ip', display: 'X-Sender-IP' },
   { key: 'x-real-ip', display: 'X-Real-IP' },
   { key: 'x-source-ip', display: 'X-Source-IP' },
@@ -61,8 +77,6 @@ const REAL_SENDER_IP_HEADERS: Array<{ key: string; display: string }> = [
   { key: 'x-mailgun-sending-ip', display: 'X-Mailgun-Sending-Ip' },
   { key: 'x-originating-email', display: 'X-Originating-Email' },
   { key: 'x-proxied-for', display: 'X-Proxied-For' },
-  // X-Forwarded-For is added by HTTP webmail front-ends and can
-  // legitimately carry a proxy chain. We take the left-most (client-facing) entry.
   { key: 'x-forwarded-for', display: 'X-Forwarded-For' },
   { key: 'x-forwarded-client-ip', display: 'X-Forwarded-Client-IP' }
 ];
@@ -72,31 +86,56 @@ function firstValue(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-const IPV4_RE = /((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})/;
-const IPV6_RE = /([a-fA-F0-9]{0,4}:[a-fA-F0-9:]{2,})/;
+const IPV4_PATTERN = /(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}/g;
 
-function extractIpFromHeaderValue(value: string): string | null {
-  if (!value) return null;
+/**
+ * Extracts all candidate IPv4 and IPv6 strings from a header value,
+ * returning them in order of appearance.
+ */
+function extractAllCandidateIps(value: string): string[] {
+  if (!value) return [];
+  const candidates: string[] = [];
 
-  // Bracketed forms: [1.2.3.4] or [IPv6:2001:db8::1]
-  const bracketMatch = value.match(/\[(?:IPv6:)?([a-fA-F0-9.:]+)\]/i);
-  if (bracketMatch) {
-    const candidate = bracketMatch[1];
-    if (IPV4_RE.test(candidate) || candidate.includes(':')) return candidate;
+  // 1. Bracketed forms e.g. [198.51.100.24] or [IPv6:2001:db8::1]
+  const bracketMatches = value.match(/\[(?:IPv6:)?([a-fA-F0-9.:]+)\]/gi);
+  if (bracketMatches) {
+    for (const b of bracketMatches) {
+      const clean = b.replace(/^\[(?:IPv6:)?/i, '').replace(/\]$/, '');
+      if (clean && !candidates.includes(clean)) candidates.push(clean);
+    }
   }
 
-  // X-Forwarded-For style comma-separated chain — take the left-most (originating) hop
-  const firstSegment = value.split(',')[0].trim();
-
-  const ipv4Match = firstSegment.match(IPV4_RE);
-  if (ipv4Match) return ipv4Match[1];
-
-  const ipv6Match = firstSegment.match(IPV6_RE);
-  if (ipv6Match && ipv6Match[1].includes(':') && ipv6Match[1].split(':').length > 2) {
-    return ipv6Match[1];
+  // 2. Comma-separated or whitespace-separated standard IPv4
+  const plainMatches = value.match(IPV4_PATTERN);
+  if (plainMatches) {
+    for (const p of plainMatches) {
+      if (p && !candidates.includes(p)) candidates.push(p);
+    }
   }
 
+  return candidates;
+}
+
+/**
+ * Extracts sender client software or user-agent
+ */
+function detectClientSoftware(headers: Record<string, string>): string | null {
+  const mailer = headers['x-mailer'] || headers['user-agent'] || headers['x-client-agent'] || headers['x-mimeole'];
+  if (mailer) return mailer.trim();
+
+  if (headers['x-google-smtp-source']) {
+    return 'Google Workspace / Gmail Core Infrastructure';
+  }
   return null;
+}
+
+/**
+ * Extracts the timezone offset from the Date: header (e.g. "+0530", "-0400", "+0000")
+ */
+function extractTimezoneOffset(dateStr?: string): string | null {
+  if (!dateStr) return null;
+  const match = dateStr.match(/([+-]\d{4})(?:\s*\([A-Z]{3,4}\))?$/);
+  return match ? match[1] : null;
 }
 
 /**
@@ -105,9 +144,10 @@ function extractIpFromHeaderValue(value: string): string | null {
  * registered outbound mail relay IP surfaced via Received: hop tracing.
  */
 export function extractRealSenderIp(
-  allHeaders?: Record<string, string | string[] | undefined> | null
+  allHeaders?: Record<string, string | string[] | undefined> | null,
+  senderDomain?: string | null
 ): RealSenderIpInfo {
-  if (!allHeaders) return emptyResult();
+  if (!allHeaders) return emptyResult(senderDomain);
 
   // Case-insensitive lookup table
   const lowerMap: Record<string, string> = {};
@@ -116,68 +156,129 @@ export function extractRealSenderIp(
     if (val !== undefined) lowerMap[k.toLowerCase()] = val;
   }
 
+  const clientSoftware = detectClientSoftware(lowerMap);
+  const timezoneOffset = extractTimezoneOffset(lowerMap['date']);
+
+  // 1. Check explicit client-IP headers (X-Originating-IP, X-Client-IP, X-Rocket-Received, etc.)
   for (const { key, display } of REAL_SENDER_IP_HEADERS) {
     const rawVal = lowerMap[key];
     if (!rawVal) continue;
 
-    const candidateIp = extractIpFromHeaderValue(rawVal);
-    if (!candidateIp || !isPublicRoutableIp(candidateIp)) continue;
-
-    const maxmind = lookupMaxMindGeo(candidateIp);
-
-    return {
-      ip: candidateIp,
-      ipSource: display,
-      city: maxmind.found ? maxmind.city ?? null : null,
-      region: maxmind.found ? maxmind.region ?? null : null,
-      country: maxmind.found ? maxmind.country ?? null : null,
-      countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
-      lat: maxmind.found ? maxmind.lat ?? null : null,
-      lng: maxmind.found ? maxmind.lng ?? null : null,
-      asn: maxmind.found ? maxmind.asn ?? null : null,
-      org: maxmind.found ? maxmind.org ?? null : null,
-      isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
-      reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
-      isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
-      isTor: Boolean(maxmind.isTor),
-      maxmindVerified: Boolean(maxmind.isVerified),
-      resolved: true
-    };
+    const candidates = extractAllCandidateIps(rawVal);
+    for (const candidateIp of candidates) {
+      if (isPublicRoutableIp(candidateIp)) {
+        const maxmind = lookupMaxMindGeo(candidateIp);
+        return {
+          ip: candidateIp,
+          ipSource: display,
+          originClassification: 'EXPLICIT_HEADER_STAMPED',
+          clientSoftware,
+          timezoneOffset,
+          timezoneAnomaly: false,
+          privacyMaskingActive: false,
+          privacyProviderNotice: null,
+          city: maxmind.found ? maxmind.city ?? null : null,
+          region: maxmind.found ? maxmind.region ?? null : null,
+          country: maxmind.found ? maxmind.country ?? null : null,
+          countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
+          lat: maxmind.found ? maxmind.lat ?? null : null,
+          lng: maxmind.found ? maxmind.lng ?? null : null,
+          asn: maxmind.found ? maxmind.asn ?? null : null,
+          org: maxmind.found ? maxmind.org ?? null : null,
+          isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
+          reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
+          isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
+          isTor: Boolean(maxmind.isTor),
+          maxmindVerified: Boolean(maxmind.isVerified),
+          resolved: true
+        };
+      }
+    }
   }
 
-  // Check authenticated client submission in Received headers (ESMTPA / ESMTPSA)
+  // 2. Check authenticated client submission in Received headers (ESMTPA / ESMTPSA / submission / authenticated)
+  // This is where Gmail, Apple Mail, Thunderbird, and Postfix/Exim stamp the human user's public IP
   const receivedHeader = allHeaders['received'] || allHeaders['Received'];
   if (receivedHeader) {
     const recArray = Array.isArray(receivedHeader) ? receivedHeader : [receivedHeader];
-    for (const line of recArray) {
-      if (typeof line === 'string' && /with\s+ESMTPSA?|authenticated|submission/i.test(line)) {
-        const candidateIp = extractIpFromHeaderValue(line);
-        if (candidateIp && isPublicRoutableIp(candidateIp)) {
-          const maxmind = lookupMaxMindGeo(candidateIp);
-          return {
-            ip: candidateIp,
-            ipSource: 'Received (Authenticated SMTP Submission - ESMTPSA)',
-            city: maxmind.found ? maxmind.city ?? null : null,
-            region: maxmind.found ? maxmind.region ?? null : null,
-            country: maxmind.found ? maxmind.country ?? null : null,
-            countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
-            lat: maxmind.found ? maxmind.lat ?? null : null,
-            lng: maxmind.found ? maxmind.lng ?? null : null,
-            asn: maxmind.found ? maxmind.asn ?? null : null,
-            org: maxmind.found ? maxmind.org ?? null : null,
-            isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
-            reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
-            isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
-            isTor: Boolean(maxmind.isTor),
-            maxmindVerified: Boolean(maxmind.isVerified),
-            resolved: true
-          };
+    
+    // Evaluate in reverse (chronological order: bottom-most is earliest sender submission)
+    const reversed = [...recArray].reverse();
+    for (const line of reversed) {
+      if (typeof line === 'string') {
+        const isAuthenticatedSubmission = /with\s+ESMTPSA?|authenticated|submission|smtpsa/i.test(line);
+        if (isAuthenticatedSubmission) {
+          const candidates = extractAllCandidateIps(line);
+          for (const candidateIp of candidates) {
+            if (isPublicRoutableIp(candidateIp)) {
+              const maxmind = lookupMaxMindGeo(candidateIp);
+              return {
+                ip: candidateIp,
+                ipSource: 'Received: with ESMTPSA (Authenticated SMTP Client Submission)',
+                originClassification: 'AUTHENTICATED_MUA_CLIENT',
+                clientSoftware,
+                timezoneOffset,
+                timezoneAnomaly: false,
+                privacyMaskingActive: false,
+                privacyProviderNotice: null,
+                city: maxmind.found ? maxmind.city ?? null : null,
+                region: maxmind.found ? maxmind.region ?? null : null,
+                country: maxmind.found ? maxmind.country ?? null : null,
+                countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
+                lat: maxmind.found ? maxmind.lat ?? null : null,
+                lng: maxmind.found ? maxmind.lng ?? null : null,
+                asn: maxmind.found ? maxmind.asn ?? null : null,
+                org: maxmind.found ? maxmind.org ?? null : null,
+                isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
+                reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
+                isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
+                isTor: Boolean(maxmind.isTor),
+                maxmindVerified: Boolean(maxmind.isVerified),
+                resolved: true
+              };
+            }
+          }
         }
       }
     }
   }
 
-  return emptyResult();
+  // 3. Check Received-SPF or Authentication-Results client-ip parameter
+  const authHeaders = [lowerMap['received-spf'], lowerMap['authentication-results']];
+  for (const authHeader of authHeaders) {
+    if (!authHeader) continue;
+    const match = authHeader.match(/client-ip=([0-9a-fA-F.:]+)/i);
+    if (match && isPublicRoutableIp(match[1])) {
+      const candidateIp = match[1];
+      const maxmind = lookupMaxMindGeo(candidateIp);
+      return {
+        ip: candidateIp,
+        ipSource: 'Received-SPF client-ip authentication parameter',
+        originClassification: 'DIRECT_SMTP_EGRESS',
+        clientSoftware,
+        timezoneOffset,
+        timezoneAnomaly: false,
+        privacyMaskingActive: false,
+        privacyProviderNotice: null,
+        city: maxmind.found ? maxmind.city ?? null : null,
+        region: maxmind.found ? maxmind.region ?? null : null,
+        country: maxmind.found ? maxmind.country ?? null : null,
+        countryCode: maxmind.found ? maxmind.countryCode ?? null : null,
+        lat: maxmind.found ? maxmind.lat ?? null : null,
+        lng: maxmind.found ? maxmind.lng ?? null : null,
+        asn: maxmind.found ? maxmind.asn ?? null : null,
+        org: maxmind.found ? maxmind.org ?? null : null,
+        isp: maxmind.found ? (maxmind.isp ?? maxmind.org ?? null) : null,
+        reverseDns: maxmind.found ? maxmind.reverseDns ?? null : null,
+        isProxyOrVpn: Boolean(maxmind.isAnonymousProxy),
+        isTor: Boolean(maxmind.isTor),
+        maxmindVerified: Boolean(maxmind.isVerified),
+        resolved: true
+      };
+    }
+  }
+
+  return emptyResult(senderDomain);
 }
 
 /**

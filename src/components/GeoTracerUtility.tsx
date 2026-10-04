@@ -21,14 +21,21 @@ import {
   Sparkles, 
   AlertTriangle,
   Info,
-  Maximize2
+  Maximize2,
+  Lock,
+  UserCheck,
+  Cpu,
+  Fingerprint,
+  Radio,
+  FileText
 } from 'lucide-react';
-import { EmailHop } from '../types';
+import { EmailHop, RealSenderIpInfo } from '../types';
 import { lookupMaxMindGeo, MAXMIND_COPYRIGHT, MAXMIND_LICENSE, MaxMindGeoResolution } from '../utils/maxmindService';
 
 interface GeoTracerUtilityProps {
   hops: EmailHop[];
   originHop?: any;
+  realSenderIp?: RealSenderIpInfo;
   className?: string;
 }
 
@@ -47,8 +54,8 @@ function calculateHaversineKm(lat1: number, lon1: number, lat2: number, lon2: nu
   return Math.round(R * c);
 }
 
-export function GeoTracerUtility({ hops = [], originHop, className = '' }: GeoTracerUtilityProps) {
-  // Active selected hop index (defaults to 0 or origin)
+export function GeoTracerUtility({ hops = [], originHop, realSenderIp, className = '' }: GeoTracerUtilityProps) {
+  // Active selected hop index (defaults to 0)
   const [activeHopIndex, setActiveHopIndex] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
@@ -158,7 +165,7 @@ export function GeoTracerUtility({ hops = [], originHop, className = '' }: GeoTr
               <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                 <span>Geo-Tracer</span>
                 <span className="text-slate-500 font-normal">|</span>
-                <span className="text-sm font-medium text-slate-300">Hop-by-Hop Origin Path Mapping</span>
+                <span className="text-sm font-medium text-slate-300">Origin Client & Relay Telemetry</span>
               </h3>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 flex items-center gap-1">
                 <Database className="w-3 h-3 text-blue-400" />
@@ -166,7 +173,7 @@ export function GeoTracerUtility({ hops = [], originHop, className = '' }: GeoTr
               </span>
             </div>
             <p className="text-xs text-slate-400 font-mono mt-0.5">
-              Chronologically evaluates each MTA transmission hop against MaxMind geolocation, ASN routes, and transfer latency.
+              Demarcates real human sender client IP vs intermediate MTA mail relays, evaluating physical location and boundary traversal.
             </p>
           </div>
         </div>
@@ -189,6 +196,126 @@ export function GeoTracerUtility({ hops = [], originHop, className = '' }: GeoTr
             <Clock className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-slate-400">Transit Delay:</span>
             <span className="font-bold text-amber-300">{totalTransmissionDelaySec.toFixed(1)}s</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Origin Demarcation Hero Panel (Real Sender Client vs Mail Server) */}
+      <div className="p-4 sm:p-5 bg-gradient-to-b from-[#1b1712] to-[#15120e] border-b border-[#3a352c]/80">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${realSenderIp?.resolved ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+              <Fingerprint className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2 flex-wrap">
+                <span>Sender Client Demarcation</span>
+                {realSenderIp?.resolved ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    AUTHENTICATED SENDER IP RECOVERED
+                  </span>
+                ) : realSenderIp?.privacyMaskingActive ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30">
+                    WEBMAIL PRIVACY SHIELD ACTIVE
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 border border-slate-700">
+                    DIRECT SMTP RELAY EGRESS
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                {realSenderIp?.resolved
+                  ? `True originating client IP disclosed via ${realSenderIp.ipSource}.`
+                  : realSenderIp?.privacyMaskingActive
+                  ? realSenderIp.privacyProviderNotice
+                  : 'No client device IP disclosed in headers; tracing begins at outbound network gateway.'}
+              </p>
+            </div>
+          </div>
+
+          {/* Client Software / User-Agent if detected */}
+          {realSenderIp?.clientSoftware && (
+            <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-2 self-start lg:self-auto">
+              <Cpu className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-slate-400">Mailer:</span>
+              <span className="font-bold text-white truncate max-w-[200px]">{realSenderIp.clientSoftware}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Real Sender IP Attributes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-3 font-mono text-xs">
+          {/* IP Card */}
+          <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-[10px] uppercase text-slate-400 font-bold">Client IP Address</div>
+            <div className="text-sm font-bold text-white mt-1 flex items-center gap-1.5">
+              <span>{realSenderIp?.ip || enrichedHops[0]?.fromIp || 'Unresolved'}</span>
+              {(realSenderIp?.ip || enrichedHops[0]?.fromIp) && (
+                <button
+                  type="button"
+                  onClick={() => handleCopy(realSenderIp?.ip || enrichedHops[0]?.fromIp || '')}
+                  className="text-slate-500 hover:text-slate-300 p-0.5 cursor-pointer"
+                  title="Copy IP"
+                >
+                  {copiedText === (realSenderIp?.ip || enrichedHops[0]?.fromIp) ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate mt-0.5">
+              {realSenderIp?.reverseDns || enrichedHops[0]?.reverseDns || 'No PTR Record'}
+            </div>
+          </div>
+
+          {/* Physical Location */}
+          <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-[10px] uppercase text-slate-400 font-bold">Physical Location</div>
+            <div className="text-sm font-bold text-rose-400 mt-1 flex items-center gap-1.5 truncate">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {realSenderIp?.city || enrichedHops[0]?.city || 'Unmapped City'}, {realSenderIp?.country || enrichedHops[0]?.country || 'Unknown'}
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-0.5">
+              {realSenderIp?.countryCode || enrichedHops[0]?.countryCode || 'UN'} • MaxMind Verified
+            </div>
+          </div>
+
+          {/* Coordinates */}
+          <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-[10px] uppercase text-slate-400 font-bold">GPS Coordinates</div>
+            <div className="text-sm font-bold text-cyan-400 mt-1 truncate">
+              {typeof (realSenderIp?.lat ?? enrichedHops[0]?.lat) === 'number' &&
+              typeof (realSenderIp?.lng ?? enrichedHops[0]?.lng) === 'number'
+                ? `${(realSenderIp?.lat ?? enrichedHops[0]?.lat)!.toFixed(4)}°, ${(realSenderIp?.lng ?? enrichedHops[0]?.lng)!.toFixed(4)}°`
+                : 'Private Subnet (No Public GPS)'}
+            </div>
+            {typeof (realSenderIp?.lat ?? enrichedHops[0]?.lat) === 'number' && (
+              <a
+                href={`https://www.google.com/maps?q=${realSenderIp?.lat ?? enrichedHops[0]?.lat},${realSenderIp?.lng ?? enrichedHops[0]?.lng}&z=10`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-blue-400 hover:underline flex items-center gap-1 mt-0.5 font-sans"
+              >
+                <span>View on Maps</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            )}
+          </div>
+
+          {/* Carrier / Telecom ISP */}
+          <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-[10px] uppercase text-slate-400 font-bold">Telecom Carrier / ASN</div>
+            <div className="text-sm font-bold text-slate-200 mt-1 truncate">
+              {realSenderIp?.asn || enrichedHops[0]?.asn || 'AS Unknown'}
+            </div>
+            <div className="text-[10px] text-slate-400 truncate mt-0.5">
+              {realSenderIp?.org || enrichedHops[0]?.org || 'Unmapped Organization'}
+            </div>
           </div>
         </div>
       </div>
