@@ -36,7 +36,8 @@ import {
   Layers,
   Users,
   Crosshair,
-  Zap
+  Zap,
+  Mail
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { sha256Sync } from '../utils/crypto';
@@ -62,6 +63,7 @@ import { BlastRadiusMatrix } from './BlastRadiusMatrix';
 import { MitreAttackDossier } from './MitreAttackDossier';
 import { SoarPlaybookConsole } from './SoarPlaybookConsole';
 import { LegalCustodyCertificate } from './LegalCustodyCertificate';
+import { GmailSecurityDefenseHub } from './GmailSecurityDefenseHub';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -77,6 +79,7 @@ export type ReportTab =
   | 'mitre_attack'
   | 'soar_playbook'
   | 'legal_custody'
+  | 'gmail_defense'
   | 'soc_report'
   | 'institutional'
   | 'legal'
@@ -456,6 +459,17 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
               <span>FRE 902 Certificate</span>
             </button>
             <button
+              onClick={() => setActiveTab('gmail_defense')}
+              className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'gmail_defense'
+                  ? 'border-indigo-400 text-indigo-300 bg-indigo-950/20'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Gmail Defense &amp; Hunting</span>
+            </button>
+            <button
               onClick={() => setActiveTab('soc_report')}
               className={`flex items-center gap-1.5 pb-2.5 px-2 text-xs font-semibold border-b-2 transition-colors ${
                 activeTab === 'soc_report'
@@ -613,6 +627,11 @@ export function ReportModal({ isOpen, onClose, analysis, privacyConfig = DEFAULT
           {/* TAB: FRE 902 / ISO 27037 LEGAL CERTIFICATE */}
           {activeTab === 'legal_custody' && (
             <LegalCustodyCertificate analysis={analysis} />
+          )}
+
+          {/* TAB: GMAIL DEFENSE & THREAT HUNTING */}
+          {activeTab === 'gmail_defense' && (
+            <GmailSecurityDefenseHub analysis={analysis} />
           )}
 
           {/* TAB: GEMINI SOC ANALYST REPORT */}

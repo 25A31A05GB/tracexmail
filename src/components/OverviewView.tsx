@@ -60,6 +60,7 @@ import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
 import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
 import { CaseTagManager } from './CaseTagManager';
 import { EnterpriseForensicDossier } from './EnterpriseForensicDossier';
+import { GeoTracerUtility } from './GeoTracerUtility';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -518,11 +519,11 @@ export function OverviewView({
       reverseDns: originHopRaw.reverseDns || geo.reverseDns || 'No PTR Record',
       abuseScore: originHopRaw.abuseScore ?? 0,
       abuseStatus: originHopRaw.abuseStatus,
-      is_tor: originHopRaw.is_tor ?? originHopRaw.isProxyOrVpn ?? geo.isTor ?? false,
-      is_vpn: originHopRaw.is_vpn ?? false,
+      is_tor: Boolean(originHopRaw.is_tor || originHopRaw.isTorExitNode || geo.isTor),
+      is_vpn: Boolean(originHopRaw.is_vpn || originHopRaw.isProxyOrVpn || (originHopRaw.infra === 'vpn')) && !originHopRaw.is_tor && !geo.isTor,
       is_open_relay: originHopRaw.is_open_relay ?? false,
-      is_botnet_indicator: originHopRaw.is_botnet_indicator ?? false,
-      is_cloud: originHopRaw.is_cloud ?? false,
+      is_botnet_indicator: Boolean(originHopRaw.is_botnet_indicator),
+      is_cloud: Boolean(originHopRaw.is_cloud || (originHopRaw.infra === 'hosting')),
       isPrivate: false,
       isRfc1918: false,
       subnetType: 'Public Internet',
@@ -1523,6 +1524,13 @@ export function OverviewView({
             </div>
           </div>
         </div>
+
+        {/* Geo-Tracer: Hop-by-Hop Origin Path Mapping Utility */}
+        <GeoTracerUtility 
+          hops={safeHops} 
+          originHop={effectiveOriginHop} 
+          className="my-2"
+        />
 
         {/* Domain Intelligence Card */}
         <div id="domain-intelligence-card" className="bg-[#1a1712] border border-[#3a352c] rounded-lg flex flex-col overflow-hidden shadow-sm">

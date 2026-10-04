@@ -10,7 +10,8 @@ import {
   Sparkles,
   FileCheck2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Mail
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SafeEmailSandbox } from './SafeEmailSandbox';
@@ -18,6 +19,7 @@ import { BlastRadiusMatrix } from './BlastRadiusMatrix';
 import { MitreAttackDossier } from './MitreAttackDossier';
 import { SoarPlaybookConsole } from './SoarPlaybookConsole';
 import { LegalCustodyCertificate } from './LegalCustodyCertificate';
+import { GmailSecurityDefenseHub } from './GmailSecurityDefenseHub';
 
 interface EnterpriseForensicDossierProps {
   analysis: EmailAnalysis;
@@ -30,7 +32,7 @@ export function EnterpriseForensicDossier({
   onOpenReportModal,
   className = ''
 }: EnterpriseForensicDossierProps) {
-  const [activeTab, setActiveTab] = useState<'sandbox' | 'blast_radius' | 'mitre' | 'soar' | 'custody'>('sandbox');
+  const [activeTab, setActiveTab] = useState<'sandbox' | 'blast_radius' | 'mitre' | 'soar' | 'custody' | 'gmail_hub'>('sandbox');
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   return (
@@ -152,6 +154,19 @@ export function EnterpriseForensicDossier({
               <Scale className="w-3.5 h-3.5 text-teal-400" />
               <span>FRE 902 Certificate</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('gmail_hub')}
+              className={`flex items-center gap-1.5 pb-2.5 px-3 text-xs font-mono font-semibold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${
+                activeTab === 'gmail_hub'
+                  ? 'border-indigo-400 text-indigo-300 bg-indigo-950/20 rounded-t'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Mail className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Gmail Defense &amp; Hunting</span>
+            </button>
           </div>
 
           {/* Tab Content Display */}
@@ -174,6 +189,10 @@ export function EnterpriseForensicDossier({
 
             {activeTab === 'custody' && (
               <LegalCustodyCertificate analysis={analysis} />
+            )}
+
+            {activeTab === 'gmail_hub' && (
+              <GmailSecurityDefenseHub analysis={analysis} />
             )}
           </div>
         </>

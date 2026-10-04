@@ -284,6 +284,7 @@ const state: GmailServiceState = {
   activeScopes: process.env.GMAIL_USER_EMAIL ? [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.settings.basic',
     'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ] : [],
@@ -510,6 +511,7 @@ export function refreshOAuthPermissionsState(options?: {
   state.activeScopes = options?.scopes || [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.modify',
+    'https://www.googleapis.com/auth/gmail.settings.basic',
     'https://www.googleapis.com/auth/gmail.insert',
     'https://www.googleapis.com/auth/userinfo.email'
   ];
@@ -2828,5 +2830,195 @@ export function setAutoSyncConfig(enabled: boolean, intervalSeconds?: number) {
     stopAutoSyncLoop();
   }
   return getAutoSyncConfig();
+}
+
+/**
+ * Creates or retrieves the 'TraceXMail/QUARANTINED' label in the user's Gmail mailbox.
+ */
+export async function createOrGetQuarantineLabel(overrideToken?: string): Promise<{ labelId: string; name: string }> {
+  const token = overrideToken || await ensureFreshAccessToken();
+  if (!token) throw new Error('Gmail authentication required. Please connect your Gmail account.');
+
+  // Check existing labels
+  const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!listRes.ok) {
+    throw new Error(`Failed to list Gmail labels: HTTP ${listRes.status}`);
+  }
+
+  const listData = await listRes.json();
+  const existing = (listData.labels || []).find((l: any) => l.name === 'TraceXMail/QUARANTINED' || l.name === 'QUARANTINED');
+  if (existing) {
+    return { labelId: existing.id, name: existing.name };
+  }
+
+  // Create the label with prominent red security styling
+  const createRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: 'TraceXMail/QUARANTINED',
+      labelListVisibility: 'labelShow',
+      messageListVisibility: 'show',
+      color: {
+        backgroundColor: '#cc3a21',
+        textColor: '#ffffff'
+      }
+    })
+  });
+
+  if (!createRes.ok) {
+    // If creation fails due to duplicate name collision, fallback to generic QUARANTINED
+    const errData = await createRes.json().catch(() => ({}));
+    if (errData?.error?.message?.includes('already exists')) {
+      const fallbackList = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json());
+      const matched = (fallbackList.labels || []).find((l: any) => l.name?.includes('QUARANTINED'));
+      if (matched) return { labelId: matched.id, name: matched.name };
+    }
+    throw new Error(`Failed to create Gmail quarantine label: ${errData?.error?.message || createRes.statusText}`);
+  }
+
+  const created = await createRes.json();
+  return { labelId: created.id, name: created.name };
+}
+
+/**
+ * Quarantines an email in Gmail: strips INBOX, marks read, and attaches the TraceXMail/QUARANTINED label.
+ */
+export async function quarantineGmailMessage(messageId: string, overrideToken?: string): Promise<{ success: boolean; labelApplied: string }> {
+  const token = overrideToken || await ensureFreshAccessToken();
+  if (!token) throw new Error('Gmail authentication required.');
+
+  const { labelId, name } = await createOrGetQuarantineLabel(token);
+
+  const modifyRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/modify`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      addLabelIds: [labelId],
+      removeLabelIds: ['INBOX', 'UNREAD']
+    })
+  });
+
+  if (!modifyRes.ok) {
+    const err = await modifyRes.json().catch(() => ({}));
+    throw new Error(`Failed to modify Gmail message: ${err?.error?.message || modifyRes.statusText}`);
+  }
+
+  return { success: true, labelApplied: name };
+}
+
+/**
+ * Creates a native Gmail filter that automatically sends all future emails from a sender or domain to Trash.
+ */
+export async function createGmailBlockFilter(fromCriteria: string, overrideToken?: string): Promise<{ success: boolean; filterId: string }> {
+  const token = overrideToken || await ensureFreshAccessToken();
+  if (!token) throw new Error('Gmail authentication required.');
+
+  const filterRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/settings/filters', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      criteria: {
+        from: fromCriteria
+      },
+      action: {
+        removeLabelIds: ['INBOX'],
+        addLabelIds: ['TRASH']
+      }
+    })
+  });
+
+  if (!filterRes.ok) {
+    const err = await filterRes.json().catch(() => ({}));
+    throw new Error(`Failed to create Gmail filter: ${err?.error?.message || filterRes.statusText}`);
+  }
+
+  const data = await filterRes.json();
+  return { success: true, filterId: data.id };
+}
+
+/**
+ * Executes a threat-hunting search across the connected Gmail inbox using Google's native search operators.
+ */
+export async function searchGmailMessages(query: string, overrideToken?: string): Promise<any[]> {
+  const token = overrideToken || await ensureFreshAccessToken();
+  if (!token) throw new Error('Gmail authentication required.');
+
+  const searchRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=15`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!searchRes.ok) {
+    const err = await searchRes.json().catch(() => ({}));
+    throw new Error(`Gmail search failed: ${err?.error?.message || searchRes.statusText}`);
+  }
+
+  const listData = await searchRes.json();
+  const messages = listData.messages || [];
+  if (messages.length === 0) return [];
+
+  // Fetch headers for top results concurrently
+  const details = await Promise.all(
+    messages.slice(0, 10).map(async (m: { id: string }) => {
+      try {
+        const itemRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=Message-ID`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!itemRes.ok) return null;
+        const itemData = await itemRes.json();
+        const headers = itemData.payload?.headers || [];
+        const getHeader = (name: string) => headers.find((h: any) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+        return {
+          id: itemData.id,
+          threadId: itemData.threadId,
+          snippet: itemData.snippet,
+          subject: getHeader('Subject') || '(No Subject)',
+          from: getHeader('From') || 'Unknown',
+          date: getHeader('Date') || '',
+          messageId: getHeader('Message-ID') || '',
+          labelIds: itemData.labelIds || []
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return details.filter(Boolean);
+}
+
+/**
+ * Trashes an email in Gmail using the official users.messages.trash endpoint.
+ */
+export async function trashGmailMessage(messageId: string, overrideToken?: string): Promise<{ success: boolean }> {
+  const token = overrideToken || await ensureFreshAccessToken();
+  if (!token) throw new Error('Gmail authentication required.');
+
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(messageId)}/trash`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(`Failed to trash Gmail message: ${err?.error?.message || res.statusText}`);
+  }
+
+  return { success: true };
 }
 

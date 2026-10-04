@@ -103,7 +103,11 @@ import {
   updateQueueItemStatus,
   getAutoSyncConfig,
   setAutoSyncConfig,
-  IngestionQueueItem
+  IngestionQueueItem,
+  quarantineGmailMessage,
+  createGmailBlockFilter,
+  searchGmailMessages,
+  trashGmailMessage
 } from './src/server/gmailService';
 import {
   getSlackConfig,
@@ -1133,6 +1137,8 @@ async function parseRawEmailToAnalysis(
       isBlacklisted: ipIsSpamhaus || (geo.isBlacklisted ?? false),
       isProxyOrVpn: geo.isProxyOrVpn ?? false,
       isAnonymousProxy: geo.isProxyOrVpn ?? false,
+      is_vpn: Boolean((geo.infra === 'vpn' || geo.isProxyOrVpn) && !geo.isTor),
+      is_cloud: Boolean(geo.infra === 'hosting' || infraType === 'DATACENTER_HOSTING'),
       is_tor: geo.isTor ?? (cand.fromIp ? isTorExitNode(cand.fromIp) : false),
       isTorExitNode: geo.isTor ?? (cand.fromIp ? isTorExitNode(cand.fromIp) : false),
       is_botnet_indicator: ipIsSpamhaus,
@@ -5506,6 +5512,8 @@ Link: https://verify-auth-portal.net/login`;
       abuse_score: geo.abuseScore,
       is_blacklisted: geo.isBlacklisted,
       is_proxy_vpn: geo.isProxyOrVpn,
+      is_vpn: Boolean((geo.infra === 'vpn' || geo.isProxyOrVpn) && !geo.isTor),
+      is_cloud: Boolean(geo.infra === 'hosting'),
       is_tor: geo.isTor,
       maxmind_verified: true,
       maxmind_source: geo.source,
@@ -6649,6 +6657,71 @@ Thanks!`;
     } catch (err: any) {
       console.error('[GmailSyncConfig] Error updating auto sync config:', err);
       res.status(500).json({ status: 'error', error: err?.message || 'Failed to update sync config' });
+    }
+  });
+
+  // 14a. Quarantine Message in Gmail: strips INBOX, marks read, and adds TraceXMail/QUARANTINED label
+  app.post('/api/gmail/quarantine-message', authenticatedLimiter, async (req, res) => {
+    try {
+      const { messageId } = req.body;
+      if (!messageId) {
+        return res.status(400).json({ status: 'error', error: 'messageId is required' });
+      }
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const result = await quarantineGmailMessage(messageId, bearerToken);
+      res.json({ status: 'ok', ...result });
+    } catch (err: any) {
+      console.error('[GmailQuarantine] Error:', err);
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed to quarantine message' });
+    }
+  });
+
+  // 14b. Create Block Filter in Gmail: sends matching incoming emails directly to Trash
+  app.post('/api/gmail/create-filter', authenticatedLimiter, async (req, res) => {
+    try {
+      const { fromCriteria } = req.body;
+      if (!fromCriteria) {
+        return res.status(400).json({ status: 'error', error: 'fromCriteria is required' });
+      }
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const result = await createGmailBlockFilter(fromCriteria, bearerToken);
+      res.json({ status: 'ok', ...result });
+    } catch (err: any) {
+      console.error('[GmailCreateFilter] Error:', err);
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed to create block filter' });
+    }
+  });
+
+  // 14c. Search Gmail Messages for Threat Hunting
+  app.get('/api/gmail/search', authenticatedLimiter, async (req, res) => {
+    try {
+      const query = (req.query.q as string) || 'label:INBOX';
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const messages = await searchGmailMessages(query, bearerToken);
+      res.json({ status: 'ok', messages });
+    } catch (err: any) {
+      console.error('[GmailSearch] Error:', err);
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed to search messages' });
+    }
+  });
+
+  // 14d. Trash Message in Gmail
+  app.post('/api/gmail/trash-message', authenticatedLimiter, async (req, res) => {
+    try {
+      const { messageId } = req.body;
+      if (!messageId) {
+        return res.status(400).json({ status: 'error', error: 'messageId is required' });
+      }
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const result = await trashGmailMessage(messageId, bearerToken);
+      res.json({ status: 'ok', ...result });
+    } catch (err: any) {
+      console.error('[GmailTrash] Error:', err);
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed to trash message' });
     }
   });
 

@@ -61,7 +61,7 @@ async function resolvePtr(ip: string): Promise<string | undefined> {
   try {
     const ptrPromise = dns.promises.reverse(ip);
     const timeoutPromise = new Promise<string[]>((_, reject) =>
-      setTimeout(() => reject(new Error('DNS Timeout')), 600)
+      setTimeout(() => reject(new Error('DNS Timeout')), 1500)
     );
     const ptrs = await Promise.race([ptrPromise, timeoutPromise]);
     return ptrs.length > 0 ? ptrs[0] : undefined;
@@ -84,7 +84,7 @@ async function fetchFromIpApi(ip: string): Promise<Partial<GeoLocationResult> | 
   try {
     const url = `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query`;
     const response = await axios.get(url, {
-      timeout: 800,
+      timeout: 2500,
       headers: { 'User-Agent': 'TraceXMail-Forensic-Engine/1.0' }
     });
 
@@ -125,7 +125,7 @@ async function fetchFromIpWhoIs(ip: string): Promise<Partial<GeoLocationResult> 
   try {
     const url = `https://ipwho.is/${encodeURIComponent(ip)}`;
     const response = await axios.get(url, {
-      timeout: 800,
+      timeout: 2500,
       headers: { 'User-Agent': 'TraceXMail-Forensic-Engine/1.0' }
     });
 
@@ -170,7 +170,7 @@ async function fetchFromIpGeoLocationIo(ip: string): Promise<Partial<GeoLocation
   try {
     const url = `https://api.ipgeolocation.io/ipgeo?apiKey=${encodeURIComponent(apiKey)}&ip=${encodeURIComponent(ip)}`;
     const response = await axios.get(url, {
-      timeout: 800,
+      timeout: 2500,
       headers: { 'User-Agent': 'TraceXMail-Forensic-Engine/1.0' }
     });
 

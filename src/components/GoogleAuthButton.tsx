@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Loader2, ShieldCheck, Sparkles, X, ArrowRight } from 'lucide-react';
 import { signInWithGoogleOAuth, signInWithGoogleDemoSession } from '../lib/supabaseGoogleAuth';
+import { googleSignIn } from '../lib/firebaseClient';
 
 export interface GoogleAuthButtonProps {
   mode?: 'signin' | 'signup' | 'continue';
   variant?: 'primary' | 'secondary' | 'compact' | 'landing';
-  scopes?: string;
   onSuccess?: (user?: any) => void;
   onError?: (error: string) => void;
   className?: string;
@@ -41,7 +41,6 @@ export function GoogleGLogo({ className = "w-4 h-4" }: { className?: string }) {
 export function GoogleAuthButton({
   mode = 'signin',
   variant = 'primary',
-  scopes,
   onSuccess,
   onError,
   className = '',
@@ -69,7 +68,57 @@ export function GoogleAuthButton({
 
     setLoading(true);
     try {
-      const res = await signInWithGoogleOAuth({ scopes });
+      // 1. Primary: Use provisioned Google Workspace Firebase Auth with Gmail defense scopes
+      try {
+        const { user, accessToken } = await googleSignIn();
+        if (user && user.email) {
+          const localSession = {
+            token: accessToken,
+            user: {
+              id: user.uid,
+              email: user.email,
+              email_confirmed_at: new Date().toISOString(),
+              user_metadata: {
+                full_name: user.displayName || user.email.split('@')[0],
+                avatar_url: user.photoURL,
+                email: user.email,
+                role: 'analyst',
+                org_name: 'Enterprise SOC',
+                organization_name: 'Enterprise SOC'
+              }
+            },
+            profile: {
+              id: user.uid,
+              email: user.email,
+              full_name: user.displayName || user.email.split('@')[0],
+              role: 'analyst',
+              account_type: 'organization',
+              organization_id: 'org_user_' + user.uid.slice(0, 8),
+              email_verified: Boolean(user.emailVerified)
+            },
+            storedAt: Date.now()
+          };
+          localStorage.setItem('tracexmail_enclave_session', JSON.stringify(localSession));
+          localStorage.setItem('user_email', user.email);
+          localStorage.setItem('google_access_token', accessToken);
+
+          if (onSuccess) {
+            onSuccess(localSession.user);
+          } else {
+            window.location.reload();
+          }
+          return;
+        }
+      } catch (fbErr: any) {
+        console.warn('[GoogleAuthButton] Firebase popup failed or closed, checking fallback:', fbErr);
+        // If user actively cancelled popup, don't fallback to demo
+        if (fbErr?.code === 'auth/popup-closed-by-user') {
+          return;
+        }
+      }
+
+      // 2. Secondary fallback: Supabase OAuth
+      const res = await signInWithGoogleOAuth();
 
       if (res.success) {
         if (onSuccess) {
@@ -80,11 +129,11 @@ export function GoogleAuthButton({
       } else if (res.notConfigured) {
         setShowConfigModal(true);
         if (onError) {
-          onError(res.error || 'Supabase credentials are not configured.');
+          onError(res.error || 'Google credentials setup required.');
         }
       } else {
         if (onError) {
-          onError(res.error || 'Google authentication via Supabase failed.');
+          onError(res.error || 'Google authentication failed.');
         }
       }
     } catch (err: any) {

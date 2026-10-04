@@ -56,7 +56,7 @@ export function MapView({ analysis }: MapViewProps) {
 
   const hops = Array.isArray(analysis?.hops) ? analysis.hops : [];
   const validHops = hops.filter(
-    (h) => h?.lat !== undefined && h?.lng !== undefined && !(h?.lat === 0 && h?.lng === 0)
+    (h) => typeof h?.lat === 'number' && typeof h?.lng === 'number' && !isNaN(h.lat) && !isNaN(h.lng) && !(h.lat === 0 && h.lng === 0)
   );
 
   const handleCopyIp = (ip: string) => {
@@ -197,17 +197,21 @@ export function MapView({ analysis }: MapViewProps) {
     });
 
     // Draw connecting path polyline between hops if enabled
-    if (showArcs && latLngs.length > 1) {
-      L.polyline(latLngs, {
-        color: '#3B82F6',
-        weight: 3,
-        opacity: 0.85,
-        dashArray: '8, 10',
-      }).addTo(map);
+    if (latLngs.length > 1) {
+      if (showArcs) {
+        L.polyline(latLngs, {
+          color: '#3B82F6',
+          weight: 3,
+          opacity: 0.85,
+          dashArray: '8, 10',
+        }).addTo(map);
+      }
 
       // Fit bounds with padding
       const bounds = L.latLngBounds(latLngs);
       map.fitBounds(bounds, { padding: [60, 60], maxZoom: 6 });
+    } else if (latLngs.length === 1) {
+      map.setView(latLngs[0], 5);
     }
 
     return () => {
