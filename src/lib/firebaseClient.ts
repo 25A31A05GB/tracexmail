@@ -1,8 +1,9 @@
 /**
  * Firebase Client Enclave Adapter
- * Safely initializes Firebase config using firebase-applet-config.json or environment variables.
+ * Safely initializes Firebase config and auth helpers using firebase-applet-config.json or environment variables.
  */
 import appletConfig from '../../firebase-applet-config.json';
+import { signInWithGoogleOAuth } from './supabaseGoogleAuth';
 
 export interface FirebaseClientConfig {
   apiKey?: string;
@@ -27,5 +28,32 @@ export const firebaseConfig: FirebaseClientConfig = {
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.projectId && (firebaseConfig.apiKey || (import.meta as any).env?.VITE_FIREBASE_API_KEY)
 );
+
+/**
+ * Google Sign-In helper adapter
+ */
+export async function googleSignIn(options?: any) {
+  try {
+    return await signInWithGoogleOAuth(options);
+  } catch (error: any) {
+    console.warn('[firebaseClient] googleSignIn notice:', error);
+    return { data: null, error };
+  }
+}
+
+export const signInWithGoogle = googleSignIn;
+
+export async function signOutFromFirebase() {
+  return { error: null };
+}
+
+export const auth = null;
+export const firebaseAuth = null;
+export const db = null;
+export const firestore = null;
+
+export function getFirebaseAuth() {
+  return null;
+}
 
 export default firebaseConfig;
