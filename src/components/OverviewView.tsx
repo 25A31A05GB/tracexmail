@@ -42,7 +42,7 @@ import {
   Search
 } from 'lucide-react';
 import { EmailAnalysis, AINarrative } from '../types';
-import { resolveOrigin } from '../utils/originResolution';
+import { resolveOrigin, extractReceivedChainHops } from '../utils/originResolution';
 import { sha256Sync } from '../utils/crypto';
 import { ForensicCaseTwoPanel } from './ForensicCaseTwoPanel';
 import { DnsStatusSection } from './DnsStatusSection';
@@ -436,6 +436,15 @@ export function OverviewView({
   };
 
   const safeHops = Array.isArray(analysis?.hops) ? analysis.hops : [];
+  
+  // Extract Received header chain IPs and identify internal vs external hops for GeoTracer
+  const geoTracerHops = React.useMemo(() => {
+    const rawReceived = analysis?.headers?.allHeaders?.['received'] || 
+                        analysis?.headers?.allHeaders?.['Received'] || 
+                        (analysis?.headers as any)?.received;
+    return extractReceivedChainHops(rawReceived, safeHops);
+  }, [analysis?.headers, safeHops]);
+
   const originHopRaw = safeHops.find((h) => h?.isOrigin) || safeHops[0];
   const firstPublicGatewayHop = safeHops.find((h) => !h?.isPrivate && h?.fromIp && !h?.isOrigin) || safeHops.find((h) => !h?.isPrivate && h?.fromIp);
 
@@ -1527,7 +1536,7 @@ export function OverviewView({
 
         {/* Geo-Tracer: Hop-by-Hop Origin Path Mapping Utility */}
         <GeoTracerUtility 
-          hops={safeHops} 
+          hops={geoTracerHops} 
           originHop={effectiveOriginHop} 
           realSenderIp={analysis.realSenderIp}
           className="my-2"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured, logSupabaseAuthEvent } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { 
   Loader2, 
   AlertCircle, 
@@ -234,7 +235,7 @@ export function ResetPasswordView({
 
       // 2. Synchronize password with server endpoint
       const activeToken = currentResetToken || manualTokenInput.trim() || undefined;
-      const res = await fetch('/api/auth/reset-password-with-token', {
+      const res = await apiFetch('/api/auth/reset-password-with-token', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Shield, Lock, Mail, User, AlertCircle, CheckCircle2, X, LogIn, UserPlus, Building2, Loader2, MailCheck, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { GoogleAuthButton } from './GoogleAuthButton';
+import { TurnstileWidget } from './TurnstileWidget';
 import { initializeSession, SessionUser, signOutUser } from '../lib/api';
 
 interface AuthModalProps {
@@ -24,6 +25,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
 
   // MFA Challenge State
   const [mfaChallenge, setMfaChallenge] = useState<{ factorId: string; challengeId: string } | null>(null);
@@ -607,6 +609,17 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                   </div>
                 </>
               )}
+
+              {/* Cloudflare Turnstile Verification Widget */}
+              <div className="pt-1">
+                <TurnstileWidget
+                  action={mode === 'signin' ? 'modal-signin' : 'modal-signup'}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken('')}
+                  compact
+                  onError={(err) => console.warn('[Turnstile] Challenge error:', err)}
+                />
+              </div>
 
               <button
                 type="submit"

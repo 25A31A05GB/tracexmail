@@ -1357,6 +1357,8 @@ export function RelationshipGraphView({
                   >
                     {/* Outer Large Translucent Halo Aura */}
                     <circle
+                      cx="0"
+                      cy="0"
                       r={isCenter ? 36 : 28}
                       fill={haloColor}
                       stroke={haloBorder}
@@ -1366,6 +1368,8 @@ export function RelationshipGraphView({
 
                     {/* Middle Pulse Ring */}
                     <circle
+                      cx="0"
+                      cy="0"
                       r={isCenter ? 22 : 17}
                       fill={isDanger ? 'rgba(244, 63, 94, 0.25)' : 'rgba(2, 132, 199, 0.28)'}
                       className={isDanger || isCenter ? 'animate-pulse' : ''}
@@ -1373,6 +1377,8 @@ export function RelationshipGraphView({
 
                     {/* Core Solid Glowing Node Dot */}
                     <circle
+                      cx="0"
+                      cy="0"
                       r={isCenter ? 9 : 7}
                       fill={dotColor}
                       filter="url(#glow-cyan)"

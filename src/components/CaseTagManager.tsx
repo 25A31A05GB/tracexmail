@@ -133,7 +133,17 @@ export function CaseTagManager({
   
   // Local state for tags
   const [tags, setTags] = useState<string[]>(() => {
-    return Array.isArray(analysis?.tags) ? [...analysis.tags] : [];
+    if (Array.isArray(analysis?.tags) && analysis.tags.length > 0) {
+      return [...analysis.tags];
+    }
+    try {
+      const stored = localStorage.getItem(`tracexmail_tags_${caseId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
   });
   
   const [newTagInput, setNewTagInput] = useState<string>('');
@@ -142,12 +152,23 @@ export function CaseTagManager({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showPresets, setShowPresets] = useState<boolean>(false);
 
-  // Sync state if analysis prop updates
+  // Sync state if analysis prop updates or retrieve from local storage
   useEffect(() => {
-    if (Array.isArray(analysis?.tags)) {
+    if (Array.isArray(analysis?.tags) && analysis.tags.length > 0) {
       setTags([...analysis.tags]);
+    } else {
+      try {
+        const stored = localStorage.getItem(`tracexmail_tags_${caseId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTags(parsed);
+            if (onTagsUpdated) onTagsUpdated(parsed);
+          }
+        }
+      } catch {}
     }
-  }, [analysis?.id, analysis?.tags]);
+  }, [caseId, analysis?.tags]);
 
   /**
    * Persists updated tags list to the backend forensic API

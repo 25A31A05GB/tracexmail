@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, Mail, ShieldCheck, RefreshCw, Lock } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
@@ -103,7 +104,7 @@ export function MagicLinkVerifyView({
         // Case C: Native Enclave / Server-side magic link token
         if (token) {
           setStatusMsg('Validating single-use cryptographic enclave link…');
-          const res = await fetch('/api/auth/magic-link/verify', {
+          const res = await apiFetch('/api/auth/magic-link/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ token, email: emailParam })
@@ -230,7 +231,7 @@ export function MagicLinkVerifyView({
       }
 
       // 2. Authoritative reliable server dispatch
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

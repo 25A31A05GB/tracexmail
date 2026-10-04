@@ -1,7 +1,9 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, EyeOff, User, Building2, MailCheck, Send, RefreshCw, Mail } from 'lucide-react';
+import { TurnstileWidget } from './TurnstileWidget';
+import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, EyeOff, User, Building2, MailCheck, Send, RefreshCw, Mail, ShieldCheck } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface SignupViewProps {
@@ -40,6 +42,8 @@ export function SignupView({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [userExistsError, setUserExistsError] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [directVerifyUrl, setDirectVerifyUrl] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToLogin;
 
@@ -79,7 +83,7 @@ export function SignupView({
     try {
       // 0. Pre-check if email already exists
       try {
-        const checkRes = await fetch(`/api/auth/check-exists?email=${encodeURIComponent(cleanEmail)}`);
+        const checkRes = await apiFetch(`/api/auth/check-exists?email=${encodeURIComponent(cleanEmail)}`);
         if (checkRes.ok) {
           const checkData = await checkRes.json();
           if (checkData.exists) {
@@ -147,9 +151,9 @@ export function SignupView({
         }
       }
 
-      // 2. Also register in local/enclave backend and dispatch verification magic link
+      // 2. Also register in local/enclave backend with Turnstile verification
       try {
-        const regRes = await fetch('/api/auth/register', {
+        const regRes = await apiFetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -158,7 +162,8 @@ export function SignupView({
             fullName: effectiveName,
             orgName: assignedOrg,
             role: assignedRole,
-            accountType
+            accountType,
+            turnstileToken
           })
         });
 
@@ -168,13 +173,17 @@ export function SignupView({
           setErrorMsg(`An account registered to '${cleanEmail}' already exists. Please log in instead.`);
           setLoading(false);
           return;
+        } else if (!regRes.ok && regData?.error) {
+          setErrorMsg(regData.error);
+          setLoading(false);
+          return;
         }
       } catch (srvErr) {
         console.warn('[SignupView] Backend registration notice:', srvErr);
       }
 
       // 3. Reliable server-side magic link dispatch (authoritative)
-      const mlRes = await fetch('/api/auth/magic-link/send', {
+      const mlRes = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -187,13 +196,18 @@ export function SignupView({
             accountType,
             password
           },
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin,
+          turnstileToken
         })
       });
 
       const mlData = await mlRes.json();
       if (!mlRes.ok) {
         throw new Error(mlData.error || 'Failed to dispatch verification email.');
+      }
+
+      if (mlData.magicLinkUrl || mlData.debugLink) {
+        setDirectVerifyUrl(mlData.magicLinkUrl || mlData.debugLink);
       }
 
       // Transition to email verification link confirmation
@@ -233,13 +247,14 @@ export function SignupView({
       }
 
       // 2. Authoritative reliable server dispatch
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
           type: 'signup',
-          redirectTo: redirectUrl
+          redirectTo: redirectUrl,
+          turnstileToken
         })
       });
 
@@ -289,6 +304,16 @@ export function SignupView({
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[var(--forensic-green)]" />
                 <div className="leading-relaxed font-sans">{resendStatus}</div>
               </div>
+            )}
+
+            {directVerifyUrl && (
+              <a
+                href={directVerifyUrl}
+                className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-2 text-center no-underline cursor-pointer shadow-md"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Activate & Access Forensic Workspace Now →</span>
+              </a>
             )}
 
             <div className="flex flex-col gap-2 pt-2">
@@ -617,6 +642,21 @@ export function SignupView({
                     </p>
                   </div>
                 </label>
+              </div>
+
+              {/* Cloudflare Turnstile Verification Widget */}
+              <div className="pt-1">
+                <TurnstileWidget
+                  action="signup"
+                  onVerify={(token) => {
+                    setTurnstileToken(token);
+                    if (errorMsg?.includes('challenge') || errorMsg?.includes('Turnstile') || errorMsg?.includes('verification')) {
+                      setErrorMsg(null);
+                    }
+                  }}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={(err) => console.warn('[Turnstile] Challenge error:', err)}
+                />
               </div>
 
               <button

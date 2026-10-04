@@ -121,6 +121,10 @@ export function GeoTracerUtility({ hops = [], originHop, realSenderIp, className
   // Calculate cumulative transmission latency (seconds)
   const totalTransmissionDelaySec = enrichedHops.reduce((sum, h) => sum + (h.delaySec || 0), 0);
 
+  // Internal vs External Hop Counts
+  const internalHopCount = enrichedHops.filter(h => h.isPrivate || h.hopType === 'internal').length;
+  const externalHopCount = enrichedHops.filter(h => !h.isPrivate && h.hopType !== 'internal').length;
+
   // Auto-play / Simulation loop
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -184,6 +188,18 @@ export function GeoTracerUtility({ hops = [], originHop, realSenderIp, className
             <Globe className="w-3.5 h-3.5 text-blue-400" />
             <span className="text-slate-400">Total Hops:</span>
             <span className="font-bold text-white">{enrichedHops.length}</span>
+          </div>
+
+          <div className="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-cyan-800/60 text-cyan-300 flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-slate-400">Internal:</span>
+            <span className="font-bold text-cyan-300">{internalHopCount}</span>
+          </div>
+
+          <div className="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-blue-800/60 text-blue-300 flex items-center gap-1.5">
+            <Radio className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-slate-400">External:</span>
+            <span className="font-bold text-blue-300">{externalHopCount}</span>
           </div>
 
           <div className="px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-slate-300 flex items-center gap-1.5">
@@ -443,17 +459,38 @@ export function GeoTracerUtility({ hops = [], originHop, realSenderIp, className
 
                         <span className="font-bold text-white text-xs">{h.fromIp || 'Private Gateway'}</span>
 
+                        {/* Internal vs External Badge */}
+                        {h.isPrivate || h.hopType === 'internal' ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-950/70 border border-cyan-700/60 text-cyan-300 flex items-center gap-1">
+                            <Lock className="w-2.5 h-2.5" />
+                            INTERNAL (LAN)
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-950/70 border border-blue-700/60 text-blue-300 flex items-center gap-1">
+                            <Globe className="w-2.5 h-2.5" />
+                            EXTERNAL (PUBLIC)
+                          </span>
+                        )}
+
                         {/* Hop Role Badge */}
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            isOrigin
+                            h.hopRole === 'EXTERNAL_ORIGIN' || h.isPublicGateway
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : isOrigin
                               ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                               : isLast
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                               : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                           }`}
                         >
-                          {isOrigin ? 'Root Origin Sender' : isLast ? 'Enterprise Ingress MX' : 'Intermediate Transit Relay'}
+                          {h.hopRole === 'EXTERNAL_ORIGIN' || h.isPublicGateway
+                            ? '⚡ Trust Boundary Origin'
+                            : isOrigin
+                            ? 'Root Origin Sender'
+                            : isLast
+                            ? 'Enterprise Ingress MX'
+                            : 'Intermediate Transit Relay'}
                         </span>
 
                         {h.is_tor && (
@@ -580,6 +617,24 @@ export function GeoTracerUtility({ hops = [], originHop, realSenderIp, className
                 <div className="p-2 rounded bg-slate-950/70 border border-slate-800/80 col-span-2">
                   <div className="text-[10px] text-slate-500 uppercase">Autonomous System & Provider</div>
                   <div className="text-white font-bold truncate mt-0.5">{activeHop.asn} • {activeHop.org}</div>
+                </div>
+
+                <div className="p-2 rounded bg-slate-950/70 border border-slate-800/80 col-span-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-500 uppercase">Routing Scope & Boundary</div>
+                    <div className="text-white font-bold mt-0.5">
+                      {activeHop.isPrivate || activeHop.hopType === 'internal'
+                        ? 'Internal Enterprise Intranet (RFC 1918)'
+                        : 'Public Routable Internet (BGP Autonomous System)'}
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    activeHop.isPrivate || activeHop.hopType === 'internal'
+                      ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                      : 'bg-blue-950 text-blue-300 border border-blue-800'
+                  }`}>
+                    {activeHop.isPrivate || activeHop.hopType === 'internal' ? 'LAN SCOPE' : 'WAN SCOPE'}
+                  </span>
                 </div>
               </div>
 

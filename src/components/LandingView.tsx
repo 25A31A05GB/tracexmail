@@ -178,36 +178,54 @@ export function LandingView({
       name: 'Jayaram Sappa',
       role: 'System Design & Backend Engineering',
       dotColor: 'bg-[#b23a2e]',
+      borderColor: 'border-[#b23a2e]',
+      accentColor: 'text-[#ef4444]',
+      quote: "Building TraceXMail required constructing a deterministic forensic pipeline that verifies raw RFC 822 headers, live SPF/DKIM/DMARC records, and BGP/ASN telemetry without relying on black-box heuristics or unverified assumptions.",
     },
     {
       agentId: 'AGENT-02',
       name: 'Vennela Obilisetti',
-      role: 'Threat Intelligence',
+      role: 'Threat Intelligence & Detection',
       dotColor: 'bg-[#c9a227]',
+      borderColor: 'border-[#c9a227]',
+      accentColor: 'text-[#eab308]',
+      quote: "Threat intelligence is only actionable when it identifies origin infrastructure, Botnet C2 telemetry, and campaign clusters rather than just flagging domain age or superficial keywords.",
     },
     {
       agentId: 'AGENT-03',
       name: 'Katari Pavan Sai Krishna',
-      role: 'Machine Learning',
+      role: 'Machine Learning & Semantic Classification',
       dotColor: 'bg-[#60a5fa]',
+      borderColor: 'border-[#60a5fa]',
+      accentColor: 'text-[#60a5fa]',
+      quote: "In digital forensics, black-box AI models fail legal scrutiny. We engineered our 5-class semantic classifier to output mathematically deterministic probability distributions with transparent feature attribution.",
     },
     {
       agentId: 'AGENT-04',
       name: 'Eeli Hema Venkata Lalitha',
-      role: 'Digital Forensics',
-      dotColor: 'bg-[#b23a2e]',
+      role: 'Digital Forensics & RFC Boundary Traversal',
+      dotColor: 'bg-[#10b981]',
+      borderColor: 'border-[#10b981]',
+      accentColor: 'text-[#10b981]',
+      quote: "Traceability hinges on rigorous chain-of-custody protocols. By parsing Received header hops chronologically and distinguishing internal RFC 1918 subnets from external egress gateways, we turn elusive email trails into courtroom-ready evidence.",
     },
     {
       agentId: 'AGENT-05',
       name: 'Sairam Saladi',
-      role: 'Database Integration',
-      dotColor: 'bg-[#c9a227]',
+      role: 'Database Integration & Evidence Persistence',
+      dotColor: 'bg-[#a855f7]',
+      borderColor: 'border-[#a855f7]',
+      accentColor: 'text-[#c084fc]',
+      quote: "Every investigated email is forensic evidence that must be permanently verifiable. We architected an immutable persistence layer that seals case artifacts with cryptographic SHA-256 hashes for instant STIX 2.1 and SIEM synchronization.",
     },
     {
       agentId: 'AGENT-06',
       name: 'Penugonda Mounika',
-      role: 'Frontend Engineering',
-      dotColor: 'bg-[#60a5fa]',
+      role: 'Frontend Engineering & Tactical Visualization',
+      dotColor: 'bg-[#f97316]',
+      borderColor: 'border-[#f97316]',
+      accentColor: 'text-[#fb923c]',
+      quote: "Cybersecurity analysts triage critical incidents under severe time pressure. We designed the interface to translate dense raw MIME byte streams into intuitive flight-path vectors, MaxMind telemetry maps, and decisive one-click triage controls.",
     }
   ];
 
@@ -1133,28 +1151,49 @@ export function LandingView({
           </div>
 
           {/* Why We Built This Quote Cards */}
-          <div className="mt-12 pt-8 border-t border-[#3a352c] space-y-6">
-            <h3 className="text-xs font-mono text-[#8e8574] uppercase tracking-wider font-semibold">
-              Why we built this
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-[#1a1712] p-6 rounded-[4px] border-l-2 border-[#b23a2e] space-y-3">
-                <p className="text-[#ede6d8] italic text-[14.5px] leading-relaxed font-serif">
-                  &quot;Building TraceXMail required constructing a deterministic forensic pipeline that verifies raw RFC822 headers, live SPF/DKIM/DMARC records, and BGP/ASN telemetry without relying on black-box heuristics.&quot;
+          <div className="mt-14 pt-10 border-t border-[#3a352c] space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-mono text-[#8e8574] uppercase tracking-wider font-semibold">
+                  Why We Built This — Perspectives From The Core Team
+                </h3>
+                <p className="text-xs text-[#b9af9c] mt-0.5 font-sans">
+                  Direct insights from each domain engineer on solving email spoofing, adversarial deception, and forensic verification.
                 </p>
-                <footer className="text-xs font-mono text-[#22c55e] uppercase">
-                  — JAYARAM SAPPA · SYSTEM DESIGN &amp; BACKEND ENGINEERING
-                </footer>
               </div>
+              <span className="text-[11px] font-mono text-[#c9a227] px-2.5 py-1 rounded bg-[#3a352c]/40 border border-[#3a352c] self-start sm:self-auto flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227]" />
+                6 Specialized Engineering Pillars
+              </span>
+            </div>
 
-              <div className="bg-[#1a1712] p-6 rounded-[4px] border-l-2 border-[#c9a227] space-y-3">
-                <p className="text-[#ede6d8] italic text-[14.5px] leading-relaxed font-serif">
-                  &quot;Threat intelligence is only actionable when it identifies origin infrastructure and campaign clusters rather than just flagging domain age.&quot;
-                </p>
-                <footer className="text-xs font-mono text-[#22c55e] uppercase">
-                  — VENNELA OBILISETTI · THREAT INTELLIGENCE &amp; DETECTION
-                </footer>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {teamMembers.map((member, qIdx) => (
+                <div
+                  key={qIdx}
+                  className={`bg-[#1a1712] p-5 sm:p-6 rounded-[4px] border-l-2 ${member.borderColor} space-y-4 flex flex-col justify-between hover:bg-[#1f1b15] transition-all border-y border-r border-[#3a352c]/50 shadow-sm`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#8e8574] uppercase tracking-wider font-bold">
+                        {member.agentId}
+                      </span>
+                      <span className={`w-2.5 h-2.5 rounded-full ${member.dotColor}`} />
+                    </div>
+                    <p className="text-[#ede6d8] italic text-[14px] leading-relaxed font-serif">
+                      &quot;{member.quote}&quot;
+                    </p>
+                  </div>
+                  <footer className="pt-3 border-t border-[#3a352c]/60">
+                    <div className="font-bold text-[13px] text-[#ede6d8]">
+                      {member.name}
+                    </div>
+                    <div className={`text-[11px] font-mono ${member.accentColor} uppercase tracking-tight mt-0.5`}>
+                      {member.role}
+                    </div>
+                  </footer>
+                </div>
+              ))}
             </div>
           </div>
         </div>

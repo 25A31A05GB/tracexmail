@@ -1,5 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured, getResetPasswordRedirectUrl, logSupabaseAuthEvent } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { 
   Loader2, 
   AlertCircle, 
@@ -31,6 +32,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfigGuide, setShowConfigGuide] = useState(false);
   const [resending, setResending] = useState(false);
+  const [directResetUrl, setDirectResetUrl] = useState<string | null>(null);
 
   const handleBack = onBackToLogin || onBackToIntro;
 
@@ -69,7 +71,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       }
 
       // 2. Reliable server-side magic link dispatch (authoritative)
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
@@ -78,10 +80,12 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         console.warn('[ForgotPassword] Server recovery link notice:', data);
+      } else if (data.magicLinkUrl || data.debugLink) {
+        setDirectResetUrl(data.magicLinkUrl || data.debugLink);
       }
 
       // 3. Parity endpoint
-      await fetch('/api/auth/reset-password', {
+      await apiFetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, redirectTo: redirectUrl })
@@ -119,7 +123,7 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       }
 
       // 2. Reliable server-side dispatch (authoritative)
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
@@ -215,6 +219,16 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
             </div>
 
             <div className="flex flex-col gap-2 pt-2">
+              {directResetUrl && (
+                <a
+                  href={directResetUrl}
+                  className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-2 text-center no-underline cursor-pointer shadow-md"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Reset Master Password Now →</span>
+                </a>
+              )}
+
               <button
                 type="button"
                 onClick={handleResend}

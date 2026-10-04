@@ -1,7 +1,9 @@
 import React, { useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send, Eye, EyeOff } from 'lucide-react';
+import { TurnstileWidget } from './TurnstileWidget';
+import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface LoginViewProps {
@@ -39,6 +41,8 @@ export function LoginView({
   const [resendStatus, setResendStatus] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
+  const [directMagicLinkUrl, setDirectMagicLinkUrl] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToGate;
 
@@ -66,19 +70,24 @@ export function LoginView({
       }
 
       // 2. Server-side reliable magic link dispatch (authoritative)
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
           type: 'signin',
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin,
+          turnstileToken
         })
       });
 
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to dispatch magic link.');
+      }
+
+      if (data.magicLinkUrl || data.debugLink) {
+        setDirectMagicLinkUrl(data.magicLinkUrl || data.debugLink);
       }
 
       setMagicLinkSent(true);
@@ -107,13 +116,14 @@ export function LoginView({
       }
 
       // 2. Authoritative reliable server dispatch
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
           type: 'signin',
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin,
+          turnstileToken
         })
       });
 
@@ -147,13 +157,14 @@ export function LoginView({
       }
 
       // 2. Authoritative reliable server dispatch
-      const res = await fetch('/api/auth/magic-link/send', {
+      const res = await apiFetch('/api/auth/magic-link/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: cleanEmail,
           type: 'signin',
-          redirectTo: window.location.origin
+          redirectTo: window.location.origin,
+          turnstileToken
         })
       });
 
@@ -250,10 +261,10 @@ export function LoginView({
       }
 
       // 2. Authoritative Fallback: Authenticate via hardened server endpoint /api/auth/login
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword, turnstileToken })
       });
 
       if (res.status === 429) {
@@ -470,6 +481,16 @@ export function LoginView({
                 </div>
               )}
 
+              {directMagicLinkUrl && (
+                <a
+                  href={directMagicLinkUrl}
+                  className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-2 text-center no-underline cursor-pointer shadow-md"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Authenticate & Open Workspace Now →</span>
+                </a>
+              )}
+
               <div className="flex flex-col gap-2 pt-2">
                 <button
                   type="button"
@@ -515,6 +536,21 @@ export function LoginView({
 
               <div className="p-3 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs text-[var(--paper-muted)] font-sans leading-relaxed">
                 We will email you a secure, single-use magic link. No passwords or codes required—just one click to authenticate.
+              </div>
+
+              {/* Cloudflare Turnstile Verification Widget */}
+              <div className="pt-1">
+                <TurnstileWidget
+                  action="magic-link-login"
+                  onVerify={(token) => {
+                    setTurnstileToken(token);
+                    if (errorMsg?.includes('challenge') || errorMsg?.includes('Turnstile') || errorMsg?.includes('verification')) {
+                      setErrorMsg(null);
+                    }
+                  }}
+                  onExpire={() => setTurnstileToken('')}
+                  onError={(err) => console.warn('[Turnstile] Challenge error:', err)}
+                />
               </div>
 
               <button
@@ -590,6 +626,21 @@ export function LoginView({
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Cloudflare Turnstile Verification Widget */}
+            <div className="pt-1">
+              <TurnstileWidget
+                action="password-login"
+                onVerify={(token) => {
+                  setTurnstileToken(token);
+                  if (errorMsg?.includes('challenge') || errorMsg?.includes('Turnstile') || errorMsg?.includes('verification')) {
+                    setErrorMsg(null);
+                  }
+                }}
+                onExpire={() => setTurnstileToken('')}
+                onError={(err) => console.warn('[Turnstile] Challenge error:', err)}
+              />
             </div>
 
             <button

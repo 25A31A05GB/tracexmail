@@ -32,6 +32,8 @@ export interface EmailHop {
   infra?: 'vpn' | 'hosting' | null;
   isOrigin?: boolean;
   isPublicGateway?: boolean;
+  hopType?: 'internal' | 'external';
+  hopRole?: 'INTERNAL_ORIGIN' | 'EXTERNAL_ORIGIN' | 'TRANSIT_RELAY' | 'INGRESS_GATEWAY';
   isPrivate?: boolean;
   isRfc1918?: boolean;
   subnetType?: string;

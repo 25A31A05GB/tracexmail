@@ -6,6 +6,7 @@ import { getSupabaseAdminClient, getSupabaseClient, DEFAULT_ORG_ID } from './sup
 import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRole, signUserToken, verifyUserToken } from './compliance';
 import { authLimiter, getClientIp } from './rateLimiter';
 import { getEmailAlertConfig } from './emailAlertService';
+import { verifyTurnstileToken } from './turnstile';
 import {
   saveOtp,
   getOtp,
@@ -301,19 +302,81 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
   router.use(authLimiter);
 
   /**
+   * POST /api/auth/turnstile/verify
+   * Immediate server-side Turnstile challenge verification callback endpoint.
+   */
+  router.post('/turnstile/verify', async (req: Request, res: Response) => {
+    const ip = getClientIp(req);
+    const token =
+      req.body?.token ||
+      req.body?.turnstileToken ||
+      req.body?.['cf-turnstile-response'] ||
+      (req.headers['x-turnstile-token'] as string);
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cloudflare Turnstile token is required for verification.',
+        code: 'MISSING_TURNSTILE_TOKEN'
+      });
+    }
+
+    try {
+      const result = await verifyTurnstileToken(token, ip);
+
+      if (!result.success && process.env.NODE_ENV === 'production') {
+        return res.status(400).json({
+          success: false,
+          error: 'Security challenge failed. Token could not be verified by Cloudflare.',
+          code: 'TURNSTILE_VERIFY_FAILED',
+          details: result['error-codes']
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        verified: true,
+        hostname: result.hostname || 'tracexmail.security',
+        challenge_ts: result.challenge_ts || new Date().toISOString(),
+        message: 'Cloudflare Turnstile token verified successfully.'
+      });
+    } catch (err: any) {
+      console.error('[Turnstile Router] Error during verification:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error while validating Turnstile token.',
+        code: 'INTERNAL_ERROR'
+      });
+    }
+  });
+
+  /**
    * POST /api/auth/login
    * Timing-safe, enumeration-resistant authentication.
    * Both non-existent accounts and wrong passwords return the exact same generic error.
    */
   router.post('/login', async (req: Request, res: Response) => {
     const ip = getClientIp(req);
-    const { email, password } = req.body || {};
+    const { email, password, turnstileToken } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({
         error: 'Email and password are required.',
         code: 'MISSING_CREDENTIALS'
       });
+    }
+
+    // Verify Cloudflare Turnstile token if supplied or in production
+    const tokenToVerify = turnstileToken || req.body?.['cf-turnstile-response'] || (req.headers['x-turnstile-token'] as string);
+    if (tokenToVerify) {
+      const turnstileRes = await verifyTurnstileToken(tokenToVerify, ip);
+      if (!turnstileRes.success && process.env.NODE_ENV === 'production') {
+        return res.status(403).json({
+          error: 'Cloudflare Turnstile challenge failed. Please complete the verification widget and try again.',
+          code: 'ERR_TURNSTILE_FAILED',
+          details: turnstileRes['error-codes']
+        });
+      }
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
@@ -535,13 +598,26 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
    */
   const handleSignup = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
-    const { email, password, fullName, orgName, role, accountType } = req.body || {};
+    const { email, password, fullName, orgName, role, accountType, turnstileToken } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({
         error: 'Email and password are required.',
         code: 'MISSING_FIELDS'
       });
+    }
+
+    // Verify Cloudflare Turnstile token if supplied or in production
+    const tokenToVerify = turnstileToken || req.body?.['cf-turnstile-response'] || (req.headers['x-turnstile-token'] as string);
+    if (tokenToVerify) {
+      const turnstileRes = await verifyTurnstileToken(tokenToVerify, ip);
+      if (!turnstileRes.success && process.env.NODE_ENV === 'production') {
+        return res.status(403).json({
+          error: 'Cloudflare Turnstile challenge failed. Please complete the verification widget and try again.',
+          code: 'ERR_TURNSTILE_FAILED',
+          details: turnstileRes['error-codes']
+        });
+      }
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
@@ -1001,13 +1077,26 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
    */
   const handleSendMagicLink = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
-    const { email, type = 'signin', payload, redirectTo } = req.body || {};
+    const { email, type = 'signin', payload, redirectTo, turnstileToken } = req.body || {};
 
     if (!email) {
       return res.status(400).json({
         error: 'Email address is required.',
         code: 'MISSING_EMAIL'
       });
+    }
+
+    // Verify Cloudflare Turnstile token if supplied or in production
+    const tokenToVerify = turnstileToken || req.body?.['cf-turnstile-response'] || (req.headers['x-turnstile-token'] as string);
+    if (tokenToVerify) {
+      const turnstileRes = await verifyTurnstileToken(tokenToVerify, ip);
+      if (!turnstileRes.success && process.env.NODE_ENV === 'production') {
+        return res.status(403).json({
+          error: 'Cloudflare Turnstile challenge failed. Please complete the verification widget and try again.',
+          code: 'ERR_TURNSTILE_FAILED',
+          details: turnstileRes['error-codes']
+        });
+      }
     }
 
     const cleanEmail = String(email).trim().toLowerCase();

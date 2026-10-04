@@ -15,5 +15,9 @@ __pycache__/
 data/maxmind/*.mmdb
 data/geolite2/*.mmdb
 
+# Firebase sensitive config
+firebase-applet-config.json
+firebase_applet_config.xml
+
 .DS_Store
 

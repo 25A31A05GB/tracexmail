@@ -1,4 +1,5 @@
 import { EmailHop } from '../types';
+import { lookupMaxMindGeo } from './maxmindService';
 
 export interface ResolvedOrigin {
   ip: string | null;
@@ -178,3 +179,189 @@ export function formatOriginIp(origin: ResolvedOrigin): string {
   }
   return origin.ip;
 }
+
+/**
+ * Helper function to extract Received header chain IPs, identify internal vs external hops,
+ * and format them for GeoTracer path visualization.
+ * 
+ * - Traverses Received headers in chronological order (bottom-to-top).
+ * - Distinguishes between Internal (Private RFC 1918 / Loopback) and External (Public Routable Internet) hops.
+ * - Resolves External hops against MaxMind GeoLite2 for accurate geographic pathing.
+ * - Demarcates the perimeter boundary where traffic transitions from internal intranet to public internet.
+ */
+export function extractReceivedChainHops(
+  rawReceived?: string | string[] | null,
+  existingHops?: EmailHop[] | null
+): EmailHop[] {
+  // If rawReceived is provided, parse the Received headers chronologically
+  const receivedLines: string[] = [];
+  if (rawReceived) {
+    if (Array.isArray(rawReceived)) {
+      receivedLines.push(...rawReceived.filter((r): r is string => typeof r === 'string' && r.trim().length > 0));
+    } else if (typeof rawReceived === 'string' && rawReceived.trim().length > 0) {
+      receivedLines.push(rawReceived);
+    }
+  }
+
+  // If no rawReceived headers, but existingHops exist, classify and enrich existing hops
+  if (receivedLines.length === 0 && existingHops && existingHops.length > 0) {
+    let firstExternalFound = false;
+    return existingHops.map((hop, idx) => {
+      const ip = hop.fromIp || '';
+      const isPublic = isPublicRoutableIp(ip);
+      const isInternal = !isPublic;
+      const hopType: 'internal' | 'external' = isInternal ? 'internal' : 'external';
+      
+      let hopRole: 'INTERNAL_ORIGIN' | 'EXTERNAL_ORIGIN' | 'TRANSIT_RELAY' | 'INGRESS_GATEWAY';
+      if (idx === existingHops.length - 1 && existingHops.length > 1) {
+        hopRole = 'INGRESS_GATEWAY';
+      } else if (!isInternal && !firstExternalFound) {
+        firstExternalFound = true;
+        hopRole = 'EXTERNAL_ORIGIN';
+      } else if (idx === 0 && isInternal) {
+        hopRole = 'INTERNAL_ORIGIN';
+      } else {
+        hopRole = 'TRANSIT_RELAY';
+      }
+
+      const geo = ip && isPublic ? lookupMaxMindGeo(ip) : null;
+
+      return {
+        ...hop,
+        hopType,
+        hopRole,
+        isPrivate: isInternal,
+        isRfc1918: isInternal,
+        isPublicGateway: hopRole === 'EXTERNAL_ORIGIN',
+        city: isInternal ? 'Internal Subnet' : (hop.city || geo?.city || 'Public Relay Space'),
+        country: isInternal ? 'Private Network (RFC 1918)' : (hop.country || geo?.country || 'Global Routing Area'),
+        countryCode: isInternal ? 'LAN' : (hop.countryCode || geo?.countryCode || 'NET'),
+        lat: isInternal ? undefined : (typeof hop.lat === 'number' ? hop.lat : geo?.lat),
+        lng: isInternal ? undefined : (typeof hop.lng === 'number' ? hop.lng : geo?.lng),
+        asn: isInternal ? 'RFC 1918' : (hop.asn || (geo?.asn ? `AS${geo.asn}` : 'Unannounced')),
+        org: isInternal ? 'Corporate Intranet Segment' : (hop.org || geo?.org || 'Internet Relay Host'),
+        maxmindVerified: isPublic && Boolean(geo?.isVerified)
+      };
+    });
+  }
+
+  // Parse raw Received headers chronologically (bottom-to-top is Hop 1 -> Hop N)
+  const orderedReceived = [...receivedLines].reverse();
+  const hops: EmailHop[] = [];
+  let firstExternalFound = false;
+
+  orderedReceived.forEach((recv, idx) => {
+    // 1. IP extraction (brackets, parentheses, plain IPv4/IPv6)
+    const bracketMatch = recv.match(/\[(?:IPv6:)?([a-fA-F0-9.:]+)\]/);
+    const parenMatch = recv.match(/\(((?:[a-zA-Z0-9.-]+\s+)?(?:\[)?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})(?:\])?)\)/);
+    const rawIps = recv.match(/\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/g) || [];
+    const extractedIp = bracketMatch ? bracketMatch[1] : parenMatch ? parenMatch[2] : rawIps[0];
+    const ip = extractedIp && extractedIp !== '127.0.0.1' ? extractedIp : (rawIps[0] || extractedIp);
+
+    // 2. Host extraction
+    const fromMatch = recv.match(/\bfrom\s+([^\s;()\[\]]+)/i);
+    const rawFromHost = fromMatch && fromMatch[1] !== '(' && fromMatch[1] !== '[' ? fromMatch[1].trim() : undefined;
+    const fromHost = rawFromHost || (ip ? `host-${ip.replace(/[.:]/g, '-')}` : 'mailer-relay');
+
+    const byMatch = recv.match(/\bby\s+([^\s;()\[\]]+)/i);
+    const byHost = byMatch ? byMatch[1].trim() : 'mx-ingress';
+
+    // 3. Protocol
+    const protoMatch = recv.match(/\bwith\s+([a-zA-Z0-9_-]+)/i);
+    const protocol = protoMatch ? protoMatch[1].toUpperCase() : 'ESMTP';
+
+    // 4. Timestamp & Delay calculation
+    let timestamp = new Date().toUTCString();
+    let parsedDateMs: number | null = null;
+    const semiIdx = recv.lastIndexOf(';');
+    if (semiIdx !== -1) {
+      const rawDateStr = recv.substring(semiIdx + 1).trim();
+      const d = new Date(rawDateStr);
+      if (!isNaN(d.getTime())) {
+        timestamp = d.toUTCString();
+        parsedDateMs = d.getTime();
+      } else if (rawDateStr) {
+        timestamp = rawDateStr;
+      }
+    }
+
+    let delaySec = 0;
+    if (idx > 0 && parsedDateMs !== null) {
+      const prevHop = hops[idx - 1];
+      if (prevHop && prevHop.timestamp) {
+        const prevTimeMs = new Date(prevHop.timestamp).getTime();
+        if (!isNaN(prevTimeMs) && parsedDateMs >= prevTimeMs) {
+          delaySec = Math.round((parsedDateMs - prevTimeMs) / 1000);
+        }
+      }
+    }
+
+    // 5. Internal vs External Identification
+    const isPublic = isPublicRoutableIp(ip);
+    const isInternal = !isPublic;
+    const hopType: 'internal' | 'external' = isInternal ? 'internal' : 'external';
+
+    // 6. Role Assignment & Perimeter Demarcation
+    const isLast = idx === orderedReceived.length - 1;
+    let hopRole: 'INTERNAL_ORIGIN' | 'EXTERNAL_ORIGIN' | 'TRANSIT_RELAY' | 'INGRESS_GATEWAY';
+    if (isLast && idx > 0) {
+      hopRole = 'INGRESS_GATEWAY';
+    } else if (!isInternal && !firstExternalFound) {
+      firstExternalFound = true;
+      hopRole = 'EXTERNAL_ORIGIN';
+    } else if (idx === 0 && isInternal) {
+      hopRole = 'INTERNAL_ORIGIN';
+    } else {
+      hopRole = 'TRANSIT_RELAY';
+    }
+
+    // 7. MaxMind GeoIP resolution for external hops
+    const geo = ip && isPublic ? lookupMaxMindGeo(ip) : null;
+    const isTor = Boolean(geo?.isTor);
+    const isVpn = Boolean(geo?.isAnonymousProxy && !geo?.isTor);
+
+    hops.push({
+      hopNumber: idx + 1,
+      fromHost,
+      fromIp: ip,
+      byHost,
+      protocol,
+      timestamp,
+      delaySec,
+      hopType,
+      hopRole,
+      city: isInternal ? 'Internal Subnet' : (geo?.city || 'Public Relay Space'),
+      country: isInternal ? 'Private Network (RFC 1918)' : (geo?.country || 'Global Routing Area'),
+      countryCode: isInternal ? 'LAN' : (geo?.countryCode || 'NET'),
+      lat: isInternal ? undefined : geo?.lat,
+      lng: isInternal ? undefined : geo?.lng,
+      asn: isInternal ? 'RFC 1918' : (geo?.asn ? `AS${geo.asn}` : 'Unannounced'),
+      org: isInternal ? 'Corporate Intranet Segment' : (geo?.org || 'Internet Relay Host'),
+      reverseDns: ip ? (isInternal ? 'Internal Hostname (No PTR)' : geo?.reverseDns) : undefined,
+      abuseScore: 0,
+      isBlacklisted: false,
+      isProxyOrVpn: isVpn,
+      isTorExitNode: isTor,
+      is_tor: isTor,
+      is_vpn: isVpn,
+      isOrigin: hopRole === 'EXTERNAL_ORIGIN' || (idx === 0 && !firstExternalFound),
+      isPublicGateway: hopRole === 'EXTERNAL_ORIGIN',
+      isPrivate: isInternal,
+      isRfc1918: isInternal,
+      lookupMethod: isInternal ? 'RFC 1918 Subnet Classifier' : (geo?.lookupMethod || 'MaxMind GeoLite2'),
+      geonameId: geo?.geonameId,
+      continentCode: geo?.continentCode,
+      continentName: geo?.continentName,
+      timeZone: geo?.timeZone,
+      isInEuropeanUnion: geo?.isInEuropeanUnion,
+      accuracyRadius: geo?.accuracyRadius || 25,
+      maxmindVerified: isPublic && Boolean(geo?.isVerified),
+      maxmindSource: geo?.sourceFile,
+      maxmindCopyright: geo?.copyright,
+      maxmindLicense: geo?.license
+    });
+  });
+
+  return hops;
+}
+
