@@ -451,8 +451,15 @@ export function EvidenceTagCard({
   const [exportingImage, setExportingImage] = useState(false);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [maskPII, setMaskPII] = useState<boolean>(false);
-  const [hideLoggedInUserMailbox, setHideLoggedInUserMailbox] = useState<boolean>(false);
-  const [hiddenEnvelopeKeys, setHiddenEnvelopeKeys] = useState<string[]>([]);
+  const [hideLoggedInUserMailbox, setHideLoggedInUserMailbox] = useState<boolean>(true);
+  const [hiddenEnvelopeKeys, setHiddenEnvelopeKeys] = useState<string[]>(['RETURN-PATH', 'REPLY-TO']);
+
+  const toggleHideEnvelopeKey = (key: string) => {
+    const upper = key.toUpperCase();
+    setHiddenEnvelopeKeys(prev =>
+      prev.includes(upper) ? prev.filter(k => k !== upper) : [...prev, upper]
+    );
+  };
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [stixModalOpen, setStixModalOpen] = useState(false);
   const [mitreModalOpen, setMitreModalOpen] = useState(false);
@@ -1049,6 +1056,37 @@ export function EvidenceTagCard({
             <span>Mask PII</span>
             <span className={`w-1.5 h-1.5 rounded-full ${maskPII ? 'bg-[#CC9A4A] animate-pulse' : 'bg-[#574f42]'}`} />
           </button>
+
+          {/* Mailbox / Logged-in User Account Visibility Toggle */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setHideLoggedInUserMailbox(!hideLoggedInUserMailbox);
+            }}
+            className={`px-2 py-0.5 rounded-[4px] text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer border ${
+              hideLoggedInUserMailbox
+                ? 'bg-purple-950/40 border-purple-800/80 text-purple-300 font-semibold shadow-sm'
+                : 'bg-[#12161F] border-[#2B241E] text-[#8a8070] hover:text-[#ede6d8] hover:border-[#574f42]'
+            }`}
+            title={
+              hideLoggedInUserMailbox
+                ? 'Logged-in user mailbox is HIDDEN from evidence card. Click to restore.'
+                : 'Click to hide or remove logged-in user mailbox from evidence card.'
+            }
+          >
+            {hideLoggedInUserMailbox ? (
+              <EyeOff className="w-3 h-3 text-purple-400" />
+            ) : (
+              <Eye className="w-3 h-3 text-[#8a8070]" />
+            )}
+            <span>Mailbox: {hideLoggedInUserMailbox ? 'Hidden' : 'Visible'}</span>
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                hideLoggedInUserMailbox ? 'bg-purple-400' : 'bg-[#574f42]'
+              }`}
+            />
+          </button>
         </div>
       </motion.div>
 
@@ -1089,16 +1127,29 @@ export function EvidenceTagCard({
                 {cardData.score?.resultText} ({cardData.score?.resultLabel})
               </strong>
             </span>
-            <span>·</span>
-            <span className="flex items-center gap-1">
-              <User className="w-3 h-3 text-[#c9a227]" />
-              <span className="text-slate-300 font-semibold">
-                {hideLoggedInUserMailbox
-                  ? '[HIDDEN LOGGED-IN ACCOUNT]'
-                  : (analysis?.assigned_user || analysis?.assignedUser || user?.email || 'Jayaram Sappa')}
-              </span>
-              <span className="text-[10px] text-[#8a8070]">(Lead SOC)</span>
-            </span>
+            {!hideLoggedInUserMailbox && (
+              <>
+                <span>·</span>
+                <span className="flex items-center gap-1 group">
+                  <User className="w-3 h-3 text-[#c9a227]" />
+                  <span className="text-slate-300 font-semibold">
+                    {analysis?.assigned_user || analysis?.assignedUser || user?.email || 'Jayaram Sappa'}
+                  </span>
+                  <span className="text-[10px] text-[#8a8070]">(Lead SOC)</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHideLoggedInUserMailbox(true);
+                    }}
+                    className="ml-0.5 opacity-60 hover:opacity-100 hover:text-rose-400 text-[#8a8070] transition-opacity cursor-pointer p-0.5"
+                    title="Remove logged-in account from evidence card"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              </>
+            )}
           </div>
         </motion.div>
 
@@ -1194,22 +1245,91 @@ export function EvidenceTagCard({
         {/* 1️⃣ PILLAR 1: SENDER & ENVELOPE IDENTITY */}
         {(evidenceFilterTab === 'ALL' || evidenceFilterTab === 'SENDER') && (
           <motion.div variants={cardItemVariants} className="mb-4">
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
               <span className="section-label mb-0 flex items-center gap-1.5 text-blue-300">
                 <Mail className="w-3.5 h-3.5 text-blue-400" />
                 <span>1. SENDER &amp; ENVELOPE IDENTITY</span>
               </span>
-              <span className="text-[10px] font-mono text-[#8a8070]">Header Audit</span>
+              <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                {hiddenEnvelopeKeys.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setHiddenEnvelopeKeys([])}
+                    className="text-amber-400 hover:text-amber-300 underline cursor-pointer mr-1"
+                    title="Restore all hidden envelope headers"
+                  >
+                    Restore ({hiddenEnvelopeKeys.length} hidden)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const routing = ['RETURN-PATH', 'REPLY-TO'];
+                    const allPresent = routing.every(k => hiddenEnvelopeKeys.includes(k));
+                    if (allPresent) {
+                      setHiddenEnvelopeKeys(prev => prev.filter(k => !routing.includes(k)));
+                    } else {
+                      setHiddenEnvelopeKeys(prev => Array.from(new Set([...prev, ...routing])));
+                    }
+                  }}
+                  className={`px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                    ['RETURN-PATH', 'REPLY-TO'].every(k => hiddenEnvelopeKeys.includes(k))
+                      ? 'bg-amber-950/60 border-amber-800 text-amber-300 font-semibold'
+                      : 'bg-[#1a1612] border-[#2b241e] text-[#8a8070] hover:text-[#ede6d8]'
+                  }`}
+                  title="Toggle Return-Path and Reply-To header visibility on this evidence card"
+                >
+                  {['RETURN-PATH', 'REPLY-TO'].every(k => hiddenEnvelopeKeys.includes(k))
+                    ? '✓ Return-Path & Reply-To Hidden'
+                    : 'Hide Return-Path & Reply-To'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleHideEnvelopeKey('TO')}
+                  className={`px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                    hiddenEnvelopeKeys.includes('TO')
+                      ? 'bg-amber-950/60 border-amber-800 text-amber-300 font-semibold'
+                      : 'bg-[#1a1612] border-[#2b241e] text-[#8a8070] hover:text-[#ede6d8]'
+                  }`}
+                  title="Toggle Recipient (To) visibility on this evidence card"
+                >
+                  {hiddenEnvelopeKeys.includes('TO') ? '✓ To Hidden' : 'Hide To'}
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 bg-[#15120e] p-2.5 rounded border border-[#2b241e] text-[12px] font-mono">
-              {cardData.identityRows.map((r, idx) => (
-                <div key={idx} className="flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
-                  <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider">{r.k}:</span>
-                  <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
-                    {r.v}
-                  </span>
+              {cardData.identityRows
+                .filter(r => !hiddenEnvelopeKeys.includes(r.k.toUpperCase()))
+                .map((r, idx) => (
+                  <div key={idx} className="group flex items-baseline justify-between gap-2 py-0.5 border-b border-[#221c17] last:border-none">
+                    <span className="text-[10.5px] text-[#8a8070] uppercase font-semibold shrink-0 w-24 tracking-wider flex items-center gap-1">
+                      <span>{r.k}:</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleHideEnvelopeKey(r.k)}
+                        className="opacity-0 group-hover:opacity-100 hover:text-rose-400 text-slate-500 transition-opacity p-0.5 cursor-pointer"
+                        title={`Hide / Remove ${r.k} from evidence card`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                    <span className={`truncate text-right flex-1 ${r.status || ''} ${maskPII ? 'pii-sensitive pii-name pii-email' : ''}`} title={r.v}>
+                      {r.v}
+                    </span>
+                  </div>
+                ))}
+              {cardData.identityRows.filter(r => !hiddenEnvelopeKeys.includes(r.k.toUpperCase())).length === 0 && (
+                <div className="col-span-2 text-center py-2 text-[#8a8070] text-xs italic">
+                  All envelope identity rows have been hidden from this evidence card.{' '}
+                  <button
+                    type="button"
+                    onClick={() => setHiddenEnvelopeKeys([])}
+                    className="text-amber-400 hover:underline cursor-pointer ml-1"
+                  >
+                    Restore
+                  </button>
                 </div>
-              ))}
+              )}
             </div>
           </motion.div>
         )}

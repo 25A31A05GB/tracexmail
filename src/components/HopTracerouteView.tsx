@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { EmailAnalysis, EmailHop } from '../types';
 import { NetworkFlowDiagram } from './NetworkFlowDiagram';
+import { D3MailActorGraph } from './D3MailActorGraph';
 
 interface HopTracerouteProps {
   analysis: EmailAnalysis;
@@ -25,7 +26,7 @@ interface HopTracerouteProps {
 export function HopTracerouteView({ analysis }: HopTracerouteProps) {
   const [selectedHopIndex, setSelectedHopIndex] = useState<number>(0);
   const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'timeline' | 'flow'>('flow');
+  const [viewMode, setViewMode] = useState<'d3' | 'flow' | 'timeline'>('d3');
 
   const hops = Array.isArray(analysis?.hops) ? analysis.hops : [];
   const activeHop = hops[selectedHopIndex] || hops[0] || {} as EmailHop;
@@ -65,13 +66,22 @@ export function HopTracerouteView({ analysis }: HopTracerouteProps) {
           {/* View Mode Toggle */}
           <div className="flex items-center bg-slate-900 border border-slate-700 p-0.5 rounded-lg">
             <button
+              onClick={() => setViewMode('d3')}
+              className={`px-3 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${
+                viewMode === 'd3' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>D3 Dynamic Hops</span>
+            </button>
+            <button
               onClick={() => setViewMode('flow')}
               className={`px-3 py-1 text-xs font-semibold rounded-md flex items-center gap-1.5 cursor-pointer transition-colors ${
                 viewMode === 'flow' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Workflow className="w-3.5 h-3.5" />
-              <span>Topology Graph</span>
+              <span>DAG Flow</span>
             </button>
             <button
               onClick={() => setViewMode('timeline')}
@@ -95,6 +105,16 @@ export function HopTracerouteView({ analysis }: HopTracerouteProps) {
           </div>
         </div>
       </div>
+
+      {/* Dynamic D3 Node-Link Graph View */}
+      {viewMode === 'd3' && (
+        <div className="w-full">
+          <D3MailActorGraph 
+            analysis={analysis} 
+            height={560} 
+          />
+        </div>
+      )}
 
       {/* Interactive Graph View */}
       {viewMode === 'flow' && (

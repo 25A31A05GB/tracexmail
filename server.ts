@@ -8241,6 +8241,110 @@ Thanks!`;
   // Centralized Error Handling Middleware (Catches and sanitizes all uncaught API errors)
   app.use(errorHandler);
 
+  // SEO, LLM Knowledge Standard & Security Policy Routes
+  app.get(['/llms.txt', '/.well-known/llms.txt'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'llms.txt');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('llms.txt not found');
+  });
+
+  app.get('/llms-full.txt', (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'llms-full.txt');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('llms-full.txt not found');
+  });
+
+  app.get(['/.well-known/security.txt', '/security.txt'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', '.well-known', 'security.txt');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('security.txt not found');
+  });
+
+  app.get('/ads.txt', (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'ads.txt');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('ads.txt not found');
+  });
+
+  // Crawlable Editorial & Legal HTML Document Endpoints for Search Engines & Google AdSense Reviewers
+  app.get(['/about', '/about/index.html'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'about', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('About page not found');
+  });
+
+  app.get(['/knowledge', '/knowledge/', '/knowledge/index.html'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'knowledge', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('Knowledge base not found');
+  });
+
+  app.get('/knowledge/:slug', (req, res, next) => {
+    let slug = req.params.slug;
+    if (!slug.endsWith('.html')) slug += '.html';
+    const filePath = path.join(process.cwd(), 'public', 'knowledge', slug);
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    next();
+  });
+
+  app.get(['/privacy', '/privacy/index.html'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'privacy', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('Privacy policy not found');
+  });
+
+  app.get(['/terms', '/terms/index.html'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'terms', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('Terms of service not found');
+  });
+
+  app.get(['/contact', '/contact/index.html'], (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'contact', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+    res.status(404).send('Contact page not found');
+  });
+
   // Serve static files in production / Vite in dev
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

@@ -1447,6 +1447,20 @@ export function LandingView({
 
           <nav aria-label="Legal and Platform Verification" className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs font-mono">
             <a
+              id="footer-link-about"
+              href="/about"
+              className="link-basement text-[#ede6d8] hover:text-[#c9a227] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#c9a227]"
+            >
+              About Us
+            </a>
+            <a
+              id="footer-link-knowledge"
+              href="/knowledge"
+              className="link-basement text-[#ede6d8] hover:text-[#c9a227] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#c9a227]"
+            >
+              Knowledge Base
+            </a>
+            <a
               id="footer-link-privacy"
               href="/privacy"
               className="link-basement text-[#b9af9c] hover:text-[#ede6d8] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#ede6d8]"

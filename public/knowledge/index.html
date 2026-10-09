@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email Forensics &amp; Threat Intelligence Knowledge Base | TraceXMail</title>
+    <meta name="description" content="Free cybersecurity and email forensics tutorials, RFC 5322 header analysis guides, SPF/DKIM/DMARC protocols, and SOC phishing investigation playbooks." />
+    <link rel="canonical" href="https://tracexmail.vercel.app/knowledge" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Google AdSense Account Verification -->
+    <meta name="google-adsense-account" content="ca-pub-9357545069587539" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9357545069587539" crossorigin="anonymous"></script>
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: #14120f;
+        color: #ede6d8;
+        line-height: 1.6;
+        margin: 0;
+        padding: 24px;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #1b1814;
+        border: 1px solid #2e2922;
+        border-radius: 8px;
+        padding: 40px;
+      }
+      .nav {
+        margin-bottom: 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #2e2922;
+        padding-bottom: 16px;
+      }
+      .nav a {
+        text-decoration: none;
+        color: #ede6d8;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .nav a.back {
+        color: #e87063;
+        font-size: 13px;
+      }
+      h1 {
+        color: #ffffff;
+        font-size: 32px;
+        margin-top: 0;
+        margin-bottom: 10px;
+      }
+      p.subtitle {
+        color: #b9af9c;
+        font-size: 16px;
+        margin-top: 0;
+        margin-bottom: 30px;
+      }
+      .articles-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .article-card {
+        background: #14120f;
+        border: 1px solid #3a352c;
+        border-radius: 6px;
+        padding: 24px;
+        transition: border-color 0.2s ease;
+      }
+      .article-card:hover {
+        border-color: #c9a227;
+      }
+      .article-meta {
+        font-size: 12px;
+        font-family: monospace;
+        color: #c9a227;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 12px;
+      }
+      .article-title {
+        font-size: 20px;
+        color: #ede6d8;
+        margin: 0 0 10px 0;
+      }
+      .article-title a {
+        color: #ede6d8;
+        text-decoration: none;
+      }
+      .article-title a:hover {
+        color: #e87063;
+      }
+      .article-desc {
+        color: #b9af9c;
+        font-size: 14px;
+        line-height: 1.6;
+        margin-bottom: 16px;
+      }
+      .read-link {
+        color: #e87063;
+        font-size: 13px;
+        font-weight: bold;
+        text-decoration: none;
+      }
+      .read-link:hover {
+        text-decoration: underline;
+      }
+      footer {
+        border-top: 1px solid #2e2922;
+        margin-top: 48px;
+        padding-top: 24px;
+        font-size: 13px;
+        color: #8a8070;
+        text-align: center;
+      }
+      footer a {
+        color: #ede6d8;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <nav class="nav">
+        <a href="/">🛡️ TraceXMail Forensics</a>
+        <a href="/" class="back">← Back to Threat Console</a>
+      </nav>
+
+      <h1>Cybersecurity &amp; Email Forensics Knowledge Base</h1>
+      <p class="subtitle">
+        Authoritative guides, RFC protocol breakdowns, and SOC incident response documentation maintained by the TraceXMail forensic intelligence research team.
+      </p>
+
+      <div class="articles-grid">
+        <article class="article-card">
+          <div class="article-meta">
+            <span>PROTOCOL DEEP-DIVE</span>
+            <span>•</span>
+            <span>RFC 7208 / RFC 6376 / RFC 7489</span>
+            <span>•</span>
+            <span>12 MIN READ</span>
+          </div>
+          <h2 class="article-title">
+            <a href="/knowledge/understanding-spf-dkim-dmarc.html">
+              Understanding Email Authentication: A Complete Guide to SPF, DKIM, and DMARC
+            </a>
+          </h2>
+          <p class="article-desc">
+            Learn how the foundational pillars of modern email security work together to prevent domain spoofing. We explore DNS record syntax, header canonicalization algorithms, SPF alignment vs DKIM alignment, strict vs relaxed policy enforcement, and how to analyze aggregate DMARC feedback reports.
+          </p>
+          <a href="/knowledge/understanding-spf-dkim-dmarc.html" class="read-link">Read Full Guide →</a>
+        </article>
+
+        <article class="article-card">
+          <div class="article-meta">
+            <span>FORENSIC METHODOLOGY</span>
+            <span>•</span>
+            <span>RFC 5322 &amp; MTA HOP TRACING</span>
+            <span>•</span>
+            <span>10 MIN READ</span>
+          </div>
+          <h2 class="article-title">
+            <a href="/knowledge/email-header-forensics-guide.html">
+              The Definitive Guide to Email Header Forensics &amp; Hop Traceroutes
+            </a>
+          </h2>
+          <p class="article-desc">
+            Raw email headers contain immutable footprints of the journey an email took across the Internet. Discover how to inspect the Received header chain chronologically, identify forged client hops, calculate Mail Transfer Agent (MTA) traversal latencies, and expose spoofed Message-ID headers.
+          </p>
+          <a href="/knowledge/email-header-forensics-guide.html" class="read-link">Read Full Guide →</a>
+        </article>
+
+        <article class="article-card">
+          <div class="article-meta">
+            <span>THREAT HUNTING PLAYBOOK</span>
+            <span>•</span>
+            <span>MITRE ATT&amp;CK T1566 &amp; BEC</span>
+            <span>•</span>
+            <span>11 MIN READ</span>
+          </div>
+          <h2 class="article-title">
+            <a href="/knowledge/detecting-phishing-and-bec.html">
+              Detecting Advanced Phishing and Business Email Compromise: SOC Analyst Playbook
+            </a>
+          </h2>
+          <p class="article-desc">
+            Explore advanced threat actor techniques including Punycode / IDN homoglyph spoofing, cousin domain impersonation, weaponized SVG/HTML attachments, credential harvesting redirects, and zero-script visual detonation methodologies used by modern enterprise SOC teams.
+          </p>
+          <a href="/knowledge/detecting-phishing-and-bec.html" class="read-link">Read Full Guide →</a>
+        </article>
+      </div>
+
+      <footer>
+        <p>
+          <a href="/">Console</a> | 
+          <a href="/about">About Us</a> | 
+          <a href="/knowledge">Knowledge Base</a> | 
+          <a href="/privacy">Privacy Policy</a> | 
+          <a href="/terms">Terms of Service</a> | 
+          <a href="/cookies">Cookie Policy</a> | 
+          <a href="/domains">Authorized Domains</a> | 
+          <a href="/contact">Contact</a>
+        </p>
+        <p style="margin-top: 10px; font-size: 12px; color: #6b6254;">
+          &copy; 2026 TraceXMail Forensic Intelligence Platform. All rights reserved.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

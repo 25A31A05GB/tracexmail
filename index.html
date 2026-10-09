@@ -2,7 +2,8 @@
 <html lang="en" class="dark">
   <head>
     <meta name="google-site-verification" content="9bF4Cz39N7XjzKd2sITjAB9fZx4zg2wn0iX3LZzPK38" />
- <meta name="google-adsense-account" content="ca-pub-9357545069587539">
+    <meta name="google-adsense-account" content="ca-pub-9357545069587539" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9357545069587539" crossorigin="anonymous"></script>
     <meta charset="UTF-8" />
     <script>
       // Runtime constraint: HMR is disabled in AI Studio container. Suppress Vite HMR / WebSocket connection notices.
@@ -86,26 +87,196 @@
     <meta name="twitter:description" content="Email Forensics, Threat Intelligence, Header Analysis, Hop Traceroute &amp; ML Phishing Detection Platform" />
     <meta name="twitter:image" content="https://tracexmail.vercel.app/og-image.png" />
 
-    <!-- Schema.org SoftwareApplication Structured Data -->
+    <!-- Schema.org Identity: Organization, Person & SoftwareApplication Structured Data -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "TraceXMail",
-      "description": "Email Forensics, Threat Intelligence, Header Analysis, Hop Traceroute & ML Phishing Detection Platform",
-      "applicationCategory": "SecurityApplication",
-      "operatingSystem": "Web"
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://tracexmail.vercel.app/#organization",
+          "name": "TraceXMail Forensic Intelligence",
+          "alternateName": "TraceXMail",
+          "url": "https://tracexmail.vercel.app/",
+          "logo": "https://tracexmail.vercel.app/android-chrome-512x512.png",
+          "description": "Enterprise email forensics, threat intelligence, and zero-hallucination attack analysis platform.",
+          "email": "tracexmailofficial@gmail.com",
+          "founder": {
+            "@type": "Person",
+            "@id": "https://tracexmail.vercel.app/#founder",
+            "name": "Jayaram Sappa",
+            "jobTitle": "Lead Security Researcher & Founder",
+            "email": "jayramsappa537@gmail.com"
+          },
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "Security & Incident Response",
+            "email": "tracexmailofficial@gmail.com",
+            "url": "https://tracexmail.vercel.app/contact"
+          },
+          "sameAs": [
+            "https://github.com/tracexmail",
+            "https://x.com/tracexmail"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://tracexmail.vercel.app/#website",
+          "url": "https://tracexmail.vercel.app/",
+          "name": "TraceXMail",
+          "publisher": { "@id": "https://tracexmail.vercel.app/#organization" },
+          "description": "Enterprise Email Forensics, Header Analysis, Hop Traceroute & ML Phishing Detection"
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://tracexmail.vercel.app/#software",
+          "name": "TraceXMail",
+          "applicationCategory": "SecurityApplication",
+          "operatingSystem": "Web",
+          "url": "https://tracexmail.vercel.app/",
+          "publisher": { "@id": "https://tracexmail.vercel.app/#organization" },
+          "author": { "@id": "https://tracexmail.vercel.app/#founder" },
+          "description": "Enterprise Email Forensics, Threat Intelligence, Header Hop Traceroute & ML Phishing Detection Platform featuring live detonation sandbox, MITRE ATT&CK correlation, and FRE 902 digital evidence custody certification.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          }
+        }
+      ]
     }
     </script>
     <title>TraceXMail | Email Forensics &amp; Threat Intelligence Platform</title>
+
+    <!-- Google Analytics 4 (GA4) - Asynchronous & Privacy-First -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TRACEXMAIL1"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-TRACEXMAIL1', {
+        anonymize_ip: true,
+        send_page_view: true
+      });
+    </script>
+
+    <!-- Non-Blocking Google Fonts Preload to Eliminate Render-Blocking Resources -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fira+Code:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Syne:wght@500;600;700;800&family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
-    <!-- Cloudflare Turnstile Verification API -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+    <link 
+      rel="preload" 
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" 
+      as="style" 
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link 
+        rel="stylesheet" 
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" 
+      />
+    </noscript>
+
+    <!-- Critical Inlined CSS to Eliminate FOUC & Avoid Render-Blocking -->
+    <style>
+      :root {
+        --bg-base: #14120f;
+        --text-base: #ede6d8;
+        --color-primary: #b23a2e;
+      }
+      html, body {
+        background-color: #14120f;
+        color: #ede6d8;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ::selection {
+        background-color: #b23a2e;
+        color: #ede6d8;
+      }
+    </style>
   </head>
   <body class="bg-[#14120f] text-[#ede6d8] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8]">
-    <div id="root"></div>
+    <!-- Initial Semantic HTML Skeleton for Search Engines & LLM Web Crawlers (GEO & AdSense Review) -->
+    <div id="root">
+      <div style="padding: 32px 24px; max-width: 980px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: #ede6d8; line-height: 1.7;">
+        <header style="border-bottom: 1px solid #3a352c; padding-bottom: 20px; margin-bottom: 28px;">
+          <h1 style="font-size: 28px; margin: 0 0 10px 0; color: #ffffff; letter-spacing: -0.02em;">TraceXMail Forensic Intelligence Platform</h1>
+          <p style="font-size: 15px; color: #b9af9c; margin: 0 0 14px 0;">Enterprise RFC 822 Email Forensics, Hop Traceroute Deconstruction &amp; Threat Intelligence Research</p>
+          <nav style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px;">
+            <a href="/" style="color: #c9a227; text-decoration: none; font-weight: bold;">Threat Console</a>
+            <a href="/about" style="color: #ede6d8; text-decoration: none;">About Us</a>
+            <a href="/knowledge" style="color: #ede6d8; text-decoration: none;">Knowledge Base</a>
+            <a href="/security" style="color: #b9af9c; text-decoration: none;">Security Architecture</a>
+            <a href="/domains" style="color: #b9af9c; text-decoration: none;">Domain &amp; SPF Setup</a>
+            <a href="/privacy" style="color: #b9af9c; text-decoration: none;">Privacy Policy</a>
+            <a href="/terms" style="color: #b9af9c; text-decoration: none;">Terms of Service</a>
+            <a href="/cookies" style="color: #b9af9c; text-decoration: none;">Cookie Policy</a>
+            <a href="/contact" style="color: #b9af9c; text-decoration: none;">Contact SOC</a>
+            <a href="/llms.txt" style="color: #4ade80; text-decoration: none;">LLM Specification (llms.txt)</a>
+          </nav>
+        </header>
+
+        <main>
+          <section style="margin-bottom: 32px;">
+            <h2 style="font-size: 20px; color: #ffffff; margin-bottom: 12px;">Automated Email Forensic Deconstruction &amp; Threat Intelligence</h2>
+            <p style="color: #b9af9c; font-size: 14.5px;">
+              TraceXMail provides defensive cybersecurity practitioners, incident response teams, and SOC analysts with an end-to-end investigation suite for deconstructing phishing lures, business email compromise (BEC), and spoofed email headers. Unlike traditional email security solutions that output opaque verdicts, TraceXMail provides transparent, reproducible, and court-admissible forensic dossiers backed by bit-exact SHA-256 evidence digests.
+            </p>
+          </section>
+
+          <section style="margin-bottom: 32px;">
+            <h2 style="font-size: 20px; color: #ffffff; margin-bottom: 14px;">Core Capabilities &amp; Technical Architecture</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+              <div style="background: #191612; border: 1px solid #332c23; padding: 18px; border-radius: 6px;">
+                <h3 style="font-size: 16px; margin: 0 0 6px 0; color: #ede6d8;">Safe Visual Detonation Sandbox</h3>
+                <p style="font-size: 13.5px; color: #9c917f; margin: 0; line-height: 1.6;">Zero-script, DOM-isolated sandbox iframe defangs tracking pixels, web beacons, and malicious JavaScript payloads while preserving visual fidelity for analysts.</p>
+              </div>
+              <div style="background: #191612; border: 1px solid #332c23; padding: 18px; border-radius: 6px;">
+                <h3 style="font-size: 16px; margin: 0 0 6px 0; color: #ede6d8;">MTA Hop Traceroute Chronology</h3>
+                <p style="font-size: 13.5px; color: #9c917f; margin: 0; line-height: 1.6;">Dissects every RFC 5322 Received header, resolves autonomous system numbers (ASN), computes server transfer latencies in milliseconds, and detects injected forged hops.</p>
+              </div>
+              <div style="background: #191612; border: 1px solid #332c23; padding: 18px; border-radius: 6px;">
+                <h3 style="font-size: 16px; margin: 0 0 6px 0; color: #ede6d8;">Cryptographic Protocol Validation</h3>
+                <p style="font-size: 13.5px; color: #9c917f; margin: 0; line-height: 1.6;">Automated verification of Sender Policy Framework (RFC 7208), DomainKeys Identified Mail (RFC 6376), and DMARC alignment (RFC 7489) in strict and relaxed modes.</p>
+              </div>
+              <div style="background: #191612; border: 1px solid #332c23; padding: 18px; border-radius: 6px;">
+                <h3 style="font-size: 16px; margin: 0 0 6px 0; color: #ede6d8;">MITRE ATT&amp;CK Matrix Correlation</h3>
+                <p style="font-size: 13.5px; color: #9c917f; margin: 0; line-height: 1.6;">Maps email threat indicators to enterprise attack tactics (T1566 Phishing, T1586 Compromised Accounts, T1534 Internal Spearphishing) with actionable mitigation guidance.</p>
+              </div>
+            </div>
+          </section>
+
+          <section style="margin-bottom: 32px; background: #16130f; border: 1px solid #3a352c; padding: 24px; border-radius: 8px;">
+            <h2 style="font-size: 20px; color: #ffffff; margin-top: 0; margin-bottom: 12px;">Cybersecurity Research &amp; Knowledge Base Guides</h2>
+            <p style="color: #b9af9c; font-size: 14px; margin-bottom: 16px;">
+              Read our peer-reviewed technical tutorials and forensic methodologies published for security practitioners:
+            </p>
+            <ul style="font-size: 14px; line-height: 2; color: #e87063; padding-left: 20px; margin: 0;">
+              <li>
+                <a href="/knowledge/understanding-spf-dkim-dmarc.html" style="color: #ede6d8; text-decoration: underline;">Understanding Email Authentication: SPF, DKIM, and DMARC Deep Dive</a>
+                <span style="color: #8a8070; font-size: 12px; margin-left: 8px;">(RFC 7208 / RFC 6376 / RFC 7489 Specifications)</span>
+              </li>
+              <li>
+                <a href="/knowledge/email-header-forensics-guide.html" style="color: #ede6d8; text-decoration: underline;">The Definitive Guide to Email Header Forensics &amp; Hop Traceroutes</a>
+                <span style="color: #8a8070; font-size: 12px; margin-left: 8px;">(Decoding Received Chains, MTA Latency &amp; Injected Hops)</span>
+              </li>
+              <li>
+                <a href="/knowledge/detecting-phishing-and-bec.html" style="color: #ede6d8; text-decoration: underline;">Detecting Advanced Phishing &amp; Business Email Compromise (BEC)</a>
+                <span style="color: #8a8070; font-size: 12px; margin-left: 8px;">(Punycode Homoglyphs, Display Name Spoofing &amp; SOC Playbooks)</span>
+              </li>
+            </ul>
+          </section>
+
+          <section style="border-top: 1px solid #2d261e; padding-top: 20px; font-size: 13px; color: #8a8070; line-height: 1.8;">
+            <p><strong>Published Security Standards:</strong> RFC 5322 (Internet Message Format), RFC 7208 (SPF), RFC 6376 (DKIM), RFC 7489 (DMARC), RFC 8617 (ARC), NIST SP 800-86.</p>
+            <p><strong>Project Leadership:</strong> Jayaram Sappa (Lead Forensic Security Researcher) | Contact: <a href="mailto:jayramsappa537@gmail.com" style="color: #b9af9c;">jayramsappa537@gmail.com</a></p>
+          </section>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

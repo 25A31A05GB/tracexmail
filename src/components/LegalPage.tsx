@@ -41,7 +41,7 @@ import {
 import { TraceXLogo } from './common/TraceXLogo';
 import { updatePageMetadata, ROUTE_METADATA } from '../utils/seo';
 
-export type LegalPageType = 'privacy' | 'terms' | 'cookies' | 'domains' | 'contact' | 'security';
+export type LegalPageType = 'about' | 'privacy' | 'terms' | 'cookies' | 'domains' | 'contact' | 'security';
 
 interface LegalPageProps {
   type?: LegalPageType;
@@ -49,7 +49,7 @@ interface LegalPageProps {
   onNavigateToPath?: (path: string) => void;
 }
 
-export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }: LegalPageProps) {
+export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: LegalPageProps) {
   const [activeTab, setActiveTab] = useState<LegalPageType>(type);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -99,6 +99,7 @@ export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }
   };
 
   const tabs: { id: LegalPageType; label: string; path: string; icon: any; summary: string; readTime: string }[] = [
+    { id: 'about', label: 'About Us', path: '/about', icon: Info, summary: 'Mission, RFC standards & founder leadership', readTime: '5 min read' },
     { id: 'privacy', label: 'Privacy Policy', path: '/privacy', icon: Lock, summary: 'GDPR, CCPA & Google Limited Use', readTime: '7 min read' },
     { id: 'terms', label: 'Terms of Service', path: '/terms', icon: FileText, summary: 'Authorized use, SLA & liability', readTime: '6 min read' },
     { id: 'cookies', label: 'Cookie Policy', path: '/cookies', icon: CookieIcon, summary: 'Local storage & zero-tracking', readTime: '4 min read' },
@@ -241,6 +242,7 @@ export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-['Fraunces',serif]">
+                {activeTab === 'about' && 'About TraceXMail & Forensic Intelligence Mission'}
                 {activeTab === 'privacy' && 'Privacy Policy & Data Protection Standard'}
                 {activeTab === 'terms' && 'Terms of Service & Lawful Forensic Use'}
                 {activeTab === 'cookies' && 'Cookie Policy & Local Storage Transparency'}
@@ -249,6 +251,7 @@ export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }
                 {activeTab === 'contact' && 'Developer Contact, DPO & Legal Enquiries'}
               </h1>
               <p className="mt-1.5 text-xs sm:text-sm text-[#b9af9c] leading-relaxed max-w-3xl">
+                {activeTab === 'about' && 'Enterprise RFC 822 email forensic engineering, cryptographic header verification, zero-retention architecture, and founder profile for Jayaram Sappa.'}
                 {activeTab === 'privacy' && 'Comprehensive disclosure of data minimization principles, cryptographic RFC 822 forensic parsing, Google OAuth Limited Use adherence, zero-training AI guarantee, and GDPR/CCPA data subject rights.'}
                 {activeTab === 'terms' && 'Governing terms, lawful digital forensic investigation mandates, 100% customer evidentiary dossier ownership, assistive AI disclaimers, and 99.9% uptime commitments.'}
                 {activeTab === 'cookies' && 'Transparent breakdown of essential authentication tokens, client preference stores, zero third-party trackers guarantee, and live browser storage audit utilities.'}
@@ -317,6 +320,7 @@ export function LegalPage({ type = 'privacy', onNavigateHome, onNavigateToPath }
 
         {/* Content Container */}
         <div id="legal-content-container" className="space-y-6">
+          {activeTab === 'about' && <AboutContent filter={searchQuery} onCopy={handleCopy} copiedKey={copiedKey} />}
           {activeTab === 'privacy' && <PrivacyContent filter={searchQuery} onCopy={handleCopy} copiedKey={copiedKey} />}
           {activeTab === 'terms' && <TermsContent filter={searchQuery} onCopy={handleCopy} copiedKey={copiedKey} />}
           {activeTab === 'cookies' && <CookiesContent filter={searchQuery} onCopy={handleCopy} copiedKey={copiedKey} />}
@@ -1115,6 +1119,68 @@ function DomainsContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
           </div>
         </div>
       </Section>
+
+      <Section title="3. Domain SPF, DKIM &amp; DMARC DNS Record Configuration Guide" badge="Anti-Spoofing & RFC 7208" filter={filter}>
+        <p>
+          To protect your organization against spoofed emails, domain impersonation, and Business Email Compromise (BEC), publish the following recommended DNS records for your domain:
+        </p>
+
+        <div className="space-y-3 mt-4">
+          <div className="p-3.5 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-amber-400">1. Sender Policy Framework (SPF - RFC 7208)</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-700 text-emerald-300">DNS TXT Record</span>
+            </div>
+            <p className="text-[11px] text-[#8a8070]">Authorizes legitimate mail transfer agents and rejects unauthorized spoofing servers:</p>
+            <div className="p-2.5 rounded bg-[#0d0c0a] border border-[#241f19] flex items-center justify-between font-mono text-xs text-[#ede6d8]">
+              <code className="select-all break-all">v=spf1 include:_spf.google.com ~all</code>
+              <button
+                type="button"
+                onClick={() => onCopy('v=spf1 include:_spf.google.com ~all', 'dns_spf')}
+                className="ml-2 text-xs text-amber-400 hover:underline shrink-0 cursor-pointer"
+              >
+                {copiedKey === 'dns_spf' ? 'Copied!' : 'Copy TXT'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-cyan-400">2. DMARC Policy (RFC 7489)</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-700 text-cyan-300">DNS TXT (_dmarc)</span>
+            </div>
+            <p className="text-[11px] text-[#8a8070]">Instructs recipient gateways to reject unauthenticated mail claiming to originate from your domain:</p>
+            <div className="p-2.5 rounded bg-[#0d0c0a] border border-[#241f19] flex items-center justify-between font-mono text-xs text-[#ede6d8]">
+              <code className="select-all break-all">v=DMARC1; p=reject; rua=mailto:dmarc-reports@tracexmail.vercel.app; pct=100</code>
+              <button
+                type="button"
+                onClick={() => onCopy('v=DMARC1; p=reject; rua=mailto:dmarc-reports@tracexmail.vercel.app; pct=100', 'dns_dmarc')}
+                className="ml-2 text-xs text-amber-400 hover:underline shrink-0 cursor-pointer"
+              >
+                {copiedKey === 'dns_dmarc' ? 'Copied!' : 'Copy TXT'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-purple-400">3. RFC 9116 Security Policy Contact</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950/60 border border-purple-700 text-purple-300">Published URI</span>
+            </div>
+            <p className="text-[11px] text-[#8a8070]">Direct link to published machine-readable security policy for automated vulnerability scanners:</p>
+            <div className="p-2.5 rounded bg-[#0d0c0a] border border-[#241f19] flex items-center justify-between font-mono text-xs text-[#ede6d8]">
+              <code className="select-all break-all">https://tracexmail.vercel.app/.well-known/security.txt</code>
+              <button
+                type="button"
+                onClick={() => onCopy('https://tracexmail.vercel.app/.well-known/security.txt', 'dns_sec_txt')}
+                className="ml-2 text-xs text-amber-400 hover:underline shrink-0 cursor-pointer"
+              >
+                {copiedKey === 'dns_sec_txt' ? 'Copied!' : 'Copy URI'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Section>
     </>
   );
 }
@@ -1348,6 +1414,116 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
             </button>
           </form>
         )}
+      </Section>
+    </>
+  );
+}
+
+function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (text: string, key: string) => void; copiedKey: string | null }) {
+  return (
+    <>
+      <Section id="about-mission" title="1. Platform Mission & Engineering Philosophy" filter={filter}>
+        <p className="text-xs sm:text-sm text-[#b9af9c] leading-relaxed">
+          TraceXMail was engineered to bring absolute transparency, mathematical rigor, and court-admissible forensic verification to email threat detection. Over 85% of corporate cyber breaches initiate via deceptive email lures. Traditional gateways often output opaque verdicts without showing analysts the underlying transport layer evidence.
+        </p>
+        <p className="mt-2 text-xs sm:text-sm text-[#b9af9c] leading-relaxed">
+          Our platform deconstructs raw RFC 822 / RFC 5322 payloads down to every individual Mail Transfer Agent (MTA) hop, validates cryptographic public key DNS proofs (SPF, DKIM, DMARC, ARC), and exposes forged headers without hallucination.
+        </p>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="bg-[#120f0c] p-3 rounded border border-[#2d271f]">
+            <div className="text-xs font-mono text-amber-400 font-bold">RFC 5322 Standards</div>
+            <div className="text-[11px] text-[#8a8070] mt-1">Bit-exact reverse chronological Received hop deconstruction.</div>
+          </div>
+          <div className="bg-[#120f0c] p-3 rounded border border-[#2d271f]">
+            <div className="text-xs font-mono text-cyan-400 font-bold">FRE 902 Custody</div>
+            <div className="text-[11px] text-[#8a8070] mt-1">Court-admissible electronic digital records with SHA-256 digests.</div>
+          </div>
+          <div className="bg-[#120f0c] p-3 rounded border border-[#2d271f]">
+            <div className="text-xs font-mono text-green-400 font-bold">Zero-Retention Enclave</div>
+            <div className="text-[11px] text-[#8a8070] mt-1">Client-isolated processing that never trains public machine models.</div>
+          </div>
+        </div>
+      </Section>
+
+      <Section id="about-leadership" title="2. Leadership & Lead Researcher Profile" filter={filter}>
+        <div className="flex flex-col sm:flex-row items-start gap-4 bg-[#120f0c] p-4 rounded-lg border border-[#2d271f]">
+          <div className="w-14 h-14 rounded-full bg-[#1c1813] border-2 border-amber-400/80 flex items-center justify-center font-bold text-lg text-[#ede6d8] shrink-0 font-mono">
+            JS
+          </div>
+          <div className="space-y-1.5 text-xs text-[#b9af9c]">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white font-['Fraunces',serif]">Jayaram Sappa</span>
+              <span className="text-[10px] font-mono bg-amber-400/10 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded">Founder &amp; Lead Researcher</span>
+            </div>
+            <p className="text-[12px] text-[#8a8070] leading-relaxed">
+              Cybersecurity researcher specializing in digital forensics, incident response automation, applied cryptography, and defensive threat intelligence. Jayaram designed TraceXMail to provide security operations center (SOC) analysts worldwide with open, mathematically verifiable email diagnostics.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-mono">
+              <span className="text-[#8a8070]">Email:</span>
+              <a href="mailto:jayramsappa537@gmail.com" className="text-amber-400 hover:underline">jayramsappa537@gmail.com</a>
+              <span className="text-[#3a3225]">•</span>
+              <span className="text-[#8a8070]">Official SOC:</span>
+              <a href="mailto:tracexmailofficial@gmail.com" className="text-amber-400 hover:underline">tracexmailofficial@gmail.com</a>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section id="about-standards" title="3. Supported Cryptographic & Forensics Standards" filter={filter}>
+        <div className="space-y-2 text-xs font-mono text-[#b9af9c]">
+          <div className="p-2.5 rounded bg-[#120f0c] border border-[#2d271f] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>RFC 7208 — Sender Policy Framework (SPF)</span>
+            <span className="text-amber-400 text-[11px]">Strict &amp; SoftFail Evaluation + 10-Lookup Limit</span>
+          </div>
+          <div className="p-2.5 rounded bg-[#120f0c] border border-[#2d271f] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>RFC 6376 — DomainKeys Identified Mail (DKIM)</span>
+            <span className="text-amber-400 text-[11px]">RSA-SHA256 &amp; Ed25519 Cryptographic Verification</span>
+          </div>
+          <div className="p-2.5 rounded bg-[#120f0c] border border-[#2d271f] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>RFC 7489 — DMARC Alignment Protocol</span>
+            <span className="text-amber-400 text-[11px]">Strict &amp; Relaxed Identifier Alignment</span>
+          </div>
+          <div className="p-2.5 rounded bg-[#120f0c] border border-[#2d271f] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>RFC 8617 — Authenticated Received Chain (ARC)</span>
+            <span className="text-amber-400 text-[11px]">Cross-Forwarder Cryptographic Continuity</span>
+          </div>
+          <div className="p-2.5 rounded bg-[#120f0c] border border-[#2d271f] flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span>NIST SP 800-86 — Forensic Incident Guidelines</span>
+            <span className="text-amber-400 text-[11px]">Digital Media &amp; Evidence Handling Standards</span>
+          </div>
+        </div>
+      </Section>
+
+      <Section id="about-knowledge" title="4. Open Research & Knowledge Base Tutorials" filter={filter}>
+        <p className="text-xs text-[#b9af9c] mb-3">
+          Explore our complete educational guides published for security operations practitioners:
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <a
+            href="/knowledge/understanding-spf-dkim-dmarc.html"
+            className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
+          >
+            <div className="text-xs font-bold text-white mb-1">SPF, DKIM &amp; DMARC</div>
+            <div className="text-[11px] text-[#8a8070]">Deep dive into email authentication and alignment mechanics.</div>
+            <div className="text-[11px] text-amber-400 mt-2 font-mono">Read Guide &rarr;</div>
+          </a>
+          <a
+            href="/knowledge/email-header-forensics-guide.html"
+            className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
+          >
+            <div className="text-xs font-bold text-white mb-1">Header Forensics</div>
+            <div className="text-[11px] text-[#8a8070]">Decoding Received hops, MTA latency, and forged headers.</div>
+            <div className="text-[11px] text-amber-400 mt-2 font-mono">Read Guide &rarr;</div>
+          </a>
+          <a
+            href="/knowledge/detecting-phishing-and-bec.html"
+            className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
+          >
+            <div className="text-xs font-bold text-white mb-1">Phishing &amp; BEC Playbook</div>
+            <div className="text-[11px] text-[#8a8070]">SOC triage for lookalike domains and weaponized lures.</div>
+            <div className="text-[11px] text-amber-400 mt-2 font-mono">Read Guide &rarr;</div>
+          </a>
+        </div>
       </Section>
     </>
   );

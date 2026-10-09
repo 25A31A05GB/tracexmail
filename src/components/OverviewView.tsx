@@ -61,6 +61,7 @@ import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
 import { CaseTagManager } from './CaseTagManager';
 import { EnterpriseForensicDossier } from './EnterpriseForensicDossier';
 import { GeoTracerUtility } from './GeoTracerUtility';
+import { D3MailActorGraph } from './D3MailActorGraph';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -328,6 +329,7 @@ export function OverviewView({
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
+  const [actorGraphViewMode, setActorGraphViewMode] = useState<'d3_actors' | 'reactflow_entities'>('d3_actors');
   const [caseTags, setCaseTags] = useState<string[]>(() => {
     return Array.isArray(analysis?.tags) ? [...analysis.tags] : [];
   });
@@ -1745,43 +1747,89 @@ export function OverviewView({
         </div>
 
         {/* Graph-Based Relationship & Relay Path Analysis Card */}
-        <div className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-700/70 pb-3">
+        <div id="overview-actor-graph-card" className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/70 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded bg-blue-950 border border-blue-800 flex items-center justify-center text-blue-400">
                 <Network className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-xs text-slate-200 font-bold uppercase tracking-wider block">
-                  Graph-Based Relationship &amp; Relay Path Analysis
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-200 font-bold uppercase tracking-wider block font-mono">
+                    Email Actors &amp; Hop Path Topology
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-950/80 border border-blue-800/80 text-blue-300">
+                    D3 Node-Link Graph
+                  </span>
+                </div>
                 <span className="text-[11px] text-slate-400">
-                  Interactive topology connecting sender domains, IPs, aliases, reply diverters &amp; relay hops
+                  Dynamic force-directed graph illustrating Sender origin, sequential MTA relay hops, latency metrics, and Recipient delivery
                 </span>
               </div>
             </div>
-            {onNavigateToGraph && (
-              <button
-                onClick={onNavigateToGraph}
-                className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1.5 bg-blue-950/60 border border-blue-800/80 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
-              >
-                <span>Open Full Graph</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </button>
-            )}
+
+            <div className="flex items-center flex-wrap gap-2">
+              {/* View Switcher: D3 Dynamic Actors vs Full Multi-Entity ReactFlow */}
+              <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs font-mono">
+                <button
+                  onClick={() => setActorGraphViewMode('d3_actors')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    actorGraphViewMode === 'd3_actors'
+                      ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Dynamic D3 force simulation with packet transmission pulses and hop telemetry"
+                >
+                  ⚡ D3 Hop Graph
+                </button>
+                <button
+                  onClick={() => setActorGraphViewMode('reactflow_entities')}
+                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                    actorGraphViewMode === 'reactflow_entities'
+                      ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Expanded multi-entity forensic relationship graph"
+                >
+                  Entity Canvas
+                </button>
+              </div>
+
+              {onNavigateToGraph && (
+                <button
+                  onClick={onNavigateToGraph}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1.5 bg-blue-950/60 border border-blue-800/80 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
+                  title="Open Dedicated Fullscreen Graph Analysis Tab"
+                >
+                  <span>Open Full Graph</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="h-[480px] w-full rounded-xl overflow-hidden border border-slate-800">
-            <React.Suspense fallback={
-              <div className="flex-1 flex items-center justify-center h-full bg-[#0b0d12]">
-                <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-              </div>
-            }>
-              <RelationshipGraphView
+          <div className="w-full rounded-xl overflow-hidden border border-slate-800">
+            {actorGraphViewMode === 'd3_actors' ? (
+              <D3MailActorGraph
                 analysis={analysis}
-                caseId={analysis.id}
+                height={520}
+                onNavigateToGraph={onNavigateToGraph}
+                onNavigateToHopView={onNavigateToTimeline}
               />
-            </React.Suspense>
+            ) : (
+              <div className="h-[520px] w-full">
+                <React.Suspense fallback={
+                  <div className="flex-1 flex items-center justify-center h-full bg-[#0b0d12]">
+                    <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                  </div>
+                }>
+                  <RelationshipGraphView
+                    analysis={analysis}
+                    caseId={analysis.id}
+                  />
+                </React.Suspense>
+              </div>
+            )}
           </div>
         </div>
 

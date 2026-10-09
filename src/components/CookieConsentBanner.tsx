@@ -16,7 +16,8 @@ import {
 export interface CookiePreferences {
   essential: boolean; // Always true
   preferences: boolean; // UI layout, Persona, View mode
-  analytics: boolean; // Always false / zero-telemetry
+  analytics: boolean; // GA4 measurement
+  marketing?: boolean; // Google AdSense & advertising partners
   acknowledgedAt: string;
 }
 
@@ -32,7 +33,8 @@ export function CookieConsentBanner({
   const [preferences, setPreferences] = useState<CookiePreferences>({
     essential: true,
     preferences: true,
-    analytics: false,
+    analytics: true,
+    marketing: false,
     acknowledgedAt: ''
   });
 
@@ -187,21 +189,24 @@ export function CookieConsentBanner({
                 />
               </div>
 
-              {/* 3. Third-Party Analytics & Marketing (Disabled by Default) */}
-              <div className="p-2.5 rounded-lg bg-[#110f0c] border border-[#262118] flex items-center justify-between gap-3 opacity-70">
+              {/* 3. Third-Party Analytics & Advertising (Google AdSense) */}
+              <div className="p-2.5 rounded-lg bg-[#110f0c] border border-[#262118] flex items-center justify-between gap-3">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-[#b9af9c]">
-                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Third-Party Trackers &amp; Marketing</span>
-                    <span className="text-[9px] font-mono bg-[#1c1813] border border-[#332b20] text-[#8a8070] px-1 rounded">None Installed</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Advertising &amp; Analytics (Google AdSense &amp; GA4)</span>
+                    <span className="text-[9px] font-mono bg-[#1c1813] border border-[#332b20] text-[#c9a227] px-1 rounded">Consent Protected</span>
                   </div>
                   <p className="text-[11px] text-[#8a8070]">
-                    TraceXMail employs zero advertising scripts, pixels, or profiling brokers.
+                    Google AdSense and partners use cookies to serve ads based on visits. You can opt out anytime via Google Ads Settings.
                   </p>
                 </div>
-                <div className="shrink-0 font-mono text-xs text-[#8a8070]">
-                  Off
-                </div>
+                <input
+                  type="checkbox"
+                  checked={preferences.marketing}
+                  onChange={(e) => setPreferences({ ...preferences, marketing: e.target.checked })}
+                  className="w-4 h-4 rounded border-[#383025] bg-[#1a1612] text-amber-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                />
               </div>
             </motion.div>
           )}

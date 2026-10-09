@@ -1,0 +1,28 @@
+# TraceXMail Forensic Intelligence Platform
+> Enterprise Email Forensics, Threat Intelligence, Header Hop Traceroute & ML Phishing Detection
+
+## Platform Overview
+TraceXMail is an enterprise digital forensics and email security platform. It decodes raw RFC 822 / RFC 5322 message envelopes, verifies cryptographic authentication protocols (SPF, DKIM, DMARC, ARC), maps MTA relay latency across global autonomous systems (ASNs), and provides live detonation sandbox telemetry correlated with the MITRE ATT&CK framework.
+
+## Core Capabilities
+- **Safe Visual Email Sandbox**: DOM-isolated zero-script rendering environment for live inspection of malicious lures, embedded links, and attachments without client-side exploitation risk.
+- **Organizational Blast Radius & Telemetry**: Evaluates identity breach spread, compromised user tokens, affected Active Directory / Google Workspace nodes, and lateral movement timelines.
+- **MITRE ATT&CK Correlation**: Automated mapping of email attack vectors against enterprise matrix techniques (e.g., T1566 Phishing, T1566.001 Spearphishing Attachment, T1566.002 Spearphishing Link, T1586 Compromised Accounts).
+- **1-Click SOAR Playbook Console**: Automated security orchestration actions including host isolation, Google Workspace OAuth revocation, native domain blacklisting, and SIGMA/YARA detection rule generation.
+- **FRE 902 / ISO 27037 Legal Custody Certificate**: Self-authenticating digital evidence generation under Federal Rules of Evidence 902(13) and 902(14) with bit-exact SHA-256 cryptographic hashing and atomic UTC timestamps.
+- **Google Workspace Enterprise Defense & Threat Hunter**: Direct Gmail API integration for organization-wide cross-mailbox threat queries, automated quarantine routing, and native filter creation.
+
+## Key Technical Specifications
+- Standards: RFC 5322, RFC 7208 (SPF), RFC 6376 (DKIM), RFC 7489 (DMARC), RFC 8617 (ARC), ISO/IEC 27037:2012, NIST SP 800-86
+- Cryptography: WebCrypto bit-exact SHA-256 digest validation
+- Geolocation: MaxMind GeoLite2 & RIR database routing
+- ML Models: 5-class nearest centroid cosine vector classification & logistic regression
+
+## Official Links & Endpoints
+- Web Console: https://tracexmail.vercel.app/
+- Full LLM Documentation: https://tracexmail.vercel.app/llms-full.txt
+- Security Policy: https://tracexmail.vercel.app/security
+- Domain & SPF Guide: https://tracexmail.vercel.app/domains
+- Contact Security Team: https://tracexmail.vercel.app/contact
+- Privacy Policy: https://tracexmail.vercel.app/privacy
+- Terms of Service: https://tracexmail.vercel.app/terms

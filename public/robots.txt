@@ -1,12 +1,66 @@
 User-agent: *
 Allow: /
+Allow: /about
+Allow: /knowledge
 Allow: /privacy
 Allow: /terms
 Allow: /cookies
 Allow: /domains
 Allow: /contact
 Allow: /security
+Allow: /llms.txt
+Allow: /llms-full.txt
+Allow: /ads.txt
 Disallow: /api/
 Disallow: /oauth/
 
+# Google AdSense Crawlers
+User-agent: Mediapartners-Google
+Allow: /
+
+User-agent: AdsBot-Google
+Allow: /
+
+# Explicit AI Search Engine & LLM Crawlers
+User-agent: GPTBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+
+User-agent: Google-Extended
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+
+User-agent: Applebot-Extended
+Allow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /api/
+
+User-agent: Amazonbot
+Allow: /
+Disallow: /api/
+
+User-agent: cohere-ai
+Allow: /
+Disallow: /api/
+
 Sitemap: https://tracexmail.vercel.app/sitemap.xml
+# LLM Knowledge Standard Reference
+# See https://llmstxt.org/
+# https://tracexmail.vercel.app/llms.txt

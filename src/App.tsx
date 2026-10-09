@@ -69,6 +69,7 @@ import { ForensicOfflineModeBanner } from './components/common/ForensicOfflineMo
 import { NotFoundView } from './components/NotFoundView';
 import { AuthCallbackView } from './components/AuthCallbackView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
+import { trackPageView } from './utils/analytics';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
 
 function ViewSuspenseLoader() {
@@ -231,7 +232,7 @@ export default function App() {
         description: 'Authorize TraceXMail to perform read-only email threat analysis via Gmail API.',
         canonicalPath: currentPath
       });
-    } else if (['/privacy', '/terms', '/cookies', '/domains', '/contact', '/security'].includes(currentPath)) {
+    } else if (['/about', '/privacy', '/terms', '/cookies', '/domains', '/contact', '/security'].includes(currentPath)) {
       const key = currentPath.replace(/^\//, '');
       if (ROUTE_METADATA[key]) {
         updatePageMetadata(ROUTE_METADATA[key]);
@@ -248,6 +249,13 @@ export default function App() {
       const tabMeta = TAB_METADATA[effectiveTab] || TAB_METADATA['overview'];
       updatePageMetadata(tabMeta);
     }
+
+    // Trigger virtual pageview for GA4 analytics
+    const activeTitle = document.title;
+    const trackedPath = currentPath !== '/' && currentPath !== '/index.html' && currentPath !== '' 
+      ? currentPath 
+      : `/#${effectiveTab}`;
+    trackPageView(trackedPath, activeTitle);
   }, [currentPath, session, authView, effectiveTab]);
 
   // Track session transition to automatically redirect to Email Ingestion tab upon confirmed login
@@ -726,8 +734,8 @@ export default function App() {
     );
   }
 
-  // Public Legal and Compliance portals (Privacy, Terms, Cookies, Domains, Contact, Security)
-  const legalRoutes: LegalPageType[] = ['privacy', 'terms', 'cookies', 'domains', 'contact', 'security'];
+  // Public Legal and Compliance portals (About, Privacy, Terms, Cookies, Domains, Contact, Security)
+  const legalRoutes: LegalPageType[] = ['about', 'privacy', 'terms', 'cookies', 'domains', 'contact', 'security'];
   const strippedPath = currentPath.replace(/^\//, '') as LegalPageType;
   if (legalRoutes.includes(strippedPath)) {
     return (

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   FileQuestion, 
   Home, 
@@ -10,10 +10,16 @@ import {
   Globe, 
   CheckCircle2,
   Lock,
-  Route
+  Route,
+  ExternalLink,
+  BookOpen,
+  ShieldCheck,
+  FileCode,
+  Sparkles
 } from 'lucide-react';
 import { TraceXLogo } from './common/TraceXLogo';
 import { updatePageMetadata, ROUTE_METADATA } from '../utils/seo';
+import { trackPageView, trackEvent } from '../utils/analytics';
 
 interface NotFoundViewProps {
   pathname?: string;
@@ -22,9 +28,12 @@ interface NotFoundViewProps {
 
 export function NotFoundView({ pathname = typeof window !== 'undefined' ? window.location.pathname : '', onNavigateHome }: NotFoundViewProps) {
   const currentYear = new Date().getFullYear();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     updatePageMetadata(ROUTE_METADATA['404']);
+    trackPageView('/404', '404 Docket Not Found | TraceXMail');
   }, []);
 
   const handleGoHome = () => {
@@ -33,6 +42,16 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
     } else if (typeof window !== 'undefined') {
       window.location.href = '/';
     }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    trackEvent('404_search', 'Navigation', searchQuery);
+    setSearchFeedback(`Redirecting query "${searchQuery}" to Forensic Analysis Console...`);
+    setTimeout(() => {
+      handleGoHome();
+    }, 700);
   };
 
   return (
@@ -118,8 +137,31 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
           does not correspond to an active forensic case, analysis dossier, or compliance endpoint. It may have expired from temporary custody or was entered incorrectly.
         </p>
 
+        {/* Search Bar for Quick Recovery */}
+        <form onSubmit={handleSearchSubmit} className="mt-6 w-full max-w-md mx-auto">
+          <div className="relative flex items-center">
+            <Search className="absolute left-3.5 w-4 h-4 text-[#8a8070] pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search docket, RFC 822 header, or security topic..."
+              className="w-full bg-[#181511] border border-[#3a352c] focus:border-[#c9a227] text-xs font-mono text-[#ede6d8] pl-10 pr-20 py-2.5 rounded-[3px] outline-none transition-colors"
+            />
+            <button
+              type="submit"
+              className="absolute right-1 px-3 py-1.5 text-xs font-mono font-semibold bg-[#24201a] hover:bg-[#302b23] text-[#c9a227] border border-[#3a352c] rounded-[2px] cursor-pointer transition-colors"
+            >
+              Search
+            </button>
+          </div>
+          {searchFeedback && (
+            <p className="mt-2 text-xs font-mono text-[#c9a227] animate-pulse">{searchFeedback}</p>
+          )}
+        </form>
+
         {/* Action Buttons */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full max-w-md">
           <button
             type="button"
             onClick={handleGoHome}
@@ -138,19 +180,43 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
           </a>
         </div>
 
-        {/* Quick Nav Directory */}
-        <div className="mt-12 pt-8 border-t border-[#2a241c] w-full max-w-2xl">
-          <div className="text-xs font-mono text-[#8a8070] uppercase tracking-wider mb-4 font-semibold">
-            Authorized Navigation Destinations
+        {/* Quick Nav Directory & Link Building Hub */}
+        <div className="mt-10 pt-8 border-t border-[#2a241c] w-full max-w-3xl text-left">
+          <div className="text-xs font-mono text-[#8a8070] uppercase tracking-wider mb-4 font-semibold text-center sm:text-left">
+            Authorized Forensic Modules &amp; Compliance Hub
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono mb-6">
             <a
               href="/"
               className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
             >
               <Terminal className="w-3.5 h-3.5 text-[#c9a227] shrink-0" />
               <span className="truncate">Home / Console</span>
+            </a>
+
+            <a
+              href="/security"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
+              <span className="truncate">Security Architecture</span>
+            </a>
+
+            <a
+              href="/domains"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <FileCode className="w-3.5 h-3.5 text-[#fbbf24] shrink-0" />
+              <span className="truncate">Domain &amp; SPF Setup</span>
+            </a>
+
+            <a
+              href="/llms.txt"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#4ade80] shrink-0" />
+              <span className="truncate">llms.txt Standard</span>
             </a>
 
             <a
@@ -170,12 +236,43 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
             </a>
 
             <a
+              href="/cookies"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <Route className="w-3.5 h-3.5 text-[#a78bfa] shrink-0" />
+              <span className="truncate">Cookie Compliance</span>
+            </a>
+
+            <a
               href="/contact"
               className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
             >
               <Globe className="w-3.5 h-3.5 text-[#ff8d7d] shrink-0" />
               <span className="truncate">Contact Support</span>
             </a>
+          </div>
+
+          {/* Authoritative Security Standards & Link Building References */}
+          <div className="p-3 rounded bg-[#120f0c] border border-[#262018] text-[11px] font-mono text-[#8a8070] space-y-1">
+            <span className="font-semibold text-[#b9af9c] uppercase block tracking-wider text-[10px]">Authoritative Standards &amp; External References:</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+              <a href="https://attack.mitre.org/" target="_blank" rel="noopener noreferrer" className="hover:text-[#ede6d8] flex items-center gap-1 text-[#b9af9c] no-underline">
+                <span>MITRE ATT&amp;CK Framework</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a href="https://csrc.nist.gov/publications/detail/sp/800-86/final" target="_blank" rel="noopener noreferrer" className="hover:text-[#ede6d8] flex items-center gap-1 text-[#b9af9c] no-underline">
+                <span>NIST SP 800-86 Guide</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a href="https://www.rfc-editor.org/rfc/rfc5322" target="_blank" rel="noopener noreferrer" className="hover:text-[#ede6d8] flex items-center gap-1 text-[#b9af9c] no-underline">
+                <span>IETF RFC 5322 Format</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <a href="https://www.rfc-editor.org/rfc/rfc7208" target="_blank" rel="noopener noreferrer" className="hover:text-[#ede6d8] flex items-center gap-1 text-[#b9af9c] no-underline">
+                <span>RFC 7208 SPF Standard</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </div>
           </div>
         </div>
 
@@ -190,6 +287,10 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
           </div>
 
           <div className="flex items-center gap-4 text-xs font-mono">
+            <a href="/about" className="text-[#8a8070] hover:text-[#ede6d8] transition-colors no-underline">About</a>
+            <span>•</span>
+            <a href="/knowledge" className="text-[#8a8070] hover:text-[#ede6d8] transition-colors no-underline">Knowledge Base</a>
+            <span>•</span>
             <a href="/privacy" className="text-[#8a8070] hover:text-[#ede6d8] transition-colors no-underline">Privacy</a>
             <span>•</span>
             <a href="/terms" className="text-[#8a8070] hover:text-[#ede6d8] transition-colors no-underline">Terms</a>

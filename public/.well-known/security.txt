@@ -1,0 +1,14 @@
+# TraceXMail Security Policy (RFC 9116)
+Contact: mailto:tracexmailofficial@gmail.com
+Contact: mailto:jayramsappa537@gmail.com
+Expires: 2028-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://tracexmail.vercel.app/.well-known/security.txt
+Policy: https://tracexmail.vercel.app/security
+Hiring: https://tracexmail.vercel.app/contact
+Acknowledgments: https://tracexmail.vercel.app/security#hall-of-fame
+
+# Domain Verification & Mail Authentication Notice
+# Authorized inbound mail routing: ASPMX.L.GOOGLE.COM
+# Published SPF: v=spf1 include:_spf.google.com ~all
+# Published DMARC: v=DMARC1; p=reject; rua=mailto:dmarc-reports@tracexmail.vercel.app

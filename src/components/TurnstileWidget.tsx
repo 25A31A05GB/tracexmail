@@ -185,6 +185,16 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
         }
       };
 
+      // Lazy-load Cloudflare Turnstile script on-demand rather than on initial page load
+      if (!window.turnstile && typeof document !== 'undefined' && !document.getElementById('cloudflare-turnstile-script')) {
+        const script = document.createElement('script');
+        script.id = 'cloudflare-turnstile-script';
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+
       if (window.turnstile) {
         renderWidget(activeSiteKey);
       } else {

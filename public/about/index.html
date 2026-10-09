@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About TraceXMail | Email Forensics &amp; Threat Intelligence Research</title>
+    <meta name="description" content="Learn about TraceXMail, our cybersecurity mission, email header forensic standards (RFC 5322, RFC 7208, RFC 6376), and founder Jayaram Sappa." />
+    <link rel="canonical" href="https://tracexmail.vercel.app/about" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- Google AdSense Account Verification -->
+    <meta name="google-adsense-account" content="ca-pub-9357545069587539" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9357545069587539" crossorigin="anonymous"></script>
+
+    <!-- Schema.org Identity -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "mainEntity": {
+        "@type": "Organization",
+        "name": "TraceXMail Forensic Intelligence",
+        "url": "https://tracexmail.vercel.app/",
+        "founder": {
+          "@type": "Person",
+          "name": "Jayaram Sappa",
+          "jobTitle": "Lead Security Researcher & Founder",
+          "email": "jayramsappa537@gmail.com"
+        },
+        "description": "Enterprise email forensics, threat intelligence, and zero-hallucination attack analysis platform."
+      }
+    }
+    </script>
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: #14120f;
+        color: #ede6d8;
+        line-height: 1.7;
+        margin: 0;
+        padding: 24px;
+      }
+      .container {
+        max-width: 860px;
+        margin: 0 auto;
+        background: #1b1814;
+        border: 1px solid #2e2922;
+        border-radius: 8px;
+        padding: 40px;
+      }
+      .nav {
+        margin-bottom: 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #2e2922;
+        padding-bottom: 16px;
+      }
+      .nav a {
+        text-decoration: none;
+        color: #ede6d8;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .nav a.back {
+        color: #e87063;
+        font-size: 13px;
+      }
+      h1 {
+        color: #ffffff;
+        font-size: 32px;
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-family: "Space Grotesk", system-ui, sans-serif;
+      }
+      h2 {
+        color: #f3efe6;
+        font-size: 20px;
+        margin-top: 32px;
+        border-bottom: 1px solid #2e2922;
+        padding-bottom: 8px;
+      }
+      h3 {
+        color: #e6dfd1;
+        font-size: 16px;
+        margin-top: 20px;
+      }
+      p, li {
+        color: #b9af9c;
+        font-size: 15px;
+      }
+      a {
+        color: #e87063;
+        text-decoration: underline;
+      }
+      .badge {
+        display: inline-block;
+        background: #24201a;
+        border: 1px solid #3a352c;
+        color: #c9a227;
+        font-size: 11px;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .card {
+        background: #14120f;
+        border: 1px solid #3a352c;
+        padding: 20px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      .author-profile {
+        display: flex;
+        align-items: flex-start;
+        gap: 20px;
+        background: #16130f;
+        border: 1px solid #3a352c;
+        padding: 24px;
+        border-radius: 8px;
+        margin-top: 24px;
+      }
+      .author-avatar {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: #2d261e;
+        border: 2px solid #c9a227;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 26px;
+        color: #ede6d8;
+        flex-shrink: 0;
+      }
+      .standards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin: 20px 0;
+      }
+      .standard-item {
+        background: #14120f;
+        border: 1px solid #2d271f;
+        padding: 16px;
+        border-radius: 6px;
+      }
+      .standard-title {
+        color: #ede6d8;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      .standard-desc {
+        color: #8a8070;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      footer {
+        border-top: 1px solid #2e2922;
+        margin-top: 40px;
+        padding-top: 24px;
+        font-size: 13px;
+        color: #8a8070;
+        text-align: center;
+      }
+      footer a {
+        color: #ede6d8;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <nav class="nav">
+        <a href="/">🛡️ TraceXMail Forensics</a>
+        <a href="/" class="back">← Back to Threat Console</a>
+      </nav>
+
+      <span class="badge">Platform Information &amp; Editorial Standards</span>
+      <h1>About TraceXMail</h1>
+      <p>
+        <strong>TraceXMail</strong> is a dedicated cybersecurity intelligence and digital forensics platform engineered for security operations center (SOC) analysts, incident responders, corporate IT administrators, and security researchers. Our platform deconstructs suspicious email messages down to their raw RFC 822 cryptographic headers, identifies spoofed relay hops, computes MTA latency, and correlates threat vectors against the MITRE ATT&amp;CK framework.
+      </p>
+
+      <h2>1. Our Mission: Eliminating Hallucinations in Email Forensics</h2>
+      <p>
+        In contemporary cyber warfare, email remains the primary initial access vector (accounting for over 85% of corporate breaches according to industry threat telemetry). Traditional security gateways and basic mail clients often summarize or strip the underlying header artifacts that reveal the true origin of a lure.
+      </p>
+      <p>
+        TraceXMail was created to provide deterministic, transparent, and reproducible forensic analysis. Every score, verdict, and hop traceroute generated by our platform is tied to bit-exact evidence, rigorous RFC specifications, and cryptographically verifiable public key DNS records.
+      </p>
+
+      <div class="standards-grid">
+        <div class="standard-item">
+          <div class="standard-title">RFC 5322 &amp; RFC 822</div>
+          <div class="standard-desc">Rigorous parsing of Internet Message Format, Received hop chains, Return-Path, and envelope boundaries.</div>
+        </div>
+        <div class="standard-item">
+          <div class="standard-title">RFC 7208 (SPF)</div>
+          <div class="standard-desc">Sender Policy Framework validation, evaluating envelope MAIL FROM domains against DNS TXT records.</div>
+        </div>
+        <div class="standard-item">
+          <div class="standard-title">RFC 6376 (DKIM)</div>
+          <div class="standard-desc">DomainKeys Identified Mail cryptographic signature verification across header canonicalization algorithms.</div>
+        </div>
+        <div class="standard-item">
+          <div class="standard-title">RFC 7489 (DMARC)</div>
+          <div class="standard-desc">Domain-based Message Authentication Reporting and Conformance alignment check for strict and relaxed modes.</div>
+        </div>
+      </div>
+
+      <h2>2. Founder &amp; Lead Researcher Profile</h2>
+      <div class="author-profile">
+        <div class="author-avatar">JS</div>
+        <div>
+          <h3 style="margin: 0 0 4px 0; color: #ede6d8; font-size: 18px;">Jayaram Sappa</h3>
+          <p style="margin: 0 0 10px 0; color: #c9a227; font-size: 13px; font-weight: 500;">
+            Lead Security Researcher, Systems Architect &amp; Founder
+          </p>
+          <p style="margin: 0 0 12px 0; font-size: 14px; color: #b9af9c;">
+            Jayaram specializes in digital forensics, incident response, applied cryptography, and threat hunting. Having investigated countless Business Email Compromise (BEC) campaigns, credential harvesting schemes, and state-sponsored phishing campaigns, he designed TraceXMail to bring automated, court-admissible forensic precision to the global security community.
+          </p>
+          <p style="margin: 0; font-size: 13px;">
+            <strong>Email:</strong> <a href="mailto:jayramsappa537@gmail.com">jayramsappa537@gmail.com</a> | 
+            <strong>Official Project Contact:</strong> <a href="mailto:tracexmailofficial@gmail.com">tracexmailofficial@gmail.com</a>
+          </p>
+        </div>
+      </div>
+
+      <h2>3. Core Architectural Commitments</h2>
+      <div class="card">
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>Zero-Retention Client Enclave:</strong> Header parsing and hop deconstruction occur in a private sandbox. User evidence is never used to train public machine learning models.</li>
+          <li><strong>Court-Admissible Evidence Standards:</strong> Automated generation of FRE 902 / ISO 27037 digital custody certificates with bit-exact SHA-256 digests.</li>
+          <li><strong>Safe Visual Detonation:</strong> Micro-sandboxed DOM isolation prevents active script execution, web bugs, tracking pixels, and payload triggers during inspection.</li>
+          <li><strong>Open Knowledge Contribution:</strong> We publish free, accessible technical guides on email authentication protocols, header anatomy, and incident response playbooks for the global cybersecurity ecosystem.</li>
+        </ul>
+      </div>
+
+      <h2>4. Editorial &amp; Publishing Integrity</h2>
+      <p>
+        All guides, documentation, and technical articles published on TraceXMail are authored by cybersecurity practitioners and independently reviewed against RFC documentation, NIST guidelines (NIST SP 800-86), and the MITRE ATT&amp;CK knowledge base. We do not publish automated, unverified content or sponsored threat endorsements.
+      </p>
+
+      <h2>5. Get in Touch</h2>
+      <p>
+        We actively welcome vulnerability disclosures, peer-review feedback, enterprise inquiries, and research collaborations.
+      </p>
+      <ul>
+        <li><strong>Security Disclosures:</strong> <a href="mailto:jayramsappa537@gmail.com">jayramsappa537@gmail.com</a> (See our <a href="/security">Security &amp; VDP Policy</a>)</li>
+        <li><strong>Technical Support &amp; General Inquiries:</strong> <a href="/contact">Visit our Contact Portal</a></li>
+        <li><strong>Knowledge Base &amp; Tutorials:</strong> <a href="/knowledge">Explore the Forensic Knowledge Base</a></li>
+      </ul>
+
+      <footer>
+        <p>
+          <a href="/">Console</a> | 
+          <a href="/about">About Us</a> | 
+          <a href="/knowledge">Knowledge Base</a> | 
+          <a href="/privacy">Privacy Policy</a> | 
+          <a href="/terms">Terms of Service</a> | 
+          <a href="/cookies">Cookie Policy</a> | 
+          <a href="/domains">Authorized Domains</a> | 
+          <a href="/contact">Contact</a>
+        </p>
+        <p style="margin-top: 10px; font-size: 12px; color: #6b6254;">
+          &copy; 2026 TraceXMail Forensic Intelligence Platform. All rights reserved.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

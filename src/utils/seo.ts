@@ -6,9 +6,10 @@ export interface PageMetadata {
   title: string;
   description: string;
   canonicalPath?: string;
+  robots?: string;
 }
 
-export function updatePageMetadata({ title, description, canonicalPath = '/' }: PageMetadata) {
+export function updatePageMetadata({ title, description, canonicalPath = '/', robots = 'index, follow' }: PageMetadata) {
   if (typeof document === 'undefined') return;
 
   // 1. Update Title
@@ -23,7 +24,16 @@ export function updatePageMetadata({ title, description, canonicalPath = '/' }: 
   }
   descMeta.setAttribute('content', description);
 
-  // 3. Update Open Graph Meta
+  // 3. Update Robots Directives (e.g. noindex, follow on 404)
+  let robotsMeta = document.querySelector('meta[name="robots"]');
+  if (!robotsMeta) {
+    robotsMeta = document.createElement('meta');
+    robotsMeta.setAttribute('name', 'robots');
+    document.head.appendChild(robotsMeta);
+  }
+  robotsMeta.setAttribute('content', robots);
+
+  // 4. Update Open Graph Meta
   let ogTitle = document.querySelector('meta[property="og:title"]');
   if (ogTitle) ogTitle.setAttribute('content', title);
 
@@ -83,10 +93,21 @@ export const ROUTE_METADATA: Record<string, PageMetadata> = {
     description: 'Technical specifications on NIST SP 800-86 evidence chain of custody, AES-256-GCM encryption, sandboxed link defanging, and safe harbor disclosure.',
     canonicalPath: '/security'
   },
+  about: {
+    title: 'About TraceXMail | Email Forensics & Threat Intelligence Research',
+    description: 'Learn about TraceXMail, our cybersecurity mission, email header forensic standards (RFC 5322, RFC 7208, RFC 6376), and founder Jayaram Sappa.',
+    canonicalPath: '/about'
+  },
+  knowledge: {
+    title: 'Email Forensics & Threat Intelligence Knowledge Base | TraceXMail',
+    description: 'Cybersecurity and email forensics tutorials, RFC 5322 header analysis guides, SPF/DKIM/DMARC protocols, and SOC phishing investigation playbooks.',
+    canonicalPath: '/knowledge'
+  },
   '404': {
     title: '404 Page Not Found | TraceXMail',
     description: 'The requested forensic case docket or compliance view could not be located in the TraceXMail enclave.',
-    canonicalPath: '/404'
+    canonicalPath: '/404',
+    robots: 'noindex, follow'
   },
   login: {
     title: 'Sign In to Enclave | TraceXMail',

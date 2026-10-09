@@ -34,6 +34,9 @@ export default defineConfig({
         'android-chrome-192x192.png',
         'android-chrome-512x512.png',
         'robots.txt',
+        'sitemap.xml',
+        'llms.txt',
+        'llms-full.txt',
         'site.webmanifest'
       ],
       manifest: {

@@ -292,14 +292,28 @@ export function SafeEmailSandbox({ analysis, className = '' }: SafeEmailSandboxP
         <div className="space-y-4">
           <div className="rounded-lg border border-slate-800 bg-[#141722] overflow-hidden shadow-inner font-sans">
             {/* Title Bar */}
-            <div className="bg-[#1c202e] px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+            <div className="bg-[#1c202e] px-4 py-2 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
                 <span className="ml-2 font-medium text-slate-300 truncate max-w-sm">{subject}</span>
               </div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider">SANDBOX DOM ISOLATED</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setHideEnvelope(!hideEnvelope)}
+                  className={`px-2 py-0.5 rounded border text-[10.5px] font-mono transition-colors cursor-pointer ${
+                    hideEnvelope
+                      ? 'bg-amber-950/60 border-amber-800 text-amber-300 font-semibold'
+                      : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  }`}
+                  title="Toggle Return-Path and Reply-To envelope routing"
+                >
+                  {hideEnvelope ? '✓ Return-Path & Reply-To Hidden' : 'Hide Return-Path & Reply-To'}
+                </button>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider">SANDBOX DOM ISOLATED</span>
+              </div>
             </div>
 
             {/* Email Header Telemetry */}
@@ -318,15 +332,19 @@ export function SafeEmailSandbox({ analysis, className = '' }: SafeEmailSandboxP
                   <span className="text-slate-400">To:</span>
                   <span className="text-slate-200 break-all">{to}</span>
                 </div>
-                <div className="flex items-center gap-2 text-[11px]">
-                  <span className="text-slate-400">Return-Path:</span>
-                  <span className="text-amber-300 truncate">{returnPath}</span>
-                </div>
-                {replyTo && (
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span className="text-slate-400">Reply-To:</span>
-                    <span className="text-purple-300 truncate">{replyTo}</span>
-                  </div>
+                {!hideEnvelope && (
+                  <>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="text-slate-400">Return-Path:</span>
+                      <span className="text-amber-300 truncate">{returnPath}</span>
+                    </div>
+                    {replyTo && (
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <span className="text-slate-400">Reply-To:</span>
+                        <span className="text-purple-300 truncate">{replyTo}</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

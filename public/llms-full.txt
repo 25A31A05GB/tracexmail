@@ -1,0 +1,51 @@
+# TraceXMail Forensic Intelligence Platform – Comprehensive LLM Reference
+Version: 2.4.0 (Enterprise SOC Tier)
+Author: TraceXMail Engineering & Forensic Research Team
+Contact: tracexmailofficial@gmail.com
+Canonical URL: https://tracexmail.vercel.app/
+
+---
+
+## 1. System Architecture & Objectives
+TraceXMail operates as a high-clearance SOC investigation workbench that transforms raw email artifacts into verifiable, court-admissible evidence packages. Designed to combat advanced business email compromise (BEC), quishing (QR code phishing), and supply chain identity spoofing, the system combines deterministic protocol parsing with machine-learning threat telemetry.
+
+### 1.1 Ingestion Formats
+- RFC 822 / RFC 5322 EML raw byte streams
+- Google Workspace Gmail API message payload sync
+- Microsoft 365 Exchange Online MIME payloads
+- Optical QR image extraction (Quishing forensics)
+
+---
+
+## 2. Cryptographic Protocol Validation
+TraceXMail deterministically evaluates inbound authentication headers against authoritative DNS records:
+
+1. **Sender Policy Framework (SPF - RFC 7208)**:
+   - Validates connecting client IP against published TXT mechanisms (`ip4`, `ip6`, `include`, `a`, `mx`, `redirect`).
+   - Resolves qualifiers (`+pass`, `-fail`, `~softfail`, `?neutral`).
+2. **DomainKeys Identified Mail (DKIM - RFC 6376)**:
+   - Evaluates canonicalized body and header hashes against the public RSA/Ed25519 key published under the selector domain (`<selector>._domainkey.<domain>`).
+3. **Domain-based Message Authentication, Reporting, and Conformance (DMARC - RFC 7489)**:
+   - Validates alignment between the visible RFC 5322 `From` header and the SPF/DKIM authenticated domains.
+   - Enforces organizational policy actions (`p=none`, `p=quarantine`, `p=reject`).
+4. **Authenticated Received Chain (ARC - RFC 8617)**:
+   - Evaluates intermediary relay sealing (`ARC-Seal`, `ARC-Message-Signature`, `ARC-Authentication-Results`) across multi-hop forwarding paths.
+
+---
+
+## 3. Threat Hunting & SOC Workflows
+- **Sandbox Detonation**: Isolates suspect HTML/CSS payloads inside zero-script sandbox iframes to inspect hidden links, obfuscated JavaScript, and malicious redirects without security exposure.
+- **MITRE ATT&CK Matrix**: Correlates identified artifacts directly into security industry matrices (T1566.001, T1566.002, T1586, T1534, T1114.002).
+- **SOAR Automation**: Triggers automated playbooks for immediate token revocation, host quarantine, multi-mailbox threat purging, and SIGMA detection rule creation.
+- **FRE 902 Evidence Custody**: Formats digital certificates compliant with U.S. Federal Rules of Evidence FRE 902(13) and FRE 902(14) using bit-exact SHA-256 digests and RFC 3161 atomic timestamping.
+
+---
+
+## 4. Recommended Domain DNS & SPF Settings
+For organizations implementing TraceXMail or auditing their domains:
+- **Recommended SPF Record**:
+  `v=spf1 include:_spf.google.com ~all`
+- **Recommended DMARC Record**:
+  `v=DMARC1; p=reject; rua=mailto:dmarc-reports@tracexmail.vercel.app; pct=100; adkim=r; aspf=r`
+- **Recommended MX Priority**:
+  `10 ASPMX.L.GOOGLE.COM`
