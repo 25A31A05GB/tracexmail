@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { AlertTriangle, RefreshCw, ShieldAlert, Terminal, Sparkles, DownloadCloud } from 'lucide-react';
 
 interface Props {
@@ -51,6 +52,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
       msg.includes('Invalid hook call');
 
     this.setState({ errorInfo, isChunkError: isChunk });
+    try {
+      Sentry.captureException(error, {
+        extra: {
+          componentStack: errorInfo.componentStack
+        }
+      });
+    } catch (sentryErr) {
+      console.warn('[Sentry] Error dispatch notice:', sentryErr);
+    }
     console.error(
       '[TraceXMail Fatal Render Error] Uncaught runtime exception in component tree:\n',
       error,

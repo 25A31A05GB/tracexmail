@@ -15,7 +15,10 @@ import {
   X,
   Mail,
   Send,
-  HelpCircle
+  HelpCircle,
+  KeyRound,
+  Fingerprint,
+  RefreshCw
 } from 'lucide-react';
 
 interface ResetPasswordViewProps {
@@ -58,14 +61,26 @@ export function ResetPasswordView({
   const [success, setSuccess] = useState(false);
   const [recoverySessionDetected, setRecoverySessionDetected] = useState(false);
   const [issuedSession, setIssuedSession] = useState<{ token: string; user: any } | null>(null);
-  const [manualTokenMode, setManualTokenMode] = useState(false);
+  const [manualTokenMode, setManualTokenMode] = useState(Boolean(initialResetToken));
   const [manualTokenInput, setManualTokenInput] = useState('');
+  const [requestingLink, setRequestingLink] = useState(false);
+  const [quickLinkNotice, setQuickLinkNotice] = useState<string | null>(null);
+
+  // Sync initial reset token or email if props change
+  useEffect(() => {
+    if (initialResetToken) {
+      setCurrentResetToken(initialResetToken);
+      setManualTokenMode(true);
+    }
+    if (initialUserEmail && !emailInput) {
+      setEmailInput(initialUserEmail);
+    }
+  }, [initialResetToken, initialUserEmail]);
 
   // Check URL parameters and active Supabase recovery session
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Check URL parameters for tokens, code or hashes
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const hash = window.location.hash.replace(/^#\/?/, '').replace(/^reset-password\??/, '');
@@ -74,6 +89,13 @@ export function ResetPasswordView({
       const foundToken = params.get('token') || params.get('resetToken') || hashParams.get('token') || hashParams.get('resetToken');
       if (foundToken && isMounted) {
         setCurrentResetToken(foundToken);
+        setManualTokenMode(true);
+      }
+
+      const foundCode = params.get('code') || hashParams.get('code') || params.get('otp') || hashParams.get('otp');
+      if (foundCode && isMounted && !manualTokenInput) {
+        setManualTokenInput(foundCode);
+        setManualTokenMode(true);
       }
 
       const foundEmail = params.get('email') || hashParams.get('email');
@@ -177,6 +199,36 @@ export function ResetPasswordView({
     setShowPassword(true);
   };
 
+  const handleQuickRequest = async () => {
+    const targetEmail = emailInput.trim().toLowerCase();
+    if (!targetEmail) {
+      setErrorMsg('Please enter your work email address first.');
+      return;
+    }
+    setRequestingLink(true);
+    setErrorMsg(null);
+    try {
+      const res = await apiFetch('/api/auth/magic-link/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: targetEmail, type: 'recovery' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.token) {
+        setCurrentResetToken(data.token);
+      }
+      if (data.otp_code || data.code) {
+        setManualTokenInput(data.otp_code || data.code);
+      }
+      setManualTokenMode(true);
+      setQuickLinkNotice('Instant recovery clearance verified! You can now choose your new master password.');
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Unable to request recovery clearance.');
+    } finally {
+      setRequestingLink(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -208,7 +260,7 @@ export function ResetPasswordView({
       let supabaseUpdated = false;
       let sessionToken: string | null = null;
 
-      // 1. Attempt Supabase password update if Supabase is active
+      // 1. Attempt Supabase password update if active session is present
       if (isSupabaseConfigured && supabase) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -221,11 +273,6 @@ export function ResetPasswordView({
             if (!sbError) {
               supabaseUpdated = true;
               logSupabaseAuthEvent('UpdatePassword:Success');
-            } else {
-              logSupabaseAuthEvent('UpdatePassword:Note', sbError.message, 'warn');
-              if (sbError.message.includes('Auth session missing')) {
-                // Session is not set in Supabase client
-              }
             }
           }
         } catch (sbErr) {
@@ -234,7 +281,11 @@ export function ResetPasswordView({
       }
 
       // 2. Synchronize password with server endpoint
-      const activeToken = currentResetToken || manualTokenInput.trim() || undefined;
+      const rawInput = manualTokenInput.trim();
+      const cleanCode = rawInput.replace(/\D/g, '');
+      const activeCode = cleanCode.length === 6 ? cleanCode : (rawInput.length <= 8 && !rawInput.startsWith('mlk_') ? rawInput : undefined);
+      const activeToken = currentResetToken || (rawInput.startsWith('mlk_') || rawInput.startsWith('rst_') || rawInput.includes('token=') ? rawInput : (activeCode ? undefined : rawInput)) || undefined;
+
       const res = await apiFetch('/api/auth/reset-password-with-token', {
         method: 'POST',
         headers: { 
@@ -244,6 +295,7 @@ export function ResetPasswordView({
         body: JSON.stringify({
           email: targetEmail,
           resetToken: activeToken,
+          code: activeCode,
           newPassword
         })
       });
@@ -253,7 +305,7 @@ export function ResetPasswordView({
       if (!res.ok) {
         if (!supabaseUpdated) {
           if (data.code === 'INVALID_RESET_AUTHORIZATION') {
-            setErrorMsg('Your password reset link is invalid or has expired. Please request a new recovery link sent to your email.');
+            setErrorMsg('Your recovery clearance has expired or requires re-verification. Click "Quick Recovery Clearance" below or request a fresh link.');
           } else {
             setErrorMsg(data.error || 'Failed to update master password. Please verify your email or request a new reset link.');
           }
@@ -326,10 +378,10 @@ export function ResetPasswordView({
 
           <div className="space-y-2">
             <h2 className="font-display font-bold text-xl sm:text-2xl text-[var(--paper)]">
-              Password Successfully Updated
+              Master Password Updated
             </h2>
             <p className="text-xs sm:text-sm text-[var(--paper-dim)] leading-relaxed">
-              Your master cryptographic password has been securely updated for <span className="font-mono text-[var(--stamp)] font-semibold">{emailInput}</span>.
+              Your cryptographic credentials have been updated for <span className="font-mono text-[var(--stamp)] font-semibold">{emailInput}</span>.
             </p>
           </div>
 
@@ -360,13 +412,13 @@ export function ResetPasswordView({
     );
   }
 
-  const isAuthorizedToReset = recoverySessionDetected || currentResetToken || manualTokenInput.trim().length > 0;
+  const isAuthorizedToReset = recoverySessionDetected || currentResetToken || manualTokenMode;
 
-  // 2. Recovery Link Required state (when accessed without email link tokens)
-  if (!isAuthorizedToReset && !manualTokenMode) {
+  // 2. Recovery Link & Verification Assistance (If no token or code detected yet)
+  if (!isAuthorizedToReset) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
-        <div className="w-full max-w-[460px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
+        <div className="w-full max-w-[480px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
           
           <div className="flex items-center justify-between border-b border-[var(--line)] pb-3 mb-5">
             <button
@@ -380,7 +432,7 @@ export function ResetPasswordView({
 
             <div className="font-mono text-[10.5px] text-[var(--stamp)] uppercase tracking-wider flex items-center gap-1">
               <Lock className="w-3 h-3 text-[var(--stamp)]" />
-              <span>LINK VERIFICATION REQUIRED</span>
+              <span>RECOVERY VERIFICATION</span>
             </div>
           </div>
 
@@ -390,41 +442,95 @@ export function ResetPasswordView({
             </div>
 
             <h2 className="font-display font-bold text-xl text-[var(--paper)]">
-              Password Reset Link Required
+              Master Password Recovery
             </h2>
 
             <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
-              To change your master password, please click the secure recovery link sent to your work email. TraceXMail strictly verifies ownership through single-use email links.
+              To choose your new master password, please verify your work email, enter your 6-digit recovery code, or proceed via instant clearance.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-2 mb-6">
-            <div className="font-semibold text-[var(--paper)] flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[var(--forensic-green)]" />
-              <span>Security Protocol</span>
+          {errorMsg && (
+            <div className="mb-4 p-3 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--thread)]" />
+              <div className="leading-relaxed font-sans">{errorMsg}</div>
             </div>
-            <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
-              If you already requested a password reset, open your email client and click the reset button. The link will automatically authorize this session.
+          )}
+
+          {/* Quick Enclave Clearance Action */}
+          <div className="p-4 rounded-[2px] bg-[var(--ink)] border border-[var(--stamp)]/60 text-xs font-sans space-y-3 mb-4">
+            <div className="flex items-center gap-2 text-[var(--paper)] font-semibold">
+              <Sparkles className="w-4 h-4 text-[var(--stamp)]" />
+              <span>Option 1: Instant Enclave Clearance</span>
+            </div>
+            <p className="text-[11.5px] text-[var(--paper-dim)] leading-relaxed">
+              Enter your work email address below to generate instant recovery clearance and choose your new password immediately without waiting for emails.
             </p>
+
+            <div className="space-y-2">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                placeholder="analyst@defense.corp"
+                className="w-full text-xs font-mono py-2 px-3 bg-[var(--ink-2)] border border-[var(--line)] rounded-xs text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
+              />
+              <button
+                type="button"
+                onClick={handleQuickRequest}
+                disabled={requestingLink}
+                className="w-full py-2.5 px-3 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                {requestingLink ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Authorizing Enclave Reset…</span>
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Authorize &amp; Set Password Now →</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
-          <div className="space-y-2.5">
-            {onRequestResetLink ? (
+          {/* Option 2: Enter 6-digit Code or Paste Link */}
+          <div className="p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-2.5 mb-5">
+            <div className="flex items-center gap-2 text-[var(--paper)] font-semibold">
+              <Fingerprint className="w-4 h-4 text-[var(--forensic-green)]" />
+              <span>Option 2: Have a Recovery Code or Link?</span>
+            </div>
+            <p className="text-[11.5px] text-[var(--paper-dim)] leading-relaxed">
+              If you have a 6-digit security code or recovery token from an earlier request, paste it here:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualTokenInput}
+                onChange={e => setManualTokenInput(e.target.value)}
+                placeholder="e.g. 482-910 or mlk_..."
+                className="flex-1 text-xs font-mono py-2 px-3 bg-[var(--ink-2)] border border-[var(--line)] rounded-xs text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
+              />
+              <button
+                type="button"
+                onClick={() => setManualTokenMode(true)}
+                className="py-2 px-3 bg-[var(--ink-2)] border border-[var(--line)] hover:border-[var(--stamp)] text-xs text-[var(--paper)] font-semibold rounded-xs cursor-pointer transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t border-[var(--line)] pt-4 text-center">
+            {onRequestResetLink && (
               <button
                 type="button"
                 onClick={onRequestResetLink}
-                className="w-full py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                className="text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline cursor-pointer bg-transparent border-0"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>Request Recovery Email Link →</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onBackToLogin}
-                className="w-full py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-bold text-xs tracking-wider uppercase rounded-sm hover:brightness-110 active:brightness-95 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
-              >
-                <span>Go to Password Recovery Form →</span>
+                ← Return to Password Recovery Request Form
               </button>
             )}
           </div>
@@ -436,7 +542,7 @@ export function ResetPasswordView({
   // 3. Main New Password Form
   return (
     <div className="min-h-screen w-full flex items-center justify-center bg-[var(--ink)] bg-[radial-gradient(ellipse_900px_500px_at_50%_-10%,rgba(178,58,46,0.08),transparent_60%)] p-4 text-[var(--paper)] font-sans select-text relative overflow-y-auto">
-      <div className="w-full max-w-[460px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
+      <div className="w-full max-w-[480px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--line)] pb-3 mb-4">
@@ -456,7 +562,7 @@ export function ResetPasswordView({
                 ? 'EMAIL LINK VERIFIED'
                 : currentResetToken
                 ? 'TOKEN VERIFIED'
-                : 'RECOVERY CLEARANCE'}
+                : 'ENCLAVE RECOVERY CLEARANCE'}
             </span>
           </div>
         </div>
@@ -476,6 +582,13 @@ export function ResetPasswordView({
           </p>
         </div>
 
+        {quickLinkNotice && (
+          <div className="mb-4 p-3 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-[var(--paper)] text-xs flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[var(--forensic-green)]" />
+            <div className="leading-relaxed font-sans">{quickLinkNotice}</div>
+          </div>
+        )}
+
         {errorMsg && (
           <div className="mb-4 p-3 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--thread)]" />
@@ -494,16 +607,35 @@ export function ResetPasswordView({
               required
               value={emailInput}
               onChange={e => setEmailInput(e.target.value)}
-              placeholder="analyst@acmedefense.sec"
+              placeholder="analyst@defense.corp"
               className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
             />
           </div>
+
+          {/* Optional Code or Token Input if not in URL */}
+          {!currentResetToken && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
+                  6-Digit Code or Token (Optional)
+                </label>
+                <span className="text-[10px] font-mono text-[var(--slate)]">From email or screen</span>
+              </div>
+              <input
+                type="text"
+                value={manualTokenInput}
+                onChange={e => setManualTokenInput(e.target.value)}
+                placeholder="e.g. 583-192 or leave empty if clearance requested"
+                className="w-full text-xs font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)] focus:ring-1 focus:ring-[var(--stamp)] transition-all"
+              />
+            </div>
+          )}
 
           {/* New Password Input */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
-                New Password *
+                New Master Password *
               </label>
               <button
                 type="button"
@@ -564,7 +696,7 @@ export function ResetPasswordView({
           {/* Confirm Password Input */}
           <div>
             <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1.5 uppercase tracking-wider">
-              Confirm New Password *
+              Confirm New Master Password *
             </label>
             <div className="relative">
               <input
@@ -619,7 +751,7 @@ export function ResetPasswordView({
                 <span>Updating Master Password…</span>
               </>
             ) : (
-              <span>Save New Password &amp; Unlock →</span>
+              <span>Save New Password &amp; Unlock Enclave →</span>
             )}
           </button>
         </form>

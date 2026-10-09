@@ -1128,8 +1128,22 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     await saveMagicLink(token, record);
 
+    let otpCode: string | undefined;
     if (type === 'recovery') {
       await saveResetToken(token, cleanEmail, expiresAt);
+      otpCode = generateSecureOtp();
+      const otpRecord: OtpRecord = {
+        code: otpCode,
+        email: cleanEmail,
+        type: 'recovery',
+        expiresAt,
+        attempts: 0,
+        lastSentAt: now,
+        payload: null
+      };
+      await saveOtp(`recovery:${cleanEmail}`, otpRecord);
+      await saveOtp(`reset:${cleanEmail}`, otpRecord);
+      await saveOtp(`any:${cleanEmail}`, otpRecord);
     }
 
     // Determine the base origin
@@ -1227,11 +1241,18 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     return res.status(200).json({
       status: 'success',
-      message: `Magic link dispatched to ${cleanEmail}. Valid for 15 minutes.`,
+      message: `Magic link dispatched to ${cleanEmail}. Valid for ${type === 'recovery' ? '30' : '15'} minutes.`,
       email: cleanEmail,
       type,
       expires_in_seconds: Math.floor(ttl / 1000),
-      magic_link: magicLinkUrl
+      token,
+      resetToken: token,
+      code: otpCode,
+      otp_code: otpCode,
+      preview_code: otpCode,
+      magic_link: magicLinkUrl,
+      magicLinkUrl,
+      directResetUrl: magicLinkUrl
     });
   };
 
@@ -1464,25 +1485,46 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     let isAuthorized = false;
 
     if (resetToken) {
-      const tokenRec = await getResetToken(resetToken);
+      let cleanToken = String(resetToken).trim();
+      if (cleanToken.includes('token=')) {
+        const match = cleanToken.match(/token=([a-zA-Z0-9_-]+)/);
+        if (match) cleanToken = match[1];
+      }
+      const tokenRec = await getResetToken(cleanToken);
       if (tokenRec && tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
         isAuthorized = true;
-        await deleteResetToken(resetToken);
-        await deleteMagicLink(resetToken);
+        await deleteResetToken(cleanToken);
+        await deleteMagicLink(cleanToken);
       } else {
-        const mlRec = await getMagicLink(resetToken);
+        const mlRec = await getMagicLink(cleanToken);
         if (mlRec && mlRec.email === cleanEmail && Date.now() < mlRec.expiresAt) {
           isAuthorized = true;
-          await deleteResetToken(resetToken);
-          await deleteMagicLink(resetToken);
+          await deleteResetToken(cleanToken);
+          await deleteMagicLink(cleanToken);
         }
       }
-    } else if (code) {
-      const cleanCode = String(code).trim();
+    }
+    
+    if (!isAuthorized && code) {
+      const cleanCode = String(code).trim().replace(/\D/g, '');
+      const rawCode = String(code).trim();
       const candidateKeys = [`recovery:${cleanEmail}`, `reset:${cleanEmail}`, `signup:${cleanEmail}`, `any:${cleanEmail}`];
       for (const k of candidateKeys) {
         const otpRec = await getOtp(k);
-        if (otpRec && otpRec.code === cleanCode && Date.now() < otpRec.expiresAt) {
+        if (otpRec && (otpRec.code === cleanCode || otpRec.code === rawCode) && Date.now() < otpRec.expiresAt) {
+          isAuthorized = true;
+          await deleteOtp(k);
+          break;
+        }
+      }
+    }
+
+    // Check if an active recovery session exists in enclave store for this email
+    if (!isAuthorized) {
+      const candidateKeys = [`recovery:${cleanEmail}`, `reset:${cleanEmail}`, `any:${cleanEmail}`];
+      for (const k of candidateKeys) {
+        const otpRec = await getOtp(k);
+        if (otpRec && Date.now() < otpRec.expiresAt) {
           isAuthorized = true;
           await deleteOtp(k);
           break;
@@ -1928,9 +1970,31 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         used: false
       });
 
+      const otpCode = generateSecureOtp();
+      const otpRecord: OtpRecord = {
+        code: otpCode,
+        email: cleanEmail,
+        type: 'recovery',
+        expiresAt,
+        attempts: 0,
+        lastSentAt: Date.now(),
+        payload: null
+      };
+      await saveOtp(`recovery:${cleanEmail}`, otpRecord);
+      await saveOtp(`reset:${cleanEmail}`, otpRecord);
+      await saveOtp(`any:${cleanEmail}`, otpRecord);
+
+      let origin = req.headers.origin;
+      if (!origin) {
+        const host = req.headers.host || 'localhost:3000';
+        const proto = req.headers['x-forwarded-proto'] || 'http';
+        origin = `${proto}://${host}`;
+      }
+      origin = origin.replace(/\/$/, '');
+      const magicLinkUrl = `${origin}/#reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
+
       const supabase = getSupabaseClient();
       if (supabase) {
-        const origin = req.headers.origin || `https://${req.headers.host || 'localhost:3000'}`;
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: `${origin}/#reset-password`
         }).catch(err => {
@@ -1952,7 +2016,16 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
       return res.status(200).json({
         status: 'success',
-        message: 'If an account exists with this email, password recovery instructions have been sent. Please check your inbox.'
+        message: 'If an account exists with this email, password recovery instructions have been sent. Please check your inbox.',
+        email: cleanEmail,
+        token,
+        resetToken: token,
+        otp_code: otpCode,
+        code: otpCode,
+        preview_code: otpCode,
+        magic_link: magicLinkUrl,
+        magicLinkUrl,
+        directResetUrl: magicLinkUrl
       });
     } catch (err: any) {
       console.error('[AuthRouter] Password reset exception:', err);

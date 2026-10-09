@@ -30,7 +30,8 @@ import {
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { UserRole, AccountType } from '../hooks/useSession';
 import { InactivityConfig, WorkspaceLockState } from '../types';
-import { Sparkles, Terminal } from 'lucide-react';
+import { Sparkles, Terminal, Activity } from 'lucide-react';
+import { ErrorButton } from './ErrorButton';
 
 interface AccountSettingsViewProps {
   role: UserRole;
@@ -1252,6 +1253,40 @@ export function AccountSettingsView({
                 {revokeNotice}
               </div>
             )}
+          </div>
+
+          {/* Section 6: Sentry Error Tracking & Diagnostic Verification */}
+          <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
+            <div className="border-b border-[var(--line)] pb-3">
+              <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-[var(--gold)]" />
+                <span>SENTRY ERROR TRACKING &amp; REAL-TIME TELEMETRY</span>
+              </div>
+              <div className="text-[11.5px] text-[var(--paper-dim)] mt-0.5">
+                Application health and uncaught runtime forensic exceptions monitored via Sentry SDK.
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="font-semibold text-[var(--paper)] flex items-center gap-2">
+                  <span>Sentry Error Verification</span>
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono font-medium">
+                    CONNECTED
+                  </span>
+                </div>
+                <div className="text-[11.5px] text-[var(--paper-muted)]">
+                  Trigger an intentional test exception to verify real-time ingestion on your Sentry dashboard.
+                </div>
+                <div className="text-[10px] text-[var(--paper-dim)] font-mono break-all opacity-70">
+                  DSN: https://9992e15f5960d46b12aafc1481677cfe@o4512227424534528.ingest.us.sentry.io/4512227431809024
+                </div>
+              </div>
+
+              <div className="shrink-0">
+                <ErrorButton />
+              </div>
+            </div>
           </div>
 
         </div>

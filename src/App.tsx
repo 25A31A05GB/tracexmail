@@ -126,6 +126,8 @@ export default function App() {
 
   const [authView, setAuthView] = useState<'intro' | 'login' | 'signup' | 'forgot-password' | 'reset-password' | 'accept-invite' | 'magic-link'>('intro');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [resetEmail, setResetEmail] = useState<string | null>(null);
 
   // Auto-detect invitation tokens, password resets, magic links, or recovery tokens in URL
   useEffect(() => {
@@ -141,6 +143,7 @@ export default function App() {
       const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
       const type = searchParams.get('type') || hashParams.get('type');
       const token = searchParams.get('token') || hashParams.get('token') || searchParams.get('magic_token') || hashParams.get('magic_token');
+      const email = searchParams.get('email') || hashParams.get('email');
 
       const isRecovery = type === 'recovery' || 
                          hash.includes('type=recovery') || 
@@ -155,6 +158,8 @@ export default function App() {
           setAuthView('accept-invite');
         }
       } else if (isRecovery) {
+        if (token) setResetToken(token);
+        if (email) setResetEmail(email);
         setAuthView('reset-password');
       } else if (
         code || 
@@ -813,6 +818,8 @@ export default function App() {
         )}
         {authView === 'reset-password' && (
           <ResetPasswordView
+            resetToken={resetToken}
+            userEmail={resetEmail}
             onRequestResetLink={() => {
               setAuthView('forgot-password');
               window.location.hash = '#forgot-password';

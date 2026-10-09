@@ -1,9 +1,14 @@
+import * as Sentry from "@sentry/react";
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
+
+Sentry.init({
+  dsn: "https://9992e15f5960d46b12aafc1481677cfe@o4512227424534528.ingest.us.sentry.io/4512227431809024"
+});
 
 // Register Service Worker for offline forensics asset caching and instant updates in production
 if (import.meta.env.PROD && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -52,11 +57,15 @@ if (typeof window !== 'undefined') {
   });
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+const container = document.getElementById("app") || document.getElementById("root");
+if (container) {
+  const root = createRoot(container);
+  root.render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
 
