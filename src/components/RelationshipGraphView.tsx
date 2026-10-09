@@ -65,6 +65,7 @@ import {
 import { EmailAnalysis, EmailHop } from '../types';
 import { ShareCaseModal } from './ShareCaseModal';
 import { exportEvidenceAsJson, exportEvidenceAsCsv, exportEvidenceAsPdf } from '../utils/exportEvidence';
+import { EmailActorD3Graph } from './EmailActorD3Graph';
 
 // Custom Entity Node supporting all forensic evidence types in ReactFlow
 const CustomGraphNode = ({ data }: any) => {
@@ -394,7 +395,7 @@ export function RelationshipGraphView({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedEntity, setSelectedEntity] = useState<any | null>(null);
-  const [viewMode, setViewMode] = useState<'constellation' | 'all_evidence' | 'relay_pipeline' | 'iocs_threats' | 'auth_identity'>('constellation');
+  const [viewMode, setViewMode] = useState<'constellation' | 'd3_actors' | 'all_evidence' | 'relay_pipeline' | 'iocs_threats' | 'auth_identity'>('constellation');
   const [hidePrivateHops, setHidePrivateHops] = useState<boolean>(false);
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [activeConstellationNode, setActiveConstellationNode] = useState<string>('email');
@@ -1122,6 +1123,18 @@ export function RelationshipGraphView({
               <span>Constellation</span>
             </button>
             <button
+              onClick={() => setViewMode('d3_actors')}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'd3_actors'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950/60'
+                  : 'text-indigo-400 hover:text-indigo-200 bg-indigo-950/40 border border-indigo-800/50'
+              }`}
+              title="D3.js Dynamic Mail Hop Actor Graph"
+            >
+              <Activity className="w-3.5 h-3.5 text-indigo-300" />
+              <span>D3 Actor Flow</span>
+            </button>
+            <button
               onClick={() => setViewMode('all_evidence')}
               className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                 viewMode === 'all_evidence'
@@ -1511,9 +1524,21 @@ export function RelationshipGraphView({
         )}
 
         {/* ======================================================== */}
+        {/* 1.5 D3 DYNAMIC ACTOR GRAPH VIEW */}
+        {/* ======================================================== */}
+        {viewMode === 'd3_actors' && effectiveAnalysis && (
+          <div className="flex-1 h-full relative overflow-hidden flex flex-col p-4 bg-[#070b14]">
+            <EmailActorD3Graph
+              analysis={effectiveAnalysis}
+              className="h-full w-full"
+            />
+          </div>
+        )}
+
+        {/* ======================================================== */}
         {/* 2. REACTFLOW DETAILED CANVAS (For Topology & IOC Drilldown) */}
         {/* ======================================================== */}
-        {viewMode !== 'constellation' && (
+        {viewMode !== 'constellation' && viewMode !== 'd3_actors' && (
           <div className="flex-1 h-full relative">
             <ReactFlow
               nodes={nodes}

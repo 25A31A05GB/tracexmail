@@ -153,6 +153,20 @@ export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: 
           </a>
 
           <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => {
+                if (onNavigateToPath) {
+                  onNavigateToPath('/knowledge');
+                } else {
+                  window.location.href = '/knowledge';
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-amber-400 hover:text-amber-300 px-2.5 py-1.5 rounded-sm border border-amber-400/30 bg-amber-400/10 hover:bg-amber-400/20 transition-colors cursor-pointer"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+              <span>Knowledge Base</span>
+            </button>
+
             <a
               href="https://tracexmail.vercel.app"
               target="_blank"
@@ -341,6 +355,18 @@ export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: 
           </div>
 
           <div className="flex flex-wrap gap-4 text-xs font-mono">
+            <button
+              onClick={() => {
+                if (onNavigateToPath) {
+                  onNavigateToPath('/knowledge');
+                } else {
+                  window.location.href = '/knowledge';
+                }
+              }}
+              className="text-amber-400 hover:text-amber-300 font-bold transition-colors cursor-pointer"
+            >
+              Knowledge Base
+            </button>
             {tabs.map((tab) => (
               <button 
                 key={tab.id} 

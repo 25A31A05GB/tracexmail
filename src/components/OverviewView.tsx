@@ -61,7 +61,7 @@ import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
 import { CaseTagManager } from './CaseTagManager';
 import { EnterpriseForensicDossier } from './EnterpriseForensicDossier';
 import { GeoTracerUtility } from './GeoTracerUtility';
-import { D3MailActorGraph } from './D3MailActorGraph';
+import { EmailActorD3Graph } from './EmailActorD3Graph';
 
 const RelationshipGraphView = React.lazy(() => import('./RelationshipGraphView').then(m => ({ default: m.RelationshipGraphView })));
 
@@ -320,6 +320,7 @@ export function OverviewView({
   const [reverifying, setReverifying] = useState<boolean>(false);
   const [originAssessmentOpen, setOriginAssessmentOpen] = useState<boolean>(false);
   const [isEvidenceTagOpen, setIsEvidenceTagOpen] = useState<boolean>(false);
+  const [overviewGraphMode, setOverviewGraphMode] = useState<'d3_actor' | 'entity_topology'>('d3_actor');
   const [overviewMode, setOverviewMode] = useState<'non_technical' | 'card' | 'workspace'>(() => {
     if (userPersona === 'non_technical' || viewMode === 'simple') {
       return 'non_technical';
@@ -329,7 +330,6 @@ export function OverviewView({
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
-  const [actorGraphViewMode, setActorGraphViewMode] = useState<'d3_actors' | 'reactflow_entities'>('d3_actors');
   const [caseTags, setCaseTags] = useState<string[]>(() => {
     return Array.isArray(analysis?.tags) ? [...analysis.tags] : [];
   });
@@ -1747,51 +1747,53 @@ export function OverviewView({
         </div>
 
         {/* Graph-Based Relationship & Relay Path Analysis Card */}
-        <div id="overview-actor-graph-card" className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-5 shadow-sm space-y-4">
+        <div className="bg-[#1a1712] border border-[#3a352c] rounded-lg p-5 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/70 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded bg-blue-950 border border-blue-800 flex items-center justify-center text-blue-400">
+              <div className="w-7 h-7 rounded bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400">
                 <Network className="w-4 h-4" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-200 font-bold uppercase tracking-wider block font-mono">
-                    Email Actors &amp; Hop Path Topology
+                  <span className="text-xs text-slate-200 font-bold uppercase tracking-wider block">
+                    Email Actor &amp; Mail Hop Path Graph
                   </span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-950/80 border border-blue-800/80 text-blue-300">
-                    D3 Node-Link Graph
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/60 border border-indigo-700 text-indigo-300 font-mono font-bold">
+                    D3.js Force Dynamic
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-400">
-                  Dynamic force-directed graph illustrating Sender origin, sequential MTA relay hops, latency metrics, and Recipient delivery
+                  Interactive node-link graph of sender, relay servers, and recipient with live transit latency &amp; telemetry
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center flex-wrap gap-2">
-              {/* View Switcher: D3 Dynamic Actors vs Full Multi-Entity ReactFlow */}
-              <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs font-mono">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {/* Tab Selector between D3 Dynamic Actor Graph and Entity Topology */}
+              <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-800 text-xs">
                 <button
-                  onClick={() => setActorGraphViewMode('d3_actors')}
-                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-                    actorGraphViewMode === 'd3_actors'
-                      ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  type="button"
+                  onClick={() => setOverviewGraphMode('d3_actor')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                    overviewGraphMode === 'd3_actor'
+                      ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Dynamic D3 force simulation with packet transmission pulses and hop telemetry"
                 >
-                  ⚡ D3 Hop Graph
+                  <Activity className="w-3.5 h-3.5 text-indigo-200" />
+                  <span>D3 Actor Graph</span>
                 </button>
                 <button
-                  onClick={() => setActorGraphViewMode('reactflow_entities')}
-                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
-                    actorGraphViewMode === 'reactflow_entities'
-                      ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  type="button"
+                  onClick={() => setOverviewGraphMode('entity_topology')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                    overviewGraphMode === 'entity_topology'
+                      ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
-                  title="Expanded multi-entity forensic relationship graph"
                 >
-                  Entity Canvas
+                  <Network className="w-3.5 h-3.5 text-slate-300" />
+                  <span>Full Topology</span>
                 </button>
               </div>
 
@@ -1799,9 +1801,8 @@ export function OverviewView({
                 <button
                   onClick={onNavigateToGraph}
                   className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1.5 bg-blue-950/60 border border-blue-800/80 px-2.5 py-1 rounded-md transition-colors cursor-pointer"
-                  title="Open Dedicated Fullscreen Graph Analysis Tab"
                 >
-                  <span>Open Full Graph</span>
+                  <span>Expand Graph</span>
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -1809,15 +1810,13 @@ export function OverviewView({
           </div>
 
           <div className="w-full rounded-xl overflow-hidden border border-slate-800">
-            {actorGraphViewMode === 'd3_actors' ? (
-              <D3MailActorGraph
+            {overviewGraphMode === 'd3_actor' ? (
+              <EmailActorD3Graph
                 analysis={analysis}
-                height={520}
-                onNavigateToGraph={onNavigateToGraph}
-                onNavigateToHopView={onNavigateToTimeline}
+                onNavigateToHeaders={onNavigateToHeaders}
               />
             ) : (
-              <div className="h-[520px] w-full">
+              <div className="h-[480px] w-full">
                 <React.Suspense fallback={
                   <div className="flex-1 flex items-center justify-center h-full bg-[#0b0d12]">
                     <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />

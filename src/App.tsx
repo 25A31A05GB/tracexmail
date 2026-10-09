@@ -68,6 +68,7 @@ import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { ForensicOfflineModeBanner } from './components/common/ForensicOfflineModeBanner';
 import { NotFoundView } from './components/NotFoundView';
 import { AuthCallbackView } from './components/AuthCallbackView';
+import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 import { trackPageView } from './utils/analytics';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
@@ -731,6 +732,16 @@ export default function App() {
   ) {
     return (
       <AuthCallbackView onNavigateHome={() => navigateToPath('/')} />
+    );
+  }
+
+  // Knowledge Base & Educational Hub routes (/knowledge and /knowledge/*)
+  if (currentPath === '/knowledge' || currentPath.startsWith('/knowledge')) {
+    return (
+      <KnowledgeBaseView
+        onNavigateHome={() => navigateToPath('/')}
+        onNavigateToPath={(p) => navigateToPath(p)}
+      />
     );
   }
 

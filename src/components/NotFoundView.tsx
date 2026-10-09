@@ -13,6 +13,7 @@ import {
   Route,
   ExternalLink,
   BookOpen,
+  Shield,
   ShieldCheck,
   FileCode,
   Sparkles
@@ -186,13 +187,29 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
             Authorized Forensic Modules &amp; Compliance Hub
           </div>
           
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 text-xs font-mono mb-6">
             <a
               href="/"
               className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
             >
               <Terminal className="w-3.5 h-3.5 text-[#c9a227] shrink-0" />
               <span className="truncate">Home / Console</span>
+            </a>
+
+            <a
+              href="/knowledge"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">Knowledge Base</span>
+            </a>
+
+            <a
+              href="/about"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">About Us</span>
             </a>
 
             <a
@@ -208,15 +225,7 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
               className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
             >
               <FileCode className="w-3.5 h-3.5 text-[#fbbf24] shrink-0" />
-              <span className="truncate">Domain &amp; SPF Setup</span>
-            </a>
-
-            <a
-              href="/llms.txt"
-              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#4ade80] shrink-0" />
-              <span className="truncate">llms.txt Standard</span>
+              <span className="truncate">Domain &amp; SPF</span>
             </a>
 
             <a
@@ -248,7 +257,15 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
               className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
             >
               <Globe className="w-3.5 h-3.5 text-[#ff8d7d] shrink-0" />
-              <span className="truncate">Contact Support</span>
+              <span className="truncate">Contact DPO</span>
+            </a>
+
+            <a
+              href="/llms.txt"
+              className="p-2.5 rounded bg-[#181511] hover:bg-[#221e17] border border-[#2d2820] hover:border-[#3a352c] text-[#b9af9c] hover:text-[#ede6d8] transition-colors flex items-center gap-2 no-underline"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#4ade80] shrink-0" />
+              <span className="truncate">llms.txt Spec</span>
             </a>
           </div>
 
