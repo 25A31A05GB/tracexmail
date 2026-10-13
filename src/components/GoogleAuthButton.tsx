@@ -148,6 +148,9 @@ export function GoogleAuthButton({
   };
 
   const handleDemoSignIn = () => {
+    if (import.meta.env.PROD && import.meta.env.VITE_ENABLE_DEMO_AUTH !== 'true') {
+      return;
+    }
     const res = signInWithGoogleDemoSession();
     setShowConfigModal(false);
     if (res.success && onSuccess) {
@@ -231,34 +234,41 @@ export function GoogleAuthButton({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              To complete live Google Account OAuth sign-in, standard Google Client IDs are connected via Supabase Auth. You can also proceed instantly using the verified Google Analyst Enclave profile:
+              To complete live Google Account OAuth sign-in, standard Google Client IDs are connected via Supabase Auth.
+              {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_DEMO_AUTH === 'true') && (
+                <> You can also proceed instantly using the verified Google Analyst Enclave profile:</>
+              )}
             </p>
 
-            <div className="bg-[#0e0c0a] border border-[#2e2a22] rounded-lg p-3 mb-4 font-mono text-[11px] text-slate-300 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">OAuth Scope:</span>
-                <span className="text-blue-400 font-bold">email, profile, openid</span>
+            {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_DEMO_AUTH === 'true') && (
+              <div className="bg-[#0e0c0a] border border-[#2e2a22] rounded-lg p-3 mb-4 font-mono text-[11px] text-slate-300 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">OAuth Scope:</span>
+                  <span className="text-blue-400 font-bold">email, profile, openid</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Google Domain:</span>
+                  <span className="text-emerald-400">accounts.google.com</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Status:</span>
+                  <span className="text-amber-400">Enclave Enabled</span>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Google Domain:</span>
-                <span className="text-emerald-400">accounts.google.com</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400">Status:</span>
-                <span className="text-amber-400">Enclave Enabled</span>
-              </div>
-            </div>
+            )}
 
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={handleDemoSignIn}
-                className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Instant Sign-In with Google Account</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              {(!import.meta.env.PROD || import.meta.env.VITE_ENABLE_DEMO_AUTH === 'true') && (
+                <button
+                  type="button"
+                  onClick={handleDemoSignIn}
+                  className="w-full py-2.5 px-4 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Instant Sign-In with Google Account</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
 
               <button
                 type="button"

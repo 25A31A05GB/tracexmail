@@ -789,7 +789,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       await saveOtp(`reset:${cleanEmail}`, record);
     }
 
-    console.log(`[AuthRouter:OTP] Code generated for ${cleanEmail} (type: ${type}): ${code}`);
+    const isDevPreview = process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_AUTH_PREVIEW === 'true';
 
     // If Resend API is configured, attempt sending real email notification
     try {
@@ -848,7 +848,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       email: cleanEmail,
       type,
       expires_in_seconds: 900,
-      preview_code: code
+      ...(isDevPreview ? { preview_code: code, dev_preview: true } : {})
     });
   };
 
@@ -1147,11 +1147,32 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     // Determine the base origin
-    let origin = redirectTo || req.headers.origin;
+    let origin = process.env.APP_BASE_URL?.trim();
     if (!origin) {
-      const host = req.headers.host || 'localhost:3000';
-      const proto = req.headers['x-forwarded-proto'] || 'http';
-      origin = `${proto}://${host}`;
+      let allowedRedirect: string | undefined;
+      if (redirectTo && process.env.ALLOWED_REDIRECT_ORIGINS) {
+        try {
+          const redirectOrigin = new URL(redirectTo).origin.toLowerCase();
+          const allowedList = process.env.ALLOWED_REDIRECT_ORIGINS
+            .split(',')
+            .map(s => s.trim().toLowerCase())
+            .filter(Boolean);
+          if (allowedList.includes(redirectOrigin)) {
+            allowedRedirect = redirectTo;
+          }
+        } catch {
+          // Ignore invalid redirectTo URL
+        }
+      } else if (redirectTo && !process.env.ALLOWED_REDIRECT_ORIGINS) {
+        allowedRedirect = redirectTo;
+      }
+
+      origin = allowedRedirect || req.headers.origin;
+      if (!origin) {
+        const host = req.headers.host || 'localhost:3000';
+        const proto = req.headers['x-forwarded-proto'] || 'http';
+        origin = `${proto}://${host}`;
+      }
     }
     origin = origin.replace(/\/$/, '');
 
@@ -1174,9 +1195,11 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     // Attempt sending HTML email if Resend API key configured
+    const emailCfg = getEmailAlertConfig();
+    const hasEmailConfigured = Boolean(emailCfg.resendApiKey);
+
     try {
-      const emailCfg = getEmailAlertConfig();
-      if (emailCfg.resendApiKey) {
+      if (hasEmailConfigured) {
         axios.post(
           'https://api.resend.com/emails',
           {
@@ -1237,11 +1260,14 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       status: 'SUCCESS'
     }).catch(err => console.warn('[AuthAudit] Failed logging magic link sent:', err));
 
-    console.log(`[AuthRouter:MagicLink] Dispatched (${type}) for ${cleanEmail}: ${magicLinkUrl}`);
+    const isDevPreview = process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_AUTH_PREVIEW === 'true';
+    const message = hasEmailConfigured
+      ? `Magic link dispatched to ${cleanEmail}. Valid for ${type === 'recovery' ? '30' : '15'} minutes.`
+      : `Email delivery is not configured. Request processed for ${cleanEmail}.`;
 
     return res.status(200).json({
       status: 'success',
-      message: `Magic link dispatched to ${cleanEmail}. Valid for ${type === 'recovery' ? '30' : '15'} minutes.`,
+      message,
       email: cleanEmail,
       type,
       expires_in_seconds: Math.floor(ttl / 1000),
@@ -1249,10 +1275,13 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       resetToken: token,
       code: otpCode,
       otp_code: otpCode,
-      preview_code: otpCode,
-      magic_link: magicLinkUrl,
       magicLinkUrl,
-      directResetUrl: magicLinkUrl
+      directResetUrl: magicLinkUrl,
+      ...(isDevPreview ? {
+        magic_link: magicLinkUrl,
+        preview_code: otpCode,
+        dev_preview: true
+      } : {})
     });
   };
 
@@ -1338,7 +1367,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     // For signin or signup:
     const payload = record.payload || {};
-    const assignedRole: UserRole = payload.role === 'admin' ? 'admin' : payload.role === 'read_only' ? 'read_only' : 'analyst';
+    const assignedRole: UserRole = payload.role === 'read_only' ? 'read_only' : 'analyst';
     const assignedOrg = payload.accountType === 'personal' ? 'Personal Sandbox' : (payload.orgName?.trim() || 'Acme Cyber Defense SOC');
     const assignedName = payload.fullName?.trim() || cleanEmail.split('@')[0];
     const accountType = payload.accountType || (record.type === 'signup' ? 'personal' : 'organization');

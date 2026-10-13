@@ -59,14 +59,44 @@ export function LoginView({
 
     try {
       const cleanEmail = email.trim().toLowerCase();
+      let supabaseCallSucceeded = false;
       // 1. Supabase native OTP/Magic Link (best-effort secondary attempt)
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: window.location.origin
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: window.location.origin
+            }
+          });
+          if (sbErr) {
+            console.warn('[LoginView] Supabase magic link notice:', sbErr.message);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setErrorMsg(sbErr.message);
+              setLoading(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[LoginView] Supabase magic link notice:', err?.message));
+        } catch (err: any) {
+          console.warn('[LoginView] Supabase magic link notice:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setErrorMsg(err.message);
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       // 2. Server-side reliable magic link dispatch (authoritative)
@@ -81,8 +111,12 @@ export function LoginView({
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setMagicLinkSent(true);
+          return;
+        }
         throw new Error(data.error || 'Failed to dispatch magic link.');
       }
 
@@ -105,14 +139,44 @@ export function LoginView({
     setResendStatus(null);
     try {
       const cleanEmail = email.trim().toLowerCase();
+      let supabaseCallSucceeded = false;
       // 1. Supabase best-effort secondary attempt
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: window.location.origin
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: window.location.origin
+            }
+          });
+          if (sbErr) {
+            console.warn('[LoginView] Supabase resend notice:', sbErr.message);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setResendStatus(sbErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[LoginView] Supabase resend notice:', err?.message));
+        } catch (err: any) {
+          console.warn('[LoginView] Supabase resend notice:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setResendStatus(err.message);
+            setResending(false);
+            return;
+          }
+        }
       }
 
       // 2. Authoritative reliable server dispatch
@@ -127,8 +191,12 @@ export function LoginView({
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setResendStatus(`Fresh magic link dispatched to ${cleanEmail}.`);
+          return;
+        }
         throw new Error(data.error || 'Failed to resend magic link.');
       }
 
@@ -146,14 +214,44 @@ export function LoginView({
     setResendStatus(null);
     try {
       const cleanEmail = email.trim().toLowerCase();
+      let supabaseCallSucceeded = false;
       // 1. Supabase best-effort secondary attempt
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: window.location.origin
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: window.location.origin
+            }
+          });
+          if (sbErr) {
+            console.warn('[LoginView] Supabase verification resend notice:', sbErr.message);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setResendStatus(sbErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[LoginView] Supabase verification resend notice:', err?.message));
+        } catch (err: any) {
+          console.warn('[LoginView] Supabase verification resend notice:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setResendStatus(err.message);
+            setResending(false);
+            return;
+          }
+        }
       }
 
       // 2. Authoritative reliable server dispatch
@@ -168,8 +266,12 @@ export function LoginView({
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setResendStatus(`Verification magic link dispatched to ${cleanEmail}. Please check your inbox.`);
+          return;
+        }
         throw new Error(data.error || 'Failed to resend verification magic link.');
       }
 

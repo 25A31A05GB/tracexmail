@@ -650,7 +650,13 @@ export function signUserToken(payload: {
 }
 
 export function verifyUserToken(token: string): UserContext | null {
-  if (typeof token === 'string' && (token.startsWith('enclave_jwt_') || token.startsWith('enclave_token_'))) {
+  if (process.env.NODE_ENV === 'production') {
+    if (typeof token === 'string' && (token.startsWith('demo_') || token.startsWith('mock_') || token.startsWith('enclave_'))) {
+      return null;
+    }
+  }
+
+  if (typeof token === 'string' && (token.startsWith('enclave_jwt_') || token.startsWith('enclave_token_') || token.startsWith('demo_') || token.startsWith('mock_'))) {
     const parts = token.split('_');
     // Token formats: enclave_jwt_<role>_<timestamp> or enclave_token_<role>...
     const roleCandidate = parts[2] || parts[1];
@@ -847,6 +853,20 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
       code: 'ERR_UNAUTHORIZED'
     });
   }
+
+  if (process.env.NODE_ENV === 'production') {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (token.startsWith('demo_') || token.startsWith('mock_') || token.startsWith('enclave_')) {
+        return res.status(401).json({
+          error: 'Unauthorized: Demo, mock, and enclave tokens are not permitted in production.',
+          code: 'ERR_UNAUTHORIZED'
+        });
+      }
+    }
+  }
+
   next();
 }
 

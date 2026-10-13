@@ -220,14 +220,44 @@ export function MagicLinkVerifyView({
     setResendStatus(null);
     try {
       const cleanEmail = userEmail.trim().toLowerCase();
+      let supabaseCallSucceeded = false;
       // 1. Supabase best-effort secondary attempt (safely wrapped)
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: window.location.origin
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: window.location.origin
+            }
+          });
+          if (sbErr) {
+            console.warn('[MagicLinkVerifyView] Supabase resend notice:', sbErr.message);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setResendStatus(sbErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[MagicLinkVerifyView] Supabase resend notice:', err?.message));
+        } catch (err: any) {
+          console.warn('[MagicLinkVerifyView] Supabase resend notice:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setResendStatus(err.message);
+            setResending(false);
+            return;
+          }
+        }
       }
 
       // 2. Authoritative reliable server dispatch
@@ -241,8 +271,12 @@ export function MagicLinkVerifyView({
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setResendStatus(`Fresh magic link dispatched to ${cleanEmail}. Please check your inbox.`);
+          return;
+        }
         throw new Error(data.error || 'Failed to dispatch new magic link.');
       }
 

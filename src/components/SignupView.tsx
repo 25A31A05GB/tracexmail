@@ -228,22 +228,81 @@ export function SignupView({
       const cleanEmail = email.trim().toLowerCase();
       const redirectUrl = window.location.origin;
 
+      let supabaseCallSucceeded = false;
       // 1. Supabase best-effort secondary attempts (safely wrapped)
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.signInWithOtp({
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: redirectUrl
+        try {
+          const { error: sbErr } = await supabase.auth.signInWithOtp({
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: redirectUrl
+            }
+          });
+          if (sbErr) {
+            console.warn('[SignupView] Supabase magic link resend notice:', sbErr.message);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setResendStatus(sbErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[SignupView] Supabase magic link resend notice:', err?.message));
+        } catch (err: any) {
+          console.warn('[SignupView] Supabase magic link resend notice:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setResendStatus(err.message);
+            setResending(false);
+            return;
+          }
+        }
         
-        await supabase.auth.resend({
-          type: 'signup',
-          email: cleanEmail,
-          options: {
-            emailRedirectTo: redirectUrl
+        try {
+          const { error: resendErr } = await supabase.auth.resend({
+            type: 'signup',
+            email: cleanEmail,
+            options: {
+              emailRedirectTo: redirectUrl
+            }
+          });
+          if (resendErr) {
+            console.warn('[SignupView] Resend error:', resendErr.message);
+            const isRateLimit = (resendErr as any)?.status === 429 ||
+              Boolean(resendErr?.message && (
+                resendErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(resendErr.message)
+              ));
+            if (isRateLimit) {
+              setResendStatus(resendErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
           }
-        }).catch(err => console.warn('[SignupView] Resend error:', err?.message));
+        } catch (err: any) {
+          console.warn('[SignupView] Resend error:', err?.message);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setResendStatus(err.message);
+            setResending(false);
+            return;
+          }
+        }
       }
 
       // 2. Authoritative reliable server dispatch
@@ -258,8 +317,12 @@ export function SignupView({
         })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setResendStatus(`Fresh verification magic link dispatched to ${cleanEmail}.`);
+          return;
+        }
         throw new Error(data.error || 'Failed to resend verification email.');
       }
 

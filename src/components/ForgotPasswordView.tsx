@@ -68,15 +68,44 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
       const redirectUrl = getResetPasswordRedirectUrl();
       logSupabaseAuthEvent('ResetPasswordRequest:Start', { email: cleanEmail, redirectUrl });
 
+      let supabaseCallSucceeded = false;
       // 1. Supabase native password reset dispatch (best effort)
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo: redirectUrl
-        }).catch(err => {
+        try {
+          const { error: sbErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+            redirectTo: redirectUrl
+          });
+          if (sbErr) {
+            logSupabaseAuthEvent('ResetPasswordRequest:Error', sbErr, 'error');
+            console.warn('[ForgotPassword] Supabase reset request notice:', sbErr);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setErrorMsg(sbErr.message);
+              setLoading(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
+            logSupabaseAuthEvent('ResetPasswordRequest:Success');
+          }
+        } catch (err: any) {
           logSupabaseAuthEvent('ResetPasswordRequest:Error', err, 'error');
           console.warn('[ForgotPassword] Supabase reset request notice:', err);
-        });
-        logSupabaseAuthEvent('ResetPasswordRequest:Success');
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setErrorMsg(err.message);
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       // 2. Authoritative server-side recovery dispatch
@@ -88,6 +117,12 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setSuccessMsg(`Password recovery clearance initialized for ${cleanEmail}.`);
+          setStep('sent');
+          setLoading(false);
+          return;
+        }
         console.warn('[ForgotPassword] Server recovery link notice:', data);
       }
 
@@ -134,10 +169,40 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
     const cleanEmail = email.trim().toLowerCase();
     try {
       const redirectUrl = getResetPasswordRedirectUrl();
+      let supabaseCallSucceeded = false;
       if (isSupabaseConfigured && supabase) {
-        await supabase.auth.resetPasswordForEmail(cleanEmail, {
-          redirectTo: redirectUrl
-        }).catch(err => console.warn('[ForgotPassword] Supabase resend notice:', err));
+        try {
+          const { error: sbErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+            redirectTo: redirectUrl
+          });
+          if (sbErr) {
+            console.warn('[ForgotPassword] Supabase resend notice:', sbErr);
+            const isRateLimit = (sbErr as any)?.status === 429 ||
+              Boolean(sbErr?.message && (
+                sbErr.message.toLowerCase().includes('rate limit') ||
+                /after \d+ seconds/i.test(sbErr.message)
+              ));
+            if (isRateLimit) {
+              setErrorMsg(sbErr.message);
+              setResending(false);
+              return;
+            }
+          } else {
+            supabaseCallSucceeded = true;
+          }
+        } catch (err: any) {
+          console.warn('[ForgotPassword] Supabase resend notice:', err);
+          const isRateLimit = err?.status === 429 ||
+            Boolean(err?.message && (
+              err.message.toLowerCase().includes('rate limit') ||
+              /after \d+ seconds/i.test(err.message)
+            ));
+          if (isRateLimit) {
+            setErrorMsg(err.message);
+            setResending(false);
+            return;
+          }
+        }
       }
 
       const res = await apiFetch('/api/auth/magic-link/send', {
@@ -146,8 +211,13 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
         body: JSON.stringify({ email: cleanEmail, type: 'recovery', redirectTo: redirectUrl })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429 && supabaseCallSucceeded) {
+          setSuccessMsg(`Fresh recovery link and security code generated for ${cleanEmail}.`);
+          setResending(false);
+          return;
+        }
         throw new Error(data.error || 'Failed to resend recovery email.');
       }
 
@@ -252,29 +322,45 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
               </div>
             )}
 
-            {/* Instant Direct Action - No email wait needed */}
-            <div className="p-3.5 rounded-[2px] bg-[rgba(201,162,39,0.08)] border border-[var(--stamp)] text-xs font-sans space-y-2.5">
-              <div className="flex items-center justify-between">
+            {/* Instant Direct Action (dev preview mode) or Check Email Message (production) */}
+            {!resetToken && !directResetUrl && !recoveryOtp ? (
+              <div className="p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-2">
                 <div className="font-semibold text-[var(--paper)] flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[var(--stamp)]" />
-                  <span>Instant Enclave Recovery</span>
+                  <Mail className="w-4 h-4 text-[var(--stamp)]" />
+                  <span>Check Your Work Email</span>
                 </div>
-                <span className="font-mono text-[10px] bg-[var(--stamp)]/20 text-[var(--stamp)] px-2 py-0.5 rounded-xs font-semibold">
-                  ACTIVE
-                </span>
+                <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
+                  We sent a secure single-use recovery link to <span className="font-mono text-[var(--paper)] font-semibold">{email.trim()}</span>.
+                  Click that link to choose your new master password.
+                </p>
+                <p className="text-[var(--paper-muted)] text-[11px] leading-relaxed">
+                  If you don't receive the email within 2 minutes, check your junk or spam folder.
+                </p>
               </div>
-              <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
-                Your single-use cryptographic authorization token is verified and ready. You do not need to wait for email delivery.
-              </p>
-              <button
-                type="button"
-                onClick={() => setStep('new-password')}
-                className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-2 text-center cursor-pointer shadow-md"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Choose New Master Password Now →</span>
-              </button>
-            </div>
+            ) : (
+              <div className="p-3.5 rounded-[2px] bg-[rgba(201,162,39,0.08)] border border-[var(--stamp)] text-xs font-sans space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-[var(--paper)] flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[var(--stamp)]" />
+                    <span>Instant Enclave Recovery</span>
+                  </div>
+                  <span className="font-mono text-[10px] bg-[var(--stamp)]/20 text-[var(--stamp)] px-2 py-0.5 rounded-xs font-semibold">
+                    ACTIVE
+                  </span>
+                </div>
+                <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
+                  Your single-use cryptographic authorization token is verified and ready. You do not need to wait for email delivery.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setStep('new-password')}
+                  className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-2 text-center cursor-pointer shadow-md"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Choose New Master Password Now →</span>
+                </button>
+              </div>
+            )}
 
             {/* Direct Recovery Link Card */}
             {directResetUrl && (
@@ -340,7 +426,11 @@ export function ForgotPasswordView({ onBackToLogin, onBackToIntro, onSuccess }: 
               </div>
               <p className="text-[11px] text-[var(--paper-dim)] leading-relaxed">
                 Corporate spam filters, DMARC quarantines, or mail relay delays can intercept recovery emails.
-                You can bypass email delivery completely: click <strong className="text-[var(--paper)]">"Choose New Master Password Now"</strong> above or use your security code.
+                {resetToken || directResetUrl || recoveryOtp ? (
+                  <> You can bypass email delivery completely: click <strong className="text-[var(--paper)]">"Choose New Master Password Now"</strong> above or use your security code.</>
+                ) : (
+                  <> Please check your junk or spam folder, or click below to resend the link.</>
+                )}
               </p>
               <div className="pt-1 flex items-center gap-2">
                 <button
