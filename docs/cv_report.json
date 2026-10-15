@@ -1,78 +1,78 @@
 {
   "schema_version": "2.5.0",
-  "generated_at": "2026-09-14T07:45:32.772Z",
+  "generated_at": "2026-10-14T18:00:28.140Z",
   "corpus_samples": 7126,
   "k_folds": 5,
   "grid_search_results": [
     {
       "vocabSize": 1500,
       "l2Reg": 0.001,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0171,
-      "combinedScore": 0.1915
+      "meanMacroF1": 0.999,
+      "meanECE": 0.051,
+      "combinedScore": 0.9735
     },
     {
       "vocabSize": 3000,
       "l2Reg": 0.001,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0171,
-      "combinedScore": 0.1915
+      "meanMacroF1": 0.999,
+      "meanECE": 0.0526,
+      "combinedScore": 0.9727
     },
     {
       "vocabSize": 5000,
       "l2Reg": 0.001,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0171,
-      "combinedScore": 0.1915
-    },
-    {
-      "vocabSize": 1500,
-      "l2Reg": 0.1,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.023,
-      "combinedScore": 0.1885
-    },
-    {
-      "vocabSize": 3000,
-      "l2Reg": 0.1,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.023,
-      "combinedScore": 0.1885
-    },
-    {
-      "vocabSize": 5000,
-      "l2Reg": 0.1,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.023,
-      "combinedScore": 0.1885
+      "meanMacroF1": 0.999,
+      "meanECE": 0.0526,
+      "combinedScore": 0.9727
     },
     {
       "vocabSize": 1500,
       "l2Reg": 0.01,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0258,
-      "combinedScore": 0.1871
+      "meanMacroF1": 0.999,
+      "meanECE": 0.1793,
+      "combinedScore": 0.9093
     },
     {
       "vocabSize": 3000,
       "l2Reg": 0.01,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0258,
-      "combinedScore": 0.1871
+      "meanMacroF1": 0.999,
+      "meanECE": 0.1835,
+      "combinedScore": 0.9073
     },
     {
       "vocabSize": 5000,
       "l2Reg": 0.01,
-      "meanMacroF1": 0.2,
-      "meanECE": 0.0258,
-      "combinedScore": 0.1871
+      "meanMacroF1": 0.999,
+      "meanECE": 0.1835,
+      "combinedScore": 0.9073
+    },
+    {
+      "vocabSize": 1500,
+      "l2Reg": 0.1,
+      "meanMacroF1": 0.999,
+      "meanECE": 0.5872,
+      "combinedScore": 0.7054
+    },
+    {
+      "vocabSize": 3000,
+      "l2Reg": 0.1,
+      "meanMacroF1": 0.999,
+      "meanECE": 0.5936,
+      "combinedScore": 0.7022
+    },
+    {
+      "vocabSize": 5000,
+      "l2Reg": 0.1,
+      "meanMacroF1": 0.999,
+      "meanECE": 0.5936,
+      "combinedScore": 0.7022
     }
   ],
   "best_config": {
     "vocabSize": 1500,
     "l2Reg": 0.001,
-    "meanMacroF1": 0.2,
-    "meanECE": 0.0171,
-    "combinedScore": 0.1915
+    "meanMacroF1": 0.999,
+    "meanECE": 0.051,
+    "combinedScore": 0.9735
   }
 }

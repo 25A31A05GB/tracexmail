@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for TraceXMail security remediation, SQL schema bug fixes, ML reporting recalculation, and static route cleanup.\n- Rotates plaintext credentials in data/org_users.json to unique bcrypt hashes and removes clearPassword everywhere.\n- Gitignores .gmail_connection.json and org_users.json; relocates test fixtures to os.tmpdir().\n- Fixes idx_intel_cache_provider_key column mismatch in schema_extensions.sql and expands cases.status CHECK constraint in schema.sql.\n- Resolves ML 5-class stratified cross-validation sampling bug, recalculates AUC-ROC and R-Squared, and corrects feature polarities for meta-classifier.\n- Cleans placeholder GA/AdSense tags in index.html, updates vercel.json rewrites for /about and /knowledge, and repairs truncated tor-exit-list.txt.",
+  "updatedAt": "2026-10-14T17:46:59.286296906Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

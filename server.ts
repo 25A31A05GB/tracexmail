@@ -7251,7 +7251,6 @@ Thanks!`;
           role: u.role,
           permissions: u.permissions,
           status: u.status,
-          clearPassword: caller.role === 'admin' ? u.clearPassword : undefined, // Handover recovery for admins
           lastActive: u.lastActive,
           createdBy: u.createdBy,
           notificationStatus: u.notificationStatus,

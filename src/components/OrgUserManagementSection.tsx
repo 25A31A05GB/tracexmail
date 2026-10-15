@@ -73,7 +73,6 @@ export interface OrgUserItem {
   role: UserRole;
   permissions?: OrgUserPermissions;
   status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
-  clearPassword?: string;
   lastActive: string;
   createdBy?: string;
   notificationStatus?: OrgUserNotificationStatus;

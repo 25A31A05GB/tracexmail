@@ -2,6 +2,10 @@
 -- TraceXMail Forensic Email Analysis Platform: Extension Tables & RLS
 -- ==============================================================================
 
+-- Compatibility fallback for auth.users foreign keys in non-Supabase environments
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE TABLE IF NOT EXISTS auth.users (id UUID PRIMARY KEY, email TEXT);
+
 -- 1. Gmail Connections Table (State, Watch, Quarantine configs & encrypted tokens)
 CREATE TABLE IF NOT EXISTS gmail_connections (
     id TEXT PRIMARY KEY,
@@ -131,7 +135,7 @@ CREATE INDEX IF NOT EXISTS idx_slack_delivery_logs_org ON slack_delivery_logs(or
 CREATE INDEX IF NOT EXISTS idx_slack_delivery_logs_timestamp ON slack_delivery_logs(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_email_alert_logs_org ON email_alert_logs(organization_id);
 CREATE INDEX IF NOT EXISTS idx_email_alert_logs_timestamp ON email_alert_logs(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_intel_cache_provider_key ON intelligence_cache(provider, lookup_key);
+CREATE INDEX IF NOT EXISTS idx_intel_cache_provider_key ON intelligence_cache(cache_type, lookup_key);
 CREATE INDEX IF NOT EXISTS idx_intel_cache_expires_at ON intelligence_cache(expires_at);
 CREATE INDEX IF NOT EXISTS idx_team_invitations_org ON team_invitations(organization_id);
 CREATE INDEX IF NOT EXISTS idx_team_invitations_email ON team_invitations(email);

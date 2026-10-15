@@ -2,8 +2,15 @@
 -- TraceXMail Forensic Email Analysis Platform: Postgres Database Schema & RLS
 -- ==============================================================================
 
--- 1. Enable UUID Extension
+-- 1. Enable UUID Extension & Auth Schema Compatibility
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Standard PostgreSQL compatibility fallback for auth.users foreign key references
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE TABLE IF NOT EXISTS auth.users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT
+);
 
 -- 2. Organizations Table
 CREATE TABLE IF NOT EXISTS organizations (
@@ -34,7 +41,7 @@ CREATE TABLE IF NOT EXISTS cases (
     created_by TEXT,
     title TEXT NOT NULL,
     description TEXT,
-    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'FALSE_POSITIVE')),
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'INVESTIGATING', 'CONTAINED', 'RESOLVED', 'FALSE_POSITIVE', 'QUARANTINED', 'CLOSED')),
     severity TEXT NOT NULL DEFAULT 'HIGH' CHECK (severity IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'CLEAN')),
     threat_score INTEGER NOT NULL DEFAULT 0,
     threat_score_breakdown JSONB DEFAULT '{}'::jsonb,

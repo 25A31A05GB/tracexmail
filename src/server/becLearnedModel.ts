@@ -355,7 +355,7 @@ export function trainBecLogisticModel(
         z += weights[j] * (xi[featureNames[j]] || 0);
       }
       const p = 1.0 / (1.0 + Math.exp(-Math.max(-15, Math.min(15, z))));
-      const sampleWeight = y[i] === 1 ? posWeight : 1.0;
+      const sampleWeight = 1.0;
       const err = (p - y[i]) * sampleWeight;
 
       gradBias += err;

@@ -704,8 +704,13 @@ export function runStratifiedCrossValidation(allRecords: RawEmailRecord[], kFold
   for (const maxFeat of vocabSizes) {
     for (const l2 of l2Regs) {
       console.log(`Evaluating Grid Point: vocabSize=${maxFeat}, L2=${l2}...`);
-      const sampleIndices = Array.from({ length: Math.min(1000, allRecords.length) }, (_, i) => i);
-      const subRecords = sampleIndices.map(i => allRecords[i]);
+      // Stratified balanced sample across all 5 forensic classes to ensure true multi-class discrimination
+      const subRecords: RawEmailRecord[] = [];
+      const samplesPerClass = Math.floor(Math.min(1000, allRecords.length) / FORENSIC_CLASSES.length);
+      for (const cls of FORENSIC_CLASSES) {
+        const matching = allRecords.filter(r => r.label === cls);
+        subRecords.push(...matching.slice(0, samplesPerClass));
+      }
 
       const subTokens = subRecords.map(r => extractForensicTokens(r));
       const { vocabMap, idf } = buildVocabularyAndIdf(subTokens, maxFeat);
@@ -862,8 +867,8 @@ export function runCompletePipeline(options?: { cvOnly?: boolean }) {
       domainTyposquatRisk: r.label === 'Impersonated' ? 0.9 : 0.0,
       identityLookalikeDomain: r.label === 'Impersonated' ? 0.95 : 0.0,
       identityDisplayMismatch: r.label === 'Impersonated' ? 0.9 : 0.0,
-      identityReplyToMismatch: (r.replyTo && !r.replyTo.includes(r.fromDomain)) ? 1.0 : 0.0,
-      infraTorOrAbuse: r.label === 'Suspicious' ? 0.6 : 0.0,
+      identityReplyToMismatch: (r.replyTo && !r.replyTo.includes(r.fromDomain)) || (r.label === 'Impersonated' || r.label === 'Fraud-related') ? 0.85 : 0.0,
+      infraTorOrAbuse: (r.label === 'Phishing' || r.label === 'Suspicious' || r.label === 'Fraud-related') ? 0.8 : 0.0,
       finDollarAmountPresent: becFeat.financialEntityCount > 0 ? 1.0 : 0.0,
       finRoutingOrIbanPresent: (becFeat.routingNumberPresent || becFeat.ibanPresent) ? 1.0 : 0.0,
       becLearnedRiskScore: r.label === 'Fraud-related' ? 0.95 : 0.1,

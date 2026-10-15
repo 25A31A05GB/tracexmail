@@ -43,7 +43,19 @@
       "destination": "/auth/callback/index.html"
     },
     {
-      "source": "/((?!api|privacy|terms|cookies|domains|contact|security|auth|assets).*)",
+      "source": "/about",
+      "destination": "/about/index.html"
+    },
+    {
+      "source": "/knowledge",
+      "destination": "/knowledge/index.html"
+    },
+    {
+      "source": "/knowledge/:slug",
+      "destination": "/knowledge/:slug.html"
+    },
+    {
+      "source": "/((?!api|privacy|terms|cookies|domains|contact|security|auth|about|knowledge|assets|robots\\.txt|sitemap\\.xml|llms.*).*)",
       "destination": "/index.html"
     }
   ],

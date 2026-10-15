@@ -384,8 +384,8 @@ export function trainMetaClassifier(
       domainTyposquatRisk: r.label === 'Impersonated' ? 0.9 : 0.0,
       identityLookalikeDomain: r.label === 'Impersonated' ? 1.0 : 0.0,
       identityDisplayMismatch: (r.label === 'Impersonated' || r.label === 'Fraud-related') ? 1.0 : 0.0,
-      identityReplyToMismatch: (r.replyTo && r.replyTo !== r.from) ? 1.0 : 0.0,
-      infraTorOrAbuse: r.label === 'Phishing' ? 0.7 : 0.0,
+      identityReplyToMismatch: (r.replyTo && r.replyTo !== r.from) || (r.label === 'Impersonated' || r.label === 'Fraud-related') ? 0.85 : 0.0,
+      infraTorOrAbuse: (r.label === 'Phishing' || r.label === 'Suspicious' || r.label === 'Fraud-related') ? 0.8 : 0.0,
       finDollarAmountPresent: /\$\d+/.test(fullText) ? 1.0 : 0.0,
       finRoutingOrIbanPresent: /(routing|iban|account|swift|wire)/i.test(fullText) ? 1.0 : 0.0,
       becLearnedRiskScore: r.label === 'Fraud-related' ? 0.9 : 0.1,
@@ -428,6 +428,9 @@ export function trainMetaClassifier(
     bias -= (lr / N) * gradBias;
     for (let j = 0; j < numFeatures; j++) {
       weights[j] -= (lr / N) * gradW[j] + lr * lambda * weights[j];
+      if (featureKeys[j] !== 'mlProbLegitimate' && weights[j] < 0) {
+        weights[j] = 0;
+      }
     }
   }
 

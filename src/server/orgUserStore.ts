@@ -93,7 +93,6 @@ export interface OrgUser {
   permissions: OrgUserPermissions;
   status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
   passwordHash: string;
-  clearPassword?: string; // Stored securely for initial admin handover manifest & credential export
   lastActive: string;
   createdBy?: string;
   notificationStatus?: OrgUserNotificationStatus;
@@ -118,6 +117,7 @@ function loadFromFile(): void {
       const parsed: OrgUser[] = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         parsed.forEach(u => {
+          delete (u as any).clearPassword;
           orgUsersMap.set(u.id, u);
           orgUsersMap.set(u.email.toLowerCase(), u);
           if (u.employeeId) {
@@ -142,6 +142,7 @@ function persistToFile(): void {
     for (const u of orgUsersMap.values()) {
       if (!seenIds.has(u.id)) {
         seenIds.add(u.id);
+        delete (u as any).clearPassword;
         uniqueUsers.push(u);
       }
     }
@@ -155,9 +156,6 @@ function persistToFile(): void {
 function initializeSeedUsers(): void {
   loadFromFile();
   if (orgUsersMap.size === 0) {
-    const defaultPassword = 'Password1234!';
-    const defaultHash = bcrypt.hashSync(defaultPassword, 10);
-
     const initialUsers: OrgUser[] = [
       {
         id: 'usr_org_admin_01',
@@ -169,8 +167,7 @@ function initializeSeedUsers(): void {
         role: 'admin',
         permissions: DEFAULT_PERMISSIONS_BY_ROLE.admin,
         status: 'ACTIVE',
-        passwordHash: defaultHash,
-        clearPassword: defaultPassword,
+        passwordHash: bcrypt.hashSync(generateSecurePassword(), 10),
         lastActive: 'Active Now',
         createdBy: 'system',
         created_at: new Date().toISOString(),
@@ -186,8 +183,7 @@ function initializeSeedUsers(): void {
         role: 'admin',
         permissions: DEFAULT_PERMISSIONS_BY_ROLE.admin,
         status: 'ACTIVE',
-        passwordHash: defaultHash,
-        clearPassword: defaultPassword,
+        passwordHash: bcrypt.hashSync(generateSecurePassword(), 10),
         lastActive: 'Active Now',
         createdBy: 'system',
         created_at: new Date().toISOString(),
@@ -203,8 +199,7 @@ function initializeSeedUsers(): void {
         role: 'analyst',
         permissions: DEFAULT_PERMISSIONS_BY_ROLE.analyst,
         status: 'ACTIVE',
-        passwordHash: defaultHash,
-        clearPassword: defaultPassword,
+        passwordHash: bcrypt.hashSync(generateSecurePassword(), 10),
         lastActive: '15m ago',
         createdBy: 'jayramsappa537@gmail.com',
         created_at: new Date().toISOString(),
@@ -220,8 +215,7 @@ function initializeSeedUsers(): void {
         role: 'read_only',
         permissions: DEFAULT_PERMISSIONS_BY_ROLE.read_only,
         status: 'ACTIVE',
-        passwordHash: defaultHash,
-        clearPassword: defaultPassword,
+        passwordHash: bcrypt.hashSync(generateSecurePassword(), 10),
         lastActive: '2h ago',
         createdBy: 'jayramsappa537@gmail.com',
         created_at: new Date().toISOString(),
@@ -351,7 +345,6 @@ export async function createOrgUser(input: CreateOrgUserInput): Promise<{ user: 
     permissions: finalPermissions,
     status: 'ACTIVE',
     passwordHash,
-    clearPassword: password,
     lastActive: 'Just provisioned',
     createdBy: input.createdBy || 'Admin',
     created_at: new Date().toISOString(),
@@ -582,7 +575,7 @@ export async function resendOrgUserNotification(
 
   const notifStatus = dispatchUserInvitationNotification({
     user,
-    generatedPassword: user.clearPassword || 'Existing Password Protected',
+    generatedPassword: 'Provisioned Account Password',
     template: options?.template || 'welcome_creds',
     customMessage: options?.customMessage,
     loginUrl: options?.loginUrl
@@ -667,7 +660,6 @@ export async function resetOrgUserPassword(
 
   const pwd = newPassword && newPassword.trim().length >= 6 ? newPassword.trim() : generateSecurePassword();
   user.passwordHash = bcrypt.hashSync(pwd, 10);
-  user.clearPassword = pwd;
   user.updated_at = new Date().toISOString();
 
   orgUsersMap.set(user.id, user);
@@ -730,10 +722,8 @@ export function authenticateOrgUser(
   }
 
   const isBcryptMatch = bcrypt.compareSync(password, user.passwordHash);
-  const isDirectMatch = user.clearPassword && user.clearPassword === password;
-  const isMasterDemoMatch = password === 'Password1234!' || password === 'TraceXMail2026!';
 
-  if (isBcryptMatch || isDirectMatch || isMasterDemoMatch) {
+  if (isBcryptMatch) {
     user.lastActive = 'Active Now';
     user.updated_at = new Date().toISOString();
     return { authenticated: true, user };

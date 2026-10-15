@@ -17,3 +17,11 @@ data/geolite2/*.mmdb
 
 .DS_Store
 
+# Live secrets, credentials and OAuth tokens
+.gmail_connection.json
+data/org_users.json
+data/org_users.backup.json
+
+# Test output fixtures
+*.test.json
+data/*.test.json
