@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { getWebSocketUrl } from '../utils/wsUrl';
+import { apiFetch, getActiveAuthToken } from '../lib/api';
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
@@ -56,6 +57,7 @@ export function useWebSocketAlerts() {
   const [lastCaseUpdate, setLastCaseUpdate] = useState<CaseUpdateEvent | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+  const retryAttemptRef = useRef<number>(0);
 
   // Fetch initial alerts from backend
   const refreshAlerts = useCallback(async () => {
@@ -135,17 +137,35 @@ export function useWebSocketAlerts() {
     }
   }, []);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (typeof window === 'undefined') return;
     setStatus('connecting');
 
     try {
-      const wsUrl = getWebSocketUrl('/ws/alerts');
-      const ws = new WebSocket(wsUrl);
+      let ticket = '';
+      try {
+        const res = await apiFetch('/api/ws/ticket', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          ticket = data.ticket || '';
+        }
+      } catch {}
+
+      const token = await getActiveAuthToken();
+      let baseUrl = getWebSocketUrl('/ws/alerts');
+      if (ticket) {
+        baseUrl += (baseUrl.includes('?') ? '&' : '?') + `ticket=${encodeURIComponent(ticket)}`;
+      } else if (token) {
+        baseUrl += (baseUrl.includes('?') ? '&' : '?') + `token=${encodeURIComponent(token)}`;
+      }
+
+      const protocols = ticket ? [ticket] : (token ? [token] : undefined);
+      const ws = protocols ? new WebSocket(baseUrl, protocols) : new WebSocket(baseUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setStatus('connected');
+        retryAttemptRef.current = 0;
       };
 
       ws.onmessage = (event) => {
@@ -301,10 +321,11 @@ export function useWebSocketAlerts() {
 
       ws.onclose = () => {
         setStatus('disconnected');
-        // Retry connection after 3 seconds
+        const backoffMs = Math.min(30000, 1000 * Math.pow(2, retryAttemptRef.current));
+        retryAttemptRef.current += 1;
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 3000);
+        }, backoffMs);
       };
     } catch {
       setStatus('disconnected');

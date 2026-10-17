@@ -25,6 +25,16 @@ export function isRunningInIframe(): boolean {
  * are not yet provisioned in a sandbox environment.
  */
 export function signInWithGoogleDemoSession(customEmail?: string): GoogleAuthResult {
+  const isDemoEnabled = import.meta.env.VITE_ENABLE_DEMO_AUTH === 'true';
+  const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production';
+
+  if (isProduction || !isDemoEnabled) {
+    return {
+      success: false,
+      error: 'Demo Google authentication is disabled in this environment.'
+    };
+  }
+
   try {
     const userEmail = (customEmail || 'user@tracexmail.sec').toLowerCase().trim();
     const stableId = `usr_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;

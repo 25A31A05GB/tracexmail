@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS case_notes (
     id TEXT PRIMARY KEY,
     case_id TEXT NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
     organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    -- Note: auth.users is managed by Supabase Auth engine. On non-Supabase PostgreSQL, provision schema auth or omit FK constraint.
     author_id UUID REFERENCES auth.users(id),
     author_email TEXT NOT NULL,
     label TEXT NOT NULL CHECK (label IN ('Confirmed Phish', 'False Positive', 'Escalated', 'Needs Follow-up', 'Resolved', 'Informational')),

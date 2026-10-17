@@ -649,6 +649,36 @@ export function signUserToken(payload: {
   );
 }
 
+function safeCompareStrings(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf8');
+  const bufB = Buffer.from(b, 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+export function validateStartupSecurityConfig(): void {
+  if (process.env.NODE_ENV === 'production') {
+    const secret = process.env.JWT_SECRET?.trim();
+    if (!secret || secret.length < 32) {
+      throw new Error('FATAL SECURITY ERROR: process.env.JWT_SECRET must be configured and at least 32 characters in production.');
+    }
+  } else {
+    if (process.env.ALLOW_DEV_HEADER_AUTH === 'true') {
+      console.warn('[SECURITY WARNING] ALLOW_DEV_HEADER_AUTH is enabled. Client-supplied auth headers will be accepted in development mode!');
+    }
+  }
+}
+
+try {
+  validateStartupSecurityConfig();
+} catch (err: any) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(err.message);
+    throw err;
+  }
+}
+
 export function verifyUserToken(token: string): UserContext | null {
   if (process.env.NODE_ENV === 'production') {
     if (typeof token === 'string' && (token.startsWith('demo_') || token.startsWith('mock_') || token.startsWith('enclave_'))) {
@@ -671,8 +701,12 @@ export function verifyUserToken(token: string): UserContext | null {
     }
   }
 
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) {
+    return null;
+  }
+
   try {
-    const secret = process.env.JWT_SECRET?.trim() || resolveMasterSecret();
     const decoded = jwt.verify(token, secret) as any;
     if (decoded && decoded.role && ['admin', 'analyst', 'read_only'].includes(decoded.role)) {
       return {
@@ -738,7 +772,24 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
   let userContext: UserContext | null = null;
   const knownKeys = getKnownApiKeys();
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
+  // 1. API key authentication using constant-time comparison
+  if (apiKeyHeader) {
+    for (const [key, record] of Object.entries(knownKeys)) {
+      if (safeCompareStrings(apiKeyHeader, key)) {
+        userContext = {
+          userId: record.userId,
+          email: record.email,
+          organizationId: record.organizationId,
+          role: record.role,
+          authMethod: 'api_key'
+        };
+        break;
+      }
+    }
+  }
+
+  // 2. Bearer Token Authentication
+  if (!userContext && authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
     const supabaseAdmin = getSupabaseClient();
 
@@ -747,8 +798,6 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
         const { data, error } = await supabaseAdmin.auth.getUser(token);
         if (!error && data?.user) {
           const authUser = data.user;
-          // Resilient profile resolution: queries Supabase 'profiles' if available,
-          // falls back gracefully to in-memory store and authenticated metadata if table is missing.
           const resolved = await resolveUserProfile(authUser);
           userContext = {
             userId: authUser.id,
@@ -763,7 +812,7 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
       }
     }
 
-    // Fallback to local signed JWT (e.g., development or testing)
+    // Fallback to local signed JWT (e.g., development or testing verified with JWT_SECRET)
     if (!userContext) {
       const localVerified = verifyUserToken(token);
       if (localVerified) {
@@ -771,27 +820,27 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
       }
     }
 
-    // Fallback: Parse Supabase Auth JWT directly if remote validation was unreachable or timed out
-    if (!userContext && token.includes('.')) {
+    // Fallback: Verify Supabase Auth JWT signature directly with SUPABASE_JWT_SECRET if provided
+    if (!userContext && process.env.SUPABASE_JWT_SECRET && token.includes('.')) {
       try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
-          const payload = JSON.parse(payloadStr);
-          if (payload && payload.sub && (payload.iss?.includes('supabase') || payload.role === 'authenticated' || payload.aud === 'authenticated')) {
-            const nowSec = Math.floor(Date.now() / 1000);
-            // Allow token within expiration or 10 min clock skew
-            if (!payload.exp || payload.exp > (nowSec - 600)) {
-              const fallbackEmail = payload.email || (req.headers['x-user-email'] as string) || '';
+        const secret = process.env.SUPABASE_JWT_SECRET.trim();
+        const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as any;
+        if (decoded && decoded.sub) {
+          const nowSec = Math.floor(Date.now() / 1000);
+          if (!decoded.exp || decoded.exp > nowSec) {
+            const validIss = !decoded.iss || decoded.iss.includes('supabase');
+            const validAud = !decoded.aud || decoded.aud === 'authenticated';
+            if (validIss && validAud) {
+              const fallbackEmail = decoded.email || '';
               const syntheticUser = {
-                id: payload.sub,
+                id: decoded.sub,
                 email: fallbackEmail,
-                user_metadata: payload.user_metadata || {},
-                app_metadata: payload.app_metadata || {}
+                user_metadata: decoded.user_metadata || {},
+                app_metadata: decoded.app_metadata || {}
               };
               const resolved = await resolveUserProfile(syntheticUser);
               userContext = {
-                userId: payload.sub,
+                userId: decoded.sub,
                 email: fallbackEmail,
                 organizationId: resolved.organizationId,
                 role: resolved.role,
@@ -801,22 +850,13 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
           }
         }
       } catch (jwtErr) {
-        console.warn('[Auth] Supabase direct JWT payload parse fallback warning:', jwtErr);
+        console.warn('[Auth] Supabase JWT signature verification failed:', jwtErr);
       }
     }
-  } else if (apiKeyHeader && knownKeys[apiKeyHeader]) {
-    const record = knownKeys[apiKeyHeader];
-    userContext = {
-      userId: record.userId,
-      email: record.email,
-      organizationId: record.organizationId,
-      role: record.role,
-      authMethod: 'api_key'
-    };
   }
 
-  // Fallback to client headers (x-user-id, x-user-email, x-organization-id) if no bearer or API key was passed
-  if (!userContext) {
+  // 3. Optional Dev Header Auth ONLY when process.env.NODE_ENV !== 'production' AND process.env.ALLOW_DEV_HEADER_AUTH === 'true'
+  if (!userContext && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_HEADER_AUTH === 'true') {
     const headerUserId = (req.headers['x-user-id'] as string) || (req.query.user_id as string);
     const headerEmail = (req.headers['x-user-email'] as string) || (req.query.user_email as string);
     const headerOrgId = (req.headers['x-organization-id'] as string) || (req.query.organization_id as string);
@@ -825,11 +865,17 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
       const derivedUserId = headerUserId || (headerEmail ? `usr_${headerEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'usr_anon');
       const derivedEmail = headerEmail || `${derivedUserId}@local.sec`;
       const derivedOrgId = headerOrgId || `org_${derivedUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+      let requestedRole = (req.headers['x-user-role'] as UserRole) || 'analyst';
+      if (requestedRole === 'admin') {
+        requestedRole = 'analyst'; // Downgrade admin requests from unauthenticated headers
+      }
+
       userContext = {
         userId: derivedUserId,
         email: derivedEmail,
         organizationId: derivedOrgId,
-        role: (req.headers['x-user-role'] as UserRole) || 'analyst',
+        role: requestedRole,
         authMethod: 'header_context'
       };
     }

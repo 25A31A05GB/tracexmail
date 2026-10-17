@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS team_invitations (
     role TEXT NOT NULL CHECK (role IN ('admin', 'analyst', 'read_only')),
     status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'REVOKED', 'EXPIRED')),
     token TEXT UNIQUE,
+    -- Note: auth.users is managed by Supabase Auth engine. On non-Supabase PostgreSQL, provision schema auth or omit FK constraint.
     invited_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     invited_by_email TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
