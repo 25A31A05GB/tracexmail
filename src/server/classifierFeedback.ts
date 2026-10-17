@@ -59,6 +59,9 @@ export function loadCorrections(): ClassifierCorrection[] {
   return cachedCorrections;
 }
 
+import crypto from 'crypto';
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
+
 export function saveCorrections(corrections: ClassifierCorrection[]): void {
   cachedCorrections = corrections;
   try {
@@ -68,8 +71,44 @@ export function saveCorrections(corrections: ClassifierCorrection[]): void {
     }
     fs.writeFileSync(CORRECTIONS_FILE_PATH, JSON.stringify(corrections, null, 2), 'utf8');
   } catch (err) {
-    console.error('[Classifier Feedback] Failed to persist corrections to disk:', err);
+    console.warn('[Classifier Feedback] Local file cache notice:', err);
   }
+
+  const supabase = getSupabaseAdminClient();
+  if (!supabase || corrections.length === 0) return;
+
+  const rows = corrections.map((c) => ({
+    id: c.id,
+    case_id: c.case_id,
+    original_analysis_id: c.original_analysis_id || c.case_id,
+    organization_id: c.organization_id || DEFAULT_ORG_ID,
+    subject: c.subject,
+    from_address: c.from,
+    from_domain: c.from_domain,
+    body_snippet: c.body_snippet,
+    model_prediction: c.model_prediction,
+    model_confidence: c.model_confidence,
+    model_threat_score: c.model_threat_score,
+    analyst_verdict: c.analyst_verdict,
+    analyst_notes: c.analyst_notes,
+    analyst_id: c.analyst_id,
+    analyst_email: c.analyst_email,
+    status: c.status,
+    created_at: c.created_at,
+    reviewed_at: c.reviewed_at || null,
+    reviewed_by: c.reviewed_by || null,
+    review_notes: c.review_notes || null
+  }));
+
+  Promise.resolve(
+    supabase
+      .from('classifier_corrections')
+      .upsert(rows, { onConflict: 'id' })
+  )
+    .then(({ error }: any) => {
+      if (error) console.warn('[Classifier Feedback] Supabase upsert notice:', error.message);
+    })
+    .catch((err: any) => console.warn('[Classifier Feedback] Supabase exception:', err?.message));
 }
 
 export function recordCorrectionIfDiscrepancy(
@@ -109,7 +148,7 @@ export function recordCorrectionIfDiscrepancy(
   }
 
   const correction: ClassifierCorrection = {
-    id: `corr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    id: `corr_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 8)}`,
     case_id: caseItem.id,
     original_analysis_id: caseItem.id,
     subject: caseItem.title || caseItem.subject || 'Investigated Case',

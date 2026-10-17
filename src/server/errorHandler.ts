@@ -93,19 +93,27 @@ export function errorHandler(
   console.error(`[SERVER_ERROR][${correlationId}] ${req.method} ${req.path} - HTTP ${statusCode}`);
   console.error(err.stack || err.message || err);
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   // 6. Generic sanitized client response: no stack traces, no internal paths, no raw SQL
   let clientMessage: string;
   if (statusCode < 500) {
     // 4xx client errors: return sanitized message
     clientMessage = sanitizeErrorMessage(err.message || 'Invalid request.');
+    if (isProduction && (clientMessage.includes('Error:') || clientMessage.includes('at '))) {
+      clientMessage = 'Invalid request parameters.';
+    }
   } else {
     // 5xx server errors: NEVER return raw server exception to user
     clientMessage = 'An unexpected server error occurred while processing your request. Please contact support with the correlation ID.';
   }
 
-  return res.status(statusCode).json({
+  const responseBody: Record<string, any> = {
     error: clientMessage,
     code: err.code || (statusCode >= 500 ? 'INTERNAL_SERVER_ERROR' : 'BAD_REQUEST'),
     correlationId
-  });
+  };
+
+  // Explicit security rule: NEVER expose stack or internal error properties to client
+  return res.status(statusCode).json(responseBody);
 }

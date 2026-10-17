@@ -2099,8 +2099,6 @@ export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
 /**
  * Saves Gmail Connection with encrypted tokens into Supabase `gmail_connections` table.
  */
-const LOCAL_GMAIL_CACHE_PATH = path.join(process.cwd(), '.gmail_connection.json');
-
 export async function saveGmailConnectionToDb(params: {
   orgId?: string;
   emailAddress: string;
@@ -2118,27 +2116,6 @@ export async function saveGmailConnectionToDb(params: {
   if (params.refreshToken) state.refreshToken = params.refreshToken;
   if (params.expiresInSeconds) {
     state.tokenExpiresAt = Date.now() + params.expiresInSeconds * 1000;
-  }
-
-  // Always write to local secure enclave cache file so connection survives dev reboots
-  try {
-    const encryptedAccess = params.accessToken ? encryptToken(params.accessToken) : (state.accessToken ? encryptToken(state.accessToken) : undefined);
-    const encryptedRefresh = params.refreshToken ? encryptToken(params.refreshToken) : (state.refreshToken ? encryptToken(state.refreshToken) : undefined);
-    const cachePayload = {
-      orgId,
-      emailAddress: state.emailAddress,
-      isConnected: state.isConnected,
-      access_token_encrypted: encryptedAccess,
-      refresh_token_encrypted: encryptedRefresh,
-      tokenExpiresAt: state.tokenExpiresAt,
-      lastRefreshedAt: new Date().toISOString(),
-      quarantine: state.quarantine,
-      watch: state.watch,
-      updated_at: new Date().toISOString()
-    };
-    fs.writeFileSync(LOCAL_GMAIL_CACHE_PATH, JSON.stringify(cachePayload, null, 2), 'utf8');
-  } catch (cacheErr: any) {
-    console.warn('[GmailService] Could not write local connection cache:', cacheErr?.message);
   }
 
   if (!supabase) return true;
@@ -2278,42 +2255,7 @@ export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID):
     }
   }
 
-  // Fallback: Read local persistent file cache if Supabase didn't provide connection
-  if (!loadedFromSupabase && fs.existsSync(LOCAL_GMAIL_CACHE_PATH)) {
-    try {
-      const raw = fs.readFileSync(LOCAL_GMAIL_CACHE_PATH, 'utf8');
-      const cached = JSON.parse(raw);
-      if (cached && cached.isConnected) {
-        state.isConnected = true;
-        state.emailAddress = cached.emailAddress || state.emailAddress;
-        if (cached.access_token_encrypted) {
-          try {
-            state.accessToken = decryptToken(cached.access_token_encrypted);
-          } catch {}
-        }
-        if (cached.refresh_token_encrypted) {
-          try {
-            state.refreshToken = decryptToken(cached.refresh_token_encrypted);
-          } catch {}
-        }
-        if (cached.tokenExpiresAt) {
-          state.tokenExpiresAt = cached.tokenExpiresAt;
-        }
-        if (cached.lastRefreshedAt) {
-          state.lastRefreshedAt = cached.lastRefreshedAt;
-        }
-        if (cached.quarantine) {
-          state.quarantine = { ...state.quarantine, ...cached.quarantine };
-        }
-        if (cached.watch) {
-          state.watch = { ...state.watch, ...cached.watch };
-        }
-        console.log('[GmailService] Restored active Gmail connection from local persistent enclave cache for:', state.emailAddress);
-      }
-    } catch (fsErr: any) {
-      console.warn('[GmailService] Error reading local connection cache:', fsErr?.message);
-    }
-  }
+
 }
 
 // Kick off initial sync asynchronously
@@ -2562,12 +2504,6 @@ export async function disconnectGmail(
     state.watch.expiration = null;
     state.watch.subscription = null;
     ingestionQueue.length = 0;
-
-    try {
-      if (fs.existsSync(LOCAL_GMAIL_CACHE_PATH)) {
-        fs.unlinkSync(LOCAL_GMAIL_CACHE_PATH);
-      }
-    } catch {}
   }
 
   // 4. Asynchronously clear database tokens in Supabase so they are not resurrected

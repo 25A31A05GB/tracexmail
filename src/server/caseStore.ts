@@ -258,6 +258,8 @@ export const DEFAULT_BASELINE_CASES: PersistedCase[] = [
   }
 ];
 
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
+
 // Persistent Map cache
 const inMemoryStore = new Map<string, PersistedCase>();
 let isInitialized = false;
@@ -272,8 +274,63 @@ function ensureDataDir(): void {
   }
 }
 
+function syncCaseToSupabase(caseItem: PersistedCase): void {
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+
+  const orgId = caseItem.organization_id || DEFAULT_ORG_ID;
+  const dbPayload = {
+    id: caseItem.id,
+    organization_id: orgId,
+    user_id: caseItem.user_id || null,
+    user_email: caseItem.user_email || null,
+    created_by: caseItem.created_by || null,
+    title: caseItem.title || 'Investigated Case',
+    description: caseItem.description || null,
+    status: caseItem.status || 'OPEN',
+    severity: caseItem.severity || 'HIGH',
+    threat_score: caseItem.threat_score ?? (caseItem.threatScore ?? 0),
+    threat_score_breakdown: caseItem.threat_score_breakdown || {},
+    classification: caseItem.classification || 'SUSPICIOUS',
+    auth: caseItem.auth || {},
+    heuristics: caseItem.heuristics || [],
+    hops: caseItem.hops || [],
+    origin_ip: caseItem.origin_ip || null,
+    origin_country: caseItem.origin_country || null,
+    origin_asn: caseItem.origin_asn || null,
+    origin_asn_org: caseItem.origin_asn_org || null,
+    infra_type: caseItem.infra_type || null,
+    from_domain: caseItem.from_domain || null,
+    assigned_user: caseItem.assigned_user || null,
+    tags: caseItem.tags || [],
+    source: caseItem.source || 'pipeline',
+    is_demo: Boolean(caseItem.is_demo),
+    headers: caseItem.headers || {},
+    why: caseItem.why || null,
+    raw_analysis: caseItem.raw_analysis || null,
+    created_at: caseItem.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  Promise.resolve(
+    supabase
+      .from('cases')
+      .upsert(dbPayload, { onConflict: 'id' })
+  )
+    .then(({ error }: any) => {
+      if (error) {
+        console.warn('[CaseStore] Supabase case upsert notice:', error.message);
+      }
+    })
+    .catch((err: any) => {
+      console.warn('[CaseStore] Supabase case upsert exception:', err?.message);
+    });
+}
+
 export function loadCasesFromDisk(): Map<string, PersistedCase> {
   ensureDataDir();
+
+  // 1. Load from local file if present (resilient offline/dev cache)
   try {
     if (fs.existsSync(CASES_FILE)) {
       const raw = fs.readFileSync(CASES_FILE, 'utf-8');
@@ -281,23 +338,50 @@ export function loadCasesFromDisk(): Map<string, PersistedCase> {
       if (Array.isArray(parsed) && parsed.length > 0) {
         parsed.forEach((c: PersistedCase) => {
           if (c && c.id) {
+            c.organization_id = c.organization_id || DEFAULT_ORG_ID;
             inMemoryStore.set(c.id, c);
           }
         });
         console.log(`[CaseStore] Loaded ${inMemoryStore.size} persistent cases from disk.`);
-        return inMemoryStore;
       }
     }
   } catch (err) {
     console.warn('[CaseStore] Failed to read cases.json from disk:', err);
   }
 
-  // Seed default baseline cases if file did not exist or was empty
-  console.log('[CaseStore] Seeding initial baseline cases to disk...');
-  DEFAULT_BASELINE_CASES.forEach((c) => {
-    inMemoryStore.set(c.id, c);
-  });
-  saveCasesToDisk(inMemoryStore);
+  // 2. Seed baseline cases if empty
+  if (inMemoryStore.size === 0) {
+    console.log('[CaseStore] Seeding initial baseline cases...');
+    DEFAULT_BASELINE_CASES.forEach((c) => {
+      c.organization_id = c.organization_id || DEFAULT_ORG_ID;
+      inMemoryStore.set(c.id, c);
+    });
+    saveCasesToDisk(inMemoryStore);
+  }
+
+  // 3. Hydrate asynchronously from Supabase Postgres if configured
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    Promise.resolve(
+      supabase
+        .from('cases')
+        .select('*')
+    )
+      .then(({ data, error }: any) => {
+        if (!error && Array.isArray(data) && data.length > 0) {
+          data.forEach((row: any) => {
+            if (row && row.id) {
+              row.organization_id = row.organization_id || DEFAULT_ORG_ID;
+              inMemoryStore.set(row.id, row);
+            }
+          });
+        }
+      })
+      .catch((err: any) => {
+        console.warn('[CaseStore] Supabase background query exception:', err?.message);
+      });
+  }
+
   return inMemoryStore;
 }
 
@@ -313,12 +397,16 @@ export function saveCasesToDisk(casesMap: Map<string, PersistedCase>): boolean {
   }
 }
 
-export function getPersistedCases(): PersistedCase[] {
+export function getPersistedCases(filterOrgId?: string): PersistedCase[] {
   if (!isInitialized) {
     loadCasesFromDisk();
     isInitialized = true;
   }
-  return Array.from(inMemoryStore.values());
+  const allCases = Array.from(inMemoryStore.values());
+  if (filterOrgId) {
+    return allCases.filter((c) => c.organization_id === filterOrgId);
+  }
+  return allCases;
 }
 
 export function upsertPersistedCase(caseItem: PersistedCase): PersistedCase {
@@ -326,27 +414,44 @@ export function upsertPersistedCase(caseItem: PersistedCase): PersistedCase {
     loadCasesFromDisk();
     isInitialized = true;
   }
+  caseItem.organization_id = caseItem.organization_id || DEFAULT_ORG_ID;
   inMemoryStore.set(caseItem.id, caseItem);
   saveCasesToDisk(inMemoryStore);
+  syncCaseToSupabase(caseItem);
   return caseItem;
 }
 
-export function deletePersistedCase(caseId: string): boolean {
+export function deletePersistedCase(caseId: string, orgId?: string): boolean {
   if (!isInitialized) {
     loadCasesFromDisk();
     isInitialized = true;
   }
+  const existing = inMemoryStore.get(caseId);
+  if (existing && orgId && existing.organization_id && existing.organization_id !== orgId) {
+    return false; // Prevent unauthorized cross-org deletion
+  }
+
   const existed = inMemoryStore.delete(caseId);
   if (existed) {
     saveCasesToDisk(inMemoryStore);
+    const supabase = getSupabaseAdminClient();
+    if (supabase) {
+      let query = supabase.from('cases').delete().eq('id', caseId);
+      if (orgId) query = query.eq('organization_id', orgId);
+      Promise.resolve(query).then(() => {}).catch(() => {});
+    }
   }
   return existed;
 }
 
-export function getPersistedCase(caseId: string): PersistedCase | undefined {
+export function getPersistedCase(caseId: string, orgId?: string): PersistedCase | undefined {
   if (!isInitialized) {
     loadCasesFromDisk();
     isInitialized = true;
   }
-  return inMemoryStore.get(caseId);
+  const c = inMemoryStore.get(caseId);
+  if (c && orgId && c.organization_id && c.organization_id !== orgId) {
+    return undefined; // RLS tenant isolation
+  }
+  return c;
 }

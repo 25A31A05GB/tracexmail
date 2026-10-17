@@ -57,12 +57,49 @@ function loadTestimonialsFromDisk(): UserTestimonial[] {
   return [];
 }
 
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
+
+function syncTestimonialToDb(t: UserTestimonial): void {
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+
+  const payload = {
+    id: t.id,
+    organization_id: DEFAULT_ORG_ID,
+    name: t.name,
+    role: t.role,
+    organization: t.organization || null,
+    rating: t.rating,
+    feedback: t.feedback,
+    impact_metric: t.impactMetric || null,
+    verified: t.verified ?? true,
+    verification_digest: t.verificationDigest || null,
+    created_at: t.createdAt,
+    is_reported: Boolean(t.isReported),
+    report_count: t.reportCount || 0,
+    report_reason: t.reportReason || null,
+    reported_at: t.reportedAt || null,
+    moderation_status: t.moderationStatus || 'approved'
+  };
+
+  Promise.resolve(
+    supabase
+      .from('user_testimonials')
+      .upsert(payload, { onConflict: 'id' })
+  )
+    .then(({ error }: any) => {
+      if (error) console.warn('[testimonialStore] Supabase upsert notice:', error.message);
+    })
+    .catch((err: any) => console.warn('[testimonialStore] Supabase exception:', err?.message));
+}
+
 function saveTestimonialsToDisk(testimonials: UserTestimonial[]): boolean {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     fs.writeFileSync(TESTIMONIALS_FILE, JSON.stringify(testimonials, null, 2), 'utf-8');
+    testimonials.forEach(syncTestimonialToDb);
     return true;
   } catch (err) {
     console.error('[testimonialStore] Failed to write testimonials to disk:', err);
@@ -130,7 +167,7 @@ export function addLiveTestimonial(data: {
   const cleanMetric = (data.impactMetric || '').trim() || undefined;
   const createdAt = new Date().toISOString();
 
-  const id = `rev_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const id = `rev_${Date.now()}_${crypto.randomUUID().replace(/-/g, '').substring(0, 8)}`;
   
   // Deterministic SHA-256 verification hash
   const payloadToHash = `${id}|${cleanName}|${cleanRole}|${cleanFeedback}|${createdAt}`;

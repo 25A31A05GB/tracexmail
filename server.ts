@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import helmet from 'helmet';
 import cors, { CorsOptions } from 'cors';
 import http from 'http';
 import path from 'path';
@@ -246,13 +247,16 @@ const ALLOWED_EMAIL_MIME_TYPES = new Set([
   'application/octet-stream' // Permitted only in combination with email extensions (.eml, .msg, .rfc822, .mime, .txt, .emlx)
 ]);
 
-// Multer memory storage for uploads enforcing strict 20MB size limits and email MIME filtering
+export const MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+export const MAX_UPLOAD_FILE_COUNT = 10;
+
+// Multer memory storage for uploads enforcing strict MAX_UPLOAD_SIZE_BYTES size limits and email MIME filtering
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // Strict 20MB limit per file
-    files: 20, // Max 20 files per batch
-    fieldSize: 20 * 1024 * 1024,
+    fileSize: MAX_UPLOAD_SIZE_BYTES, // Strict 20MB limit per file
+    files: MAX_UPLOAD_FILE_COUNT, // Max 10 files per batch
+    fieldSize: MAX_UPLOAD_SIZE_BYTES,
     fields: 30,
     parts: 100
   },
@@ -1918,6 +1922,23 @@ async function verifyGooglePubSubPushToken(req: express.Request): Promise<boolea
  */
 function validateProductionEnvironment(): void {
   const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction) {
+    if (!process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS.trim().length === 0) {
+      throw new Error(
+        '[Production Security Configuration Error] ALLOWED_ORIGINS is empty. Refusing to start in production without explicit allowed CORS origins.'
+      );
+    }
+    const hasDatabase = Boolean(
+      process.env.DATABASE_URL ||
+      (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+    );
+    if (!hasDatabase) {
+      throw new Error(
+        '[Production Security Configuration Error] Neither DATABASE_URL nor (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) is configured. Refusing to start in production without a persistent database.'
+      );
+    }
+  }
+
   const requiredVars = [
     { key: 'SUPABASE_URL', value: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL },
     { key: 'SUPABASE_SERVICE_ROLE_KEY', value: process.env.SUPABASE_SERVICE_ROLE_KEY },
@@ -1949,21 +1970,68 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-  // Configure reverse proxy trust appropriately for Cloud Run / production load balancers
-  app.set('trust proxy', true);
+  // Configure reverse proxy trust appropriately for Render / Cloud Run (single hop proxy)
+  app.set('trust proxy', 1);
+
+  // Helmet Security Headers & Content Security Policy (CSP)
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            "https://challenges.cloudflare.com",
+            "https://*.cloudflare.com",
+            "https://*.sentry.io",
+            "https://www.googletagmanager.com",
+            "https://www.google-analytics.com"
+          ],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: [
+            "'self'",
+            "https:",
+            "wss:",
+            ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : ["https://*.supabase.co"]),
+            "https://challenges.cloudflare.com"
+          ],
+          frameSrc: ["'self'", "https://challenges.cloudflare.com"],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"]
+        }
+      },
+      hsts: {
+        maxAge: 15552000,
+        includeSubDomains: true
+      },
+      referrerPolicy: {
+        policy: 'strict-origin-when-cross-origin'
+      }
+    })
+  );
+
+  // Permissions-Policy header
+  app.use((_req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    next();
+  });
 
   // Explicit CORS policy with support for deployed frontend (Vercel) and backend (Render)
   const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || '';
   const allowedOriginsList = [
     'https://tracexmail.vercel.app',
     'https://tracexmail-l6c7.onrender.com',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
+    ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'] : []),
     ...rawAllowedOrigins
       .split(',')
       .map(origin => origin.trim().replace(/\/+$/, ''))
       .filter(Boolean)
   ];
+  const allowedOriginsSet = new Set(allowedOriginsList);
 
   const standardAllowedHeaders = [
     'Content-Type',
@@ -1990,34 +2058,27 @@ async function startServer() {
 
   const corsOptionsDelegate = (req: express.Request, callback: (err: Error | null, options?: CorsOptions) => void) => {
     const requestOrigin = req.header('Origin');
-
-    // Dynamically include any requested headers from Access-Control-Request-Headers alongside standard headers
-    const reqHeaders = req.header('access-control-request-headers');
-    const dynamicHeaders = reqHeaders
-      ? reqHeaders.split(',').map(h => h.trim()).filter(Boolean)
-      : [];
-    const mergedAllowedHeaders = Array.from(new Set([...standardAllowedHeaders, ...dynamicHeaders]));
+    const isAllowed = Boolean(requestOrigin && allowedOriginsSet.has(requestOrigin));
 
     callback(null, {
-      origin: requestOrigin || true,
-      credentials: true,
+      origin: isAllowed ? requestOrigin : false,
+      credentials: isAllowed,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: mergedAllowedHeaders,
+      allowedHeaders: standardAllowedHeaders,
       exposedHeaders: ['Content-Range', 'X-Content-Range'],
       optionsSuccessStatus: 200
     });
   };
 
-  // Explicit CORS middleware guaranteeing Access-Control-* headers on EVERY response
-  // Covers Google AI Studio iframes, Cloud Run, Vercel frontend, Render backend, and local development
+  // Explicit CORS middleware guaranteeing Access-Control-* headers without arbitrary origin reflection
   app.use((req, res, next) => {
     const origin = req.header('Origin');
     const reqHeaders = req.header('access-control-request-headers');
 
-    if (origin && origin !== 'null') {
+    if (origin && allowedOriginsSet.has(origin)) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else {
+    } else if (!origin && process.env.NODE_ENV !== 'production') {
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
@@ -2028,7 +2089,6 @@ async function startServer() {
       : [];
     const effectiveAllowedHeaders = Array.from(new Set([...standardAllowedHeaders, ...requestedHeaders]));
     res.setHeader('Access-Control-Allow-Headers', effectiveAllowedHeaders.join(', '));
-
     res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range');
 
     if (req.method === 'OPTIONS') {
@@ -2042,8 +2102,14 @@ async function startServer() {
   app.options('/api/gmail/*', cors(corsOptionsDelegate));
   app.options('/api/*', cors(corsOptionsDelegate));
 
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Global body parser limits set to 1mb
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // Allow larger payload on dedicated upload/raw analysis routes
+  app.use('/api/analyze', express.json({ limit: '20mb' }));
+  app.use('/api/v1/analyze', express.json({ limit: '20mb' }));
+
   app.use(authenticateUser);
 
   // Apply strict rate limiting to authentication routes
@@ -5276,11 +5342,11 @@ Link: https://verify-auth-portal.net/login`;
     }
   };
 
-  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
-  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyzeBatch);
-  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
-  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyzeBatch);
-  app.post('/api/analyze', authenticatedLimiter, upload.array('files', 20) as any, postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/v1/analyze', authenticatedLimiter, upload.array('files', MAX_UPLOAD_FILE_COUNT) as any, postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/v1/analyze/batch', authenticatedLimiter, upload.array('files', MAX_UPLOAD_FILE_COUNT) as any, postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze/raw', authenticatedLimiter, upload.array('files', MAX_UPLOAD_FILE_COUNT) as any, postUploadRfc822Validator, handleAnalyze);
+  app.post('/api/analyze/batch', authenticatedLimiter, upload.array('files', MAX_UPLOAD_FILE_COUNT) as any, postUploadRfc822Validator, handleAnalyzeBatch);
+  app.post('/api/analyze', authenticatedLimiter, upload.array('files', MAX_UPLOAD_FILE_COUNT) as any, postUploadRfc822Validator, handleAnalyze);
 
   // Machine Learning Model Metrics & Forensic Evaluation Telemetry
   const handleMlMetrics = (_req: express.Request, res: express.Response) => {

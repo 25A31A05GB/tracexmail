@@ -107,6 +107,44 @@ const USERS_FILE = path.join(DATA_DIR, 'org_users.json');
 // In-memory store
 const orgUsersMap = new Map<string, OrgUser>();
 
+function syncOrgUserToDb(u: OrgUser): void {
+  const supabase = getSupabaseAdminClient();
+  if (!supabase) return;
+
+  const payload = {
+    id: u.id,
+    organization_id: u.organizationId || DEFAULT_ORG_ID,
+    organization_name: u.organizationName || null,
+    name: u.name,
+    email: u.email.toLowerCase(),
+    employee_id: u.employeeId || null,
+    role: u.role,
+    permissions: u.permissions || {},
+    status: u.status,
+    password_hash: u.passwordHash,
+    last_active: u.lastActive || null,
+    created_by: u.createdBy || null,
+    notification_status: u.notificationStatus || null,
+    notification_history: u.notificationHistory || [],
+    created_at: u.created_at || new Date().toISOString(),
+    updated_at: u.updated_at || new Date().toISOString()
+  };
+
+  Promise.resolve(
+    supabase
+      .from('org_users')
+      .upsert(payload, { onConflict: 'id' })
+  )
+    .then(({ error }: any) => {
+      if (error) {
+        console.warn('[OrgUserStore] Supabase org_users upsert notice:', error.message);
+      }
+    })
+    .catch((err: any) => {
+      console.warn('[OrgUserStore] Supabase org_users upsert exception:', err?.message);
+    });
+}
+
 function loadFromFile(): void {
   try {
     if (!fs.existsSync(DATA_DIR)) {
@@ -128,6 +166,50 @@ function loadFromFile(): void {
     }
   } catch (err) {
     console.warn('[OrgUserStore] Warning reading org_users.json:', err);
+  }
+
+  // Hydrate from Supabase org_users if available
+  const supabase = getSupabaseAdminClient();
+  if (supabase) {
+    Promise.resolve(
+      supabase
+        .from('org_users')
+        .select('*')
+    )
+      .then(({ data, error }: any) => {
+        if (!error && Array.isArray(data)) {
+          data.forEach((u: any) => {
+            if (u && u.id && u.email) {
+              const user: OrgUser = {
+                id: u.id,
+                organizationId: u.organization_id || DEFAULT_ORG_ID,
+                organizationName: u.organization_name,
+                name: u.name,
+                email: u.email,
+                employeeId: u.employee_id,
+                role: u.role,
+                permissions: u.permissions || {},
+                status: u.status || 'ACTIVE',
+                passwordHash: u.password_hash,
+                lastActive: u.last_active || 'Recent',
+                createdBy: u.created_by,
+                notificationStatus: u.notification_status,
+                notificationHistory: u.notification_history || [],
+                created_at: u.created_at || new Date().toISOString(),
+                updated_at: u.updated_at || new Date().toISOString()
+              };
+              orgUsersMap.set(user.id, user);
+              orgUsersMap.set(user.email.toLowerCase(), user);
+              if (user.employeeId) {
+                orgUsersMap.set(user.employeeId.toLowerCase(), user);
+              }
+            }
+          });
+        }
+      })
+      .catch((err: any) => {
+        console.warn('[OrgUserStore] Supabase load notice:', err?.message);
+      });
   }
 }
 
@@ -268,15 +350,17 @@ export function generateEmployeeId(): string {
 /**
  * Get all users for a specific organization ONLY (Strict Multi-Tenant Isolation)
  */
-export function getOrgUsers(organizationId: string): OrgUser[] {
-  const cleanOrg = organizationId || DEFAULT_ORG_ID;
+export function getOrgUsers(organizationId?: string): OrgUser[] {
+  const cleanOrg = organizationId;
   const uniqueUsers: OrgUser[] = [];
   const seenIds = new Set<string>();
 
   for (const user of orgUsersMap.values()) {
-    if (!seenIds.has(user.id) && (user.organizationId === cleanOrg || cleanOrg === DEFAULT_ORG_ID)) {
-      seenIds.add(user.id);
-      uniqueUsers.push(user);
+    if (!seenIds.has(user.id)) {
+      if (!cleanOrg || user.organizationId === cleanOrg) {
+        seenIds.add(user.id);
+        uniqueUsers.push(user);
+      }
     }
   }
 
@@ -355,6 +439,7 @@ export async function createOrgUser(input: CreateOrgUserInput): Promise<{ user: 
   orgUsersMap.set(cleanEmail, newUser);
   orgUsersMap.set(employeeId.toLowerCase(), newUser);
   persistToFile();
+  syncOrgUserToDb(newUser);
 
   // Also sync to Supabase Auth & profiles if available
   const supabaseAdmin = getSupabaseAdminClient();
@@ -666,6 +751,7 @@ export async function resetOrgUserPassword(
   orgUsersMap.set(user.email.toLowerCase(), user);
   if (user.employeeId) orgUsersMap.set(user.employeeId.toLowerCase(), user);
   persistToFile();
+  syncOrgUserToDb(user);
 
   // Sync with Supabase Auth
   const supabaseAdmin = getSupabaseAdminClient();
@@ -696,6 +782,7 @@ export async function deleteOrgUser(organizationId: string, userId: string): Pro
   if (supabaseAdmin) {
     try {
       await supabaseAdmin.from('profiles').delete().or(`id.eq.${user.id},email.eq.${user.email}`);
+      await supabaseAdmin.from('org_users').delete().eq('id', user.id);
     } catch (err: any) {
       console.warn('[OrgUserStore] Supabase delete notice:', err.message);
     }
