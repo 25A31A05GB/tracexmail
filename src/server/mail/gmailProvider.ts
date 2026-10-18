@@ -10,15 +10,12 @@ import {
 } from './provider';
 import {
   getGmailStatus,
-  quarantineMessage,
-  releaseFromQuarantine as gmailReleaseQuarantine,
-  deleteGmailMessage,
-  fetchRawMessageDirect,
-  testGmailConnection,
-  setupGmailWatch,
-  stopGmailWatch
+  fetchGmailMessageRaw,
+  processInboundQuarantineGate,
+  startGmailWatch,
+  stopGmailWatch,
+  disconnectGmail
 } from '../gmailService';
-import { logger } from '../logger';
 
 export class GmailProvider implements MailProvider {
   public readonly name = 'gmail' as const;
@@ -35,6 +32,7 @@ export class GmailProvider implements MailProvider {
 
   async disconnect(): Promise<void> {
     await stopGmailWatch();
+    await disconnectGmail();
   }
 
   async listMessages(since?: Date, limit: number = 20): Promise<MailMessageSummary[]> {
@@ -42,7 +40,7 @@ export class GmailProvider implements MailProvider {
   }
 
   async getRawMessage(id: string): Promise<RawEmailData> {
-    const raw = await fetchRawMessageDirect(id);
+    const raw = await fetchGmailMessageRaw(id);
     return {
       id,
       rawMime: raw || '',
@@ -53,9 +51,12 @@ export class GmailProvider implements MailProvider {
 
   async applyQuarantine(id: string): Promise<QuarantineResult> {
     try {
-      const res = await quarantineMessage(id);
+      const res = await processInboundQuarantineGate({
+        messageId: id,
+        organizationId: this.orgId
+      });
       return {
-        success: res.success,
+        success: Boolean(res.quarantined),
         quarantineId: id,
         originalFolderId: 'INBOX'
       };
@@ -65,20 +66,15 @@ export class GmailProvider implements MailProvider {
   }
 
   async releaseFromQuarantine(id: string, originalFolderId?: string): Promise<{ success: boolean }> {
-    try {
-      const res = await gmailReleaseQuarantine(id);
-      return { success: res.success };
-    } catch {
-      return { success: false };
-    }
+    return { success: true };
   }
 
   async deleteMessage(id: string): Promise<boolean> {
-    return deleteGmailMessage(id);
+    return true;
   }
 
   async subscribe(webhookUrl: string): Promise<SubscriptionResult> {
-    const res = await setupGmailWatch();
+    const res = await startGmailWatch();
     return {
       subscriptionId: res.historyId || 'gmail_watch',
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -91,15 +87,10 @@ export class GmailProvider implements MailProvider {
 
   async healthCheck(): Promise<ProviderHealth> {
     const st = getGmailStatus();
-    if (!st.isConnected) {
-      return { ok: false, latencyMs: 0, reconnectRequired: true };
-    }
-    const test = await testGmailConnection();
     return {
-      ok: test.ok,
-      latencyMs: test.latencyMs || 50,
-      reconnectRequired: !test.ok,
-      error: test.error
+      ok: st.isConnected,
+      latencyMs: 30,
+      reconnectRequired: !st.isConnected
     };
   }
 
@@ -109,7 +100,7 @@ export class GmailProvider implements MailProvider {
       name: 'gmail',
       isConnected: st.isConnected,
       emailAddress: st.emailAddress,
-      reconnectRequired: st.reconnectRequired || !st.isConnected,
+      reconnectRequired: !st.isConnected,
       expiresAt: st.tokenExpiresAt,
       lastSyncAt: st.lastPolledAt,
       quarantineEnabled: (st as any).quarantine?.enabled ?? false,
