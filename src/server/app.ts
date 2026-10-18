@@ -83,37 +83,52 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
   });
 
   // 5. Strict CORS Configuration
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173')
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
+  const siteUrl = process.env.SITE_URL || process.env.VITE_SITE_URL || process.env.APP_BASE_URL;
+
   const corsOptions: CorsOptions = {
     origin: (origin, callback) => {
-      // Allow server-to-server or curl/mobile requests without origin in development
+      // Allow requests without origin (curl, same-origin, mobile, server-to-server)
       if (!origin) {
-        if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DEV_HEADER_AUTH) {
-          return callback(null, true);
-        }
         return callback(null, true);
       }
 
       const normalizedOrigin = origin.toLowerCase().trim();
-      const isAllowed = allowedOrigins.some((allowed) => {
-        if (allowed === '*' && process.env.NODE_ENV !== 'production') return true;
-        return allowed === normalizedOrigin;
-      });
+
+      // Check if origin is permitted
+      const isAllowed =
+        process.env.NODE_ENV !== 'production' ||
+        normalizedOrigin.includes('localhost') ||
+        normalizedOrigin.includes('127.0.0.1') ||
+        normalizedOrigin.endsWith('.run.app') ||
+        envOrigins.includes('*') ||
+        envOrigins.includes(normalizedOrigin) ||
+        (siteUrl && normalizedOrigin === siteUrl.toLowerCase().trim());
 
       if (isAllowed) {
-        callback(null, true);
-      } else {
-        logger.warn({ origin: normalizedOrigin }, '[CORS Blocked] Origin not allowed');
-        callback(new Error(`CORS origin '${origin}' not permitted by security policy`));
+        return callback(null, true);
       }
+
+      logger.warn({ origin: normalizedOrigin }, '[CORS Blocked] Origin not permitted');
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key', 'apikey', 'x-organization-id', 'x-user-id', 'x-user-email', 'x-goog-pubsub-token']
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-api-key',
+      'apikey',
+      'x-organization-id',
+      'x-user-id',
+      'x-user-email',
+      'x-goog-pubsub-token',
+      'x-request-id'
+    ]
   };
 
   app.use(cors(corsOptions));
