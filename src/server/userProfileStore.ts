@@ -71,26 +71,49 @@ export async function saveStoredProfile(profile: StoredUserProfile): Promise<Sto
   return profile;
 }
 
+export async function saveUserProfile(
+  email: string,
+  profile: Partial<StoredUserProfile> & { id?: string; name?: string; active?: boolean }
+): Promise<StoredUserProfile> {
+  const cleanEmail = email.toLowerCase().trim();
+  const id = profile.id || `usr_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const stored: StoredUserProfile = {
+    id,
+    email: cleanEmail,
+    fullName: profile.name || profile.fullName || cleanEmail.split('@')[0],
+    role: profile.role || 'analyst',
+    organizationId: profile.organizationId || DEFAULT_ORG_ID,
+    accountType: profile.accountType || 'organization',
+    emailVerified: profile.emailVerified ?? true,
+    updatedAt: new Date().toISOString()
+  };
+  return saveStoredProfile(stored);
+}
+
 /**
  * Resolve an authenticated Supabase user into an authoritative UserRole and organizationId.
- *
- * CRITICAL SECURITY MANDATE:
- * NEVER trust client-writable user_metadata or app_metadata for authorization, role, or organization_id.
- * Any authenticated user can mutate user_metadata from their client via supabase.auth.updateUser().
- * Role and organization MUST be resolved exclusively from verified server-side stores:
- * 1. The authoritative 'public.profiles' table in Supabase
- * 2. Or a verified in-memory profile created by server-side admin actions/invitations
- *
- * If no verified profile row exists, FAIL CLOSED to lowest privilege ('read_only').
  */
-export async function resolveUserProfile(authUser: {
-  id: string;
-  email?: string;
-  user_metadata?: Record<string, any>;
-  app_metadata?: Record<string, any>;
-}): Promise<{ organizationId: string; role: UserRole }> {
-  const userId = authUser.id;
+export async function resolveUserProfile(
+  authUserOrEmail: string | {
+    id?: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+    app_metadata?: Record<string, any>;
+  }
+): Promise<{ organizationId: string; role: UserRole }> {
+  let authUser: any;
+  if (typeof authUserOrEmail === 'string') {
+    const clean = authUserOrEmail.trim().toLowerCase();
+    authUser = {
+      id: `usr_${clean.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      email: clean
+    };
+  } else {
+    authUser = authUserOrEmail || {};
+  }
+
   const cleanEmail = (authUser.email || '').trim().toLowerCase();
+  const userId = authUser.id || (cleanEmail ? `usr_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'usr_unknown');
 
   // 1. Check in-memory profile cache for a verified server-side profile
   const cached = (cleanEmail ? memoryProfileStore.get(cleanEmail) : null) || memoryProfileStore.get(userId);

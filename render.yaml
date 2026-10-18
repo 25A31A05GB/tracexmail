@@ -4,10 +4,15 @@ services:
     runtime: node
     buildCommand: npm install && npm run build
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     envVars:
       - key: NODE_ENV
         value: production
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: tracexmail-redis
+          property: connectionString
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
@@ -16,6 +21,10 @@ services:
         sync: false
       - key: TOKEN_ENCRYPTION_KEY
         sync: false
+      - key: TOKEN_ENCRYPTION_KEYS
+        sync: false
+      - key: TOKEN_ENCRYPTION_ACTIVE_KEY_ID
+        value: k1
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
@@ -30,3 +39,30 @@ services:
         sync: false
       - key: GMAIL_PUBSUB_TOPIC
         sync: false
+
+  - type: worker
+    name: tracexmail-worker
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm run worker
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: tracexmail-redis
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+
+databases:
+  - name: tracexmail-redis
+    plan: free
+    ipAllowList: []

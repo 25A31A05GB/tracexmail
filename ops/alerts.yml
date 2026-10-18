@@ -1,0 +1,79 @@
+groups:
+  - name: tracexmail_slo_alerts
+    rules:
+      # 1. API Availability SLO (< 99.9% over 5m window)
+      - alert: HighHttpErrorRate
+        expr: >-
+          (sum(rate(tracexmail_http_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(tracexmail_http_requests_total[5m]))) > 0.001
+        for: 2m
+        labels:
+          severity: critical
+          service: tracexmail-api
+        annotations:
+          summary: "API 5xx error rate exceeds 0.1% SLO threshold"
+          description: "High error rate observed on TraceXMail API: {{ $value | humanizePercentage }} 5xx errors."
+          runbook_url: "docs/RUNBOOK.md#database-outage"
+
+      # 2. Analysis Latency SLO (p95 > 5.0 seconds)
+      - alert: ForensicAnalysisHighLatency
+        expr: >-
+          histogram_quantile(0.95, sum(rate(tracexmail_analysis_duration_seconds_bucket[5m])) by (le)) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          service: tracexmail-analysis
+        annotations:
+          summary: "Forensic analysis p95 latency exceeds 5s"
+          description: "p95 analysis latency is currently {{ $value }}s, exceeding the 5-second target."
+          runbook_url: "docs/RUNBOOK.md#llm-provider-outage"
+
+      # 3. Quarantine Action Latency (< 2.0s)
+      - alert: QuarantineActionSlow
+        expr: >-
+          histogram_quantile(0.95, sum(rate(tracexmail_external_api_duration_seconds_bucket{provider="gmail"}[5m])) by (le)) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          service: tracexmail-quarantine
+        annotations:
+          summary: "Quarantine actions taking longer than 2 seconds"
+          description: "Gmail mailbox quarantine latency is {{ $value }}s."
+          runbook_url: "docs/RUNBOOK.md#gmail-api-quota-exhaustion"
+
+      # 4. Background Queue Backlog
+      - alert: HighQueueBacklog
+        expr: sum(tracexmail_queue_depth) > 250
+        for: 10m
+        labels:
+          severity: warning
+          service: tracexmail-worker
+        annotations:
+          summary: "Background queue backlog accumulated > 250 jobs"
+          description: "Total pending jobs across queues is {{ $value }}. Check worker scaling."
+          runbook_url: "docs/RUNBOOK.md#redis-outage"
+
+      # 5. Dead-Letter Queue Surge
+      - alert: DeadLetterQueueSurge
+        expr: sum(increase(tracexmail_queue_failures_total[10m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          service: tracexmail-worker
+        annotations:
+          summary: "Sudden spike in dead-letter queue failures"
+          description: "{{ $value }} jobs failed and were moved to the DLQ in the last 10 minutes."
+          runbook_url: "docs/RUNBOOK.md#database-outage"
+
+      # 6. Service Readiness Failure
+      - alert: TraceXMailReadinessFailed
+        expr: probe_success{instance="https://tracexmail.com/api/health/ready"} == 0
+        for: 1m
+        labels:
+          severity: page
+          service: tracexmail
+        annotations:
+          summary: "Readiness probe failing (503 Service Unavailable)"
+          description: "Database, Redis, or essential upstream dependency is reported DOWN."
+          runbook_url: "docs/RUNBOOK.md#database-outage"

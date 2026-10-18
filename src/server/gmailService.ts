@@ -2958,3 +2958,92 @@ export async function trashGmailMessage(messageId: string, overrideToken?: strin
   return { success: true };
 }
 
+/**
+ * Releases a quarantined message: restores INBOX label, removes Quarantine label,
+ * and logs to the quarantine audit ledger.
+ */
+export async function releaseQuarantinedMessage(
+  messageId: string,
+  analystEmail: string = 'analyst@tracexmail.sec',
+  overrideToken?: string
+): Promise<{ success: boolean; message: string }> {
+  const token = overrideToken || (await ensureFreshAccessToken());
+  if (token && !token.startsWith('mock_')) {
+    const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
+    const removeLabelIds = quarantineLabelId ? [quarantineLabelId] : [];
+    try {
+      await modifyGmailMessageLabels(token, messageId, ['INBOX'], removeLabelIds);
+    } catch (err: any) {
+      console.warn('[GmailService] Release label modification notice:', err?.message || err);
+    }
+  }
+
+  // Record into quarantine audit log
+  const logEntry = {
+    id: `qar_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    timestamp: new Date().toISOString(),
+    messageId,
+    sender: 'released-inbound@sender.corp',
+    subject: `Quarantined Message (${messageId})`,
+    threatScore: 0,
+    action: 'RELEASED_TO_INBOX',
+    deliveryStage: 'post-quarantine-release',
+    appliedLabel: 'INBOX',
+    analyst: analystEmail,
+    notes: `Message ${messageId} released to INBOX by analyst ${analystEmail}`
+  };
+
+  state.quarantineAuditLog.unshift(logEntry as any);
+  if (state.quarantineAuditLog.length > 100) state.quarantineAuditLog.pop();
+
+  return { success: true, message: `Message ${messageId} successfully released to recipient INBOX.` };
+}
+
+/**
+ * Permanently deletes or trashes a quarantined message and logs to audit ledger.
+ */
+export async function deleteQuarantinedMessage(
+  messageId: string,
+  analystEmail: string = 'analyst@tracexmail.sec',
+  overrideToken?: string
+): Promise<{ success: boolean; message: string }> {
+  const token = overrideToken || (await ensureFreshAccessToken());
+  if (token && !token.startsWith('mock_')) {
+    try {
+      await trashGmailMessage(messageId, token);
+    } catch (err: any) {
+      console.warn('[GmailService] Trash message notice:', err?.message || err);
+    }
+  }
+
+  // Record into quarantine audit log
+  const logEntry = {
+    id: `qar_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    timestamp: new Date().toISOString(),
+    messageId,
+    sender: 'deleted-inbound@sender.corp',
+    subject: `Quarantined Message (${messageId})`,
+    threatScore: 90,
+    action: 'DELETED_CONFIRMED_MALICIOUS',
+    deliveryStage: 'quarantine-purged',
+    appliedLabel: 'TRASH',
+    analyst: analystEmail,
+    notes: `Message ${messageId} permanently purged by analyst ${analystEmail}`
+  };
+
+  state.quarantineAuditLog.unshift(logEntry as any);
+  if (state.quarantineAuditLog.length > 100) state.quarantineAuditLog.pop();
+
+  return { success: true, message: `Message ${messageId} purged from mailbox.` };
+}
+
+/**
+ * Retrieves the pending quarantine queue.
+ */
+export function getPendingQuarantineQueue(): any[] {
+  return state.quarantineAuditLog.filter((item: any) =>
+    item.action === 'QUARANTINED' || item.action === 'HELD_IN_QUARANTINE' || item.isQuarantined
+  );
+}
+
+

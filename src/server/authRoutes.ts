@@ -383,6 +383,15 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const cleanPassword = String(password);
 
     try {
+      // Check SSO enforcement
+      const { isPasswordLoginForbiddenForEmail } = require('./identity/sso');
+      if (isPasswordLoginForbiddenForEmail(cleanEmail)) {
+        return res.status(403).json({
+          error: 'SSO_ENFORCED: Your organization requires Single Sign-On (SSO). Password login is disabled.',
+          code: 'ERR_SSO_ENFORCED'
+        });
+      }
+
       // 1. Check organization users registry (support both email and employeeId)
       const orgAuth = authenticateOrgUser(cleanEmail, cleanPassword);
       if (orgAuth.authenticated && orgAuth.user) {

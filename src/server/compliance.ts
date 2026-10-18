@@ -20,6 +20,7 @@ import jwt from 'jsonwebtoken';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdminClient } from './supabase';
 import { resolveUserProfile } from './userProfileStore';
+import { isMfaRequiredForOrg } from './identity/mfa';
 import type { Request, Response, NextFunction } from 'express';
 import { 
   PrivacyConfig, 
@@ -552,36 +553,41 @@ export function getEncryptionKey(): Buffer {
 
 /**
  * Encrypts a sensitive plaintext field (e.g. raw_content, body_text, OAuth tokens)
- * using AES-256-GCM with authenticated tags. Throws on cipher failure.
+ * using AES-256-GCM with versioned format v1:<keyId>:<iv>:<tag>:<data>.
  */
 export function encryptSensitiveField(plaintext: string | null | undefined): string | null {
   if (plaintext === null || plaintext === undefined) return null;
   if (typeof plaintext !== 'string') plaintext = String(plaintext);
   if (plaintext.length === 0) return '';
-  if (plaintext.startsWith(ENCRYPTED_PREFIX)) {
+  if (plaintext.startsWith('v1:') || plaintext.startsWith(ENCRYPTED_PREFIX)) {
     return plaintext; // Already encrypted
   }
 
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
-
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
-    cipher.final()
-  ]);
-  const tag = cipher.getAuthTag();
-
-  return `${ENCRYPTED_PREFIX}${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+  try {
+    const { encrypt } = require('./crypto/encryption');
+    return encrypt(plaintext);
+  } catch {
+    const key = getEncryptionKey();
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, { authTagLength: AUTH_TAG_LENGTH });
+    const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return `${ENCRYPTED_PREFIX}${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+  }
 }
 
 /**
- * Decrypts an AES-256-GCM encrypted field.
+ * Decrypts an AES-256-GCM encrypted field (supporting both v1:<keyId>... and legacy enc:aes-gcm:v1:...).
  * Throws on decipher failure or tag authentication failure.
  */
 export function decryptSensitiveField(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value !== 'string') return String(value);
+
+  if (value.startsWith('v1:')) {
+    const { decrypt } = require('./crypto/encryption');
+    return decrypt(value);
+  }
 
   if (!value.startsWith(ENCRYPTED_PREFIX)) {
     // Legacy unencrypted text
@@ -594,7 +600,6 @@ export function decryptSensitiveField(value: string | null | undefined): string 
     throw new Error('[Encryption] Malformed AES-GCM ciphertext payload');
   }
 
-  // Strict hex regex and length verification to prevent truncation or malformed payload injection
   const hexRegex = /^[0-9a-fA-F]+$/;
   if (
     !hexRegex.test(ivHex) ||
@@ -622,7 +627,7 @@ export function decryptSensitiveField(value: string | null | undefined): string 
   return decrypted.toString('utf8');
 }
 
-// Token encryption aliases (same single key mechanism)
+// Token encryption aliases
 export const encryptToken = encryptSensitiveField;
 export const decryptToken = decryptSensitiveField;
 
@@ -701,7 +706,7 @@ export function verifyUserToken(token: string): UserContext | null {
     }
   }
 
-  const secret = process.env.JWT_SECRET?.trim();
+  const secret = process.env.JWT_SECRET?.trim() || resolveMasterSecret();
   if (!secret) {
     return null;
   }
@@ -910,6 +915,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
           code: 'ERR_UNAUTHORIZED'
         });
       }
+    }
+  }
+
+  // Org-level MFA requirement check
+  if (user.organizationId && isMfaRequiredForOrg(user.organizationId)) {
+    const isMfa = (user as any).mfaVerified || (user as any).amr?.includes('mfa');
+    if (!isMfa) {
+      return res.status(403).json({
+        error: 'MFA_REQUIRED: Multi-factor authentication is required by your organization policy.',
+        code: 'ERR_MFA_REQUIRED'
+      });
     }
   }
 

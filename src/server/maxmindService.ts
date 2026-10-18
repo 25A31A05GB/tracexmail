@@ -291,6 +291,13 @@ export class MaxMindDatabase {
 
     return cityRecord;
   }
+
+  public getStatus(): { status: string; isLoaded: boolean } {
+    return {
+      status: this.cityReader ? 'LOADED' : 'UNLOADED',
+      isLoaded: !!this.cityReader
+    };
+  }
 }
 
 export const maxMindDb = new MaxMindDatabase();

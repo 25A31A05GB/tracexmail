@@ -25,3 +25,11 @@ data/org_users.backup.json
 # Test output fixtures
 *.test.json
 data/*.test.json
+
+# Large datasets & raw corpora
+data/raw_corpora/
+data/raw_corpora/*.mbox
+data/datasets/real_corpus.json
+
+# Platform & artifacts directory
+.aistudio/

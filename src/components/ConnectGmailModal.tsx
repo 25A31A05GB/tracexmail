@@ -13,7 +13,11 @@ import {
   Lock,
   ArrowRight,
   Sparkles,
-  Server
+  Server,
+  Cloud,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { GoogleAuthButton } from './GoogleAuthButton';
@@ -31,7 +35,21 @@ export function ConnectGmailModal({
   currentUserEmail = '',
   onConnected
 }: ConnectGmailModalProps) {
-  const [activeTab, setActiveTab] = useState<'token' | 'stream' | 'enterprise'>('token');
+  // Provider Selection: 'gmail' | 'microsoft365'
+  const [selectedProvider, setSelectedProvider] = useState<'gmail' | 'microsoft365'>('gmail');
+
+  // Gmail Tabs: 'token' | 'stream' | 'enterprise'
+  const [gmailTab, setGmailTab] = useState<'token' | 'stream' | 'enterprise'>('token');
+
+  // M365 Inputs
+  const [m365TenantId, setM365TenantId] = useState('');
+  const [m365ClientId, setM365ClientId] = useState('');
+  const [m365ClientSecret, setM365ClientSecret] = useState('');
+  const [m365UserEmail, setM365UserEmail] = useState(currentUserEmail || '');
+  const [m365Quarantine, setM365Quarantine] = useState(true);
+  const [showAdminConsentGuide, setShowAdminConsentGuide] = useState(false);
+
+  // Common Inputs
   const [emailInput, setEmailInput] = useState<string>(currentUserEmail || '');
   const [accessTokenInput, setAccessTokenInput] = useState<string>('');
   const [clientIdInput, setClientIdInput] = useState<string>('');
@@ -40,11 +58,65 @@ export function ConnectGmailModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Provider Statuses
+  const [providersStatus, setProvidersStatus] = useState<any[]>([]);
+
   useEffect(() => {
     if (currentUserEmail) {
       setEmailInput(currentUserEmail);
+      setM365UserEmail(currentUserEmail);
+    }
+    if (isOpen) {
+      apiFetch('/api/mail/providers')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setProvidersStatus(data);
+        })
+        .catch(() => {});
     }
   }, [currentUserEmail, isOpen]);
+
+  if (!isOpen) return null;
+
+  const effectiveEmail = emailInput.trim() || currentUserEmail || 'operator@acmedefense.sec';
+
+  const handleM365Connect = async () => {
+    if (!m365ClientId.trim() || !m365ClientSecret.trim() || !m365TenantId.trim()) {
+      setErrorMsg('Tenant ID, Client ID, and Client Secret are required for Microsoft 365.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await apiFetch('/api/mail/m365/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId: m365TenantId.trim(),
+          clientId: m365ClientId.trim(),
+          clientSecret: m365ClientSecret.trim(),
+          emailAddress: m365UserEmail.trim() || effectiveEmail,
+          quarantineEnabled: m365Quarantine
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to authenticate and connect to Microsoft 365 Graph API.');
+      }
+
+      setSuccessMsg('Microsoft 365 Exchange Online successfully connected! Tokens encrypted at rest.');
+      await onConnected(m365UserEmail.trim() || effectiveEmail);
+      setTimeout(() => onClose(), 1400);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Error connecting Microsoft 365');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleSaveClientCredentials = async () => {
     if (!clientIdInput.trim() || !clientSecretInput.trim()) {
@@ -83,10 +155,6 @@ export function ConnectGmailModal({
     }
   };
 
-  if (!isOpen) return null;
-
-  const effectiveEmail = emailInput.trim() || currentUserEmail || 'operator@acmedefense.sec';
-
   const handleActivateStream = async () => {
     setIsSubmitting(true);
     setErrorMsg(null);
@@ -111,9 +179,7 @@ export function ConnectGmailModal({
 
       setSuccessMsg(`Live SOC stream connected for ${effectiveEmail}! Initializing real-time telemetry...`);
       await onConnected(effectiveEmail);
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      setTimeout(() => onClose(), 1200);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error connecting live stream');
     } finally {
@@ -150,9 +216,7 @@ export function ConnectGmailModal({
       setSuccessMsg(`Google Workspace credentials authorized for ${effectiveEmail}! Starting live sync...`);
       setAccessTokenInput('');
       await onConnected(effectiveEmail);
-      setTimeout(() => {
-        onClose();
-      }, 1200);
+      setTimeout(() => onClose(), 1200);
     } catch (err: any) {
       setErrorMsg(err.message || 'Error verifying Google OAuth credentials');
     } finally {
@@ -174,10 +238,10 @@ export function ConnectGmailModal({
             </div>
             <div>
               <h3 className="font-bold text-sm sm:text-base text-[#ede6d8] flex items-center gap-2">
-                <span>Connect Gmail Live Synchronization</span>
+                <span>Enterprise Mailbox Connector</span>
               </h3>
               <p className="text-[11px] text-[#9d9282] font-mono mt-0.5">
-                In-app real-time inbox telemetry &bull; Zero external popup windows
+                Real-time threat monitoring &amp; automated quarantine isolation
               </p>
             </div>
           </div>
@@ -189,288 +253,302 @@ export function ConnectGmailModal({
           </button>
         </div>
 
-        {/* Tab selection */}
-        <div className="flex border-b border-[#2c261e] bg-[#100e0b] px-4 pt-2 gap-2 text-xs font-mono overflow-x-auto">
+        {/* Provider Switcher */}
+        <div className="grid grid-cols-2 p-2 bg-[#100e0b] border-b border-[#2c261e] gap-2">
           <button
-            onClick={() => { setActiveTab('token'); setErrorMsg(null); }}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
-              activeTab === 'token'
-                ? 'border-amber-400 text-amber-300 font-bold'
-                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+            onClick={() => { setSelectedProvider('gmail'); setErrorMsg(null); }}
+            className={`p-2.5 rounded flex items-center justify-center gap-2 font-mono text-xs cursor-pointer border transition-all ${
+              selectedProvider === 'gmail'
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-300 font-bold'
+                : 'bg-[#181511] border-[#2c261e] text-[#8a8070] hover:text-[#ede6d8]'
             }`}
           >
-            <Globe className="w-3.5 h-3.5 text-amber-400" />
-            <span>Sign in with Google OAuth (Primary)</span>
+            <Globe className="w-4 h-4 text-amber-400" />
+            <span>Google Workspace / Gmail</span>
           </button>
 
           <button
-            onClick={() => { setActiveTab('stream'); setErrorMsg(null); }}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
-              activeTab === 'stream'
-                ? 'border-amber-400 text-amber-300 font-bold'
-                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+            onClick={() => { setSelectedProvider('microsoft365'); setErrorMsg(null); }}
+            className={`p-2.5 rounded flex items-center justify-center gap-2 font-mono text-xs cursor-pointer border transition-all ${
+              selectedProvider === 'microsoft365'
+                ? 'bg-blue-500/15 border-blue-500/50 text-blue-300 font-bold'
+                : 'bg-[#181511] border-[#2c261e] text-[#8a8070] hover:text-[#ede6d8]'
             }`}
           >
-            <Zap className="w-3.5 h-3.5" />
-            <span>1-Click Live Ingestion Stream</span>
-          </button>
-
-          <button
-            onClick={() => { setActiveTab('enterprise'); setErrorMsg(null); }}
-            className={`pb-2.5 px-3 border-b-2 flex items-center gap-2 cursor-pointer transition-colors shrink-0 ${
-              activeTab === 'enterprise'
-                ? 'border-amber-400 text-amber-300 font-bold'
-                : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
-            }`}
-          >
-            <Server className="w-3.5 h-3.5" />
-            <span>Enterprise Gateway</span>
+            <Cloud className="w-4 h-4 text-blue-400" />
+            <span>Microsoft 365 (Exchange)</span>
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-5 overflow-y-auto space-y-4 font-mono text-xs">
+        {/* Content Area */}
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
           {errorMsg && (
-            <div className="p-3 bg-rose-950/40 border border-rose-800/60 rounded text-rose-300 flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-              <div className="flex-1 font-sans text-xs leading-relaxed">{errorMsg}</div>
+            <div className="p-3 bg-red-950/40 border border-red-800/60 rounded text-red-300 text-xs flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-400 mt-0.5" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded text-emerald-300 flex items-start gap-2.5">
+            <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded text-emerald-300 text-xs flex items-start gap-2.5">
               <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" />
-              <div className="flex-1 font-sans text-xs leading-relaxed">{successMsg}</div>
+              <span>{successMsg}</span>
             </div>
           )}
 
-          {/* Email input field common to both */}
-          <div className="space-y-1.5">
-            <label className="text-[11px] text-[#9d9282] uppercase tracking-wider font-semibold block">
-              Target Gmail Address to Monitor
-            </label>
-            <div className="relative">
-              <input
-                type="email"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="user@gmail.com or corporate-inbox@domain.com"
-                className="w-full px-3.5 py-2.5 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245]"
-              />
-              <span className="absolute right-3 top-2.5 text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Encrypted Enclave</span>
-              </span>
-            </div>
-            <p className="text-[10.5px] text-[#7a7162] font-sans">
-              Inbound emails received by this address will be monitored, evaluated for SPF/DKIM alignment, and checked against threat heuristics.
-            </p>
-          </div>
-
-          {/* TAB 1: Stream Mode */}
-          {activeTab === 'stream' && (
-            <div className="space-y-4 pt-1">
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-2">
-                <div className="flex items-center gap-2 text-amber-300 font-bold">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>Seamless In-App Ingestion Stream</span>
-                </div>
-                <p className="text-[11px] text-[#b9af9c] font-sans leading-relaxed">
-                  Activates continuous live monitoring and polling directly within your security analyst workstation. Eliminates external browser popups, consent redirects, and landing page flashing.
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-2 text-[10.5px]">
-                  <div className="p-2 rounded bg-[#100e0b] border border-[#2a241c] flex items-center gap-2 text-emerald-400">
-                    <Check className="w-3.5 h-3.5 shrink-0" />
-                    <span>In-App Real-time Feed</span>
-                  </div>
-                  <div className="p-2 rounded bg-[#100e0b] border border-[#2a241c] flex items-center gap-2 text-emerald-400">
-                    <Check className="w-3.5 h-3.5 shrink-0" />
-                    <span>Auto-quarantine Heuristics</span>
-                  </div>
+          {/* MICROSOFT 365 WIZARD */}
+          {selectedProvider === 'microsoft365' && (
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-950/20 border border-blue-900/40 rounded flex items-start gap-3">
+                <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-[#c9bfae] space-y-1">
+                  <p className="font-semibold text-blue-300">Microsoft Graph API Integration</p>
+                  <p>
+                    Connects using least-privilege scopes (<code className="text-blue-300 font-mono">Mail.Read</code> &amp; <code className="text-blue-300 font-mono">Mail.ReadWrite</code> for quarantine). All credentials are stored with versioned AES-256-GCM encryption.
+                  </p>
                 </div>
               </div>
 
-              <div className="pt-2">
-                <button
-                  onClick={handleActivateStream}
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-stone-950 font-bold rounded text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Zap className="w-4 h-4 fill-current" />
-                  )}
-                  <span>{isSubmitting ? 'Connecting Real-Time Stream...' : `Activate Live Ingestion for ${effectiveEmail}`}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: Direct Token Mode */}
-          {activeTab === 'token' && (
-            <div className="space-y-4 pt-1">
-              {/* Option A: Direct Google OAuth Popup Button */}
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-2.5">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5 font-mono">
-                  <Globe className="w-4 h-4 text-amber-400" />
-                  <span>Option A: Interactive Google OAuth Popup</span>
-                </span>
-                <p className="text-[11px] text-[#b9af9c] font-sans leading-relaxed">
-                  Click below to open the standard Google Authentication popup and authorize your mailbox:
-                </p>
-                <GoogleAuthButton
-                  id="connect-modal-google-auth-btn"
-                  mode="continue"
-                  variant="primary"
-                  scopes="https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify"
-                  onSuccess={(user) => {
-                    const userEmail = user?.email || effectiveEmail;
-                    setSuccessMsg(`Google Account authorized for ${userEmail}! Initializing sync...`);
-                    onConnected(userEmail);
-                    setTimeout(() => onClose(), 1200);
-                  }}
-                  onError={(err) => setErrorMsg(err)}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 my-1 text-xs text-[#3a352c]">
-                <div className="flex-1 h-px bg-[#2c261e]" />
-                <span className="font-mono text-[10px] text-[#8a8070]">OR CUSTOM GOOGLE CLIENT CREDENTIALS</span>
-                <div className="flex-1 h-px bg-[#2c261e]" />
-              </div>
-
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-3">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5 font-mono">
-                  <Key className="w-4 h-4 text-amber-400" />
-                  <span>Option C: Connect Google Client ID &amp; Secret Key</span>
-                </span>
-                
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-[10.5px] text-[#9d9282] uppercase tracking-wider block mb-1">
-                      Google OAuth Client ID
-                    </label>
-                    <input
-                      type="text"
-                      value={clientIdInput}
-                      onChange={(e) => setClientIdInput(e.target.value)}
-                      placeholder="1234567890-xyz.apps.googleusercontent.com"
-                      className="w-full px-3 py-2 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245] font-mono text-[11px]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10.5px] text-[#9d9282] uppercase tracking-wider block mb-1">
-                      Google OAuth Client Secret
-                    </label>
-                    <input
-                      type="password"
-                      value={clientSecretInput}
-                      onChange={(e) => setClientSecretInput(e.target.value)}
-                      placeholder="GOCSPX-xxxxxxxxxxxxxxxxxxxx"
-                      className="w-full px-3 py-2 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245] font-mono text-[11px]"
-                    />
-                  </div>
-                </div>
-
+              {/* Admin Consent collapsible instructions */}
+              <div className="border border-[#2c261e] rounded bg-[#181511] overflow-hidden">
                 <button
                   type="button"
-                  onClick={handleSaveClientCredentials}
-                  disabled={isSubmitting || !clientIdInput.trim() || !clientSecretInput.trim()}
-                  className="w-full py-2 px-3 bg-[#26201a] hover:bg-[#332b22] border border-amber-500/40 text-amber-300 font-bold rounded text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 mt-1"
+                  onClick={() => setShowAdminConsentGuide(!showAdminConsentGuide)}
+                  className="w-full p-3 flex items-center justify-between text-xs font-mono text-[#c9bfae] hover:bg-[#201b15] transition-colors"
                 >
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  <span>Save &amp; Activate Google Client Credentials</span>
+                  <span className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-400" />
+                    <span>Microsoft Entra ID (Azure) Admin Consent Instructions</span>
+                  </span>
+                  {showAdminConsentGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                 </button>
+
+                {showAdminConsentGuide && (
+                  <div className="p-3.5 border-t border-[#2c261e] bg-[#120f0c] text-xs text-[#9d9282] space-y-2 font-mono">
+                    <p className="text-[#ede6d8] font-sans font-medium">To connect your tenant-wide organization mailbox:</p>
+                    <ol className="list-decimal pl-5 space-y-1.5 leading-relaxed">
+                      <li>Go to <strong>Microsoft Entra Admin Center</strong> (<code className="text-blue-300">entra.microsoft.com</code>).</li>
+                      <li>Navigate to <strong>App registrations</strong> &rarr; <strong>New registration</strong> (Name: <span className="text-[#ede6d8]">TraceXMail Forensic Defense</span>).</li>
+                      <li>Under <strong>API permissions</strong>, add <strong>Microsoft Graph</strong>:
+                        <ul className="list-disc pl-4 mt-1 space-y-0.5 text-[11px]">
+                          <li><span className="text-blue-300">Mail.Read</span> (Application or Delegated)</li>
+                          <li><span className="text-blue-300">Mail.ReadWrite</span> (Required for automated quarantine)</li>
+                        </ul>
+                      </li>
+                      <li>Click <strong>&quot;Grant admin consent for your organization&quot;</strong>.</li>
+                      <li>Under <strong>Certificates &amp; secrets</strong>, generate a New client secret.</li>
+                      <li>Copy the <strong>Directory (tenant) ID</strong>, <strong>Application (client) ID</strong>, and <strong>Secret value</strong> below.</li>
+                    </ol>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#9d9282] uppercase tracking-wider font-semibold block">
-                  Option B: Google OAuth Access Token (<code className="text-amber-300">ya29...</code>)
-                </label>
-                <textarea
-                  value={accessTokenInput}
-                  onChange={(e) => setAccessTokenInput(e.target.value)}
-                  placeholder="Paste OAuth2 access token with gmail.readonly and gmail.modify scopes..."
-                  rows={3}
-                  className="w-full p-3 bg-[#0e0c0a] border border-[#332b21] rounded text-[#ede6d8] focus:border-amber-400 focus:outline-none placeholder-[#5a5245] font-mono text-[11px]"
-                />
-              </div>
+              <div className="space-y-3 font-mono text-xs">
+                <div>
+                  <label className="block text-[11px] text-[#9d9282] uppercase mb-1">
+                    Directory (Tenant) ID *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={m365TenantId}
+                    onChange={(e) => setM365TenantId(e.target.value)}
+                    className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
 
-              <div className="p-3 rounded bg-[#181410] border border-[#2e2820] text-[10.5px] text-[#9d9282] font-sans space-y-1">
-                <span className="font-bold text-[#ede6d8] flex items-center gap-1.5 font-mono">
-                  <Info className="w-3.5 h-3.5 text-amber-400" />
-                  <span>How to obtain an Access Token:</span>
-                </span>
-                <p>
-                  Generate a token with scopes <code className="text-amber-300 font-mono">gmail.readonly</code> &amp; <code className="text-amber-300 font-mono">gmail.modify</code> from the Google OAuth 2.0 Playground or your Google Cloud service account.
-                </p>
-              </div>
+                <div>
+                  <label className="block text-[11px] text-[#9d9282] uppercase mb-1">
+                    Application (Client) ID *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    value={m365ClientId}
+                    onChange={(e) => setM365ClientId(e.target.value)}
+                    className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
 
-              <div className="pt-2">
+                <div>
+                  <label className="block text-[11px] text-[#9d9282] uppercase mb-1">
+                    Client Secret Value *
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Enter Microsoft Entra client secret"
+                    value={m365ClientSecret}
+                    onChange={(e) => setM365ClientSecret(e.target.value)}
+                    className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-[#9d9282] uppercase mb-1">
+                    Mailbox Address (User Principal Name)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="security-inbox@yourdomain.com"
+                    value={m365UserEmail}
+                    onChange={(e) => setM365UserEmail(e.target.value)}
+                    className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="m365QuarantineCheck"
+                    checked={m365Quarantine}
+                    onChange={(e) => setM365Quarantine(e.target.checked)}
+                    className="rounded border-[#2c261e] text-blue-500 focus:ring-0"
+                  />
+                  <label htmlFor="m365QuarantineCheck" className="text-xs text-[#c9bfae] cursor-pointer">
+                    Enable Automated Quarantine (moves threats to dedicated <code className="text-blue-300">TraceXMail-Quarantine</code> folder)
+                  </label>
+                </div>
+
                 <button
-                  onClick={handleConnectDirectToken}
-                  disabled={isSubmitting || !accessTokenInput.trim()}
-                  className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold rounded text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
+                  onClick={handleM365Connect}
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-2.5 px-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Verifying Microsoft 365 Credentials...</span>
+                    </>
                   ) : (
-                    <Key className="w-4 h-4" />
+                    <>
+                      <Cloud className="w-4 h-4" />
+                      <span>Authenticate &amp; Connect Microsoft 365</span>
+                    </>
                   )}
-                  <span>{isSubmitting ? 'Verifying Credentials...' : 'Verify & Connect Google Token'}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* TAB 3: Enterprise Webhook */}
-          {activeTab === 'enterprise' && (
-            <div className="space-y-3 pt-1">
-              <div className="p-3.5 rounded bg-[#181410] border border-[#2e2820] space-y-2">
-                <span className="font-bold text-amber-300 flex items-center gap-1.5">
-                  <Server className="w-4 h-4" />
-                  <span>Google Cloud Pub/Sub Webhook Target</span>
-                </span>
-                <p className="text-[11px] text-[#b9af9c] font-sans leading-relaxed">
-                  For enterprise organizations routing through Google Cloud Pub/Sub, configure push notifications to the TraceXMail ingestion webhook:
-                </p>
-                <div className="p-2.5 rounded bg-[#0e0c0a] border border-[#332b21] text-[11px] font-mono text-emerald-400 break-all select-all">
-                  {typeof window !== 'undefined' ? `${window.location.origin}/api/gmail/push` : '/api/gmail/push'}
-                </div>
-              </div>
-
-              <div className="pt-2">
+          {/* GMAIL WIZARD */}
+          {selectedProvider === 'gmail' && (
+            <div className="space-y-4">
+              {/* Tab selection */}
+              <div className="flex border-b border-[#2c261e] pb-1 gap-2 text-xs font-mono">
                 <button
-                  onClick={handleActivateStream}
-                  disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 bg-[#201c16] hover:bg-[#2c261e] border border-[#3a352c] text-[#ede6d8] font-bold rounded text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  onClick={() => setGmailTab('token')}
+                  className={`pb-1 px-2 border-b-2 cursor-pointer transition-colors ${
+                    gmailTab === 'token'
+                      ? 'border-amber-400 text-amber-300 font-bold'
+                      : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+                  }`}
                 >
-                  <span>Connect Webhook Gateway Stream</span>
-                  <ArrowRight className="w-4 h-4" />
+                  OAuth (Primary)
+                </button>
+                <button
+                  onClick={() => setGmailTab('stream')}
+                  className={`pb-1 px-2 border-b-2 cursor-pointer transition-colors ${
+                    gmailTab === 'stream'
+                      ? 'border-amber-400 text-amber-300 font-bold'
+                      : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+                  }`}
+                >
+                  1-Click Stream
+                </button>
+                <button
+                  onClick={() => setGmailTab('enterprise')}
+                  className={`pb-1 px-2 border-b-2 cursor-pointer transition-colors ${
+                    gmailTab === 'enterprise'
+                      ? 'border-amber-400 text-amber-300 font-bold'
+                      : 'border-transparent text-[#8a8070] hover:text-[#ede6d8]'
+                  }`}
+                >
+                  API Credentials
                 </button>
               </div>
+
+              {gmailTab === 'token' && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-amber-950/20 border border-amber-900/40 rounded flex items-start gap-2.5">
+                    <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-[#c9bfae]">
+                      Sign in with your Google account to grant TraceXMail least-privilege read access for incoming email telemetry.
+                    </p>
+                  </div>
+
+                  <div className="py-2">
+                    <GoogleAuthButton
+                      onSuccess={async (email) => {
+                        setSuccessMsg(`Google Workspace authorized for ${email}!`);
+                        await onConnected(email);
+                        setTimeout(() => onClose(), 1200);
+                      }}
+                      onError={(err) => setErrorMsg(err)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {gmailTab === 'stream' && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-[#181511] border border-[#2c261e] rounded text-xs space-y-2">
+                    <p className="text-[#ede6d8] font-bold">1-Click Live Ingestion Stream</p>
+                    <p className="text-[#9d9282]">
+                      Immediately engages synthetic live email feed and simulated Pub/Sub dispatcher for evaluation and testing.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleActivateStream}
+                    disabled={isSubmitting}
+                    className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-bold rounded flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Zap className="w-4 h-4" />
+                    )}
+                    <span>Activate Live SOC Ingestion Stream</span>
+                  </button>
+                </div>
+              )}
+
+              {gmailTab === 'enterprise' && (
+                <div className="space-y-3 font-mono text-xs">
+                  <div>
+                    <label className="block text-[11px] text-[#9d9282] uppercase mb-1">Google Client ID</label>
+                    <input
+                      type="text"
+                      placeholder="apps.googleusercontent.com"
+                      value={clientIdInput}
+                      onChange={(e) => setClientIdInput(e.target.value)}
+                      className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-[#9d9282] uppercase mb-1">Google Client Secret</label>
+                    <input
+                      type="password"
+                      placeholder="GOCSPX-..."
+                      value={clientSecretInput}
+                      onChange={(e) => setClientSecretInput(e.target.value)}
+                      className="w-full bg-[#100e0b] border border-[#2c261e] rounded p-2 text-[#ede6d8] focus:border-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSaveClientCredentials}
+                    disabled={isSubmitting}
+                    className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Key className="w-4 h-4" />}
+                    <span>Save Google API Credentials</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3.5 bg-[#100e0b] border-t border-[#2c261e] flex items-center justify-between text-[11px] text-[#8a8070] font-mono">
-          <div className="flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Cryptographic OAuth Enclave</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="px-3 py-1 bg-[#1c1813] hover:bg-[#252019] text-[#ede6d8] rounded border border-[#332b21] cursor-pointer transition-colors"
-          >
-            Cancel
-          </button>
         </div>
       </div>
     </div>
   );
 }
-
 export default ConnectGmailModal;
