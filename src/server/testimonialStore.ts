@@ -191,3 +191,7 @@ export function addLiveTestimonial(data: {
 
   return newTestimonial;
 }
+
+export const getTestimonials = getLiveTestimonials;
+export const addTestimonial = addLiveTestimonial;
+export const moderateTestimonial = updateModerationStatus;

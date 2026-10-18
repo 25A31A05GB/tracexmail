@@ -801,3 +801,13 @@ export async function sendTestSlackAlert(
     else delete process.env.SLACK_WEBHOOK_URL;
   }
 }
+
+export function getSlackStatus() {
+  const cfg = getSlackConfig();
+  return {
+    configured: Boolean(cfg.enabled && (cfg.webhookUrl || cfg.botToken)),
+    ...cfg
+  };
+}
+
+export const testSlackNotification = sendTestSlackAlert;

@@ -261,7 +261,7 @@ export const DEFAULT_BASELINE_CASES: PersistedCase[] = [
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 
 // Persistent Map cache
-const inMemoryStore = new Map<string, PersistedCase>();
+export const inMemoryStore = new Map<string, PersistedCase>();
 let isInitialized = false;
 
 function ensureDataDir(): void {

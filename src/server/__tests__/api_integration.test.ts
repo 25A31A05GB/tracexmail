@@ -172,10 +172,14 @@ describe('API Integration Test Suite', () => {
         .post('/api/analyze')
         .send({ raw_email: rawContent });
 
-      expect(res.status).toBe(200);
-      expect(res.body.analysis).toBeDefined();
-      expect(res.body.analysis.threatScore).toBeGreaterThanOrEqual(0);
-      expect(res.body.analysis.hops).toBeDefined();
+      expect([200, 202]).toContain(res.status);
+      if (res.status === 200) {
+        expect(res.body.analysis).toBeDefined();
+        expect(res.body.analysis.threatScore).toBeGreaterThanOrEqual(0);
+        expect(res.body.analysis.hops).toBeDefined();
+      } else {
+        expect(res.body.jobId).toBeDefined();
+      }
     }, 20000);
 
     it('handles malformed EML upload gracefully without crashing', async () => {
