@@ -24,8 +24,8 @@ export function initBackendSentry(): void {
         if (event.request.data) {
           if (typeof event.request.data === 'string') {
             event.request.data = '[PII_BODY_SCRUBBED]';
-          } else if (typeof event.request.data === 'object') {
-            const sanitized = { ...event.request.data };
+          } else if (typeof event.request.data === 'object' && event.request.data !== null) {
+            const sanitized: Record<string, any> = { ...(event.request.data as Record<string, any>) };
             delete sanitized.raw_email;
             delete sanitized.raw_content;
             delete sanitized.rawEml;

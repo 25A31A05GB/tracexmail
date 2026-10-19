@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Defensa Forense TraceXMail",
+    "subtitle": "Plataforma automatizada de análisis forense de correo electrónico, defensa contra quishing e inteligencia de amenazas",
+    "statusConnected": "Conectado",
+    "statusOffline": "Desconectado",
+    "statusSecure": "Protegido",
+    "quickAnalyze": "Análisis Rápido"
+  },
+  "nav": {
+    "dashboard": "Panel de Control",
+    "ingestion": "Canal de Ingesta",
+    "cases": "Casos Forenses",
+    "alerts": "Alertas de Amenaza",
+    "campaigns": "Campañas de Ataque",
+    "map": "Mapa de Geolocalización",
+    "graph": "Gráfico de Relaciones",
+    "quarantine": "Bóveda de Cuarentena",
+    "organization": "Organización",
+    "settings": "Configuración",
+    "docs": "Documentación"
+  },
+  "verdict": {
+    "clean": "Limpio",
+    "suspicious": "Sospechoso",
+    "malicious": "Malicioso",
+    "phishing": "Phishing",
+    "bec": "Fraude Financiero BEC",
+    "impersonation": "Suplantación de Marca",
+    "threatScore": "Puntuación de Amenaza",
+    "confidence": "Confianza",
+    "quarantined": "En Cuarentena"
+  },
+  "quickAnalyze": {
+    "title": "Escaneo Forense Rápido",
+    "subtitle": "Suba un archivo RFC822 (.eml/.msg) para verificar la alineación criptográfica, URLs y adjuntos en menos de 3 clics",
+    "dropPrompt": "Arrastre y suelte su archivo .eml aquí o haga clic para examinar",
+    "scanButton": "Ejecutar Análisis Forense",
+    "scanning": "Ejecutando Pipeline Forense...",
+    "viewDossier": "Abrir Expediente Forense Completo",
+    "recommendation": "Acción Recomendada"
+  },
+  "evidence": {
+    "authAlignment": "Autenticación y Firmas",
+    "urlSecurity": "Análisis de Enlaces y URLs",
+    "attachmentAnalysis": "Seguridad de Adjuntos y Magic Bytes",
+    "geoTrace": "Geolocalización de Saltos",
+    "linguisticHeuristics": "Pistas Lingüísticas y de Urgencia",
+    "lookalikeDomain": "Detección de Dominios Similares",
+    "homoglyphDetected": "Suplantación Homoglífica Detectada",
+    "mismatchedHref": "Discrepancia entre Texto y Destino",
+    "safeHandling": "Manipulación Segura: Cifrado en Reposo (Nunca Ejecutado)",
+    "limitedLanguageNotice": "Nota: Este correo está en {{language}}. Detección heurística completa activa; modelos semánticos en nivel de soporte limitado."
+  },
+  "language": {
+    "switcher": "Idioma",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "refresh": "Actualizar",
+    "loading": "Cargando...",
+    "search": "Buscar...",
+    "filter": "Filtrar",
+    "export": "Exportar JSON",
+    "exportPdf": "Exportar Informe PDF",
+    "copy": "Copiar",
+    "copied": "¡Copiado!"
+  }
+}

@@ -805,9 +805,13 @@ export async function sendTestSlackAlert(
 export function getSlackStatus() {
   const cfg = getSlackConfig();
   return {
-    configured: Boolean(cfg.enabled && (cfg.webhookUrl || cfg.botToken)),
+    configured: Boolean(cfg.webhookUrl || cfg.botToken),
+    enabled: Boolean(cfg.autoSendAlerts),
     ...cfg
   };
 }
 
 export const testSlackNotification = sendTestSlackAlert;
+export const sendSlackNotification = async (params: any) => {
+  return dispatchSlackCaseAlert(params);
+};

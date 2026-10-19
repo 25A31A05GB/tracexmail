@@ -163,9 +163,8 @@ export function registerAuthRoutes(app: express.Express): void {
       userId: stored.userId,
       email: stored.userEmail,
       role: 'analyst',
-      organizationId: 'org_acme_soc_01',
-      authMethod: 'oauth2_code'
-    }, '1h');
+      organizationId: 'org_acme_soc_01'
+    });
 
     const refreshToken = `rtk_${crypto.randomBytes(32).toString('base64url')}`;
 

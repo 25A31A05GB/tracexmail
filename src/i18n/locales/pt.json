@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Defesa Forense TraceXMail",
+    "subtitle": "Plataforma automatizada de análise forense de e-mail, defesa contra quishing e inteligência de ameaças",
+    "statusConnected": "Conectado",
+    "statusOffline": "Desconectado",
+    "statusSecure": "Protegido",
+    "quickAnalyze": "Análise Rápida"
+  },
+  "nav": {
+    "dashboard": "Painel",
+    "ingestion": "Fluxo de Ingestão",
+    "cases": "Casos Forenses",
+    "alerts": "Alertas de Ameaça",
+    "campaigns": "Campanhas de Ataque",
+    "map": "Mapa de Geolocalização",
+    "graph": "Grafo de Relações",
+    "quarantine": "Cofre de Quarentena",
+    "organization": "Organização",
+    "settings": "Configurações",
+    "docs": "Documentação"
+  },
+  "verdict": {
+    "clean": "Limpo",
+    "suspicious": "Suspeito",
+    "malicious": "Malicioso",
+    "phishing": "Phishing",
+    "bec": "Fraude de Transferência (BEC)",
+    "impersonation": "Impersonação de Marca",
+    "threatScore": "Pontuação de Ameaça",
+    "confidence": "Confiança",
+    "quarantined": "Em Quarentena"
+  },
+  "quickAnalyze": {
+    "title": "Verificação Forense Instantânea",
+    "subtitle": "Envie um arquivo RFC822 (.eml/.msg) para verificar alinhamento criptográfico, URLs e anexos em menos de 3 cliques",
+    "dropPrompt": "Arraste e solte seu arquivo .eml aqui ou clique para selecionar",
+    "scanButton": "Executar Análise Forense",
+    "scanning": "Executando Pipeline Forense...",
+    "viewDossier": "Abrir Dossiê Forense Completo",
+    "recommendation": "Ação Recomendada"
+  },
+  "evidence": {
+    "authAlignment": "Autenticação e Assinaturas",
+    "urlSecurity": "Análise de Links e URLs",
+    "attachmentAnalysis": "Segurança de Anexos e Magic Bytes",
+    "geoTrace": "Geolocalização de Saltos",
+    "linguisticHeuristics": "Pistas Linguísticas e de Urgência",
+    "lookalikeDomain": "Detecção de Domínios Semelhantes",
+    "homoglyphDetected": "Falsificação por Homóglifos Detectada",
+    "mismatchedHref": "Incompatibilidade entre Texto e Destino",
+    "safeHandling": "Manipulação Segura: Criptografado em Repouso (Nunca Executado)",
+    "limitedLanguageNotice": "Nota: Este e-mail está em {{language}}. Detecção heurística completa ativa; embeddings semânticos operando em nível de suporte limitado."
+  },
+  "language": {
+    "switcher": "Idioma",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "confirm": "Confirmar",
+    "refresh": "Atualizar",
+    "loading": "Carregando...",
+    "search": "Buscar...",
+    "filter": "Filtrar",
+    "export": "Exportar JSON",
+    "exportPdf": "Exportar Relatório PDF",
+    "copy": "Copiar",
+    "copied": "Copiado!"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "منظومة تريس إكس ميل للأدلة الجنائية",
+    "subtitle": "منصة آلية للأدلة الجنائية للبريد الإلكتروني، والدفاع ضد التصيد الاحتيالي، واستخبارات التهديدات",
+    "statusConnected": "متصل",
+    "statusOffline": "غير متصل",
+    "statusSecure": "آمن ومحمي",
+    "quickAnalyze": "تحليل سريع"
+  },
+  "nav": {
+    "dashboard": "لوحة المعلومات",
+    "ingestion": "مسار التدفق والالتقاط",
+    "cases": "القضايا الجنائية",
+    "alerts": "تنبيهات التهديدات",
+    "campaigns": "حملات الهجوم المنظمة",
+    "map": "خريطة التوزيع الجغرافي",
+    "graph": "مخطط العلاقات والروابط",
+    "quarantine": "خزينة الحجر الصحي",
+    "organization": "المؤسسة",
+    "settings": "الإعدادات",
+    "docs": "التوثيق الفني"
+  },
+  "verdict": {
+    "clean": "سليم وآمن",
+    "suspicious": "مشبوه",
+    "malicious": "خبيث وخطير",
+    "phishing": "تصيد احتيالي",
+    "bec": "احتيال تحويلات مالية (BEC)",
+    "impersonation": "انتحال هوية علامة تجارية",
+    "threatScore": "مؤشر التهديد",
+    "confidence": "نسبة الثقة",
+    "quarantined": "تم حجزه أمنياً"
+  },
+  "quickAnalyze": {
+    "title": "فحص جنائي فوري للرسائل",
+    "subtitle": "ارفع ملف RFC822 (.eml/.msg) للتحقق من التوقيعات الرقمية، الروابط، والمرفقات في أقل من 3 نقرات",
+    "dropPrompt": "اسحب وأفلت ملف .eml هنا أو انقر للاختيار",
+    "scanButton": "بدء الفحص الجنائي",
+    "scanning": "جاري تشغيل محرك الفحص الجنائي...",
+    "viewDossier": "فتح الملف الجنائي المفصل",
+    "recommendation": "الإجراء الموصى به"
+  },
+  "evidence": {
+    "authAlignment": "المصادقة والتوقيعات الرقمية",
+    "urlSecurity": "تحليل الروابط والعناوين",
+    "attachmentAnalysis": "أمان المرفقات والبايتات السحرية",
+    "geoTrace": "التتبع الجغرافي لخوادم الترحيل",
+    "linguisticHeuristics": "القرائن اللغوية ومؤشرات الإلحاح",
+    "lookalikeDomain": "اكتشاف النطاقات المتشابهة والمزيفة",
+    "homoglyphDetected": "اكتشاف احتيال باستخدام أحرف متطابقة شكلاً (Homoglyphs)",
+    "mismatchedHref": "عدم تطابق النص المعروض مع الوجهة الحقيقية",
+    "safeHandling": "التعامل الآمن: مشفر في حالة السكون (لا يتم تنفيذه إطلاقاً)",
+    "limitedLanguageNotice": "ملاحظة: هذا البريد باللغة {{language}}. الكشف الاستدلالي كامل النشاط؛ نماذج التضمين الدلالي تعمل في مستوى دعم محدود."
+  },
+  "language": {
+    "switcher": "اللغة",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "confirm": "تأكيد",
+    "refresh": "تحديث",
+    "loading": "جاري التحميل...",
+    "search": "بحث...",
+    "filter": "تصفية",
+    "export": "تصدير JSON",
+    "exportPdf": "تصدير تقرير PDF",
+    "copy": "نسخ",
+    "copied": "تم النسخ!"
+  }
+}

@@ -938,7 +938,7 @@ export async function parseRawEmailToAnalysis(
     date,
     timestamp: new Date().toISOString(),
     threatScore,
-    threatCategory: alertSeverity,
+    threatCategory: alertSeverity === 'CRITICAL' ? 'CRITICAL' : alertSeverity === 'HIGH' ? 'MALICIOUS' : alertSeverity === 'MEDIUM' ? 'SUSPICIOUS' : 'CLEAN',
     verdict,
     deliveryStage: deliveryStage as any,
     actionTaken: quarantineOutcome.actionTaken,

@@ -455,3 +455,18 @@ export function getPersistedCase(caseId: string, orgId?: string): PersistedCase 
   }
   return c;
 }
+
+export const getCaseById = getPersistedCase;
+export const getAllCases = getPersistedCases;
+
+export function updateCase(caseId: string, updates: Partial<PersistedCase>): PersistedCase | undefined {
+  const existing = getPersistedCase(caseId);
+  if (!existing) return undefined;
+  const updated: PersistedCase = {
+    ...existing,
+    ...updates,
+    updated_at: new Date().toISOString()
+  };
+  upsertPersistedCase(updated);
+  return updated;
+}

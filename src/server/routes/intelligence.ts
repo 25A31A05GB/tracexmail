@@ -221,7 +221,10 @@ export function registerIntelligenceRoutes(app: express.Express): void {
 
   app.post('/api/virustotal/enrich', authenticatedLimiter, async (req: Request, res: Response) => {
     const { urls, hashes } = req.body || {};
-    const result = await enrichWithVirusTotal({ urls, hashes });
+    const attachments = Array.isArray(hashes)
+      ? hashes.map((h: string) => ({ hash: h, filename: 'file' }))
+      : undefined;
+    const result = await enrichWithVirusTotal({ urls, attachments });
     res.json(result);
   });
 

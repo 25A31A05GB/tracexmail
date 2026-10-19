@@ -1,0 +1,44 @@
+{
+  "language": "pt",
+  "urgency": [
+    "urgente",
+    "imediatamente",
+    "dentro de 24 horas",
+    "conta suspensa",
+    "ação imediata necessária",
+    "aviso final",
+    "alerta de segurança",
+    "não demore"
+  ],
+  "financial": [
+    "transferência bancária",
+    "fatura",
+    "pagamento",
+    "conta bancária",
+    "pix",
+    "folha de pagamento",
+    "criptomoeda",
+    "atualização de conta"
+  ],
+  "authority": [
+    "diretor executivo",
+    "presidente",
+    "suporte de ti",
+    "equipe de segurança",
+    "departamento financeiro",
+    "oficial de conformidade"
+  ],
+  "credentials": [
+    "redefinir senha",
+    "verificar conta",
+    "código de segurança",
+    "tentativa de login",
+    "confirmar identidade"
+  ],
+  "threatIndicators": [
+    "manter confidencial",
+    "não me ligue",
+    "instruções de transferência atualizadas",
+    "processe com urgência"
+  ]
+}

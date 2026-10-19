@@ -474,3 +474,6 @@ export function verifyStartupKeys(): { valid: boolean; errors: string[] } {
     errors
   };
 }
+
+export const encryptSecret = encrypt;
+export const decryptSecret = decrypt;

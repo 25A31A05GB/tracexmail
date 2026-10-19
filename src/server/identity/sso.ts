@@ -65,7 +65,7 @@ export async function provisionSsoUser(params: {
   orgId: string;
   groups?: string[];
 }): Promise<{ userId: string; role: 'admin' | 'analyst' | 'read_only'; orgId: string }> {
-  const { resolveUserProfile, saveUserProfile } = await import('../userProfileStore');
+  const { getStoredProfile, saveUserProfile } = await import('../userProfileStore');
 
   let role: 'admin' | 'analyst' | 'read_only' = 'analyst';
   const config = getOrgSsoConfig(params.orgId);
@@ -83,16 +83,14 @@ export async function provisionSsoUser(params: {
     }
   }
 
-  const existing = await resolveUserProfile(params.email);
+  const existing = getStoredProfile(params.email);
   const userId = existing?.id || `usr_sso_${crypto.randomBytes(8).toString('hex')}`;
 
   await saveUserProfile(params.email, {
     id: userId,
-    email: params.email.toLowerCase(),
-    name: params.name || existing?.name || params.email.split('@')[0],
+    name: params.name || existing?.fullName || params.email.split('@')[0],
     organizationId: params.orgId,
-    role,
-    authMethod: 'sso'
+    role
   });
 
   logger.info({ userId, email: params.email, orgId: params.orgId, role }, 'JIT provisioned/synced SSO user');

@@ -309,6 +309,7 @@ export interface RetentionCleanupParams {
   caller_user_id?: string;
   caller_email?: string;
   caller_role?: string;
+  dry_run?: boolean;
   supabase?: SupabaseClient | null;
   runtimeCaches?: {
     casesStore?: any[];
@@ -1081,4 +1082,17 @@ export function maskCasePii(caseItem: any, config?: PrivacyConfig): any {
   }
 
   return copy;
+}
+
+export async function purgeExpiredEvidence(
+  organizationId: string = 'org-default',
+  olderThanDays: number = 90,
+  dryRun: boolean = false
+) {
+  return runRetentionCleanup({
+    organization_id: organizationId,
+    retention_days: olderThanDays,
+    mode: 'purge',
+    dry_run: dryRun
+  });
 }

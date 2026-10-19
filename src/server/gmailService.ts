@@ -13,6 +13,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { EventEmitter } from 'events';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 import { encryptToken, decryptToken } from './compliance';
@@ -339,6 +340,22 @@ export function setGmailUserEmail(email: string) {
  */
 export function getGmailAccessToken(): string | null {
   return state.accessToken;
+}
+
+export function getGmailService() {
+  return {
+    fetchRawMessage: (messageId: string) => fetchGmailMessageRaw(messageId),
+    getStatus: (userEmail?: string) => getGmailStatus(userEmail),
+    quarantineMessage: async (messageId: string) => {
+      return processInboundQuarantineGate({
+        messageId,
+        from: 'security@tracexmail.sec',
+        subject: `Quarantined Message (${messageId})`,
+        threatScore: 90,
+        verdict: 'MALICIOUS'
+      });
+    }
+  };
 }
 
 export function getGmailStatus(userEmail?: string) {
@@ -2972,7 +2989,7 @@ export async function releaseQuarantinedMessage(
     const quarantineLabelId = await ensureGmailLabel('TraceXMail-Quarantine', token).catch(() => null);
     const removeLabelIds = quarantineLabelId ? [quarantineLabelId] : [];
     try {
-      await modifyGmailMessageLabels(token, messageId, ['INBOX'], removeLabelIds);
+      await modifyGmailMessageLabels(messageId, ['INBOX'], removeLabelIds, token);
     } catch (err: any) {
       console.warn('[GmailService] Release label modification notice:', err?.message || err);
     }

@@ -1,0 +1,88 @@
+{
+  "version": "1.0.0",
+  "plans": {
+    "free": {
+      "id": "free",
+      "name": "Community Tier",
+      "priceMonthlyUsd": 0,
+      "priceYearlyUsd": 0,
+      "limits": {
+        "analysesPerMonth": 50,
+        "connectedMailboxes": 0,
+        "seats": 1,
+        "retentionDays": 7,
+        "ssoEnabled": false,
+        "scimEnabled": false,
+        "apiAccess": false,
+        "enrichmentProviders": ["maxmind", "abuseipdb_basic"],
+        "llmAnalysisEnabled": true,
+        "monthlyCostBudgetUsd": 5
+      },
+      "features": [
+        "50 Forensic analyses / month",
+        "7-day data retention",
+        "Community threat feed updates",
+        "Single analyst seat",
+        "Standard RFC822 parser & heuristics"
+      ]
+    },
+    "team": {
+      "id": "team",
+      "name": "SOC Pro Team",
+      "priceMonthlyUsd": 199,
+      "priceYearlyUsd": 1990,
+      "stripePriceIdMonthly": "price_team_monthly_live",
+      "stripePriceIdYearly": "price_team_yearly_live",
+      "limits": {
+        "analysesPerMonth": 2500,
+        "connectedMailboxes": 5,
+        "seats": 5,
+        "retentionDays": 90,
+        "ssoEnabled": true,
+        "scimEnabled": false,
+        "apiAccess": true,
+        "enrichmentProviders": ["maxmind", "abuseipdb", "virustotal", "otx"],
+        "llmAnalysisEnabled": true,
+        "monthlyCostBudgetUsd": 100
+      },
+      "features": [
+        "2,500 Forensic analyses / month",
+        "5 Live connected Google Workspace & M365 mailboxes",
+        "5 Analyst seats with RBAC",
+        "90-day retention & encrypted evidence vault",
+        "SAML 2.0 / OIDC Single Sign-On",
+        "Full REST API /v1 access & outbound webhooks",
+        "Automated quarantine isolation"
+      ]
+    },
+    "enterprise": {
+      "id": "enterprise",
+      "name": "Enterprise Shield",
+      "priceMonthlyUsd": 999,
+      "priceYearlyUsd": 9990,
+      "stripePriceIdMonthly": "price_enterprise_monthly_live",
+      "stripePriceIdYearly": "price_enterprise_yearly_live",
+      "limits": {
+        "analysesPerMonth": 50000,
+        "connectedMailboxes": 100,
+        "seats": 50,
+        "retentionDays": 365,
+        "ssoEnabled": true,
+        "scimEnabled": true,
+        "apiAccess": true,
+        "enrichmentProviders": ["maxmind", "abuseipdb", "virustotal", "otx", "rdap", "sandbox_detonation"],
+        "llmAnalysisEnabled": true,
+        "monthlyCostBudgetUsd": 1000
+      },
+      "features": [
+        "50,000 Forensic analyses / month",
+        "100 Connected mailboxes across Google Workspace & Exchange",
+        "SCIM 2.0 automated identity provisioning & de-provisioning",
+        "1-year retention with legal hold capabilities",
+        "Dedicated tenant data residency routing (US, EU, IN)",
+        "SIEM / SOAR streaming (Splunk HEC, Microsoft Sentinel, Elastic)",
+        "Zero-retention private LLM execution guarantees"
+      ]
+    }
+  }
+}

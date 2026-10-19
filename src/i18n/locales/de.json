@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "TraceXMail Forensische Abwehr",
+    "subtitle": "Automatisierte E-Mail-Forensik, Quishing-Schutz & Bedrohungsanalyse-Plattform",
+    "statusConnected": "Verbunden",
+    "statusOffline": "Offline",
+    "statusSecure": "Geschützt",
+    "quickAnalyze": "Schnellanalyse"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "ingestion": "Ingestion-Pipeline",
+    "cases": "Forensische Fälle",
+    "alerts": "Bedrohungsmeldungen",
+    "campaigns": "Angriffskampagnen",
+    "map": "Relay-Standortkarte",
+    "graph": "Beziehungsgraph",
+    "quarantine": "Quarantäne-Tresor",
+    "organization": "Organisation",
+    "settings": "Einstellungen",
+    "docs": "Dokumentation"
+  },
+  "verdict": {
+    "clean": "Sauber",
+    "suspicious": "Verdächtig",
+    "malicious": "Bösartig",
+    "phishing": "Phishing",
+    "bec": "BEC-Überweisungsbetrug",
+    "impersonation": "Marken-Nachahmung",
+    "threatScore": "Bedrohungswert",
+    "confidence": "Konfidenz",
+    "quarantined": "In Quarantäne"
+  },
+  "quickAnalyze": {
+    "title": "Sofortige Forensik-Prüfung",
+    "subtitle": "Laden Sie eine RFC822 (.eml/.msg) Datei hoch, um kryptografische Signaturen, Links und Anhänge in unter 3 Klicks zu überprüfen",
+    "dropPrompt": "Ziehen Sie Ihre .eml-Datei hierher oder klicken Sie zum Auswählen",
+    "scanButton": "Forensik-Scan Starten",
+    "scanning": "Führe Forensik-Pipeline aus...",
+    "viewDossier": "Vollständiges Dossier Öffnen",
+    "recommendation": "Empfohlene Maßnahme"
+  },
+  "evidence": {
+    "authAlignment": "Authentifizierung & Signaturen",
+    "urlSecurity": "URL- und Link-Analyse",
+    "attachmentAnalysis": "Dateianhänge & Magic Bytes",
+    "geoTrace": "Relay-Hop-Geolokalisierung",
+    "linguisticHeuristics": "Sprachliche & Dringlichkeits-Hinweise",
+    "lookalikeDomain": "Erkennung Ähnlicher Domains",
+    "homoglyphDetected": "Homoglyphen-Spoofing Erkannt",
+    "mismatchedHref": "Diskrepanz zwischen Text und Ziel",
+    "safeHandling": "Sichere Handhabung: Verschlüsselt Gespeichert (Nie Ausgeführt)",
+    "limitedLanguageNotice": "Hinweis: Diese E-Mail ist auf {{language}}. Vollständige heuristische Erkennung aktiv; semantische Embeddings in Stufe mit eingeschränkter Unterstützung."
+  },
+  "language": {
+    "switcher": "Sprache",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "confirm": "Bestätigen",
+    "refresh": "Aktualisieren",
+    "loading": "Lädt...",
+    "search": "Suchen...",
+    "filter": "Filtern",
+    "export": "JSON Exportieren",
+    "exportPdf": "PDF-Bericht Exportieren",
+    "copy": "Kopieren",
+    "copied": "Kopiert!"
+  }
+}

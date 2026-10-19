@@ -389,3 +389,18 @@ export async function deleteResetToken(token: string): Promise<void> {
     console.warn('[AuthTokenStore] Failed deleting reset token from Supabase:', err?.message);
   }
 }
+
+export interface StoredTokens {
+  access_token?: string;
+  refresh_token?: string;
+}
+
+let storedTokensMemory: StoredTokens | null = null;
+
+export async function getStoredTokens(): Promise<StoredTokens | null> {
+  return storedTokensMemory;
+}
+
+export async function saveTokens(tokens: StoredTokens): Promise<void> {
+  storedTokensMemory = tokens;
+}

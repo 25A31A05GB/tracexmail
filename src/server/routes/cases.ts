@@ -489,10 +489,10 @@ export function registerCasesRoutes(app: express.Express): void {
     upsertPersistedCase(updatedCase);
 
     const corr = correlateCaseWithCases(updatedCase, allCases);
-    updatedCase.suggested_members = corr.suggestedMembers;
-    updatedCase.correlation_evidence = corr.correlationEvidence;
-    updatedCase.correlation_count = corr.correlatedCases.length;
-    upsertPersistedCase(updatedCase);
+    (updatedCase as any).suggested_members = corr.suggestedMembers;
+    (updatedCase as any).correlation_evidence = corr.correlationEvidence;
+    (updatedCase as any).correlation_count = corr.correlatedCases.length;
+    upsertPersistedCase(updatedCase as any);
 
     broadcastWebSocketEvent({
       type: 'CASE_MEMBERS_ADDED',
@@ -785,7 +785,13 @@ export function registerCasesRoutes(app: express.Express): void {
     if (!name || !quote) {
       return res.status(400).json({ error: 'Name and quote are required' });
     }
-    const created = addTestimonial({ name, role, organization, quote, rating });
+    const created = addTestimonial({
+      name,
+      role: role || 'Security Analyst',
+      organization,
+      feedback: quote,
+      rating: Number(rating) || 5
+    });
     res.status(201).json(created);
   });
 

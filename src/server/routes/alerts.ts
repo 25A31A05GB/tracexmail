@@ -151,9 +151,12 @@ export function registerAlertsRoutes(app: express.Express): void {
     const targetEmail = req.body?.recipient || 'security-test@tracexmail.sec';
     try {
       const sent = await sendEmailAlert({
-        to: targetEmail,
+        recipient: targetEmail,
+        sender: 'alerts@tracexmail.sec',
+        verdict: 'TEST',
+        threatScore: 0,
         subject: '[TEST] TraceXMail Security Alert Dispatcher',
-        text: 'This is a test security alert confirming proper SMTP configuration.'
+        summary: 'This is a test security alert confirming proper SMTP configuration.'
       });
       res.json({ status: sent ? 'sent' : 'failed', recipient: targetEmail });
     } catch (err: any) {

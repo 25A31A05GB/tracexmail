@@ -236,7 +236,7 @@ export function setupWebSocket(server: http.Server): WebSocketServer {
                     email: user.email || '',
                     role: (user.user_metadata?.role as any) || 'analyst',
                     organizationId: user.user_metadata?.organization_id || 'org_acme_soc_01',
-                    authMethod: 'supabase_jwt'
+                    authMethod: 'jwt'
                   };
                 }
               } catch {}

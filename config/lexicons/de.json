@@ -1,0 +1,45 @@
+{
+  "language": "de",
+  "urgency": [
+    "dringend",
+    "sofort",
+    "innerhalb von 24 stunden",
+    "konto gesperrt",
+    "sofortige maßnahme erforderlich",
+    "letzte mahnung",
+    "sicherheitswarnung",
+    "handlungsbedarf"
+  ],
+  "financial": [
+    "überweisung",
+    "rechnung",
+    "zahlung",
+    "bankkonto",
+    "iban",
+    "bic",
+    "gehaltsabrechnung",
+    "kryptowährung",
+    "überweisungsanweisung"
+  ],
+  "authority": [
+    "geschäftsführer",
+    "vorstand",
+    "it-support",
+    "sicherheitsteam",
+    "compliance-beauftragter",
+    "rechtsabteilung"
+  ],
+  "credentials": [
+    "passwort zurücksetzen",
+    "konto verifizieren",
+    "anmeldeversuch",
+    "sicherheitscode",
+    "identität bestätigen"
+  ],
+  "threatIndicators": [
+    "streng vertraulich",
+    "bitte nicht anrufen",
+    "geänderte bankverbindung",
+    "bitte unverzüglich ausführen"
+  ]
+}

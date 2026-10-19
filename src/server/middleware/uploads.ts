@@ -59,7 +59,7 @@ const multerInstance = multer({
 });
 
 // Explicitly typed multer middleware for array of email files
-export const uploadEmailFiles: RequestHandler = multerInstance.array('files', MAX_UPLOAD_FILE_COUNT);
+export const uploadEmailFiles: RequestHandler = multerInstance.array('files', MAX_UPLOAD_FILE_COUNT) as unknown as RequestHandler;
 
 // Middleware that validates uploaded buffers are plausible RFC 822 format
 export const postUploadRfc822Validator: RequestHandler = (req: Request, res: Response, next: NextFunction): void => {

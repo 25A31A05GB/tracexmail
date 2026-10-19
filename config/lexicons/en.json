@@ -1,0 +1,61 @@
+{
+  "language": "en",
+  "urgency": [
+    "urgent",
+    "immediately",
+    "within 24 hours",
+    "immediate action required",
+    "account suspended",
+    "suspended today",
+    "final notice",
+    "critical security alert",
+    "do not delay",
+    "time sensitive"
+  ],
+  "financial": [
+    "wire transfer",
+    "invoice",
+    "payment",
+    "bank account",
+    "routing number",
+    "swift code",
+    "remittance",
+    "cryptocurrency",
+    "bitcoin",
+    "direct deposit",
+    "payroll update",
+    "vendor settlement",
+    "funds transfer"
+  ],
+  "authority": [
+    "ceo",
+    "chief executive officer",
+    "executive director",
+    "board of directors",
+    "it support",
+    "security team",
+    "helpdesk",
+    "compliance officer",
+    "legal counsel",
+    "office of the president"
+  ],
+  "credentials": [
+    "password reset",
+    "verify account",
+    "verify identity",
+    "login attempt",
+    "security pin",
+    "2fa code",
+    "update credentials",
+    "confirm password",
+    "security question"
+  ],
+  "threatIndicators": [
+    "keep confidential",
+    "do not call me",
+    "out of office on a private call",
+    "updated wire instructions",
+    "process this right away",
+    "acquisition settlement"
+  ]
+}

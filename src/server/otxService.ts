@@ -350,3 +350,8 @@ export async function enrichCaseWithOtx(indicators: {
     }
   };
 }
+
+export async function queryOtxDirect(indicator: string, type: string = 'IPv4'): Promise<OtxIndicatorResult> {
+  return queryOtxIndicator(type, indicator);
+}
+

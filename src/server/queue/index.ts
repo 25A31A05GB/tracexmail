@@ -120,14 +120,15 @@ export function updateJobStatus(
 
   // Push progress event over WebSocket scoped to organization
   try {
-    broadcastWebSocketEvent(job.organizationId, 'job:progress', {
+    broadcastWebSocketEvent({
+      type: 'job:progress',
       jobId: job.id,
       queueName: job.queueName,
       status: job.status,
       progress: job.progress,
       result: job.result,
       error: job.error
-    });
+    }, job.organizationId);
   } catch {
     // Ignore WebSocket push errors
   }

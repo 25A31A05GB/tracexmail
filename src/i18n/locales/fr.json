@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "Défense Forensique TraceXMail",
+    "subtitle": "Plateforme automatisée d'investigation d'emails, de défense contre le quishing et de cyber-renseignement",
+    "statusConnected": "Connecté",
+    "statusOffline": "Hors-ligne",
+    "statusSecure": "Sécurisé",
+    "quickAnalyze": "Analyse Rapide"
+  },
+  "nav": {
+    "dashboard": "Tableau de Bord",
+    "ingestion": "Flux d'Ingestion",
+    "cases": "Dossiers Forensiques",
+    "alerts": "Alertes de Menace",
+    "campaigns": "Campagnes d'Attaque",
+    "map": "Carte Géographique des Relais",
+    "graph": "Graphe de Relations",
+    "quarantine": "Coffre de Quarantaine",
+    "organization": "Organisation",
+    "settings": "Paramètres",
+    "docs": "Documentation"
+  },
+  "verdict": {
+    "clean": "Sain",
+    "suspicious": "Suspect",
+    "malicious": "Malveillant",
+    "phishing": "Hameçonnage (Phishing)",
+    "bec": "Fraude au Virement (BEC)",
+    "impersonation": "Usurpation de Marque",
+    "threatScore": "Score de Menace",
+    "confidence": "Indice de Confiance",
+    "quarantined": "En Quarantaine"
+  },
+  "quickAnalyze": {
+    "title": "Analyse Forensique Instantanée",
+    "subtitle": "Téléversez un fichier RFC822 (.eml/.msg) pour vérifier l'alignement cryptographique, les URLs et les pièces jointes en moins de 3 clics",
+    "dropPrompt": "Glissez-déposez votre fichier .eml ici ou cliquez pour parcourir",
+    "scanButton": "Lancer l'Analyse Forensique",
+    "scanning": "Exécution du Pipeline Forensique...",
+    "viewDossier": "Ouvrir le Dossier Forensique Complet",
+    "recommendation": "Action Recommandée"
+  },
+  "evidence": {
+    "authAlignment": "Authentification et Signatures",
+    "urlSecurity": "Analyse des Liens et URLs",
+    "attachmentAnalysis": "Sécurité des Pièces Jointes & Magic Bytes",
+    "geoTrace": "Géolocalisation des Relais",
+    "linguisticHeuristics": "Indices Linguistiques et d'Urgence",
+    "lookalikeDomain": "Détection de Domaines Sosies",
+    "homoglyphDetected": "Usurpation par Homoglyphes Détectée",
+    "mismatchedHref": "Discordance entre Texte et Destination",
+    "safeHandling": "Manipulation Sécurisée : Chiffré au Repos (Jamais Exécuté)",
+    "limitedLanguageNotice": "Note : Cet email est rédigé en {{language}}. Détection heuristique complète active ; modèles sémantiques en niveau de support limité."
+  },
+  "language": {
+    "switcher": "Langue",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "confirm": "Confirmer",
+    "refresh": "Actualiser",
+    "loading": "Chargement...",
+    "search": "Rechercher...",
+    "filter": "Filtrer",
+    "export": "Exporter JSON",
+    "exportPdf": "Exporter Rapport PDF",
+    "copy": "Copier",
+    "copied": "Copié !"
+  }
+}

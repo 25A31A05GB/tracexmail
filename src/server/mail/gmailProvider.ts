@@ -53,10 +53,13 @@ export class GmailProvider implements MailProvider {
     try {
       const res = await processInboundQuarantineGate({
         messageId: id,
-        organizationId: this.orgId
+        from: 'security@tracexmail.sec',
+        subject: `Quarantined Message (${id})`,
+        threatScore: 90,
+        verdict: 'MALICIOUS'
       });
       return {
-        success: Boolean(res.quarantined),
+        success: Boolean(res.isQuarantined),
         quarantineId: id,
         originalFolderId: 'INBOX'
       };
@@ -88,9 +91,9 @@ export class GmailProvider implements MailProvider {
   async healthCheck(): Promise<ProviderHealth> {
     const st = getGmailStatus();
     return {
-      ok: st.isConnected,
+      ok: Boolean(st.is_connected),
       latencyMs: 30,
-      reconnectRequired: !st.isConnected
+      reconnectRequired: !st.is_connected
     };
   }
 
@@ -98,13 +101,13 @@ export class GmailProvider implements MailProvider {
     const st = getGmailStatus();
     return {
       name: 'gmail',
-      isConnected: st.isConnected,
-      emailAddress: st.emailAddress,
-      reconnectRequired: !st.isConnected,
-      expiresAt: st.tokenExpiresAt,
-      lastSyncAt: st.lastPolledAt,
-      quarantineEnabled: (st as any).quarantine?.enabled ?? false,
-      watchActive: (st as any).watch?.active ?? false
+      isConnected: Boolean(st.is_connected),
+      emailAddress: st.email_address || undefined,
+      reconnectRequired: !st.is_connected,
+      expiresAt: st.oauth_scopes?.token_expires_at || undefined,
+      lastSyncAt: st.last_polled_at || undefined,
+      quarantineEnabled: st.quarantine?.enabled ?? false,
+      watchActive: st.watch?.active ?? false
     };
   }
 }

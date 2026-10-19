@@ -1,0 +1,79 @@
+{
+  "app": {
+    "title": "TraceXMail Forensic Defense",
+    "subtitle": "Automated Email Forensics, Quishing Defense & Threat Intelligence Platform",
+    "statusConnected": "Connected",
+    "statusOffline": "Offline",
+    "statusSecure": "Secured",
+    "quickAnalyze": "Quick Analyze"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "ingestion": "Ingestion Pipeline",
+    "cases": "Forensic Cases",
+    "alerts": "Threat Alerts",
+    "campaigns": "Attack Campaigns",
+    "map": "Relay Geolocation Map",
+    "graph": "Relationship Graph",
+    "quarantine": "Quarantine Vault",
+    "organization": "Organization",
+    "settings": "Settings",
+    "docs": "Documentation"
+  },
+  "verdict": {
+    "clean": "Clean",
+    "suspicious": "Suspicious",
+    "malicious": "Malicious",
+    "phishing": "Phishing",
+    "bec": "BEC Wire Fraud",
+    "impersonation": "Brand Impersonation",
+    "threatScore": "Threat Score",
+    "confidence": "Confidence",
+    "quarantined": "Quarantined"
+  },
+  "quickAnalyze": {
+    "title": "Instant Email Forensic Scan",
+    "subtitle": "Upload an RFC822 (.eml/.msg) file to verify cryptographic alignment, URLs, and attachment safety in under 3 clicks",
+    "dropPrompt": "Drag & drop your .eml or raw message here, or click to browse",
+    "scanButton": "Execute Forensic Scan",
+    "scanning": "Running Forensic Pipeline...",
+    "viewDossier": "Open Deep Forensic Dossier",
+    "recommendation": "Recommended Action"
+  },
+  "evidence": {
+    "authAlignment": "Authentication & Signatures",
+    "urlSecurity": "URL & Link Analysis",
+    "attachmentAnalysis": "Attachment Safety & Magic Bytes",
+    "geoTrace": "Relay Hop Geolocation",
+    "linguisticHeuristics": "Linguistic & Urgency Cues",
+    "lookalikeDomain": "Lookalike Domain Detection",
+    "homoglyphDetected": "Homoglyphic Spoofing Detected",
+    "mismatchedHref": "Display vs Destination Mismatch",
+    "safeHandling": "Safe-Handling: Encrypted at Rest (Never Executed)",
+    "limitedLanguageNotice": "Note: This email is in {{language}}. Full heuristic detection active; advanced semantic embeddings operating in limited support tier."
+  },
+  "language": {
+    "switcher": "Language",
+    "en": "English",
+    "hi": "Hindi (हिंदी)",
+    "es": "Spanish (Español)",
+    "fr": "French (Français)",
+    "de": "German (Deutsch)",
+    "pt": "Portuguese (Português)",
+    "ar": "Arabic (العربية)"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "search": "Search...",
+    "filter": "Filter",
+    "export": "Export JSON",
+    "exportPdf": "Export PDF Report",
+    "copy": "Copy",
+    "copied": "Copied!"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "language": "es",
+  "urgency": [
+    "urgente",
+    "inmediatamente",
+    "dentro de las 24 horas",
+    "cuenta suspendida",
+    "acción inmediata requerida",
+    "aviso final",
+    "alerta de seguridad",
+    "no demore"
+  ],
+  "financial": [
+    "transferencia bancaria",
+    "factura",
+    "pago",
+    "cuenta bancaria",
+    "número de ruta",
+    "remesa",
+    "criptomoneda",
+    "bitcoin",
+    "actualización de nómina",
+    "liquidación"
+  ],
+  "authority": [
+    "director ejecutivo",
+    "ceo",
+    "junta directiva",
+    "soporte técnico",
+    "equipo de seguridad",
+    "oficial de cumplimiento",
+    "asesor legal"
+  ],
+  "credentials": [
+    "restablecer contraseña",
+    "verificar cuenta",
+    "código de seguridad",
+    "intento de inicio de sesión",
+    "confirmar identidad",
+    "actualizar credenciales"
+  ],
+  "threatIndicators": [
+    "mantener confidencial",
+    "no me llame",
+    "instrucciones de transferencia bancaria actualizadas",
+    "procesar esto de inmediato"
+  ]
+}

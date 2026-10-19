@@ -1,0 +1,46 @@
+{
+  "language": "fr",
+  "urgency": [
+    "urgent",
+    "immédiatement",
+    "sous 24 heures",
+    "compte suspendu",
+    "action immédiate requise",
+    "dernier avis",
+    "alerte de sécurité",
+    "ne tardez pas"
+  ],
+  "financial": [
+    "virement bancaire",
+    "facture",
+    "paiement",
+    "compte bancaire",
+    "iban",
+    "bic",
+    "règlement",
+    "crypto-monnaie",
+    "bulletin de paie",
+    "mise à jour bancaire"
+  ],
+  "authority": [
+    "directeur général",
+    "président",
+    "conseil d'administration",
+    "support informatique",
+    "équipe de sécurité",
+    "responsable conformité"
+  ],
+  "credentials": [
+    "réinitialiser mot de passe",
+    "vérifier votre compte",
+    "tentative de connexion",
+    "code de sécurité",
+    "confirmer votre identité"
+  ],
+  "threatIndicators": [
+    "strictement confidentiel",
+    "ne m'appelez pas",
+    "nouvelles coordonnées bancaires",
+    "traiter immédiatement"
+  ]
+}

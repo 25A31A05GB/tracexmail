@@ -17,7 +17,7 @@ export const AnalyzeJobPayloadSchema = z.object({
   organizationId: z.string().default('default-org'),
   userId: z.string().optional(),
   clientIp: z.string().optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 });
 export type AnalyzeJobPayload = z.infer<typeof AnalyzeJobPayloadSchema>;
 
@@ -57,7 +57,7 @@ export const NotificationJobPayloadSchema = z.object({
   organizationId: z.string().default('default-org'),
   channel: z.enum(['slack', 'email', 'webhook']),
   recipient: z.string().optional(),
-  payload: z.record(z.any()),
+  payload: z.record(z.string(), z.any()),
   severity: z.string().optional()
 });
 export type NotificationJobPayload = z.infer<typeof NotificationJobPayloadSchema>;

@@ -390,6 +390,7 @@ export interface CreateOrgUserInput {
   password?: string;
   permissions?: Partial<OrgUserPermissions>;
   createdBy?: string;
+  sendNotification?: boolean;
 }
 
 export async function createOrgUser(input: CreateOrgUserInput): Promise<{ user: OrgUser; generatedPassword: string }> {

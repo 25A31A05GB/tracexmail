@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TraceXMail Report Phishing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #14120f; color: #ede6d8; margin: 0; padding: 16px; }
+    .card { background: #1a1712; border: 1px solid #3a352c; border-radius: 4px; padding: 16px; margin-bottom: 12px; }
+    h2 { font-size: 14px; margin-top: 0; color: #c9a227; }
+    button { background: #c9a227; color: #110f0c; border: none; font-weight: 600; padding: 10px 16px; border-radius: 3px; cursor: pointer; width: 100%; font-size: 13px; }
+    button:hover { background: #d8b030; }
+    .status { font-family: monospace; font-size: 11px; margin-top: 8px; color: #8a8070; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 2px; font-weight: bold; font-size: 11px; font-family: monospace; }
+    .badge-malicious { background: rgba(178,58,46,0.3); border: 1px solid #b23a2e; color: #ff6b6b; }
+    .badge-clean { background: rgba(46,178,100,0.3); border: 1px solid #2eb264; color: #51cf66; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>🛡️ TraceXMail Phishing Reporter</h2>
+    <p style="font-size: 12px; color: #c9bfae; line-height: 1.4;">
+      Suspicious of this message? Submit the raw RFC822 headers and attachments directly to your organization's SOC enclave.
+    </p>
+    <button id="reportBtn" onclick="submitCurrentEmail()">Report Suspicious Email</button>
+    <div id="status" class="status">Ready to analyze active item.</div>
+  </div>
+
+  <div id="resultCard" class="card" style="display: none;">
+    <h2>Forensic Verdict</h2>
+    <div id="verdictBadge"></div>
+    <p id="rationale" style="font-size: 12px; color: #ede6d8; margin-top: 8px;"></p>
+  </div>
+
+  <script>
+    async function submitCurrentEmail() {
+      const statusDiv = document.getElementById('status');
+      const btn = document.getElementById('reportBtn');
+      btn.disabled = true;
+      statusDiv.innerText = 'Extracting RFC822 envelope and headers...';
+
+      try {
+        // Office.js or browser integration hook
+        const rawEmail = window.Office?.context?.mailbox?.item ? 
+          await new Promise((resolve) => window.Office.context.mailbox.item.getAsFileAsync(resolve)) :
+          "From: CEO <spoof@suspicious.com>\\nSubject: Urgent Wire Request\\n\\nPlease pay invoice immediately.";
+
+        statusDiv.innerText = 'Submitting to TraceXMail Forensic Engine...';
+        const apiKey = localStorage.getItem('txm_api_key') || 'txm_live_placeholder';
+
+        const res = await fetch('/api/v1/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+          body: JSON.stringify({ raw_email: rawEmail, file_name: 'reported_message.eml' })
+        });
+
+        const data = await res.json();
+        const verdict = data.analysis || data;
+
+        document.getElementById('resultCard').style.display = 'block';
+        const isMalicious = verdict.threatScore >= 65;
+        document.getElementById('verdictBadge').innerHTML = 
+          \`<span class="badge \${isMalicious ? 'badge-malicious' : 'badge-clean'}">\${verdict.threatVerdict || 'PROCESSED'} (\${verdict.threatScore || 0}/100)</span>\`;
+        document.getElementById('rationale').innerText = verdict.why?.executive_summary || 'Analysis recorded. Security operations team notified.';
+        statusDiv.innerText = 'Email successfully reported to SOC!';
+      } catch (e) {
+        statusDiv.innerText = 'Submission error: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>

@@ -85,11 +85,17 @@ export function registerOrganizationRoutes(app: express.Express): void {
     requireRole(['admin']),
     async (req: Request, res: Response) => {
       const { id } = req.params;
-      const result = await resendOrgUserNotification(id);
-      if (!result.success) {
-        return res.status(400).json(result);
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      try {
+        const result = await resendOrgUserNotification(orgId, id);
+        if (!result.success) {
+          return res.status(400).json(result);
+        }
+        res.json(result);
+      } catch (err: any) {
+        res.status(400).json({ error: err.message || 'Failed to resend invite' });
       }
-      res.json(result);
     }
   );
 
@@ -101,11 +107,17 @@ export function registerOrganizationRoutes(app: express.Express): void {
     requireRole(['admin']),
     async (req: Request, res: Response) => {
       const { id } = req.params;
-      const updated = updateOrgUser(id, req.body);
-      if (!updated) {
-        return res.status(404).json({ error: 'User not found' });
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      try {
+        const updated = await updateOrgUser(orgId, id, req.body);
+        if (!updated) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        res.json(updated);
+      } catch (err: any) {
+        res.status(404).json({ error: err.message || 'User not found' });
       }
-      res.json(updated);
     }
   );
 
@@ -117,11 +129,17 @@ export function registerOrganizationRoutes(app: express.Express): void {
     requireRole(['admin']),
     async (req: Request, res: Response) => {
       const { id } = req.params;
-      const result = await resetOrgUserPassword(id);
-      if (!result.success) {
-        return res.status(404).json(result);
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      try {
+        const result = await resetOrgUserPassword(orgId, id);
+        if (!result || !result.user) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+        res.json({ success: true, ...result });
+      } catch (err: any) {
+        res.status(404).json({ error: err.message || 'User not found' });
       }
-      res.json(result);
     }
   );
 
@@ -133,7 +151,9 @@ export function registerOrganizationRoutes(app: express.Express): void {
     requireRole(['admin']),
     async (req: Request, res: Response) => {
       const { id } = req.params;
-      const deleted = deleteOrgUser(id);
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      const deleted = await deleteOrgUser(orgId, id);
       if (!deleted) {
         return res.status(404).json({ error: 'User not found' });
       }

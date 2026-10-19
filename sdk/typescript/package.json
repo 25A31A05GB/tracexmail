@@ -1,0 +1,13 @@
+{
+  "name": "@tracexmail/sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for TraceXMail Forensic Email Defense API",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": ["tracexmail", "email-forensics", "quishing", "threat-intel", "soc"],
+  "author": "TraceXMail Core Engineering Team",
+  "license": "Apache-2.0"
+}
