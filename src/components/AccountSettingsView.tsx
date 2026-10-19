@@ -30,8 +30,8 @@ import {
 import { supabase, isSupabaseConfigured, getIsSupabaseConfigured } from '../lib/supabase';
 import { UserRole, AccountType } from '../hooks/useSession';
 import { InactivityConfig, WorkspaceLockState } from '../types';
-import { Sparkles, Terminal, Activity } from 'lucide-react';
-import { ErrorButton } from './ErrorButton';
+import { Sparkles, Terminal, Activity, AlertOctagon, Send } from 'lucide-react';
+import * as Sentry from '@sentry/react';
 
 interface AccountSettingsViewProps {
   role: UserRole;
@@ -1284,13 +1284,83 @@ export function AccountSettingsView({
               </div>
 
               <div className="shrink-0">
-                <ErrorButton />
+                <SentryDiagnosticsTrigger />
               </div>
             </div>
           </div>
 
         </div>
       </div>
+    </div>
+  );
+}
+
+function SentryDiagnosticsTrigger() {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [lastMessage, setLastMessage] = useState<string | null>(null);
+
+  const handleSendSentryTest = () => {
+    setStatus('sending');
+    try {
+      const testError = new Error('TraceXMail Sentry Diagnostic Test: Exception verified successfully');
+      
+      Sentry.captureException(testError, {
+        level: 'info',
+        tags: {
+          diagnostic_test: 'true',
+          environment: (import.meta as any).env?.MODE || 'production',
+          source: 'AccountSettings_Diagnostic_Tool'
+        },
+        extra: {
+          timestamp: new Date().toISOString(),
+          platform: 'TraceXMail Email Forensics Enclave'
+        }
+      });
+
+      setStatus('sent');
+      setLastMessage('Test diagnostic event successfully dispatched to Sentry ingestion pipeline.');
+      setTimeout(() => {
+        setStatus('idle');
+        setLastMessage(null);
+      }, 4000);
+    } catch (err: any) {
+      console.error('[Sentry Test Exception]', err);
+      setStatus('idle');
+      setLastMessage('Failed to dispatch diagnostic to Sentry.');
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1.5">
+      <button
+        type="button"
+        onClick={handleSendSentryTest}
+        disabled={status === 'sending'}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[2px] bg-[rgba(178,58,46,0.15)] hover:bg-[rgba(178,58,46,0.25)] border border-[var(--thread)] text-[var(--rose-400)] text-xs font-mono font-medium transition-colors cursor-pointer disabled:opacity-50"
+        title="Send a verified test exception to Sentry without crashing the application"
+      >
+        {status === 'sent' ? (
+          <>
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-emerald-400">Captured in Sentry</span>
+          </>
+        ) : status === 'sending' ? (
+          <>
+            <Send className="w-3.5 h-3.5 animate-pulse" />
+            <span>Transmitting...</span>
+          </>
+        ) : (
+          <>
+            <AlertOctagon className="w-3.5 h-3.5" />
+            <span>Send Test Sentry Event</span>
+          </>
+        )}
+      </button>
+      {lastMessage && (
+        <span className="text-[10px] text-emerald-400 font-mono animate-fade-in">
+          {lastMessage}
+        </span>
+      )}
     </div>
   );
 }

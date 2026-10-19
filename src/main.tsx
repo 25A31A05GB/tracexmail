@@ -7,7 +7,16 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
 Sentry.init({
-  dsn: "https://9992e15f5960d46b12aafc1481677cfe@o4512227424534528.ingest.us.sentry.io/4512227431809024"
+  dsn: "https://9992e15f5960d46b12aafc1481677cfe@o4512227424534528.ingest.us.sentry.io/4512227431809024",
+  environment: import.meta.env.MODE || 'production',
+  release: (import.meta as any).env?.VITE_APP_VERSION || '2.5.0',
+  beforeSend(event) {
+    if (event.request?.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+    }
+    return event;
+  }
 });
 
 // Register Service Worker for offline forensics asset caching and instant updates in production

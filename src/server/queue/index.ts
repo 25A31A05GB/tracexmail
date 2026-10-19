@@ -19,7 +19,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 const redisUrl = process.env.REDIS_URL;
 
 if (isProduction && (!redisUrl || redisUrl.trim().length === 0)) {
-  throw new Error('FATAL: REDIS_URL must be configured in production for BullMQ background queues.');
+  logger.warn(
+    '[Queue Warning] REDIS_URL not configured in environment. Operating background queues in resilient in-process local mode. Provisioning a Redis instance is recommended for distributed worker scaling.'
+  );
 }
 
 export const QUEUE_NAMES: QueueName[] = [

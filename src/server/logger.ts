@@ -148,12 +148,29 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       ...(orgId ? { orgId } : {})
     };
 
+    const rawUrl = req.originalUrl || req.url;
+    // Skip dev server internal assets, HMR, and source module requests
+    const isDevAsset =
+      rawUrl.startsWith('/@') ||
+      rawUrl.startsWith('/src/') ||
+      rawUrl.startsWith('/node_modules/') ||
+      rawUrl.startsWith('/assets/') ||
+      rawUrl.endsWith('.tsx') ||
+      rawUrl.endsWith('.ts') ||
+      rawUrl.endsWith('.css') ||
+      rawUrl.endsWith('.js') ||
+      rawUrl.endsWith('.map');
+
+    if (isDevAsset && res.statusCode < 400) {
+      return;
+    }
+
     if (res.statusCode >= 500) {
-      logger.error(logPayload, `HTTP ${req.method} ${req.url} failed with ${res.statusCode}`);
+      logger.error(logPayload, `HTTP ${req.method} ${rawUrl} failed with ${res.statusCode}`);
     } else if (res.statusCode >= 400) {
-      logger.warn(logPayload, `HTTP ${req.method} ${req.url} client warning ${res.statusCode}`);
-    } else if (!req.url.startsWith('/api/health')) {
-      logger.info(logPayload, `HTTP ${req.method} ${req.url} completed ${res.statusCode}`);
+      logger.warn(logPayload, `HTTP ${req.method} ${rawUrl} client warning ${res.statusCode}`);
+    } else if (!rawUrl.startsWith('/api/health')) {
+      logger.info(logPayload, `HTTP ${req.method} ${rawUrl} completed ${res.statusCode}`);
     }
   });
 

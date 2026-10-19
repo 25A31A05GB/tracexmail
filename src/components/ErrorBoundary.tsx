@@ -86,6 +86,15 @@ export class ErrorBoundary extends React.Component<Props, State> {
     }
   }
 
+  private handleRetry = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      isChunkError: false
+    });
+  };
+
   private handleReload = () => {
     try {
       sessionStorage.removeItem('tracexmail_chunk_error_autoreload');
@@ -164,12 +173,22 @@ export class ErrorBoundary extends React.Component<Props, State> {
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
+                id="error-boundary-retry-btn"
+                type="button"
+                onClick={this.handleRetry}
+                className="py-2.5 px-4 rounded-[3px] bg-[#c9a227] hover:bg-[#d8b030] text-[#14120f] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Try Recovering View</span>
+              </button>
+
+              <button
                 id="error-boundary-reload-btn"
                 type="button"
                 onClick={this.handleReload}
-                className="flex-1 py-2.5 px-4 rounded-[3px] bg-[#c9a227] hover:bg-[#d8b030] text-[#14120f] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+                className="flex-1 py-2.5 px-4 rounded-[3px] bg-[#221e17] hover:bg-[#2b251d] border border-[#3a352c] text-[#ede6d8] text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5 text-[#c9a227]" />
                 <span>Reload Application</span>
               </button>
 
@@ -180,7 +199,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 className="py-2.5 px-4 rounded-[3px] bg-[#1a1712] hover:bg-[#242019] border border-[#3a352c] text-[#ede6d8] text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
               >
                 <Terminal className="w-3.5 h-3.5 text-[#8a8070]" />
-                <span>Reset Local Session &amp; Return</span>
+                <span>Reset &amp; Return</span>
               </button>
             </div>
           </div>
