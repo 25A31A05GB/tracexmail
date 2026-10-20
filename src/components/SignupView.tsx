@@ -5,6 +5,7 @@ import { GoogleAuthButton } from './GoogleAuthButton';
 import { TurnstileWidget } from './TurnstileWidget';
 import { Loader2, AlertCircle, ArrowLeft, CheckCircle2, Shield, Eye, EyeOff, User, Building2, MailCheck, Send, RefreshCw, Mail, ShieldCheck } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
+import { CheckInboxScreen } from './common/CheckInboxScreen';
 
 interface SignupViewProps {
   onBackToLogin: () => void;
@@ -43,7 +44,6 @@ export function SignupView({
   const [userExistsError, setUserExistsError] = useState<boolean>(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const [directVerifyUrl, setDirectVerifyUrl] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToLogin;
 
@@ -206,10 +206,6 @@ export function SignupView({
         throw new Error(mlData.error || 'Failed to dispatch verification email.');
       }
 
-      if (mlData.magicLinkUrl || mlData.debugLink) {
-        setDirectVerifyUrl(mlData.magicLinkUrl || mlData.debugLink);
-      }
-
       // Transition to email verification link confirmation
       setStep('verification-sent');
     } catch (err: any) {
@@ -339,70 +335,17 @@ export function SignupView({
       <div className="w-full max-w-[490px] bg-[var(--ink-2)] border border-[var(--line)] rounded-sm p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.6)] my-8 relative z-10">
         
         {step === 'verification-sent' ? (
-          <div className="space-y-4">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-2 shadow-sm">
-                <Mail className="w-7 h-7" />
-              </div>
-              <h2 className="font-display font-bold text-xl text-[var(--paper)]">
-                Verify Your Email Address
-              </h2>
-              <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
-                We sent a secure verification link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span>.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-2.5">
-              <div className="font-semibold text-[var(--paper)] flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
-                <span>One Click to Activate:</span>
-              </div>
-              <p className="text-[var(--paper-dim)] leading-relaxed text-[11.5px]">
-                Click the confirmation link inside the email to verify your email and unlock full access to your TraceXMail forensic workspace.
-              </p>
-            </div>
-
-            {resendStatus && (
-              <div className="p-3 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-[var(--paper)] text-xs flex items-start gap-2.5">
-                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[var(--forensic-green)]" />
-                <div className="leading-relaxed font-sans">{resendStatus}</div>
-              </div>
-            )}
-
-            {directVerifyUrl && (
-              <a
-                href={directVerifyUrl}
-                className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-2 text-center no-underline cursor-pointer shadow-md"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Activate & Access Forensic Workspace Now →</span>
-              </a>
-            )}
-
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleResendVerification}
-                disabled={resending}
-                className="w-full py-2.5 px-4 bg-[var(--ink-2)] border border-[var(--line)] hover:border-[var(--paper-dim)] text-[var(--paper)] font-semibold text-xs rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 text-[var(--slate)] ${resending ? 'animate-spin' : ''}`} />
-                <span>{resending ? 'Resending Link…' : 'Resend Verification Email'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onBackToLogin}
-                className="w-full py-2 px-3 text-xs text-[var(--stamp)] hover:underline flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
-              >
-                <span>Return to Sign In →</span>
-              </button>
-            </div>
-
-            <div className="pt-2 text-center text-[10.5px] text-[var(--paper-muted)] font-mono">
-              Didn't see it? Please check your Spam or Promotions folder.
-            </div>
-          </div>
+          <CheckInboxScreen
+            email={email}
+            title="Check your inbox"
+            description="We sent a verification link to your work email. Please verify your email before signing in."
+            onResend={handleResendVerification}
+            onChangeEmail={() => {
+              setStep('form');
+              setErrorMsg(null);
+            }}
+            onBackToLogin={onBackToLogin}
+          />
         ) : (
           <>
             <div className="flex items-center justify-between mb-4 border-b border-[var(--line)] pb-3">
@@ -628,7 +571,7 @@ export function SignupView({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
-                    Master Password *
+                    Password *
                   </label>
                   <span className="text-[10px] font-mono text-[var(--paper-dim)]">Min 12 characters</span>
                 </div>
@@ -641,7 +584,7 @@ export function SignupView({
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••••••"
                     className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
-                    aria-label="Master Password"
+                    aria-label="Password"
                   />
                   <button
                     type="button"

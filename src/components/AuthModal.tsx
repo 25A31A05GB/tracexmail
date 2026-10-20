@@ -257,7 +257,7 @@ export function AuthModal({ isOpen, onClose, currentUser = null, initialMode = '
                     Account Registration &amp; Access Dispatched
                   </h4>
                   <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
-                    Your request has been registered in the SOC enclave directory. A confirmation email and security clearance verification link have been dispatched to:
+                    Your account registration request has been received. A confirmation email and verification link have been sent to:
                   </p>
                   <div className="inline-block px-3 py-1 rounded bg-[#0c0a08] border border-[#3a352c] font-mono text-cyan-300 text-xs font-medium mt-1">
                     {email || 'your corporate email'}

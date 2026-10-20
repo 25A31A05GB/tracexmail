@@ -930,6 +930,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     }
   }
 
+  // 6. Unverified account cannot call the API
+  if ((user as any).emailVerified === false) {
+    return res.status(403).json({
+      error: 'Forbidden: Email verification required. Please verify your email address before calling API resources.',
+      code: 'EMAIL_NOT_VERIFIED'
+    });
+  }
+
   next();
 }
 

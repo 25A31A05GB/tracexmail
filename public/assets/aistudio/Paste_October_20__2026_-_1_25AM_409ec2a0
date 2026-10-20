@@ -1,0 +1,238 @@
+You are my senior front-end engineer. I will give you a prompt pack with numbered steps (A, 1 to 17, B, C). Work through them strictly in the run order in the document. For each step: (1) restate the goal in two lines, (2) list the files you will change, (3) implement, (4) run lint, typecheck and tests, (5) report files changed or deleted and anything left undone, then STOP and wait for me to reply 'continue'. Never skip ahead, never combine steps, never change backend behavior unless the step says so. If a step is too large for one response, split it by tab or section and tell me the split.
+Prompt 0: Engineering rules (applies to every step)
+You are working on TraceXMail, an Express + TypeScript + React 19 + Vite email forensics platform. Backend entry is server.ts (about 8,500 lines); auth middleware (authenticateUser, requireAuth, requireRole) is in src/server/compliance.ts; UI is in src/components.
+
+Rules for every step:
+- Make the smallest correct change that fully implements the step. Do not rewrite unrelated code or rename public API routes unless told to.
+- Never weaken existing security checks. Production behavior (NODE_ENV=production) must be strict.
+- Add or update tests for every change. For security fixes include a test that tries to exploit the original bug and asserts it fails.
+- npm run lint (tsc --noEmit) and npm run test:unit must pass.
+- Never invent numbers. Any metric shown in code, docs or UI must come from real data or a generated report.
+- At the end, list every file you changed or deleted and anything you could not do.
+Design Prompt D: Design rules (applies to every UI step)
+You are redesigning TraceXMail into a premium, international enterprise security product. Keep the existing dark warm theme and palette; do not introduce new colors or fonts.
+
+Tokens (create once in src/design-system/tokens, expose via the Tailwind theme and CSS variables, use ONLY these in components):
+- Surfaces: page #100e0c, section #14110d, card #171410. Border #3a352c. Text #ede6d8, muted #8a8070, secondary #94a3b8. Accent gold #c9a227.
+- Semantic colors already in use: green = verified, amber = anomaly, red = alert, violet = destination, teal = intelligence; each with solid, subtle-background and border variants.
+- Gold appears only on the primary button, the active nav item, and at most one highlight per screen.
+- One serif (Source Serif 4) for headings, the existing sans for body, the existing mono only for technical values (IPs, hashes, headers). Add Noto fallbacks for non-Latin scripts. Type scale 12/14/16/20/28/40; tabular numerals for all metrics.
+- 4px base spacing with an 8px rhythm; radii 6/10/14; separate with 1px borders, two elevation levels only, no glow effects except a single anomaly highlight.
+- Motion 150/250/400ms, one easing curve, honor prefers-reduced-motion, no looping animation.
+- Lucide icons at 16/20px.
+
+Rules:
+1. No hard-coded colors, font sizes or arbitrary pixel values in components; use tokens, primitives and patterns only.
+2. Answer first, then evidence, then detail, then raw data. One idea per section, one primary action per view, at most 4 metrics per row.
+3. One home per fact: never show the same data in two places; link to the single source.
+4. Every number has a label and, where it could be misread, a short 'what this means' line. Unknown values read 'Not available' with the reason, never 0 or a guess.
+5. Every screen has loading (skeleton), empty, error and partial-data states, works at 360/768/1280/1920px, is keyboard operable, meets WCAG 2.2 AA, and has no layout shift.
+6. All user-facing strings go in locale files (react-i18next); short plain language, no jargon like enclave, kinetic or blast radius.
+7. Do not change backend behavior or API shapes. Preserve existing functionality: before deleting a component, list the features it provided and confirm each is kept in the new design or intentionally removed (say which).
+8. Output a short change plan per file BEFORE coding, then implement, then list files changed or deleted and lines removed.
+Prompt A: Auth recovery security fix (run first)
+Why: /api/auth/reset-password, /api/auth/magic-link/send and /api/auth/resend-verification return the token, OTP and link in the HTTP response, and the UI shows them as buttons. Anyone can take over any account with only an email address. Do an emergency hotfix first: remove those fields from responses, redeploy, invalidate outstanding tokens, check audit logs.
+(Paste Prompt 0 first. This is a critical security fix.)
+
+Fix the authentication recovery flows. Currently /api/auth/reset-password, /api/auth/magic-link/send and /api/auth/resend-verification return the token, OTP, magic link URL and direct reset URL in the HTTP response, and the UI offers 'Authenticate & Open Workspace Now', 'Instant Enclave Clearance', 'Copy Link' and 'Copy Code'.
+
+Backend (src/server/authRoutes.ts, authTokenStore.ts):
+1. In production NO auth endpoint may ever return: token, resetToken, code, otp_code, preview_code, magic_link, magicLinkUrl, directResetUrl, debugLink, or any secret. Return only {status: 'success', message: 'If an account exists for this email, we sent instructions.'} with the SAME body, status code and similar timing whether or not the account exists. Dev preview is allowed only when NODE_ENV !== 'production' AND ALLOW_DEV_AUTH_PREVIEW === 'true' AND the request comes from localhost.
+2. Tokens: 32 random bytes (base64url), store only a SHA-256 hash, bind to email and purpose (signin, signup, reset), single use with atomic consume, 15 minute expiry, and invalidate earlier outstanding tokens of the same purpose when a new one is issued.
+3. If a numeric code is kept at all, it is a fallback typed in the same browser: 6 digits, hashed, 10 minute expiry, maximum 5 attempts then lock for 15 minutes, constant-time comparison. Prefer link-only for password reset. Remove the duplicate OTP keys (recovery:, reset:, any:).
+4. Magic-link sign-in: at request time set a short-lived HttpOnly, Secure, SameSite=Lax nonce cookie and bind the token to it. Opening the link shows a 'Confirm sign in' page that requires a click and a POST to consume the token, so email scanners that prefetch links cannot consume it. If the cookie is missing (different device), show 'Enter the code from your email' instead of signing in.
+5. Password reset: consume token, enforce password policy (minimum 12 characters, breached-password check, reject the email as the password), hash with argon2id or bcrypt cost 12, revoke ALL sessions and refresh tokens, send a 'your password was changed' email with a 'this was not me' link, write an audit log entry.
+6. Email verification at signup: same rules; an unverified account cannot sign in or call the API.
+7. Rate limits: per email (5 requests/hour) and per IP (20/hour) with Retry-After, plus Cloudflare Turnstile on the request forms. Never reveal in an error message whether an email is registered.
+8. If email delivery is not configured in production, fail the readiness check and log an error; never claim a message was dispatched.
+9. Remove tokens from the URL after reading them (history.replaceState), send Referrer-Policy: no-referrer on those pages, and make sure tokens and codes never appear in logs or analytics.
+
+Frontend (LoginView.tsx, SignupView.tsx, ForgotPasswordView.tsx, ResetPasswordView.tsx, MagicLinkVerifyView.tsx, AuthModal.tsx):
+10. Delete directMagicLinkUrl, directResetUrl, directVerifyUrl and every UI that displays or copies a link or code returned by the API.
+11. New 'Check your inbox' screen: masked email, expiry notice, Resend with a 30 second countdown, 'Use a different email', spam-folder tip, 'Back to sign in'.
+12. Reset screens: Request (email only) then Check inbox then Set new password (strength meter, show/hide, confirm field) then Success (redirect to sign in).
+13. Replace jargon (Enclave Clearance, Master Password) with plain professional wording.
+
+Tests (src/server/__tests__/authRecovery.test.ts): each endpoint response JSON contains none of the secret keys; a token cannot be reused, used after expiry, or used with a different email; a token for purpose signin cannot reset a password; identical responses for existing and unknown emails; OTP lockout after 5 attempts; all sessions revoked after reset; a scanner-style GET on the magic link does not sign in.
+Finish with a list of every endpoint response shape before and after.
+Prompt 1: Tokens, fonts and token enforcement
+(Paste Prompt 0 and Design Prompt D first.)
+Create the design foundation.
+1. Create src/design-system/tokens/ (colors.ts, typography.ts, spacing.ts, radii.ts, motion.ts) and wire them into tailwind.config and src/design-system/tokens.css with CSS variables, using the exact values from Design Prompt D.
+2. Consolidate the five near-identical warm blacks (#181511, #14110d, #171410, #14120f, #100e0c) and the navy (#050B14, #1b2b46) found in src/components/LandingView.tsx and elsewhere into the three surface tokens. Search the codebase for hard-coded hex colors (grep -rE '#[0-9a-fA-F]{3,8}' src) and produce docs/design/color-migration.md mapping each distinct value to the nearest token or marking it a deliberate exception.
+3. Typography: remove Fraunces; use Source Serif 4 for all headings; self-host fonts (no external request) with font-display: swap, subsetting, and Noto fallbacks (Sans/Serif for Devanagari, Arabic, CJK, plus Cyrillic and Greek).
+4. Add an ESLint rule or a CI script (scripts/check-design-tokens.ts) that fails the build on new hard-coded hex colors or arbitrary Tailwind values like text-[#...] or w-[13px] outside src/design-system. Add an allowlist file for migration exceptions that shrinks over time.
+5. Add src/design-system/README.md documenting the layers (tokens, primitives, patterns, templates, pages).
+Do not restyle pages yet. Report the count of hard-coded colors before and after.
+Prompt 2: Primitives and Storybook
+(Paste Prompt 0 and Design Prompt D first.)
+Build src/design-system/primitives/ on Radix UI + Tailwind + class-variance-authority + clsx + tailwind-merge (install what is missing). Create: Button (primary, secondary, ghost, danger, sizes, loading state), IconButton, Input, Textarea, Select, Combobox, Checkbox, RadioGroup, Switch, Tabs, SegmentedControl, Dialog, Drawer (side sheet), Popover, DropdownMenu, Tooltip, Toast, Badge, StatusChip (icon + text + color), Skeleton, Avatar, Separator, Kbd.
+Requirements: tokens only; focus-visible rings in gold at AA contrast; keyboard operation, focus trapping and return focus for Dialog and Drawer; Esc to close; aria labels; disabled and error states; reduced motion; RTL-safe (logical properties).
+Add Storybook (@storybook/react-vite) with one story per primitive showing all variants and states, the accessibility addon (axe), and a dark-only theme. Add unit tests for Dialog focus handling, Tabs keyboard navigation and Select. Do not touch existing pages yet.
+Prompt 3: Patterns and page templates
+(Paste Prompt 0 and Design Prompt D first.)
+Build src/design-system/patterns/ using the primitives: PageHeader (title, description, breadcrumb, primary action, overflow), SectionHeader, MetricTile (label, value, delta, optional sparkline, optional 'what this means' tooltip), KeyValueList, DataTable (sorting, column visibility, row selection and bulk actions, sticky header, pagination or virtualization, loading/empty/error states, keyboard navigation), FilterBar (search + up to 3 filters + 'More filters' popover + saved view tabs with counts), EmptyState, ErrorState, ConfirmDialog, SeverityBadge, VerdictChip, EvidenceRow (label, value, status, 'see detail' link), Timeline, CodeBlock/HeaderViewer (monospace, copy button, wrap toggle), ChartFrame (title, description, legend, accessible data-table fallback), Callout (info, warning, danger).
+Page templates: OverviewTemplate, ListDetailTemplate, DetailTabsTemplate, SettingsTemplate, FlowTemplate, all on a consistent 1200px container and 12-column grid.
+Provide a Storybook story for each with realistic data, plus a pattern gallery story composing a sample page per template. Tests: DataTable keyboard navigation and empty/error states.
+Prompt 4: Router and application shell
+(Paste Prompt 0 and Design Prompt D first.)
+Replace the state-based screen switching (effectiveTab in src/App.tsx) with react-router (createBrowserRouter, or HashRouter if the deploy requires it; keep existing auth hash links working through redirects).
+1. Routes: /overview, /emails, /emails/:id/{summary|route|origin|content|headers|evidence}, /cases, /cases/:id, /intel/{campaigns|campaigns/:id|graph|timeline|map|iocs}, /alerts/{feed|rules}, /sources, /settings/{profile|security|preferences}, /settings/org/{general|roles|privacy|security|audit}, /settings/team, /help, /legal/:doc, a separate guarded route for platform admin, and a 404. Every route lazy-loaded with React.lazy and a skeleton fallback. Route guards use the VERIFIED server-side role, never client state; show a 'no access' page for forbidden routes.
+2. New sidebar (replace src/components/Sidebar.tsx): primary items only: Overview, Emails, Cases, Threat intelligence, Alerts (with unread badge), Sources; footer: Settings, Help. Collapsible to an icon rail, active state in gold, keyboard accessible, tooltips when collapsed. Remove the 9-item Forensic tools group. Old items map as follows: Hops, Map and Raw Headers become tabs of the email detail page; Campaigns, Graph, Timeline, Map and Security Logs become Threat intelligence tabs; Search becomes Emails plus global search; Upload becomes the 'Analyze email' action; Gmail Live Sync becomes Sources.
+3. New top bar (replace src/components/Header.tsx): page title or breadcrumb, global search (Cmd/Ctrl+K opens the existing command palette), one primary 'Analyze email' button, notifications bell, help menu (shortcuts, tour, docs), user menu (profile, language, time zone, sign out). DELETE the RBAC role clearance selector entirely (role must only come from the server) and move view mode, privacy safeguards and objective setup out of the header; list where each went.
+4. Keep existing pages rendering inside the new shell at their new URLs while later prompts rebuild them. Support deep links and back/forward; keep state in the URL (filters, tabs, selected id).
+5. Remove App.tsx logic that is no longer needed; App.tsx should shrink below 300 lines.
+Tests: route guards by role, deep link to a case, redirect of old hash URLs, sidebar keyboard navigation.
+Prompt 5: Emails list page (new)
+(Paste Prompt 0 and Design Prompt D first.)
+Create src/features/emails/EmailsPage.tsx using ListDetailTemplate, FilterBar and DataTable. It replaces SearchView.tsx and becomes the home for all analyzed emails.
+- Header: title with count, primary 'Analyze email' (opens the upload flow).
+- View tabs with counts: All, Phishing, Suspicious, Legitimate, Quarantined.
+- Search (subject, sender, domain, message id) with debounce. Filters: Source (Upload or Gmail), Date range, Sender domain. More filters: risk range, has attachments, has URLs, assigned case.
+- Table columns: Verdict chip, Subject, Sender (display name + address, mismatch flagged), Source, Received (local time, UTC on hover), Risk score, Case. Row click goes to /emails/:id/summary. Bulk actions: create case, add to case, quarantine or release (role-gated), export.
+- Server-side cursor pagination and URL-synced filters; empty state with 'Analyze your first email' and a sample email button; error state with retry.
+- Remove SearchView.tsx after confirming parity (list what it supported).
+Tests: filters sync to URL, bulk selection, empty and error states.
+Prompt B: Message route view (replaces the D3 hop graph)
+(Paste Prompt 0 and Design Prompt D first.)
+Redesign the hop traceroute visualization. Current files: src/components/D3MailActorGraph.tsx (1,318 lines), HopTracerouteView.tsx, and their use in OverviewView.tsx.
+1. Replace the D3 force/radial/DAG/cards implementation with a RouteRibbon component built with plain SVG/CSS (no force simulation). Remove the views D3 Dynamic Hops, DAG Flow and Hop Cards, the layouts Pipeline, Force Physics and Radial, the hop filter, split-view button and zoom/reset controls. Keep only a segmented control 'Route | Table' and one Export menu (PNG, SVG, JSON). Fullscreen goes into the overflow menu.
+2. Data cleanup before rendering (src/utils): merge consecutive nodes with identical host and IP; label unknown values honestly ('Hostname not disclosed', 'IP not disclosed') instead of 'Unknown Sender'; show 'Not measurable' instead of 0s when timestamps are missing or identical; cap the visible chain at 8 nodes with a 'Show 3 more hops' expander.
+3. Layout: horizontal on desktop (evenly spaced on a fixed grid, no overlaps), vertical on mobile. Each node card shows role icon (Origin, Relay, Destination), hostname, IP, a country flag only when GeoIP is confirmed, and authentication chips (SPF, DKIM, DMARC) where relevant. Each edge shows the protocol (ESMTPS, LMTP) and the measured delay.
+4. Anomalies (reply-to diverted, envelope mismatch, latency spike above 5s, private IP in chain) render as one small callout attached to the node plus a count badge in the header, each with a one-line plain-language explanation and a severity color. No overlapping text anywhere.
+5. Header summary: three metrics only (Hops, Total transit time, Anomalies), each with a short tooltip, plus one automatic sentence, for example 'Message passed through 1 relay and was delivered in under 1s. 1 anomaly found: reply address differs from sender.'
+6. Click or keyboard-select a node to open a right-side drawer with the raw Received header excerpt, parsed fields and verification status. Esc closes it.
+7. If hops are 2 or fewer, show a compact card instead of a large empty canvas.
+8. Table view: sortable, accessible, also the screen-reader representation of the route.
+9. Apply the design system: warm-charcoal surfaces, gold highlights, low-contrast borders, mono for technical values, no glow except on anomalies.
+10. Report before and after bundle size (d3 should no longer load for this view) and lines removed.
+Tests: node merging, honest-unknown labels, table and route parity, keyboard navigation.
+Prompt 6: Email detail page (verdict first, six tabs)
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/OverviewView.tsx (2,250 lines) as src/features/emails/EmailDetailPage.tsx using DetailTabsTemplate. It absorbs HopTracerouteView, MapView (per-email) and RawHeaderView as tabs.
+
+Sticky header: back link, truncated subject, received time (local, UTC on hover), VerdictChip + score, primary action (Quarantine, Mark safe or Create case, role-gated), overflow menu (Export: PDF dossier, JSON/Markdown report, STIX, .eml; Share; Re-verify integrity). A 'Summary | Technical' toggle sets the default depth. Right rail (sticky, 320px): assigned analyst, case link or 'Create case', tags, quick note, last activity.
+
+Tab Summary (top to bottom):
+1) VerdictCard: label, score, confidence in words, one-sentence reason, top 3 reasons, recommended action, 'How we decided' link. AI-generated text carries a one-line note: 'AI-generated; verify against the evidence'.
+2) Key evidence: 3 to 5 EvidenceRows ranked by severity with jump links.
+3) Message at a glance: From (display name vs real address), Reply-To, To, Date, Subject; mismatches highlighted.
+4) Authentication: SPF, DKIM, DMARC as three compact rows with plain-language explanations and alignment; enforcement policy merged in.
+5) Response: available actions with status and the action log.
+Tab Route: the RouteRibbon from Prompt B (reuse it; do not rebuild D3 graphs).
+Tab Origin & Domain: Domain card (age, registrar, lookalike warning, DNS/MX behind 'Show DNS details') and Origin card (IP, country and city only if confirmed, ISP and ASN, chips for VPN, Tor, proxy, blacklist; 6 key fields instead of 12 tiles; optional small map). A 'Show all technical details' expander holds the rest.
+Tab Content: safe text preview, URL table (verdict, redirect chain), attachments table (type, hash, verdict), QR findings, quishing inspector.
+Tab Headers: HeaderViewer with parsed table, raw view, copy, search.
+Tab Evidence: hash and integrity status, chain of custody, exports, custody certificate, MITRE techniques (compact), threat-intel lookups summary, related campaign and 'other mailboxes affected', and a collapsed technical appendix (forensic log, model features and version).
+Remove: the Technical/Non-Technical mode bar (replaced by the toggle), the two D3 graph tabs, the Physical Evidence Card as a page section (becomes an export), the Enterprise Incident Dossier as a block (split into the Evidence tab and the Response section), the vault banner at the top, the long AI disclaimer (one line instead).
+Before coding, list every feature currently in OverviewView and where it lands in the new page.
+Tests: verdict renders first, mismatch highlighting, role-gated actions, unknown values shown as 'Not available'.
+Prompt 7: Cases
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/CasesView.tsx (2,006 lines) as src/features/cases/ using ListDetailTemplate.
+List page: header (title, count, primary 'New case', overflow Export); a single system-message slot shown only when offline or sync issues occur; view tabs with counts (All, Mine, Unassigned, High severity, Closed); FilterBar (search, Status, Severity, Assignee, 'More filters': tags, verdict, date); DataTable columns: Case title and ID, Severity, Status, Top finding, Email count, Assignee, Last activity; bulk actions (assign, close, tag); server-side pagination.
+Remove from the production UI: seed success and error banners (keep behind an admin-only dev flag), the correlation-engine banner (becomes a small status indicator in the header), nested cards.
+Case detail (/cases/:id) with tabs: Summary (status, severity and assignee controls; AI summary with the one-line note; key findings; campaign link; recommended next actions), Emails (compact table of linked emails with add and remove), Evidence (hashes, custody, exports, evidence tag card preview as a button), Notes and activity (threaded notes plus audit timeline).
+Create case dialog: title, severity (prefilled from selected emails), emails (prefilled), assignee optional; tags and notes under 'Add details'.
+Share and Export live in the overflow menu.
+Tests: tab routing, bulk actions, create-case prefill.
+Prompt 8: Overview (dashboard)
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/DashboardView.tsx (2,262 lines) as src/features/overview/OverviewPage.tsx with OverviewTemplate.
+Top to bottom: PageHeader with one global date-range selector (7, 30, 90 days) and a mailbox-sync status chip; a 'Needs attention' row with 3 clickable counts (quarantined awaiting review, high-risk cases unassigned, unread alerts); exactly 4 KPI MetricTiles (Emails analyzed, Threats detected with rate, Open cases, Median time to verdict), each with change versus the previous period and a sparkline; Priority queue (top 5 cases by risk, link 'View all'); one Threat trend chart (stacked bars by verdict, no area/bar/pie switch); two columns: top 5 threat origins (list, link to the map) and active campaigns or tracked actors (top 3, link to campaigns); Recent alerts (5, link to the feed). First-run empty state: a 3-step checklist (connect a mailbox, analyze a sample email, invite a teammate) instead of zero KPIs.
+Delete: minimized and full modes, 3D tilt cards and the particle layer, the quick navigation hub, the forensic triage console (link to the email detail instead), the SVG world heatmap (move to Intel > Map), the duplicate bulk-comparison chart (move to the upload results), the walkthrough banner (moves to Help and onboarding), the community feedback moderation console (moves to Platform admin), analyst workstation telemetry (moves to Settings).
+Use real data only; no hard-coded sample numbers.
+Tests: date range drives all widgets, empty state, attention counts link correctly.
+Prompt 9: Sources (Gmail Live Sync)
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/GmailConnectionView.tsx (3,005 lines) and GmailSecurityDefenseHub.tsx as src/features/sources/SourcesPage.tsx.
+Structure: connected mailboxes as cards (provider, status, last sync, mode: Monitor or Pre-delivery quarantine, connect, disconnect, reconnect); sync controller (start, stop, interval, scope); quarantine queue DataTable (subject, sender, verdict, held since, actions Approve, Release, Delete, role-gated) with row click to /emails/:id/summary; policy settings (what to quarantine, thresholds); audit log table; an 'Advanced (admin)' collapsed section for Pub/Sub watch configuration.
+Remove its built-in message detail (verdict gauge, authentication matrix, AI narrative, raw drawer): messages open the standard email detail page. Replace the OAuth explanation panel with a concise connect dialog (scopes in plain language, what data is read, what is stored) and a link to the privacy page.
+Make it provider-agnostic (Gmail now, Microsoft 365 later) with a ProviderCard component. Preserve all functional behavior; list the features and where each went. Report lines removed.
+Tests: quarantine actions are role-gated, reconnect-required state, empty state with a connect call to action.
+Prompt 10: Alerts
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/AlertsView.tsx (1,073 lines) as src/features/alerts/ with routes /alerts/feed and /alerts/rules.
+Feed: severity filter, grouped list (today, yesterday, earlier), each alert with severity, summary, time, linked email or case, status (new, acknowledged, resolved), acknowledge and assign actions; alert detail in a Drawer.
+Rules (Notification rules): channels (Slack, email; Microsoft Teams later), minimum severity, quiet hours, recipients, a 'Send test alert' button, and a delivery log DataTable.
+Remove the description card and the pasted header snippet. Real-time updates over the authenticated WebSocket scoped to the organization; show a subtle 'new alerts' pill instead of auto-jumping the list.
+Tests: acknowledge and resolve, rule validation, delivery log empty state.
+Prompt 11: Threat intelligence
+(Paste Prompt 0 and Design Prompt D first.)
+Create src/features/intel/ with tabs (routes /intel/campaigns, /intel/graph, /intel/timeline, /intel/map, /intel/iocs), sharing one FilterBar and header.
+Campaigns (CampaignsView.tsx, 1,166 lines): list DataTable (name, emails, first and last seen, objective, confidence) and detail at /intel/campaigns/:id with tabs Overview (summary, likely objective, attribution with caveats), Emails, Infrastructure timeline, Relationships, MITRE alignment; right rail with shared evidence and quick stats.
+Entity graph (RelationshipGraphView.tsx, 1,924 lines): restrained SVG graph with limited node types, no glow or pulse rings, no layout presets; selecting a node opens a side panel; search; one export menu; a table view as the accessible alternative.
+Timeline (ThreatTimelineView.tsx): grouped by day with compact rows and one filter row; the same component is reused on sender and domain pages.
+Map (MapView.tsx and the dashboard heatmap): one dark map style, no tile selector; a side list of top origins with counts; selecting a region filters the list.
+IOC lookups (ThreatLogView.tsx): DataTable of IOCs with per-provider verdicts and a clear 'provider not configured' state; the terminal-style log lives in a collapsed 'Raw log'.
+Lazy-load maps and charts.
+Tests: filters shared across tabs, graph table parity, unconfigured provider state.
+Prompt 12: Upload and inspect flow
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild src/components/IngestionPipelineView.tsx and NewAnalysisModal.tsx as one FlowTemplate dialog or page opened by 'Analyze email'.
+Steps: 1) Choose input: drop zone for .eml (multiple), paste raw email, or sample email; show supported formats with a link to the format guide. 2) Progress with real step status (parse, authenticate, enrich, classify) and a 'Details' disclosure holding the diagnostic log (collapsed by default). 3) Result: a single email goes straight to /emails/:id/summary; bulk shows a results table (verdict, subject, score) with the comparison chart.
+Remove: the pulsing radar ring, explanatory banners, the always-visible terminal log, the forensic scan animation modal. Handle errors per file (invalid EML, too large, rate limited) with clear messages and retry.
+Tests: multi-file upload, partial failures, navigation to the detail page.
+Prompt 13: Settings, Organization, Team and Platform admin
+(Paste Prompt 0 and Design Prompt D first.)
+Rebuild AccountSettingsView.tsx (1,296 lines), OrganizationView.tsx (838) and TeamView.tsx (748) with SettingsTemplate (left sub-navigation, one topic per page).
+Account: Profile; Security (password, MFA enrollment in a dialog with QR and recovery codes, active sessions with revoke); Preferences (language, time zone, notification preferences).
+Organization (admin only): General; Roles and permissions (read-only capability matrix table); Data and privacy (retention policy, PII masking with a 'Preview' panel replacing the live tester, LLM data sharing controls); Security policy (mandatory MFA, session timeout); Audit log (DataTable with filters and export); Legal and DPO contact as a footer link.
+Team: members DataTable (name, email, role dropdown, status, last active), pending invitations tab, invite dialog, bulk actions.
+Platform admin: move UltimateBossAdminView.tsx (1,192 lines) behind a separate route and guard, rename it 'Platform admin', remove the credentials card and the Boss naming; keep the tenant directory table, usage KPIs and timeframe controls using the same patterns; move the community feedback moderation here.
+All sensitive actions require re-authentication.
+Tests: role-gated routes, MFA enrollment dialog, role change confirmation.
+Prompt 14: Auth layout and onboarding
+(Paste Prompt 0 and Design Prompt D first. Run after Prompt A.)
+1. Create AuthLayout: a left brand panel (logo, one value statement, one proof point, no animation) and a right form card. Apply it to LoginView, SignupView, ForgotPasswordView, ResetPasswordView, MagicLinkVerifyView, AcceptInviteView, OAuthConsentScreen, WorkspaceLockScreen and AuthModal (replace the modal with routes /login, /signup, /forgot, /reset, /invite). Same states everywhere: idle, loading, error, success, and 'check your inbox' with a masked email.
+2. Onboarding: replace InteractiveOnboardingTour, InvestigationObjectiveModal, UserOnboardingModal, ForensicWalkthroughModal, ForensicScanAnimationModal, ModeUpgradeModal and the first-run PrivacyComplianceModal with one FlowTemplate: (a) role and goal, (b) connect a mailbox or analyze a sample, (c) see the result, (d) optional 4-stop tooltip tour. Add a 'Getting started' checklist on Overview until completed, dismissible and resumable from the Help menu.
+3. Cookie banner: one compact bar with Accept, Reject and Customize that truly gates analytics and ad scripts.
+Tests: onboarding resume, consent gating, form validation messages.
+Prompt 16: Help, Legal, 404 and modals
+(Paste Prompt 0 and Design Prompt D first.)
+1. Help center (KnowledgeBaseView.tsx): searchable articles by category, an EML guide article, keyboard shortcuts, contact support; opened from the Help menu at /help.
+2. Legal (LegalPage.tsx, 1,556 lines): move the text into versioned Markdown files in content/legal/, rendered by one LegalLayout with a table of contents, 'last updated' and version; route /legal/:doc.
+3. NotFoundView and an ErrorBoundary page: on-brand, with a clear next step and a 'report this' action that sends a request ID, no stack traces.
+4. Modals: audit all 20 *Modal.tsx files. Keep confirmations and short forms as Dialog; convert multi-section modals (evidence tag card, SOAR playbook, STIX export, share case, quishing inspector) to Drawers or pages; every modal built on the Dialog or Drawer primitive. Produce docs/design/modal-audit.md with the decision for each.
+Prompt C: Landing video section (run before Prompt 15)
+Before running: prepare your video (45 to 90 seconds, 1080p, H.264 MP4 under about 10 MB, plus a WebM copy and a poster image, plus an optional .vtt captions file). Host it on a CDN or object storage, not in the repo.
+(Paste Prompt 0 and Design Prompt D first.)
+Task: replace the 'From Suspicious Envelope to Global Threat Consensus' section in src/components/LandingView.tsx (around line 660).
+1. Delete the 10-phase kinetic flow animation and every import, state, helper and data structure used only by it. Report how many lines and which dependencies (check motion/react usage elsewhere before removing) were freed.
+2. Create src/components/landing/ThreatLoopShowcase.tsx:
+   - Left column: eyebrow 'COLLECTIVE DEFENSE INTELLIGENCE', the existing headline, ONE short supporting sentence, and a primary button 'Watch the walkthrough' with a play icon and the duration.
+   - Right column: a single card containing a self-contained animated visual built with HTML, CSS and inline SVG only (no JS animation library): a simple 4-step loop (Suspicious email, Forensic analysis, Campaign match, Shared defense) with slow subtle animation (under 12s loop, CSS keyframes, transform and opacity only). If the file src/components/landing/customAnimation.html exists, render that markup instead (inline, sanitized) inside the same card.
+   - The whole card is a button (role='button', keyboard operable, aria-label 'Play product walkthrough video') with a visible play affordance and hover state.
+3. Create src/components/ui/VideoModal.tsx: accessible dialog (focus trap, Esc to close, click outside to close, return focus to the trigger, scroll lock), responsive 16:9 player, video with controls, playsInline, preload='none' and a poster; sources from env VITE_WALKTHROUGH_VIDEO_MP4 and VITE_WALKTHROUGH_VIDEO_WEBM; optional captions track from VITE_WALKTHROUGH_CAPTIONS; autoplay on open (user gesture); pause and reset when closed; a graceful fallback message if the video fails to load. Lazy-load the modal with React.lazy so it adds nothing to initial load.
+4. Respect prefers-reduced-motion by showing a static frame of the animation.
+5. Track an analytics event when the video is opened and when it reaches 50% and 100% (use the existing analytics util; no-op without consent).
+6. Mobile: stack the columns, card full width, modal fills the viewport with a visible close button.
+7. Tests: modal opens and closes with click and Esc, focus returns, video pauses on close.
+Report the before and after landing bundle size.
+Prompt 15: Landing page (run late, after real screenshots exist)
+(Paste Prompt 0 and Design Prompt D first. Run after Prompt C.)
+Rebuild src/components/LandingView.tsx (1,531 lines, 11 sections) into 8 sections: nav and hero (value proposition, 'Analyze an email free', 'Watch the 60-second demo', a real product screenshot) then trust strip (only real numbers read from generated reports; no invented live counters) then problem and solution then how it works in 3 steps (includes the walkthrough video block) then product tour (3 feature blocks with real screenshots) then proof (benchmark summary with a link to the model card and limitations) then pricing then FAQ then final call to action and footer.
+Merge or remove: growth-loop, plain-english-decrypter, exhibits and workstation (fold into the tour), team (move to an About page), the shader, Unicorn Studio, Rive and three.js components under src/components/landing and src/components/3d (delete unused files and uninstall dependencies no longer used; report bundle size before and after), and unverified testimonials (keep only real, moderated ones, or remove the section).
+One hero visual maximum and no looping animations elsewhere. Use design tokens only (this removes the navy section). SEO: semantic headings, meta tags, Open Graph image, JSON-LD. Performance target: LCP under 2.5s on mobile, hero image preloaded, everything below the fold lazy.
+Tests: Lighthouse CI thresholds, keyboard navigation, reduced-motion.
+Prompt 17: i18n, accessibility, performance and visual testing
+(Paste Prompt 0 and Design Prompt D first.)
+Final quality pass.
+1. i18n: with react-i18next, extract every remaining hard-coded string in src/ into locale files (en as source; add hi, es, fr, de, pt, ar), a language switcher in the user menu, locale-aware dates, numbers and relative time, local time with UTC on hover, and RTL layout for Arabic (logical CSS properties). Add a CI check that fails if keys are missing or unused.
+2. Accessibility: add eslint-plugin-jsx-a11y, axe checks in Playwright for every route, verify focus order, landmarks, skip link, reduced motion and color contrast AA (including gold on dark), and text alternatives for charts and the route and graph views.
+3. Performance: verify route-level code splitting; app shell under 200 KB gzip; lazy-load maps, charts and any remaining heavy library; remove unused dependencies (three, @react-three/*, rive, unused d3 modules); optimize images; report Lighthouse mobile scores for the landing page, Overview and Email detail.
+4. Visual regression: Playwright screenshots of every route at 1280px and 390px, plus Storybook snapshots, stored as the baseline.
+5. Write docs/design/DESIGN_SYSTEM.md (tokens, primitives, patterns, templates, rules) and docs/design/page-checklist.md (definition of done). Fail CI on hard-coded colors, missing translations and accessibility violations.
+Definition of done for every page
+1. Uses only tokens, primitives and patterns.
+2. Answers one clear question, with the answer first.
+3. Has loading, empty, error and partial-data states.
+4. Works at 360, 768, 1280 and 1920px, by keyboard, and passes WCAG 2.2 AA.
+5. All text in locale files; no jargon.
+6. No data duplicated elsewhere; links go to the single source.
+7. Route-level lazy loading and no layout shift.
+Safety notes
+• Commit after every step so one page can be rolled back without losing the others.
+• Read the feature-parity list AI Studio produces for each rebuild; that is where accidental feature loss shows up.
+• Rotate any secrets (Supabase service role, Gmail client secret, Gemini, Groq, VirusTotal) if the repo or earlier deployments were ever shared, because the auth bugs may have exposed them.
+• After Prompt A, manually test: request a password reset for any email and confirm the response contains no token or link.

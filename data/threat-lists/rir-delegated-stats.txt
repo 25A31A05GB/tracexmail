@@ -530,7 +530,10 @@
 5.10.0.0/21|DE|ripencc
 5.10.8.0/21|DE|ripencc
 5.10.16.0/20|GB|ripencc
-5.10.32.0/21|GE|ripencc
+5.10.32.0/24|GE|ripencc
+5.10.33.0/24|GE|ripencc
+5.10.34.0/23|GE|ripencc
+5.10.36.0/22|GE|ripencc
 5.10.40.0/21|DE|ripencc
 5.10.48.0/20|DE|ripencc
 5.10.64.0/18|NL|ripencc
@@ -5051,6 +5054,3 @@
 45.12.40.0/22|HU|ripencc
 45.12.44.0/23|AT|ripencc
 45.12.46.0/23|AT|ripencc
-45.12.48.0/22|DE|ripencc
-45.12.52.0/23|SG|ripencc
-45.12.54.0/23|TR|ripencc

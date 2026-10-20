@@ -179,7 +179,7 @@ export function registerAuthRoutes(app: express.Express): void {
   });
 
   // Client SPA callback catcher
-  app.get(['/auth/callback', '/auth/callback/*', '/oauth/callback', '/oauth/callback/*', '/api/auth/callback'], publicLimiter, (req: Request, res: Response) => {
+  app.get(/^\/(?:auth\/callback|oauth\/callback|api\/auth\/callback)(?:\/.*)?$/, publicLimiter, (req: Request, res: Response) => {
     const code = req.query.code;
     const error = req.query.error;
     if (error) {

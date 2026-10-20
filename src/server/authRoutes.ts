@@ -8,6 +8,16 @@ import { authLimiter, getClientIp } from './rateLimiter';
 import { getEmailAlertConfig } from './emailAlertService';
 import { verifyTurnstileToken } from './turnstile';
 import {
+  createAndStoreToken,
+  consumeToken,
+  peekToken,
+  verifyTokenNonce,
+  createAndStoreOtp,
+  verifyAndConsumeOtp,
+  invalidateEarlierTokens,
+  normalizeEmail,
+  hashSecret,
+  timingSafeEqualString,
   saveOtp,
   getOtp,
   updateOtpAttempts,
@@ -22,7 +32,8 @@ import {
   deleteResetToken,
   OtpRecord,
   MagicLinkRecord,
-  ResetTokenRecord
+  ResetTokenRecord,
+  TokenPurpose
 } from './authTokenStore';
 import {
   saveStoredProfile,
@@ -31,6 +42,113 @@ import {
 import { authenticateOrgUser, findOrgUser } from './orgUserStore';
 
 export type { OtpRecord, MagicLinkRecord, ResetTokenRecord };
+
+// -----------------------------------------------------------------------------
+// RECOVERY RATE LIMITING (5 requests/hour per email, 20 requests/hour per IP)
+// -----------------------------------------------------------------------------
+const recoveryEmailLimits = new Map<string, number[]>();
+const recoveryIpLimits = new Map<string, number[]>();
+
+export function checkRecoveryRateLimit(ip: string, email?: string): { allowed: boolean; retryAfterSeconds: number } {
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+
+  // IP limit: 20/hour
+  const ipTimestamps = (recoveryIpLimits.get(ip) || []).filter(t => now - t < ONE_HOUR);
+  if (ipTimestamps.length >= 20) {
+    const oldest = ipTimestamps[0];
+    const retryAfterSeconds = Math.max(1, Math.ceil((oldest + ONE_HOUR - now) / 1000));
+    return { allowed: false, retryAfterSeconds };
+  }
+
+  // Email limit: 5/hour
+  if (email) {
+    const cleanEmail = normalizeEmail(email);
+    const emailTimestamps = (recoveryEmailLimits.get(cleanEmail) || []).filter(t => now - t < ONE_HOUR);
+    if (emailTimestamps.length >= 5) {
+      const oldest = emailTimestamps[0];
+      const retryAfterSeconds = Math.max(1, Math.ceil((oldest + ONE_HOUR - now) / 1000));
+      return { allowed: false, retryAfterSeconds };
+    }
+  }
+
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export function recordRecoveryAttempt(ip: string, email?: string): void {
+  const now = Date.now();
+  const ONE_HOUR = 60 * 60 * 1000;
+  const ipTimestamps = (recoveryIpLimits.get(ip) || []).filter(t => now - t < ONE_HOUR);
+  ipTimestamps.push(now);
+  recoveryIpLimits.set(ip, ipTimestamps);
+
+  if (email) {
+    const cleanEmail = normalizeEmail(email);
+    const emailTimestamps = (recoveryEmailLimits.get(cleanEmail) || []).filter(t => now - t < ONE_HOUR);
+    emailTimestamps.push(now);
+    recoveryEmailLimits.set(cleanEmail, emailTimestamps);
+  }
+}
+
+export function parseCookies(req: Request): Record<string, string> {
+  const list: Record<string, string> = {};
+  const rc = req.headers.cookie;
+  if (!rc) return list;
+  rc.split(';').forEach((cookie) => {
+    const parts = cookie.split('=');
+    const name = parts.shift()?.trim();
+    if (name) {
+      list[name] = decodeURIComponent(parts.join('='));
+    }
+  });
+  return list;
+}
+
+const COMMON_BREACHED_PASSWORDS = new Set([
+  'password1234', 'password12345', 'password123456', '123456789012',
+  'qwertyuiop12', 'admin1234567', 'welcome12345', 'changeme1234',
+  'iloveyou1234', 'monkey123456', 'dragon123456', 'master123456',
+  'letmein12345', 'trustno11234', 'sunshine1234', 'princess1234',
+  'football1234', 'shadow123456', 'superman1234', 'michael12345',
+  'password1234!', 'tracexmail2026!', 'tracexboss2026!'
+]);
+
+export function validatePasswordSecurity(password: string, email: string): { valid: boolean; reason?: string } {
+  if (!password || password.length < 12) {
+    return { valid: false, reason: 'Password must be at least 12 characters in length.' };
+  }
+  const cleanEmail = normalizeEmail(email);
+  const lowerPwd = password.toLowerCase();
+  if (cleanEmail && lowerPwd === cleanEmail) {
+    return { valid: false, reason: 'Password cannot be identical to your email address.' };
+  }
+  const localPart = cleanEmail ? cleanEmail.split('@')[0] : '';
+  if (localPart && localPart.length >= 4 && lowerPwd.includes(localPart)) {
+    return { valid: false, reason: 'Password cannot contain your email username.' };
+  }
+  if (COMMON_BREACHED_PASSWORDS.has(lowerPwd)) {
+    return { valid: false, reason: 'This password is known to have appeared in public data breaches. Please choose a more secure passphrase.' };
+  }
+  if (/^(.)\1{11,}$/.test(password)) {
+    return { valid: false, reason: 'Password cannot consist of a single repeated character.' };
+  }
+  return { valid: true };
+}
+
+export function isDevPreviewAllowed(req: Request): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+  if (process.env.ALLOW_DEV_AUTH_PREVIEW !== 'true') return false;
+  const ip = getClientIp(req);
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  return (
+    ip === '127.0.0.1' ||
+    ip === '::1' ||
+    ip === '::ffff:127.0.0.1' ||
+    req.hostname === 'localhost' ||
+    host === 'localhost' ||
+    host === '127.0.0.1'
+  );
+}
 
 export interface AuthSecurityOptions {
   broadcastAlertFn: (alert: any, extraData?: any) => Promise<void> | void;
@@ -157,7 +275,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
   }
 ];
 
-const localUserAccounts = new Map<string, LocalUserAccount>(
+export const localUserAccounts = new Map<string, LocalUserAccount>(
   SEED_ACCOUNTS.map(acc => [acc.email, acc])
 );
 
@@ -297,6 +415,12 @@ function resetFailedLoginCounters(ip: string, accountEmail?: string | null) {
 export function createAuthRouter(options: AuthSecurityOptions): Router {
   const router = Router();
   const { broadcastAlertFn } = options;
+
+  // Enforce Referrer-Policy: no-referrer across all authentication flows
+  router.use((_req, res, next) => {
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    next();
+  });
 
   // Apply strict rate limiting across all auth routes
   router.use(authLimiter);
@@ -438,14 +562,22 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
       // 2. Check local resilient user accounts store
       const localAccount = localUserAccounts.get(cleanEmail);
-      if (localAccount && (bcrypt.compareSync(cleanPassword, localAccount.passwordHash) || cleanPassword === 'Password1234!' || cleanPassword === 'TraceXMail2026!' || cleanPassword === 'TraceXBoss2026!')) {
-        resetFailedLoginCounters(ip, cleanEmail);
-        const enclaveToken = signUserToken({
-          userId: localAccount.id,
-          email: cleanEmail,
-          organizationId: DEFAULT_ORG_ID,
-          role: localAccount.role
-        });
+      if (localAccount) {
+        if (localAccount.emailVerified === false) {
+          return res.status(403).json({
+            error: 'Please verify your email address before signing in. Check your inbox for verification instructions.',
+            code: 'EMAIL_NOT_VERIFIED'
+          });
+        }
+
+        if (bcrypt.compareSync(cleanPassword, localAccount.passwordHash)) {
+          resetFailedLoginCounters(ip, cleanEmail);
+          const enclaveToken = signUserToken({
+            userId: localAccount.id,
+            email: cleanEmail,
+            organizationId: DEFAULT_ORG_ID,
+            role: localAccount.role
+          });
 
         await logAuditAction({
           organization_id: DEFAULT_ORG_ID,
@@ -475,6 +607,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
           }
         });
       }
+    }
 
       const supabase = getSupabaseClient();
       let authSuccess = false;
@@ -762,45 +895,24 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
-    const otpKey = `${type}:${cleanEmail}`;
-    const now = Date.now();
+    const cleanEmail = normalizeEmail(email);
 
-    // Check cooldown rate limit (5 seconds between rapid requests per email)
-    const existing = await getOtp(otpKey);
-    if (existing && now - existing.lastSentAt < 5 * 1000) {
-      const waitSeconds = Math.ceil((5 * 1000 - (now - existing.lastSentAt)) / 1000);
+    // Rate limit check: 5 requests/hour per email, 20/hour per IP
+    const rateCheck = checkRecoveryRateLimit(ip, cleanEmail);
+    if (!rateCheck.allowed) {
+      res.setHeader('Retry-After', String(rateCheck.retryAfterSeconds));
       return res.status(429).json({
-        error: `Please wait ${waitSeconds} seconds before requesting another code.`,
-        code: 'OTP_RATE_LIMITED',
-        retry_after: waitSeconds
+        error: 'Too many verification code requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: rateCheck.retryAfterSeconds
       });
     }
+    recordRecoveryAttempt(ip, cleanEmail);
 
-    const code = generateSecureOtp();
-    const expiresAt = now + 15 * 60 * 1000; // 15 minutes TTL
+    const normType = type === 'recovery' ? 'reset' : type;
+    const code = await createAndStoreOtp(cleanEmail, normType, payload);
 
-    const record: OtpRecord = {
-      code,
-      email: cleanEmail,
-      type: type as any,
-      expiresAt,
-      attempts: 0,
-      lastSentAt: now,
-      payload: payload || null
-    };
-
-    await saveOtp(otpKey, record);
-    // Store under wildcard key and recovery key for resilient lookup
-    await saveOtp(`any:${cleanEmail}`, record);
-    if (type === 'recovery' || type === 'reset') {
-      await saveOtp(`recovery:${cleanEmail}`, record);
-      await saveOtp(`reset:${cleanEmail}`, record);
-    }
-
-    const isDevPreview = process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_AUTH_PREVIEW === 'true';
-
-    // If Resend API is configured, attempt sending real email notification
+    // If Resend API is configured, send email notification
     try {
       const emailCfg = getEmailAlertConfig();
       if (emailCfg.resendApiKey) {
@@ -811,13 +923,13 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             to: [cleanEmail],
             subject: `TraceXMail Security Code: ${code}`,
             html: `
-              <div style="font-family: monospace, sans-serif; background: #0b0f17; color: #f0ede6; padding: 24px; border-radius: 4px; border: 1px solid #233044;">
-                <h2 style="color: #c9a227; margin-top: 0;">TraceXMail SOC Recovery Clearance</h2>
-                <p>A verification code was requested for your account (<strong>${cleanEmail}</strong>).</p>
-                <div style="background: #141c28; border: 1px solid #c9a227; padding: 16px; font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; color: #c9a227; margin: 20px 0;">
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #14110d; color: #ede6d8; padding: 24px; border-radius: 8px; border: 1px solid #3a352c; max-width: 480px; margin: 0 auto;">
+                <h2 style="color: #ede6d8; margin-top: 0; font-size: 18px;">Security Verification Code</h2>
+                <p style="color: #94a3b8; font-size: 14px;">Your single-use verification code for <strong>${cleanEmail}</strong> is:</p>
+                <div style="background: #171410; border: 1px solid #c9a227; padding: 16px; font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; color: #c9a227; margin: 20px 0;">
                   ${code}
                 </div>
-                <p style="color: #8fa0b5; font-size: 12px;">Valid for 15 minutes. If you did not initiate this request, alert your security team immediately.</p>
+                <p style="color: #8a8070; font-size: 12px;">Valid for 10 minutes. If you did not initiate this request, please disregard this email.</p>
               </div>
             `
           },
@@ -831,6 +943,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         ).catch(err => {
           console.warn('[AuthRouter] Resend OTP email delivery notice:', err?.response?.data || err?.message);
         });
+      } else if (process.env.NODE_ENV === 'production') {
+        console.error('[AuthRouter] Production warning: Email delivery service not configured. Verification code could not be dispatched.');
       }
     } catch (sendErr) {
       console.warn('[AuthRouter] Email delivery service skipped:', sendErr);
@@ -843,21 +957,18 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       action: 'AUTH_OTP_SENT',
       resource_type: 'otp',
       details: {
-        otp_type: type,
-        expires_at: new Date(expiresAt).toISOString(),
+        otp_type: normType,
         client_ip: ip
       },
       ip_address: ip,
       status: 'SUCCESS'
     }).catch(err => console.warn('[AuthAudit] Failed logging OTP sent:', err));
 
+    const isDev = isDevPreviewAllowed(req);
     return res.status(200).json({
       status: 'success',
-      message: `Verification code dispatched to ${cleanEmail}. Valid for 15 minutes.`,
-      email: cleanEmail,
-      type,
-      expires_in_seconds: 900,
-      ...(isDevPreview ? { preview_code: code, dev_preview: true } : {})
+      message: 'If an account exists for this email, we sent instructions.',
+      ...(isDev ? { dev_preview: true, preview_code: code } : {})
     });
   };
 
@@ -1109,51 +1220,48 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     const cleanEmail = String(email).trim().toLowerCase();
-    const now = Date.now();
 
-    // Check cooldown rate limit (5 seconds between rapid requests per email)
-    const cooldown = await checkMagicLinkCooldown(cleanEmail, 5 * 1000);
-    if (cooldown.rateLimited) {
+    // Check rate limit: 5/hr per email, 20/hr per IP
+    const rateCheck = checkRecoveryRateLimit(ip, cleanEmail);
+    if (!rateCheck.allowed) {
+      res.setHeader('Retry-After', String(rateCheck.retryAfterSeconds));
       return res.status(429).json({
-        error: `Please wait ${cooldown.retryAfterSeconds || 5} seconds before requesting another magic link.`,
-        code: 'MAGIC_LINK_RATE_LIMITED',
-        retry_after: cooldown.retryAfterSeconds || 5
+        error: 'Too many authentication requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: rateCheck.retryAfterSeconds
+      });
+    }
+    recordRecoveryAttempt(ip, cleanEmail);
+
+    const emailCfg = getEmailAlertConfig();
+    const hasEmailConfigured = Boolean(emailCfg.resendApiKey || process.env.SMTP_HOST);
+
+    // In production, fail readiness and error if email delivery is not configured
+    if (process.env.NODE_ENV === 'production' && !hasEmailConfigured) {
+      console.error('[AuthRouter:CRITICAL] Email delivery is not configured in production. Cannot send magic link.');
+      return res.status(503).json({
+        error: 'Email delivery is currently unavailable. Please contact your system administrator.',
+        code: 'EMAIL_SERVICE_UNAVAILABLE'
       });
     }
 
-    const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
-    const ttl = type === 'recovery' ? 30 * 60 * 1000 : 15 * 60 * 1000; // 15 mins (30 for recovery)
-    const expiresAt = now + ttl;
+    const purpose: TokenPurpose = (type === 'recovery' || type === 'reset') ? 'reset' : (type === 'signup' ? 'signup' : 'signin');
 
-    const record: MagicLinkRecord = {
-      token,
-      email: cleanEmail,
-      type: type as any,
-      expiresAt,
-      lastSentAt: now,
-      used: false,
-      payload: payload || null
-    };
+    // 4. Magic-link sign-in: Set short-lived HttpOnly, Secure, SameSite=Lax nonce cookie
+    const rawNonce = crypto.randomBytes(24).toString('base64url');
+    res.cookie('auth_mlk_nonce', rawNonce, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+      path: '/'
+    });
 
-    await saveMagicLink(token, record);
+    // 2. 32 random bytes (base64url), SHA-256 stored, bound to email and purpose, 15m expiry, invalidates prior tokens
+    const token = await createAndStoreToken(cleanEmail, purpose, rawNonce, payload || null);
 
-    let otpCode: string | undefined;
-    if (type === 'recovery') {
-      await saveResetToken(token, cleanEmail, expiresAt);
-      otpCode = generateSecureOtp();
-      const otpRecord: OtpRecord = {
-        code: otpCode,
-        email: cleanEmail,
-        type: 'recovery',
-        expiresAt,
-        attempts: 0,
-        lastSentAt: now,
-        payload: null
-      };
-      await saveOtp(`recovery:${cleanEmail}`, otpRecord);
-      await saveOtp(`reset:${cleanEmail}`, otpRecord);
-      await saveOtp(`any:${cleanEmail}`, otpRecord);
-    }
+    // 3. Optional fallback numeric code: 6 digits, SHA-256 stored, 10m expiry, 5 max attempts then 15m lock
+    const otpCode = await createAndStoreOtp(cleanEmail, purpose, payload || null);
 
     // Determine the base origin
     let origin = process.env.APP_BASE_URL?.trim();
@@ -1189,26 +1297,23 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     let emailSubject = '';
     let actionLabel = '';
 
-    if (type === 'recovery') {
+    if (purpose === 'reset') {
       magicLinkUrl = `${origin}/#reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
-      emailSubject = 'Reset Your TraceXMail Master Password';
-      actionLabel = 'Reset Master Password';
-    } else if (type === 'signup') {
+      emailSubject = 'Reset Your TraceXMail Password';
+      actionLabel = 'Reset Password';
+    } else if (purpose === 'signup') {
       magicLinkUrl = `${origin}/#magic-link?token=${token}&email=${encodeURIComponent(cleanEmail)}&type=signup`;
       emailSubject = 'Verify Your TraceXMail Workspace Account';
       actionLabel = 'Verify Email & Access Workspace';
     } else {
       magicLinkUrl = `${origin}/#magic-link?token=${token}&email=${encodeURIComponent(cleanEmail)}&type=signin`;
-      emailSubject = 'Sign In to TraceXMail Enclave (Magic Link)';
+      emailSubject = 'Sign In to TraceXMail (Magic Link)';
       actionLabel = 'Sign In to Workspace';
     }
 
     // Attempt sending HTML email if Resend API key configured
-    const emailCfg = getEmailAlertConfig();
-    const hasEmailConfigured = Boolean(emailCfg.resendApiKey);
-
     try {
-      if (hasEmailConfigured) {
+      if (emailCfg.resendApiKey) {
         axios.post(
           'https://api.resend.com/emails',
           {
@@ -1216,24 +1321,24 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             to: [cleanEmail],
             subject: emailSubject,
             html: `
-              <div style="font-family: monospace, -apple-system, sans-serif; background: #0b0f17; color: #f0ede6; padding: 32px; border-radius: 4px; border: 1px solid #233044; max-width: 580px; margin: 0 auto;">
-                <div style="border-bottom: 1px solid #233044; padding-bottom: 16px; margin-bottom: 24px;">
-                  <span style="color: #c9a227; font-weight: bold; font-size: 16px; letter-spacing: 1px;">TRACEXMAIL SECURITY ENCLAVE</span>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #14110d; color: #ede6d8; padding: 32px; border-radius: 4px; border: 1px solid #3a352c; max-width: 580px; margin: 0 auto;">
+                <div style="border-bottom: 1px solid #3a352c; padding-bottom: 16px; margin-bottom: 24px;">
+                  <span style="color: #c9a227; font-weight: bold; font-size: 16px; letter-spacing: 1px;">TRACEXMAIL ENTERPRISE DEFENSE</span>
                 </div>
-                <h2 style="color: #f0ede6; margin-top: 0; font-size: 20px;">${emailSubject}</h2>
-                <p style="color: #8fa0b5; font-size: 14px; line-height: 1.6;">
-                  We received an authentication request for your work email (<strong>${cleanEmail}</strong>). Click the secure button below to complete verification:
+                <h2 style="color: #ede6d8; margin-top: 0; font-size: 20px;">${emailSubject}</h2>
+                <p style="color: #94a3b8; font-size: 14px; line-height: 1.6;">
+                  We received an authentication request for your work email (<strong>${cleanEmail}</strong>). Click the secure button below to continue:
                 </p>
                 <div style="text-align: center; margin: 28px 0;">
-                  <a href="${magicLinkUrl}" style="background: #c9a227; color: #0b0f17; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: bold; border-radius: 2px; display: inline-block; letter-spacing: 0.5px; text-transform: uppercase;">
+                  <a href="${magicLinkUrl}" style="background: #c9a227; color: #100e0c; text-decoration: none; padding: 14px 28px; font-size: 14px; font-weight: bold; border-radius: 4px; display: inline-block; letter-spacing: 0.5px;">
                     ${actionLabel} →
                   </a>
                 </div>
-                <p style="color: #64748b; font-size: 12px; line-height: 1.5; border-top: 1px solid #1e293b; padding-top: 16px;">
-                  Or copy and paste this link into your browser:<br/>
+                <p style="color: #8a8070; font-size: 12px; line-height: 1.5; border-top: 1px solid #3a352c; padding-top: 16px;">
+                  Or use this link directly in your browser:<br/>
                   <a href="${magicLinkUrl}" style="color: #c9a227; word-break: break-all;">${magicLinkUrl}</a>
                 </p>
-                <p style="color: #475569; font-size: 11px; margin-top: 20px;">
+                <p style="color: #8a8070; font-size: 11px; margin-top: 20px;">
                   This single-use link expires in 15 minutes. If you did not request this, you can safely disregard this email.
                 </p>
               </div>
@@ -1261,35 +1366,23 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       action: 'AUTH_MAGIC_LINK_SENT',
       resource_type: 'magic_link',
       details: {
-        magic_link_type: type,
-        expires_at: new Date(expiresAt).toISOString(),
+        magic_link_type: purpose,
         client_ip: ip
       },
       ip_address: ip,
       status: 'SUCCESS'
     }).catch(err => console.warn('[AuthAudit] Failed logging magic link sent:', err));
 
-    const isDevPreview = process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_AUTH_PREVIEW === 'true';
-    const message = hasEmailConfigured
-      ? `Magic link dispatched to ${cleanEmail}. Valid for ${type === 'recovery' ? '30' : '15'} minutes.`
-      : `Email delivery is not configured. Request processed for ${cleanEmail}.`;
-
+    const isDev = isDevPreviewAllowed(req);
     return res.status(200).json({
       status: 'success',
-      message,
-      email: cleanEmail,
-      type,
-      expires_in_seconds: Math.floor(ttl / 1000),
-      token,
-      resetToken: token,
-      code: otpCode,
-      otp_code: otpCode,
-      magicLinkUrl,
-      directResetUrl: magicLinkUrl,
-      ...(isDevPreview ? {
+      message: 'If an account exists for this email, we sent instructions.',
+      ...(isDev ? {
+        dev_preview: true,
         magic_link: magicLinkUrl,
         preview_code: otpCode,
-        dev_preview: true
+        code: otpCode,
+        token
       } : {})
     });
   };
@@ -1297,13 +1390,21 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
   router.post('/magic-link/send', handleSendMagicLink);
   router.post('/resend-verification', handleSendMagicLink);
 
+  // Scanner prefetch rejection: GET does not sign in or consume token
+  router.get('/magic-link/verify', (_req: Request, res: Response) => {
+    return res.status(405).json({
+      error: 'Scanner prefetch rejected. Magic link verification requires an interactive POST request.',
+      code: 'SCANNER_PREFETCH_REJECTED'
+    });
+  });
+
   /**
    * POST /api/auth/magic-link/verify
    * Verifies the email-based magic link token and establishes an authenticated session.
    */
   const handleVerifyMagicLink = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
-    const { token, email } = req.body || {};
+    const { token, email, code } = req.body || {};
 
     if (!token) {
       return res.status(400).json({
@@ -1313,57 +1414,49 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     }
 
     const cleanToken = String(token).trim();
-    let record = await getMagicLink(cleanToken);
+    const peek = await peekToken(cleanToken);
 
-    // Also allow reset token lookup if type was recovery
-    if (!record) {
-      const rRec = await getResetToken(cleanToken);
-      if (rRec) {
-        record = {
-          token: cleanToken,
-          email: rRec.email,
-          type: 'recovery',
-          expiresAt: rRec.expiresAt,
-          lastSentAt: rRec.expiresAt - 30 * 60 * 1000,
-          used: false
-        };
-      }
-    }
-
-    const now = Date.now();
-
-    if (!record) {
+    if (!peek.valid || !peek.record) {
       return res.status(400).json({
         error: 'Invalid, missing, or expired magic link. Please request a fresh magic link.',
         code: 'MAGIC_LINK_INVALID'
       });
     }
 
-    if (now > record.expiresAt) {
-      await deleteMagicLink(cleanToken);
-      return res.status(400).json({
-        error: 'This magic link has expired. For security, please request a fresh link.',
-        code: 'MAGIC_LINK_EXPIRED'
-      });
-    }
-
-    if (record.used) {
-      return res.status(400).json({
-        error: 'This magic link has already been used. Please request a new link to sign in.',
-        code: 'MAGIC_LINK_ALREADY_USED'
-      });
-    }
-
-    // Mark as used and delete
-    await markMagicLinkUsed(cleanToken);
-    await deleteMagicLink(cleanToken);
-
+    const record = peek.record;
     const cleanEmail = record.email.toLowerCase();
 
-    // If recovery, grant clearance to reset password
-    if (record.type === 'recovery') {
-      const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
-      await saveResetToken(resetToken, cleanEmail, now + 30 * 60 * 1000);
+    // 4. Validate nonce cookie from the originating browser session
+    const cookies = parseCookies(req);
+    const clientNonce = cookies['auth_mlk_nonce'];
+    const nonceMatches = verifyTokenNonce(record, clientNonce);
+
+    if (!nonceMatches) {
+      const candidateCode = code ? String(code).trim() : '';
+      if (candidateCode) {
+        const otpCheck = await verifyAndConsumeOtp(cleanEmail, record.purpose, candidateCode);
+        if (!otpCheck.valid) {
+          return res.status(400).json({
+            error: otpCheck.error || 'Invalid verification code. Please check your email.',
+            code: 'INVALID_VERIFICATION_CODE'
+          });
+        }
+      } else {
+        return res.status(403).json({
+          error: 'Different device detected. Please enter the 6-digit verification code from your email to complete verification.',
+          code: 'NONCE_MISMATCH_CODE_REQUIRED',
+          requiresCode: true,
+          email: cleanEmail
+        });
+      }
+    }
+
+    // Atomically consume token so it cannot be reused
+    await consumeToken(cleanToken, record.purpose, cleanEmail);
+
+    // If recovery/reset, grant clearance to reset password
+    if (record.purpose === 'reset') {
+      const resetToken = await createAndStoreToken(cleanEmail, 'reset');
 
       return res.status(200).json({
         status: 'success',
@@ -1379,7 +1472,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const assignedRole: UserRole = payload.role === 'read_only' ? 'read_only' : 'analyst';
     const assignedOrg = payload.accountType === 'personal' ? 'Personal Sandbox' : (payload.orgName?.trim() || 'Acme Cyber Defense SOC');
     const assignedName = payload.fullName?.trim() || cleanEmail.split('@')[0];
-    const accountType = payload.accountType || (record.type === 'signup' ? 'personal' : 'organization');
+    const accountType = payload.accountType || (record.purpose === 'signup' ? 'personal' : 'organization');
 
     const supabaseAdmin = getSupabaseAdminClient();
     let finalUserId = `usr_${crypto.randomBytes(8).toString('hex')}`;
@@ -1464,12 +1557,12 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       user_id: finalUserId,
       user_email: cleanEmail,
       user_role: existingAccount?.role || assignedRole,
-      action: record.type === 'signup' ? 'AUTH_SIGNUP_MAGIC_LINK_VERIFIED' : 'AUTH_SIGNIN_MAGIC_LINK_VERIFIED',
+      action: record.purpose === 'signup' ? 'AUTH_SIGNUP_MAGIC_LINK_VERIFIED' : 'AUTH_SIGNIN_MAGIC_LINK_VERIFIED',
       resource_type: 'user',
       details: {
         client_ip: ip,
         auth_method: 'magic_link',
-        magic_link_type: record.type
+        magic_link_type: record.purpose
       },
       ip_address: ip,
       status: 'SUCCESS'
@@ -1477,7 +1570,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     return res.status(200).json({
       status: 'success',
-      type: record.type,
+      type: record.purpose,
       message: 'Magic link successfully verified. Authentication session issued.',
       token: signedToken,
       user: {
@@ -1496,7 +1589,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
   /**
    * POST /api/auth/reset-password-with-token (and /api/auth/reset-password-with-otp)
-   * Resets the user's master password using a verified magic link token, Supabase session, or authorized session.
+   * Resets the user's password using a verified single-use reset token or verified OTP code.
    */
   const handleResetPasswordWithToken = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
@@ -1509,100 +1602,56 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanEmail = normalizeEmail(String(email));
     const cleanPassword = String(newPassword);
 
-    if (cleanPassword.length < 8) {
+    // 5. Password reset: enforce password policy (min 12 chars, breached check, reject email)
+    const pwdVal = validatePasswordSecurity(cleanPassword, cleanEmail);
+    if (!pwdVal.valid) {
       return res.status(400).json({
-        error: 'Security Policy: New password must be at least 8 characters in length.',
-        code: 'PASSWORD_TOO_SHORT',
-        required_length: 8
+        error: pwdVal.reason || 'Password policy violation.',
+        code: 'PASSWORD_POLICY_VIOLATION'
       });
     }
 
     let isAuthorized = false;
 
+    // 2 & 5. Single-use atomic consume; must be bound to purpose 'reset' and cleanEmail
     if (resetToken) {
       let cleanToken = String(resetToken).trim();
       if (cleanToken.includes('token=')) {
         const match = cleanToken.match(/token=([a-zA-Z0-9_-]+)/);
         if (match) cleanToken = match[1];
       }
-      const tokenRec = await getResetToken(cleanToken);
-      if (tokenRec && tokenRec.email === cleanEmail && Date.now() < tokenRec.expiresAt) {
+      const consumed = await consumeToken(cleanToken, 'reset', cleanEmail);
+      if (consumed.valid) {
         isAuthorized = true;
-        await deleteResetToken(cleanToken);
-        await deleteMagicLink(cleanToken);
-      } else {
-        const mlRec = await getMagicLink(cleanToken);
-        if (mlRec && mlRec.email === cleanEmail && Date.now() < mlRec.expiresAt) {
-          isAuthorized = true;
-          await deleteResetToken(cleanToken);
-          await deleteMagicLink(cleanToken);
-        }
       }
     }
-    
+
+    // 3. Fallback numeric code verification (6 digits, constant-time compare, max 5 attempts)
     if (!isAuthorized && code) {
       const cleanCode = String(code).trim().replace(/\D/g, '');
-      const rawCode = String(code).trim();
-      const candidateKeys = [`recovery:${cleanEmail}`, `reset:${cleanEmail}`, `signup:${cleanEmail}`, `any:${cleanEmail}`];
-      for (const k of candidateKeys) {
-        const otpRec = await getOtp(k);
-        if (otpRec && (otpRec.code === cleanCode || otpRec.code === rawCode) && Date.now() < otpRec.expiresAt) {
-          isAuthorized = true;
-          await deleteOtp(k);
-          break;
-        }
-      }
-    }
-
-    // Check if an active recovery session exists in enclave store for this email
-    if (!isAuthorized) {
-      const candidateKeys = [`recovery:${cleanEmail}`, `reset:${cleanEmail}`, `any:${cleanEmail}`];
-      for (const k of candidateKeys) {
-        const otpRec = await getOtp(k);
-        if (otpRec && Date.now() < otpRec.expiresAt) {
-          isAuthorized = true;
-          await deleteOtp(k);
-          break;
-        }
-      }
-    }
-
-    // Also verify if the caller holds a valid active enclave Bearer token or Supabase session for this email
-    if (!isAuthorized) {
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith('Bearer ')) {
-        const token = authHeader.slice(7).trim();
-        const userCtx = verifyUserToken(token);
-        if (userCtx && userCtx.email?.toLowerCase() === cleanEmail) {
-          isAuthorized = true;
-        } else {
-          try {
-            const supabaseAdmin = getSupabaseAdminClient();
-            if (supabaseAdmin) {
-              const { data: { user: sbUser } } = await supabaseAdmin.auth.getUser(token);
-              if (sbUser && sbUser.email?.toLowerCase() === cleanEmail) {
-                isAuthorized = true;
-              }
-            }
-          } catch (tokErr) {
-            // Supabase token verification failed
-          }
-        }
+      const otpRes = await verifyAndConsumeOtp(cleanEmail, 'reset', cleanCode);
+      if (otpRes.valid) {
+        isAuthorized = true;
+      } else if (otpRes.locked) {
+        return res.status(429).json({
+          error: otpRes.error,
+          code: 'OTP_LOCKED'
+        });
       }
     }
 
     if (!isAuthorized) {
       return res.status(400).json({
-        error: 'Invalid, missing, or expired password reset link. Please click the recovery link sent to your email or request a new one.',
+        error: 'Invalid, expired, or already used password reset link. Please request a new recovery link.',
         code: 'INVALID_RESET_AUTHORIZATION'
       });
     }
 
-    // 1. Update password in resilient local accounts store
-    const passwordHash = bcrypt.hashSync(cleanPassword, 10);
+    // 5. Hash with bcrypt cost 12
+    const passwordHash = bcrypt.hashSync(cleanPassword, 12);
     const existing = localUserAccounts.get(cleanEmail);
     const updatedUser: LocalUserAccount = {
       id: existing?.id || `usr_${crypto.randomBytes(8).toString('hex')}`,
@@ -1617,7 +1666,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     };
     localUserAccounts.set(cleanEmail, updatedUser);
 
-    // 2. Safely attempt Supabase Admin password update if configured and permitted
+    // Update Supabase admin user password if configured
     try {
       const supabaseAdmin = getSupabaseAdminClient();
       if (supabaseAdmin) {
@@ -1628,27 +1677,73 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             await supabaseAdmin.auth.admin.updateUserById(targetUser.id, {
               password: cleanPassword
             });
+            // Revoke active Supabase sessions
+            await supabaseAdmin.auth.admin.signOut(targetUser.id, 'global').catch(() => {});
           }
         }
       }
     } catch (supErr: any) {
-      console.warn('[AuthRouter] Supabase admin updateUserById unavailable with current key:', supErr?.message);
+      console.warn('[AuthRouter] Supabase admin updateUser notice:', supErr?.message);
     }
 
-    const sessionToken = signUserToken({
-      userId: updatedUser.id,
-      email: cleanEmail,
-      organizationId: DEFAULT_ORG_ID,
-      role: updatedUser.role
-    });
+    // 5. Revoke ALL sessions and outstanding tokens/OTPs
+    await invalidateEarlierTokens(cleanEmail);
+    await deleteOtp('reset', cleanEmail);
+    await deleteOtp('signin', cleanEmail);
+    await deleteOtp('signup', cleanEmail);
 
+    // 5. Send 'your password was changed' email with a 'this was not me' link
+    try {
+      const emailCfg = getEmailAlertConfig();
+      if (emailCfg.resendApiKey) {
+        let origin = process.env.APP_BASE_URL?.trim() || req.headers.origin;
+        if (!origin) {
+          const host = req.headers.host || 'localhost:3000';
+          const proto = req.headers['x-forwarded-proto'] || 'http';
+          origin = `${proto}://${host}`;
+        }
+        origin = origin.replace(/\/$/, '');
+        const alertUrl = `${origin}/#security-alert?action=unauthorized-reset&email=${encodeURIComponent(cleanEmail)}`;
+
+        axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: emailCfg.smtpFrom || 'security@tracexmail-soc.internal',
+            to: [cleanEmail],
+            subject: 'Security Alert: Your TraceXMail Password Was Changed',
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #14110d; color: #ede6d8; padding: 28px; border: 1px solid #3a352c; border-radius: 4px; max-width: 520px; margin: 0 auto;">
+                <h2 style="color: #ede6d8; margin-top: 0; font-size: 18px;">Your password was changed</h2>
+                <p style="color: #94a3b8; font-size: 14px; line-height: 1.5;">The password for your TraceXMail account (<strong>${cleanEmail}</strong>) was successfully updated.</p>
+                <p style="color: #c9a227; font-size: 13px; line-height: 1.5;">All existing active sessions have been invalidated.</p>
+                <div style="margin: 24px 0;">
+                  <a href="${alertUrl}" style="background: #b23a2e; color: #ede6d8; text-decoration: none; padding: 12px 24px; font-size: 13px; font-weight: bold; border-radius: 4px; display: inline-block;">This was not me — Secure Account</a>
+                </div>
+                <p style="color: #8a8070; font-size: 12px; border-top: 1px solid #3a352c; padding-top: 14px;">If you initiated this change, no further action is necessary.</p>
+              </div>
+            `
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${emailCfg.resendApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 5000
+          }
+        ).catch(() => {});
+      }
+    } catch (mailErr) {
+      console.warn('[AuthRouter] Password change notification email notice:', mailErr);
+    }
+
+    // 5. Write audit log entry
     await logAuditAction({
       organization_id: DEFAULT_ORG_ID,
       user_email: cleanEmail,
       user_role: updatedUser.role,
       action: 'AUTH_PASSWORD_RESET_SUCCESS',
       resource_type: 'user',
-      details: { client_ip: ip, method: 'magic_link_token_verification' },
+      details: { client_ip: ip, method: 'verified_token_consumption' },
       ip_address: ip,
       status: 'SUCCESS'
     }).catch(err => console.warn('[AuthAudit] Failed logging password reset success:', err));
@@ -1656,7 +1751,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     return res.status(200).json({
       status: 'success',
       message: 'Password has been successfully updated. You may now sign in with your new credentials.',
-      token: sessionToken,
       user: {
         id: updatedUser.id,
         email: cleanEmail,
@@ -1992,35 +2086,44 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       });
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanEmail = normalizeEmail(String(email));
+
+    // Rate limit: 5/hr per email, 20/hr per IP
+    const rateCheck = checkRecoveryRateLimit(ip, cleanEmail);
+    if (!rateCheck.allowed) {
+      res.setHeader('Retry-After', String(rateCheck.retryAfterSeconds));
+      return res.status(429).json({
+        error: 'Too many password reset requests. Please try again later.',
+        code: 'RATE_LIMIT_EXCEEDED',
+        retryAfter: rateCheck.retryAfterSeconds
+      });
+    }
+    recordRecoveryAttempt(ip, cleanEmail);
+
+    const emailCfg = getEmailAlertConfig();
+    const hasEmailConfigured = Boolean(emailCfg.resendApiKey || process.env.SMTP_HOST);
+
+    if (process.env.NODE_ENV === 'production' && !hasEmailConfigured) {
+      console.error('[AuthRouter:CRITICAL] Email delivery is not configured in production. Cannot send password reset instructions.');
+      return res.status(503).json({
+        error: 'Email delivery is currently unavailable. Please contact your system administrator.',
+        code: 'EMAIL_SERVICE_UNAVAILABLE'
+      });
+    }
 
     try {
-      // Store enclave recovery magic link token
-      const token = `mlk_${crypto.randomBytes(24).toString('hex')}`;
-      const expiresAt = Date.now() + 30 * 60 * 1000;
-      await saveResetToken(token, cleanEmail, expiresAt);
-      await saveMagicLink(token, {
-        token,
-        email: cleanEmail,
-        type: 'recovery',
-        expiresAt,
-        lastSentAt: Date.now(),
-        used: false
+      // 4. Set short-lived HttpOnly, Secure, SameSite=Lax nonce cookie
+      const rawNonce = crypto.randomBytes(24).toString('base64url');
+      res.cookie('auth_mlk_nonce', rawNonce, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 15 * 60 * 1000,
+        path: '/'
       });
 
-      const otpCode = generateSecureOtp();
-      const otpRecord: OtpRecord = {
-        code: otpCode,
-        email: cleanEmail,
-        type: 'recovery',
-        expiresAt,
-        attempts: 0,
-        lastSentAt: Date.now(),
-        payload: null
-      };
-      await saveOtp(`recovery:${cleanEmail}`, otpRecord);
-      await saveOtp(`reset:${cleanEmail}`, otpRecord);
-      await saveOtp(`any:${cleanEmail}`, otpRecord);
+      // 2. 32-byte base64url single-use token, SHA-256 hash stored, invalidates prior reset tokens
+      const token = await createAndStoreToken(cleanEmail, 'reset', rawNonce);
 
       let origin = req.headers.origin;
       if (!origin) {
@@ -2036,9 +2139,40 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         await supabase.auth.resetPasswordForEmail(cleanEmail, {
           redirectTo: `${origin}/#reset-password`
         }).catch(err => {
-          // Log internally, but never reveal failure to client
           console.warn('[AuthRouter] Supabase resetPasswordForEmail notice:', err?.message);
         });
+      }
+
+      if (emailCfg.resendApiKey) {
+        axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: emailCfg.smtpFrom || 'security@tracexmail-soc.internal',
+            to: [cleanEmail],
+            subject: 'Reset Your TraceXMail Password',
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #14110d; color: #ede6d8; padding: 32px; border: 1px solid #3a352c; max-width: 520px; margin: 0 auto;">
+                <div style="border-bottom: 1px solid #3a352c; padding-bottom: 14px; margin-bottom: 20px;">
+                  <span style="color: #c9a227; font-weight: bold; font-size: 14px; letter-spacing: 1px;">TRACEXMAIL SECURITY</span>
+                </div>
+                <h2 style="color: #ede6d8; margin-top: 0; font-size: 18px;">Password Reset Request</h2>
+                <p style="color: #94a3b8; font-size: 14px; line-height: 1.5;">
+                  We received a request to reset the password for <strong>${cleanEmail}</strong>. Click the link below to choose a new password:
+                </p>
+                <div style="text-align: center; margin: 24px 0;">
+                  <a href="${magicLinkUrl}" style="background: #c9a227; color: #100e0c; text-decoration: none; padding: 12px 24px; font-weight: bold; border-radius: 4px; display: inline-block;">
+                    Reset Password →
+                  </a>
+                </div>
+                <p style="color: #8a8070; font-size: 12px;">This single-use link expires in 15 minutes. If you did not make this request, you can safely ignore this email.</p>
+              </div>
+            `
+          },
+          {
+            headers: { Authorization: `Bearer ${emailCfg.resendApiKey}`, 'Content-Type': 'application/json' },
+            timeout: 5000
+          }
+        ).catch(() => {});
       }
 
       await logAuditAction({
@@ -2052,24 +2186,22 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         status: 'SUCCESS'
       }).catch(err => console.warn('[AuthAudit] Failed logging password reset request:', err));
 
+      const isDev = isDevPreviewAllowed(req);
       return res.status(200).json({
         status: 'success',
-        message: 'If an account exists with this email, password recovery instructions have been sent. Please check your inbox.',
-        email: cleanEmail,
-        token,
-        resetToken: token,
-        otp_code: otpCode,
-        code: otpCode,
-        preview_code: otpCode,
-        magic_link: magicLinkUrl,
-        magicLinkUrl,
-        directResetUrl: magicLinkUrl
+        message: 'If an account exists for this email, we sent instructions.',
+        ...(isDev ? {
+          dev_preview: true,
+          magic_link: magicLinkUrl,
+          preview_code: '',
+          token
+        } : {})
       });
     } catch (err: any) {
       console.error('[AuthRouter] Password reset exception:', err);
       return res.status(200).json({
         status: 'success',
-        message: 'If an account exists with this email, password recovery instructions have been sent. Please check your inbox.'
+        message: 'If an account exists for this email, we sent instructions.'
       });
     }
   });

@@ -12,6 +12,7 @@ import { isVirusTotalConfigured } from '../intelligence';
 import { isOtxConfigured } from '../otxService';
 import { maxMindDb } from '../maxmindService';
 import { getMetricsHandler } from '../telemetry/metrics';
+import { getEmailAlertConfig } from '../emailAlertService';
 
 export async function checkDatabaseReadiness(): Promise<{ ready: boolean; latencyMs: number; error?: string }> {
   if (process.env.__TEST_FORCE_DB_DOWN === 'true') {
@@ -85,6 +86,16 @@ export async function checkRedisReadiness(): Promise<{ ready: boolean; latencyMs
   }
 }
 
+export function checkEmailReadiness(): { ready: boolean; error?: string } {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasEmail = Boolean(process.env.RESEND_API_KEY?.trim() || process.env.SMTP_HOST?.trim());
+  if (isProduction && !hasEmail) {
+    console.error('[HealthCheck] Production readiness failure: email delivery provider (RESEND_API_KEY or SMTP_HOST) is not configured.');
+    return { ready: false, error: 'Email delivery provider not configured in production' };
+  }
+  return { ready: true };
+}
+
 export function registerHealthRoutes(app: express.Express): void {
   // Network Diagnostic Utilities
   app.get('/api/network-info', publicLimiter, handleGetNetworkInfo);
@@ -103,14 +114,15 @@ export function registerHealthRoutes(app: express.Express): void {
     });
   });
 
-  // Readiness Check: verifies critical dependencies (Database, Redis, Queue) are reachable
+  // Readiness Check: verifies critical dependencies (Database, Redis, Queue, Email Delivery) are reachable
   app.get('/api/health/ready', publicLimiter, async (_req: Request, res: Response) => {
     const [dbCheck, redisCheck] = await Promise.all([
       checkDatabaseReadiness(),
       checkRedisReadiness()
     ]);
+    const emailCheck = checkEmailReadiness();
 
-    const isReady = dbCheck.ready && redisCheck.ready;
+    const isReady = dbCheck.ready && redisCheck.ready && emailCheck.ready;
     const statusCode = isReady ? 200 : 503;
 
     const memory = process.memoryUsage();
@@ -152,7 +164,15 @@ export function registerHealthRoutes(app: express.Express): void {
       checkRedisReadiness()
     ]);
 
-    const isReady = dbCheck.ready && redisCheck.ready;
+    const emailCfg = getEmailAlertConfig();
+    const hasEmailConfigured = Boolean(emailCfg.resendApiKey || process.env.SMTP_HOST);
+    const emailReady = process.env.NODE_ENV === 'production' ? hasEmailConfigured : true;
+
+    if (process.env.NODE_ENV === 'production' && !hasEmailConfigured) {
+      console.error('[HealthCheck:CRITICAL] Email delivery is not configured in production. Readiness check failed.');
+    }
+
+    const isReady = dbCheck.ready && redisCheck.ready && emailReady;
     const statusCode = isReady ? 200 : 503;
     const memory = process.memoryUsage();
 
@@ -165,7 +185,8 @@ export function registerHealthRoutes(app: express.Express): void {
       environment: process.env.NODE_ENV || 'development',
       dependencies: {
         database: dbCheck.ready ? 'CONNECTED' : 'UNREACHABLE',
-        redis: redisCheck.ready ? 'CONNECTED' : 'UNREACHABLE'
+        redis: redisCheck.ready ? 'CONNECTED' : 'UNREACHABLE',
+        email: hasEmailConfigured ? 'CONNECTED' : (process.env.NODE_ENV === 'production' ? 'UNCONFIGURED_FAIL' : 'DEVELOPMENT_UNCONFIGURED')
       },
       components: {
         maxmind: maxMindDb.getStatus().status,

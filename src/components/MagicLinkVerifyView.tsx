@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, FormEvent } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { apiFetch } from '../lib/api';
-import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, Mail, ShieldCheck, RefreshCw, Lock } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, ShieldCheck, Lock, KeyRound, Mail } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
 
 interface MagicLinkVerifyViewProps {
@@ -27,264 +27,157 @@ export function MagicLinkVerifyView({
   onRequestNewLink,
   onSelectRoleLogin
 }: MagicLinkVerifyViewProps) {
-  const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
-  const [statusMsg, setStatusMsg] = useState('Verifying secure magic link…');
+  const [status, setStatus] = useState<'confirm' | 'verifying' | 'code-fallback' | 'success' | 'error'>('confirm');
+  const [statusMsg, setStatusMsg] = useState('Please confirm to sign in to your account.');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
-  const [resending, setResending] = useState(false);
-  const [resendStatus, setResendStatus] = useState<string | null>(null);
+  const [magicToken, setMagicToken] = useState<string>('');
+  const [manualCode, setManualCode] = useState<string>('');
+  const [submittingCode, setSubmittingCode] = useState<boolean>(false);
+  const [isRecovery, setIsRecovery] = useState<boolean>(false);
 
   useEffect(() => {
-    let isMounted = true;
+    // 1. Extract params from both query string and hash on mount
+    const searchParams = new URLSearchParams(window.location.search);
+    let hashQuery = '';
+    if (window.location.hash.includes('?')) {
+      hashQuery = window.location.hash.split('?')[1] || '';
+    } else if (window.location.hash.startsWith('#')) {
+      hashQuery = window.location.hash.substring(1);
+    }
+    const hashParams = new URLSearchParams(hashQuery);
 
-    async function processMagicLink() {
-      try {
-        // 1. Extract params from both query string and hash
-        const searchParams = new URLSearchParams(window.location.search);
-        
-        // Parse hash params if hash contains query format like #magic-link?token=... or #access_token=...
-        let hashQuery = '';
-        if (window.location.hash.includes('?')) {
-          hashQuery = window.location.hash.split('?')[1] || '';
-        } else if (window.location.hash.startsWith('#')) {
-          hashQuery = window.location.hash.substring(1);
-        }
-        const hashParams = new URLSearchParams(hashQuery);
+    const token = searchParams.get('token') || hashParams.get('token') || searchParams.get('magic_token') || hashParams.get('magic_token');
+    const emailParam = searchParams.get('email') || hashParams.get('email');
+    const code = searchParams.get('code') || hashParams.get('code');
+    const typeParam = searchParams.get('type') || hashParams.get('type');
 
-        const token = searchParams.get('token') || hashParams.get('token') || searchParams.get('magic_token') || hashParams.get('magic_token');
-        const emailParam = searchParams.get('email') || hashParams.get('email');
-        const code = searchParams.get('code') || hashParams.get('code');
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        const typeParam = searchParams.get('type') || hashParams.get('type');
-
-        if (emailParam) {
-          setUserEmail(emailParam);
-        }
-
-        // Check if this is a recovery redirect
-        if (typeParam === 'recovery' || hashQuery.includes('type=recovery') || window.location.search.includes('type=recovery')) {
-          setStatusMsg('Recovery clearance verified. Directing to Master Password reset…');
-          setStatus('success');
-          window.location.hash = `#reset-password?code=${code || ''}&token=${token || ''}&email=${encodeURIComponent(emailParam || '')}`;
-          return;
-        }
-
-        // Case A: Supabase PKCE authorization code
-        if (code && isSupabaseConfigured && supabase) {
-          setStatusMsg('Exchanging cryptographic verification token…');
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.warn('[MagicLink] Supabase code exchange notice:', error.message);
-            // Check if session was already exchanged by Supabase listener
-            const { data: sessData } = await supabase.auth.getSession();
-            if (sessData?.session?.user && isMounted) {
-              handleSessionSuccess(sessData.session.user, sessData.session.access_token);
-              return;
-            }
-          } else if (data.session && isMounted) {
-            handleSessionSuccess(data.session.user, data.session.access_token);
-            return;
-          }
-        }
-
-        // Case B: Supabase access token in hash
-        if (accessToken && isSupabaseConfigured && supabase) {
-          setStatusMsg('Validating cryptographic credentials…');
-          const { data, error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken || ''
-          });
-          if (!error && data.session && isMounted) {
-            handleSessionSuccess(data.session.user, data.session.access_token);
-            return;
-          }
-        }
-
-        // Case C: Native Enclave / Server-side magic link token
-        if (token) {
-          setStatusMsg('Validating single-use cryptographic enclave link…');
-          const res = await apiFetch('/api/auth/magic-link/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, email: emailParam })
-          });
-
-          const resData = await res.json();
-
-          if (!res.ok) {
-            throw new Error(resData.error || 'Magic link verification failed.');
-          }
-
-          if (isMounted) {
-            if (resData.type === 'recovery') {
-              setStatusMsg('Recovery clearance verified. Directing to Master Password reset…');
-              setStatus('success');
-              window.location.hash = `#reset-password?token=${resData.resetToken || token}&email=${encodeURIComponent(resData.email || emailParam || '')}`;
-              return;
-            }
-
-            // Normal sign-in or sign-up verification
-            setStatus('success');
-            setStatusMsg('Identity authenticated. Unlocking security enclave…');
-
-            if (onSelectRoleLogin && resData.user) {
-              onSelectRoleLogin(resData.user.role || 'analyst', {
-                token: resData.token,
-                userId: resData.user.id,
-                email: resData.user.email,
-                fullName: resData.user.fullName,
-                orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
-                accountType: resData.user.accountType || 'organization',
-                isEmailVerified: true
-              });
-            } else if (onSuccess) {
-              onSuccess();
-            }
-            return;
-          }
-        }
-
-        // Case D: Active Supabase session already established in browser
-        if (isSupabaseConfigured && supabase) {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user && isMounted) {
-            handleSessionSuccess(session.user, session.access_token);
-            return;
-          }
-        }
-
-        // If neither token nor session found
-        if (isMounted) {
-          setStatus('error');
-          setErrorMsg('No valid verification token found. The link may be incomplete or invalid.');
-        }
-      } catch (err: any) {
-        console.error('[MagicLink] Verification exception:', err);
-        if (isMounted) {
-          setStatus('error');
-          setErrorMsg(err.message || 'The magic verification link has expired or has already been used.');
-        }
-      }
+    if (token) setMagicToken(token);
+    if (emailParam) setUserEmail(emailParam);
+    if (code) setManualCode(code);
+    if (typeParam === 'recovery' || hashQuery.includes('type=recovery') || window.location.search.includes('type=recovery')) {
+      setIsRecovery(true);
     }
 
-    processMagicLink();
-
-    return () => {
-      isMounted = false;
-    };
+    // Security rule 9: Remove tokens from the URL after reading them
+    if (window.location.search || window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   }, []);
 
-  const handleSessionSuccess = (user: any, token?: string) => {
-    setStatus('success');
-    setStatusMsg('Identity authenticated. Launching forensic workspace…');
+  const handleConfirmSignIn = async () => {
+    setStatus('verifying');
+    setStatusMsg('Verifying your sign-in request…');
+    setErrorMsg(null);
 
-    // Clean up address bar query parameters and hash immediately
-    if (typeof window !== 'undefined') {
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    try {
+      if (!magicToken) {
+        throw new Error('Verification link is missing or expired. Please request a new sign-in link.');
+      }
 
-    const verifiedToken = token || `sb_${user.id}`;
-    const role = (user.user_metadata?.role as UserRole) || 'analyst';
-    const fullName = user.user_metadata?.full_name || user.email?.split('@')[0];
-    const orgName = user.user_metadata?.org_name || 'Acme Cyber Defense SOC';
-    const accountType = (user.user_metadata?.account_type as AccountType) || 'organization';
-
-    if (onSelectRoleLogin) {
-      onSelectRoleLogin(role, {
-        token: verifiedToken,
-        userId: user.id,
-        email: user.email || '',
-        fullName,
-        orgName,
-        accountType,
-        isEmailVerified: true
+      // Security rule 4: POST to consume the token (blocks prefetching crawlers)
+      const res = await apiFetch('/api/auth/magic-link/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: magicToken, email: userEmail || undefined })
       });
-    }
-    if (onSuccess) {
-      onSuccess();
+
+      const resData = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // If cookie is missing or mismatch (different device / browser), show fallback code screen
+        if (res.status === 403 || resData.code === 'ERR_DEVICE_MISMATCH' || resData.code === 'ERR_COOKIE_MISSING') {
+          setStatus('code-fallback');
+          setStatusMsg('For your security on this device, please enter the 6-digit code from your email.');
+          return;
+        }
+        throw new Error(resData.error || 'Sign in link verification failed.');
+      }
+
+      if (resData.type === 'recovery' || isRecovery) {
+        setStatusMsg('Password reset authorized. Directing to password reset…');
+        setStatus('success');
+        window.location.hash = `#reset-password?token=${resData.resetToken || magicToken}&email=${encodeURIComponent(resData.email || userEmail || '')}`;
+        return;
+      }
+
+      // Success
+      setStatus('success');
+      setStatusMsg('Signed in successfully.');
+
+      if (onSelectRoleLogin && resData.user) {
+        onSelectRoleLogin(resData.user.role || 'analyst', {
+          token: resData.token,
+          userId: resData.user.id,
+          email: resData.user.email,
+          fullName: resData.user.fullName || resData.user.email.split('@')[0],
+          orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
+          accountType: resData.user.accountType || 'organization',
+          isEmailVerified: true
+        });
+      } else if (onSuccess) {
+        onSuccess();
+      }
+    } catch (err: any) {
+      console.error('[MagicLinkVerify] Verification error:', err);
+      setStatus('error');
+      setErrorMsg(err.message || 'Verification link is invalid or has expired. Please request a new one.');
     }
   };
 
-  const handleResendLink = async () => {
-    if (!userEmail) {
-      if (onRequestNewLink) {
-        onRequestNewLink();
-      } else {
-        onBackToLogin();
-      }
-      return;
-    }
+  const handleVerifyOtpFallback = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!manualCode.trim()) return;
 
-    setResending(true);
-    setResendStatus(null);
+    setSubmittingCode(true);
+    setErrorMsg(null);
+
     try {
-      const cleanEmail = userEmail.trim().toLowerCase();
-      let supabaseCallSucceeded = false;
-      // 1. Supabase best-effort secondary attempt (safely wrapped)
-      if (isSupabaseConfigured && supabase) {
-        try {
-          const { error: sbErr } = await supabase.auth.signInWithOtp({
-            email: cleanEmail,
-            options: {
-              emailRedirectTo: window.location.origin
-            }
-          });
-          if (sbErr) {
-            console.warn('[MagicLinkVerifyView] Supabase resend notice:', sbErr.message);
-            const isRateLimit = (sbErr as any)?.status === 429 ||
-              Boolean(sbErr?.message && (
-                sbErr.message.toLowerCase().includes('rate limit') ||
-                /after \d+ seconds/i.test(sbErr.message)
-              ));
-            if (isRateLimit) {
-              setResendStatus(sbErr.message);
-              setResending(false);
-              return;
-            }
-          } else {
-            supabaseCallSucceeded = true;
-          }
-        } catch (err: any) {
-          console.warn('[MagicLinkVerifyView] Supabase resend notice:', err?.message);
-          const isRateLimit = err?.status === 429 ||
-            Boolean(err?.message && (
-              err.message.toLowerCase().includes('rate limit') ||
-              /after \d+ seconds/i.test(err.message)
-            ));
-          if (isRateLimit) {
-            setResendStatus(err.message);
-            setResending(false);
-            return;
-          }
-        }
-      }
-
-      // 2. Authoritative reliable server dispatch
-      const res = await apiFetch('/api/auth/magic-link/send', {
+      const cleanCode = manualCode.trim().replace(/\D/g, '');
+      const res = await apiFetch('/api/auth/magic-link/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: cleanEmail,
-          type: 'signin',
-          redirectTo: window.location.origin
+          token: magicToken || undefined,
+          email: userEmail || undefined,
+          code: cleanCode
         })
       });
 
-      const data = await res.json().catch(() => ({}));
+      const resData = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        if (res.status === 429 && supabaseCallSucceeded) {
-          setResendStatus(`Fresh magic link dispatched to ${cleanEmail}. Please check your inbox.`);
-          return;
-        }
-        throw new Error(data.error || 'Failed to dispatch new magic link.');
+        throw new Error(resData.error || 'Invalid or expired verification code.');
       }
 
-      setResendStatus(`Fresh magic link dispatched to ${cleanEmail}. Please check your inbox.`);
+      if (resData.type === 'recovery' || isRecovery) {
+        setStatusMsg('Password reset authorized. Directing to password reset…');
+        setStatus('success');
+        window.location.hash = `#reset-password?token=${resData.resetToken || magicToken}&code=${cleanCode}&email=${encodeURIComponent(resData.email || userEmail || '')}`;
+        return;
+      }
+
+      setStatus('success');
+      setStatusMsg('Signed in successfully.');
+
+      if (onSelectRoleLogin && resData.user) {
+        onSelectRoleLogin(resData.user.role || 'analyst', {
+          token: resData.token,
+          userId: resData.user.id,
+          email: resData.user.email,
+          fullName: resData.user.fullName || resData.user.email.split('@')[0],
+          orgName: resData.user.organizationId || 'Acme Cyber Defense SOC',
+          accountType: resData.user.accountType || 'organization',
+          isEmailVerified: true
+        });
+      } else if (onSuccess) {
+        onSuccess();
+      }
     } catch (err: any) {
-      setResendStatus(err.message || 'Error requesting new magic link.');
+      console.error('[MagicLinkVerify] Fallback code error:', err);
+      setErrorMsg(err.message || 'Invalid or expired verification code.');
     } finally {
-      setResending(false);
+      setSubmittingCode(false);
     }
   };
 
@@ -303,38 +196,123 @@ export function MagicLinkVerifyView({
           </button>
 
           <div className="font-mono text-[11px] text-[var(--paper-dim)] flex items-center gap-1.5">
-            <Lock className="w-3 h-3 text-[var(--forensic-green)]" />
-            <span>Enclave Verification</span>
+            <Lock className="w-3 h-3 text-[var(--stamp)]" />
+            <span>SECURE SIGN IN</span>
           </div>
         </div>
+
+        {/* State: Confirm (Requires explicit click before POST, blocking scanners) */}
+        {status === 'confirm' && (
+          <div className="py-4 text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-[rgba(201,162,39,0.12)] border border-[var(--stamp)] text-[var(--stamp)] flex items-center justify-center mx-auto shadow-sm">
+              <Mail className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h2 className="font-display font-bold text-xl text-[var(--paper)]">
+                Confirm Sign In
+              </h2>
+              <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
+                Click below to complete sign-in and open your workspace.
+              </p>
+              {userEmail && (
+                <div className="inline-block px-3 py-1 bg-[var(--ink)] border border-[var(--line)] rounded-xs font-mono text-xs text-[var(--stamp)]">
+                  {userEmail}
+                </div>
+              )}
+            </div>
+
+            {errorMsg && (
+              <div className="p-3 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-start gap-2.5 text-left">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--thread)]" />
+                <div className="leading-relaxed font-sans">{errorMsg}</div>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleConfirmSignIn}
+                className="w-full py-3 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Confirm Sign In →</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* State: Verifying */}
         {status === 'verifying' && (
           <div className="py-8 text-center space-y-4">
             <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-2 border-[var(--line)]" />
-              <div className="absolute inset-0 rounded-full border-2 border-t-[var(--stamp)] border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-              <ShieldCheck className="w-7 h-7 text-[var(--stamp)]" />
+              <Loader2 className="w-8 h-8 text-[var(--stamp)] animate-spin" />
             </div>
-
             <div className="space-y-1.5">
               <h2 className="font-display font-bold text-lg text-[var(--paper)]">
-                Authenticating Magic Link
+                Verifying Sign In
               </h2>
               <p className="text-xs text-[var(--paper-dim)] font-mono">
                 {statusMsg}
               </p>
             </div>
+          </div>
+        )}
 
-            <div className="p-3 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-left text-[11.5px] text-[var(--paper-muted)] font-mono space-y-1">
-              <div className="flex items-center gap-1.5 text-[var(--paper-dim)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--forensic-green)] animate-pulse" />
-                <span>Zero-Password Cryptographic Verification</span>
+        {/* State: Code fallback (when cookie is missing on different device) */}
+        {status === 'code-fallback' && (
+          <div className="py-4 space-y-4">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-full bg-[rgba(201,162,39,0.12)] border border-[var(--stamp)] text-[var(--stamp)] flex items-center justify-center mx-auto mb-1">
+                <KeyRound className="w-7 h-7" />
               </div>
-              <p className="text-[10.5px] text-[var(--paper-muted)] leading-relaxed">
-                Single-use nonce validation in progress against the TraceXMail security enclave.
+              <h2 className="font-display font-bold text-lg text-[var(--paper)]">
+                Enter Verification Code
+              </h2>
+              <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
+                You are accessing this link from a different browser or device. Please enter the 6-digit code from your email to complete sign in.
               </p>
             </div>
+
+            {errorMsg && (
+              <div className="p-3 rounded-[2px] bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--thread)]" />
+                <div className="leading-relaxed font-sans">{errorMsg}</div>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyOtpFallback} className="space-y-3">
+              <div>
+                <label className="block text-xs font-mono font-medium text-[var(--paper-dim)] mb-1 uppercase tracking-wider" htmlFor="otp-fallback-code">
+                  6-Digit Verification Code
+                </label>
+                <input
+                  id="otp-fallback-code"
+                  type="text"
+                  required
+                  maxLength={6}
+                  value={manualCode}
+                  onChange={e => setManualCode(e.target.value)}
+                  placeholder="123456"
+                  className="w-full text-center text-lg tracking-widest font-mono py-2.5 px-3 bg-[var(--ink)] border border-[var(--line)] rounded-xs text-[var(--paper)] focus:outline-none focus:border-[var(--stamp)]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submittingCode || manualCode.trim().length < 6}
+                className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 disabled:opacity-50 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                {submittingCode ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying Code…</span>
+                  </>
+                ) : (
+                  <span>Verify Code & Sign In →</span>
+                )}
+              </button>
+            </form>
           </div>
         )}
 
@@ -344,77 +322,48 @@ export function MagicLinkVerifyView({
             <div className="w-16 h-16 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto shadow-sm">
               <CheckCircle2 className="w-8 h-8" />
             </div>
-
             <div className="space-y-1.5">
               <h2 className="font-display font-bold text-lg text-[var(--paper)]">
-                Access Clearance Confirmed
+                Authentication Confirmed
               </h2>
-              <p className="text-xs text-[var(--forensic-green)] font-mono">
+              <p className="text-xs text-[var(--paper-dim)]">
                 {statusMsg}
               </p>
-            </div>
-
-            <div className="p-3 rounded-[2px] bg-[rgba(72,169,117,0.08)] border border-[var(--forensic-green)] text-xs text-[var(--paper)] font-mono flex items-center justify-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--forensic-green)]" />
-              <span>Redirecting to Security Operations Center…</span>
             </div>
           </div>
         )}
 
         {/* State: Error */}
         {status === 'error' && (
-          <div className="py-4 space-y-4">
-            <div className="text-center space-y-2">
-              <div className="w-14 h-14 rounded-full bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--thread)] flex items-center justify-center mx-auto mb-1">
-                <AlertCircle className="w-7 h-7" />
-              </div>
+          <div className="py-6 text-center space-y-4">
+            <div className="w-14 h-14 rounded-full bg-[rgba(178,58,46,0.15)] border border-[var(--thread)] text-[var(--rose-300)] flex items-center justify-center mx-auto">
+              <AlertCircle className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
               <h2 className="font-display font-bold text-lg text-[var(--paper)]">
-                Magic Link Invalid or Expired
+                Verification Failed
               </h2>
               <p className="text-xs text-[var(--paper-dim)] leading-relaxed">
-                {errorMsg || 'This magic link has expired or has already been used for security.'}
+                {errorMsg || 'This link is invalid or has expired.'}
               </p>
             </div>
 
-            <div className="p-3 rounded-[2px] bg-[rgba(178,58,46,0.08)] border border-[var(--thread)] text-xs text-[var(--paper)] font-sans leading-relaxed">
-              Magic links are single-use tokens valid for 15 minutes to protect your account. You can easily request a fresh magic link to be sent to your email.
-            </div>
-
-            {resendStatus && (
-              <div className="p-3 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-xs text-[var(--paper)] font-mono flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
-                <span>{resendStatus}</span>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2 pt-2">
-              {userEmail ? (
-                <button
-                  type="button"
-                  onClick={handleResendLink}
-                  disabled={resending}
-                  className="w-full py-2.5 px-4 bg-[var(--ink)] border border-[var(--stamp)] text-[var(--stamp)] hover:bg-[var(--ink-3)] font-semibold text-xs rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${resending ? 'animate-spin' : ''}`} />
-                  <span>{resending ? 'Sending Link…' : `Request Fresh Magic Link for ${userEmail}`}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onBackToLogin}
-                  className="w-full py-2.5 px-4 bg-[var(--stamp)] text-[var(--ink)] font-semibold text-xs rounded-sm hover:opacity-95 transition-opacity flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Request Magic Link from Sign In</span>
-                </button>
-              )}
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={onRequestNewLink ? () => onRequestNewLink(userEmail) : onBackToLogin}
+                className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+              >
+                <span>Request New Sign In Link →</span>
+              </button>
 
               <button
                 type="button"
                 onClick={onBackToLogin}
-                className="w-full py-2 px-3 text-xs text-[var(--paper-dim)] hover:text-[var(--paper)] flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
+                className="w-full py-2 px-3 text-xs text-[var(--slate)] hover:text-[var(--paper)] transition-colors cursor-pointer bg-transparent border-0"
               >
-                <span>Sign In with Password Instead →</span>
+                Return to sign in
               </button>
             </div>
           </div>

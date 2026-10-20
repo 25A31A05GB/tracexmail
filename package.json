@@ -35,7 +35,7 @@
     "@types/multer": "*",
     "@types/three": "*",
     "@types/ws": "*",
-    "@vitejs/plugin-react": "*",
+    "@vitejs/plugin-react": "^4.3.4",
     "@xenova/transformers": "*",
     "@xyflow/react": "*",
     "axios": "*",
@@ -81,12 +81,6 @@
     "zod": "*"
   },
   "overrides": {
-    "qs": "6.16.0",
-    "protobufjs": "^7.6.6",
-    "sharp": "^0.35.4",
-    "onnxruntime-web": "^1.19.0"
-  },
-  "resolutions": {
     "qs": "6.16.0",
     "protobufjs": "^7.6.6",
     "sharp": "^0.35.4",

@@ -5,6 +5,7 @@ import { GoogleAuthButton } from './GoogleAuthButton';
 import { TurnstileWidget } from './TurnstileWidget';
 import { Loader2, AlertCircle, ArrowLeft, Lock, MailCheck, Send, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { UserRole, AccountType } from '../hooks/useSession';
+import { CheckInboxScreen } from './common/CheckInboxScreen';
 
 interface LoginViewProps {
   onBackToGate?: () => void;
@@ -42,7 +43,6 @@ export function LoginView({
   const [resending, setResending] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
-  const [directMagicLinkUrl, setDirectMagicLinkUrl] = useState<string | null>(null);
 
   const handleBack = onBackToIntro || onBackToGate;
 
@@ -119,11 +119,6 @@ export function LoginView({
         }
         throw new Error(data.error || 'Failed to dispatch magic link.');
       }
-
-      if (data.magicLinkUrl || data.debugLink) {
-        setDirectMagicLinkUrl(data.magicLinkUrl || data.debugLink);
-      }
-
       setMagicLinkSent(true);
     } catch (err: any) {
       console.error('[LoginView] Magic link error:', err);
@@ -556,72 +551,21 @@ export function LoginView({
 
         {authMode === 'magic-link' ? (
           magicLinkSent ? (
-            <div className="space-y-4 py-2">
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-full bg-[rgba(72,169,117,0.15)] border border-[var(--forensic-green)] text-[var(--forensic-green)] flex items-center justify-center mx-auto mb-1 shadow-sm">
-                  <MailCheck className="w-6 h-6" />
-                </div>
-                <h3 className="font-display font-bold text-base text-[var(--paper)]">
-                  Magic Link Dispatched
-                </h3>
-                <p className="text-xs text-[var(--paper-dim)] leading-relaxed font-sans">
-                  We sent a single-use sign-in link to <span className="font-mono text-[var(--stamp)] font-semibold">{email.trim()}</span>.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-[2px] bg-[var(--ink)] border border-[var(--line)] text-xs font-sans space-y-1.5">
-                <div className="font-medium text-[var(--paper)] flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-[var(--forensic-green)]" />
-                  <span>One-Click Passwordless Authentication</span>
-                </div>
-                <p className="text-[var(--paper-muted)] text-[11.5px] leading-relaxed">
-                  Click the link inside your email to immediately access your TraceXMail workspace without entering a password.
-                </p>
-              </div>
-
-              {resendStatus && (
-                <div className="p-2.5 rounded-[2px] bg-[rgba(72,169,117,0.12)] border border-[var(--forensic-green)] text-xs text-[var(--paper)] font-mono flex items-center gap-2">
-                  <MailCheck className="w-4 h-4 text-[var(--forensic-green)] shrink-0" />
-                  <span>{resendStatus}</span>
-                </div>
-              )}
-
-              {directMagicLinkUrl && (
-                <a
-                  href={directMagicLinkUrl}
-                  className="w-full py-2.5 px-4 bg-[var(--stamp)] hover:brightness-110 active:brightness-95 text-[var(--ink)] font-bold text-xs rounded-sm transition-all flex items-center justify-center gap-2 text-center no-underline cursor-pointer shadow-md"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Authenticate & Open Workspace Now →</span>
-                </a>
-              )}
-
-              <div className="flex flex-col gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={handleResendMagicLink}
-                  disabled={resending}
-                  className="w-full py-2.5 px-4 bg-[var(--ink-2)] border border-[var(--line)] hover:border-[var(--paper-dim)] text-[var(--paper)] font-semibold text-xs rounded-sm transition-colors flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Send className={`w-3.5 h-3.5 text-[var(--slate)] ${resending ? 'animate-spin' : ''}`} />
-                  <span>{resending ? 'Resending Link…' : 'Resend Magic Link'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMagicLinkSent(false);
-                    setAuthMode('password');
-                  }}
-                  className="w-full py-2 px-3 text-xs text-[var(--slate)] hover:text-[var(--paper)] hover:underline flex items-center justify-center gap-1.5 cursor-pointer bg-transparent border-0"
-                >
-                  <span>Sign In with Password Instead →</span>
-                </button>
-              </div>
-
-              <div className="text-center text-[10.5px] text-[var(--paper-muted)] font-mono pt-1">
-                Didn't receive it? Please check your Spam or Promotions folder.
-              </div>
+            <div className="py-2">
+              <CheckInboxScreen
+                email={email}
+                title="Check your inbox"
+                description="We sent a single-use sign-in link to your work email."
+                onResend={handleResendMagicLink}
+                onChangeEmail={() => {
+                  setMagicLinkSent(false);
+                  setErrorMsg(null);
+                }}
+                onBackToLogin={() => {
+                  setMagicLinkSent(false);
+                  setAuthMode('password');
+                }}
+              />
             </div>
           ) : (
             <form onSubmit={handleSendMagicLink} className="space-y-3.5">
