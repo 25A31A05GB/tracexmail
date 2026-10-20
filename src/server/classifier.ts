@@ -23,7 +23,8 @@ import {
   isPunycodeOrHomoglyph,
   getWeightedSocialEngineeringScore,
   extractFinancialEntities,
-  type FinancialEntitiesResult
+  type FinancialEntitiesResult,
+  type StructuralIdentityEvaluation
 } from './structuralFeatures.js';
 import {
   scoreSemanticSimilarity,
@@ -112,6 +113,18 @@ export interface ClassifierInput {
     };
     mx_missing?: boolean;
   };
+  ablationConfig?: LayerAblationConfig;
+}
+
+export interface LayerAblationConfig {
+  tfidfCentroid?: boolean;
+  embeddingSimilarity?: boolean;
+  llmLinguisticForensics?: boolean;
+  weightedLexicons?: boolean;
+  structuralHeaderFeatures?: boolean;
+  authenticationSignals?: boolean;
+  threatIntelSignals?: boolean;
+  metaClassifier?: boolean;
 }
 
 export interface FeatureWeight {
@@ -577,8 +590,15 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
   const features: FeatureWeight[] = [];
   const heuristics: ClassificationResult['heuristics'] = [];
   const topVectors: string[] = [];
+  const ablation = input.ablationConfig || {};
 
-  const mlOutput = mlEngine.predict({
+  const mlOutput = ablation.tfidfCentroid === false ? {
+    predictedClass: 'Legitimate' as EmailClassification,
+    probabilities: { Legitimate: 0.5, Suspicious: 0.125, Impersonated: 0.125, Phishing: 0.125, 'Fraud-related': 0.125 },
+    confidence: 0.5,
+    topFeatures: [],
+    activeClassifier: 'centroid_cosine'
+  } : mlEngine.predict({
     subject: input.subject,
     from: input.from,
     fromDomain: input.fromDomain,
@@ -590,7 +610,17 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
     hops: input.hops
   });
 
-  const structuralIdentity = evaluateStructuralIdentity({
+  const structuralIdentity: StructuralIdentityEvaluation = ablation.structuralHeaderFeatures === false ? {
+    claimedBrand: null,
+    isBrandDomainAligned: true,
+    isBrandDisplayMismatch: false,
+    isLookalikeDomain: false,
+    lookalikePattern: null,
+    isReplyToMismatch: false,
+    isReturnPathMismatch: false,
+    isPunycode: false,
+    structuralTokens: []
+  } : evaluateStructuralIdentity({
     from: input.from,
     fromDomain: input.fromDomain,
     replyTo: input.replyTo,
@@ -626,6 +656,11 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
   if (dmarcStatus === 'REJECT' || dmarcStatus === 'FAIL') {
     authScore += 10;
     authReasons.push('DMARC alignment policy failed');
+  }
+
+  if (ablation.authenticationSignals === false) {
+    authScore = 0;
+    authReasons.length = 0;
   }
 
   authScore = Math.min(25, authScore);
@@ -673,6 +708,11 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
     domainReasons.push('No Mail Exchanger (MX) records found in DNS');
   }
 
+  if (ablation.threatIntelSignals === false) {
+    domainScore = 0;
+    domainReasons.length = 0;
+  }
+
   domainScore = Math.min(25, domainScore);
   features.push({
     feature: 'domain_risk_intelligence',
@@ -694,6 +734,11 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
   if (torOrAbuseHop) {
     infraScore += 15;
     infraReasons.push(`Relay hop ${torOrAbuseHop.fromIp || 'node'} flagged for anonymization / abuse score ${torOrAbuseHop.abuseScore || 85}%`);
+  }
+
+  if (ablation.threatIntelSignals === false) {
+    infraScore = 0;
+    infraReasons.length = 0;
   }
 
   infraScore = Math.min(20, infraScore);
@@ -894,7 +939,7 @@ export function classifyEmailForensics(input: ClassifierInput): ClassificationRe
     topVectors,
     infrastructureBreakdown,
     attribution,
-    activeClassifier: mlOutput.activeClassifier
+    activeClassifier: (mlOutput.activeClassifier as ('logistic_regression' | 'centroid_cosine')) || 'centroid_cosine'
   };
 }
 
@@ -941,20 +986,56 @@ export interface LayeredClassificationResult extends ClassificationResult {
  * - Layer 3: Expanded Weighted Lexicon & Financial Entity Extractor with IBAN/ABA checksums (Always-on)
  */
 export async function classifyEmailContent(input: ClassifierInput): Promise<LayeredClassificationResult> {
+  const ablation = input.ablationConfig || {};
+
   // 1. Run Baseline Deterministic ML & Envelope Telemetry
   const baseResult = classifyEmailForensics(input);
   const bodyText = input.bodyText || input.text || '';
   const combinedText = `${input.subject} ${bodyText}`;
 
-  // 2. LAYER 3: Free deterministic weighted lexicon & entity extraction (Always-On)
-  const seScores = getWeightedSocialEngineeringScore(combinedText);
-  const finEntities = extractFinancialEntities(combinedText);
+  // 2. LAYER 3: Free deterministic weighted lexicon & entity extraction (Always-On unless ablated)
+  const seScores = ablation.weightedLexicons === false ? { urgencyScore: 0, authorityScore: 0, financialActionScore: 0, technicalSpoofScore: 0, compositeSocialEngineeringScore: 0 } as any : getWeightedSocialEngineeringScore(combinedText);
+  const finEntities: FinancialEntitiesResult = ablation.weightedLexicons === false ? {
+    hasFinancialEntities: false,
+    dollarAmounts: [],
+    routingNumbers: [],
+    ibanNumbers: [],
+    bankAccountCandidates: [],
+    totalAmountsCount: 0
+  } : extractFinancialEntities(combinedText);
 
   // 3. LAYER 1: Semantic embedding similarity via Gemini text-embedding-004 (Optional)
-  const semanticSim = await scoreSemanticSimilarity(bodyText || input.subject);
+  const semanticSim: SemanticSimilarityResult = ablation.embeddingSimilarity === false ? {
+    status: 'UNAVAILABLE' as const,
+    classSimilarities: { Legitimate: 0, Suspicious: 0, Impersonated: 0, Phishing: 0, 'Fraud-related': 0 },
+    nearestTemplate: null,
+    nearestClass: null,
+    topSimilarity: 0,
+    details: {
+      clusters: {},
+      model: 'none (ablated)',
+      provider: 'none'
+    }
+  } : await scoreSemanticSimilarity(bodyText || input.subject);
 
   // 4. LAYER 2: Structured LLM linguistic forensics (Optional, tagged as HYPOTHESIS)
-  const llmForensics = await analyzeLinguisticForensics(bodyText || input.subject, {
+  const llmForensics: LinguisticForensicsResult = ablation.llmLinguisticForensics === false ? {
+    status: 'UNAVAILABLE' as const,
+    evidence_type: 'HYPOTHESIS' as const,
+    provider: 'none' as const,
+    model_used: 'none (ablated)',
+    social_engineering_techniques: [],
+    tone_register: 'formal' as const,
+    register_anomaly_flag: false,
+    explanation: 'LLM Forensics layer bypassed by ablation configuration.',
+    extracted_entities: {
+      dollar_amounts: [],
+      account_or_routing_numbers: [],
+      deadlines_or_time_pressure: [],
+      requested_actions: []
+    },
+    confidence: 0
+  } : await analyzeLinguisticForensics(bodyText || input.subject, {
     from: input.from,
     subject: input.subject
   });
@@ -1101,7 +1182,7 @@ export async function classifyEmailContent(input: ClassifierInput): Promise<Laye
     finalClass = 'Fraud-related';
   }
 
-  const finalThreatScore = Math.max(baseResult.threatScore, fullMetaPrediction.totalThreatScore);
+  const finalThreatScore = ablation.metaClassifier === false ? baseResult.threatScore : Math.max(baseResult.threatScore, fullMetaPrediction.totalThreatScore);
   const finalSeverity: ClassificationResult['severity'] =
     finalThreatScore >= 80 ? 'CRITICAL'
     : finalThreatScore >= 60 ? 'HIGH'

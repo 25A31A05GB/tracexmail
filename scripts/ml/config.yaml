@@ -1,0 +1,50 @@
+# TraceXMail Benchmark Harness Configuration (Prompt 26)
+seed: 42
+data:
+  train_path: "data/datasets/clean/train.jsonl"
+  val_path: "data/datasets/clean/val.jsonl"
+  test_path: "data/datasets/clean/test.jsonl"
+  manifest_path: "data/datasets/clean/MANIFEST.json"
+  holdout_path: "data/datasets/adversarial_holdout.json"
+
+reports:
+  markdown_output: "reports/BENCHMARK.md"
+  json_output: "reports/benchmark.json"
+  figures_dir: "reports/figures"
+
+labels:
+  - "Legitimate"
+  - "Suspicious"
+  - "Impersonated"
+  - "Phishing"
+  - "Fraud-related"
+
+models:
+  majority_class:
+    enabled: true
+  tfidf_logistic_regression:
+    enabled: true
+    hyperparameters_val_tuning:
+      max_features: [500, 1500, 3000]
+      C: [0.1, 1.0, 5.0, 10.0]
+      ngram_range: [[1, 1], [1, 2]]
+  tfidf_linear_svm:
+    enabled: true
+    calibration: "sigmoid"
+    hyperparameters_val_tuning:
+      C: [0.1, 1.0, 5.0]
+  tfidf_gradient_boosting:
+    enabled: true
+    model_type: "hist_gradient_boosting" # or lightgbm
+    hyperparameters_val_tuning:
+      learning_rate: [0.05, 0.1, 0.2]
+      max_iter: [100, 200]
+  tracexmail_classifier:
+    enabled: true
+    adapter_command: "npx tsx scripts/ml/run_tracexmail_classifier.ts"
+
+evaluation:
+  bootstrap_resamples: 1000
+  confidence_interval: 0.95
+  operational_recall_thresholds: [0.90, 0.95]
+  mcnemar_significance_alpha: 0.05
