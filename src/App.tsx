@@ -1050,7 +1050,6 @@ export default function App() {
           onOpenUpgradeModal={handleOpenUpgradeModal}
           onSignOut={signOut}
           onOpenSettings={() => setActiveTab('settings')}
-          onSwitchRole={switchRole}
           viewMode={viewMode}
           onSetViewMode={handleToggleViewMode}
           userPersona={userPersona}

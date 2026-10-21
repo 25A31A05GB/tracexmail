@@ -47,6 +47,7 @@ import {
   Radio
 } from 'lucide-react';
 import { ModelHealthDashboard } from './ModelHealthDashboard';
+import { AdminModelHealth } from './AdminModelHealth';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -545,7 +546,7 @@ export function UltimateBossAdminView({
       </div>
 
       {activeAdminSubTab === 'mlops' ? (
-        <ModelHealthDashboard />
+        <AdminModelHealth />
       ) : (
         <>
           {/* Action Toast Alert */}

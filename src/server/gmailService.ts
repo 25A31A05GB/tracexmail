@@ -231,7 +231,7 @@ const ingestionQueue: IngestionQueueItem[] = [];
  * Automatically queues a newly detected email for forensic analysis.
  */
 export function queueEmailForAnalysis(item: Omit<IngestionQueueItem, 'queueId' | 'queuedAt' | 'status'>): IngestionQueueItem {
-  const queueId = `q_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const queueId = `q_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
   const queueItem: IngestionQueueItem = {
     ...item,
     queueId,
@@ -1234,9 +1234,9 @@ export function buildQuarantineReportNotePayload(params: {
 </html>`;
 
   const selfEmail = params.senderEmail || state.emailAddress || 'security@tracexmail.internal';
-  const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${Math.random().toString(36).slice(2, 7)}@tracexmail.internal>`;
+  const noteMessageId = `<tracexmail-report-${params.caseId || Date.now()}-${crypto.randomUUID().slice(0, 8)}@tracexmail.internal>`;
 
-  const boundary = `----=_Part_TraceXMail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const boundary = `----=_Part_TraceXMail_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
   const rfcHeaders: string[] = [
     `From: TraceXMail Security <${selfEmail}>`,
@@ -1297,7 +1297,7 @@ export function buildQuarantineReportNotePayload(params: {
  * Generates a realistic sample in-thread quarantine report payload for preview and live mailbox testing.
  */
 export function generateSampleQuarantineReportPayload(overrides?: Partial<Parameters<typeof buildQuarantineReportNotePayload>[0]>) {
-  const caseId = overrides?.caseId || `CASE-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+  const caseId = overrides?.caseId || `CASE-2026-${crypto.randomInt(1000, 10000)}`;
   const threatScore = typeof overrides?.threatScore === 'number' ? overrides.threatScore : 88;
   const verdict = overrides?.verdict || 'MALICIOUS_PHISH';
   const subject = overrides?.subject || 'URGENT: Outstanding Invoice #INV-92819 Settlement Required';
@@ -1855,7 +1855,7 @@ export async function processInboundQuarantineGate(params: {
   state.metrics.lastDeliveryStage = deliveryStage;
 
   const logEntry = {
-    id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+    id: `log-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
     timestamp: new Date().toISOString(),
     messageId: params.messageId,
     subject: params.subject,

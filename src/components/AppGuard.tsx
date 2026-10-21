@@ -13,7 +13,7 @@ interface State {
   isChunkError: boolean;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
+export class AppGuard extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -210,3 +210,5 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return this.props.children;
   }
 }
+
+export { AppGuard as ErrorBoundary };

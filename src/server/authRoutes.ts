@@ -328,7 +328,7 @@ const activeTeamInvites: TeamInvitationRecord[] = [
 
 // Helper to generate cryptographically secure 6-digit numeric OTP
 function generateSecureOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
 }
 
 // Dummy bcrypt hash used for timing-safe constant-time password verification when user does not exist
@@ -374,7 +374,7 @@ function recordFailedLogin(
   const isAccTriggered = accEntry && accEntry.count >= FAILED_LOGIN_ALERT_THRESHOLD;
 
   if (isIpTriggered || isAccTriggered) {
-    const alertId = `alt_sec_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const alertId = `alt_sec_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
     const targetLabel = isAccTriggered
       ? `Targeted Account: ${accountEmail} (${accEntry?.count} attempts)`
       : `Origin IP: ${ip} (${ipEntry.count} attempts)`;
@@ -1803,7 +1803,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const expiresAt = new Date(Date.now() + expiresInDays * 24 * 3600 * 1000).toISOString();
 
     const newInvite: TeamInvitationRecord = {
-      id: `inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      id: `inv_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
       organization_id: orgId,
       organization_name: 'Acme Cyber Defense SOC',
       email: cleanEmail,

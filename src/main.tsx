@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/react";
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppGuard } from './components/AppGuard';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
@@ -71,9 +71,9 @@ if (container) {
   const root = createRoot(container);
   root.render(
     <React.StrictMode>
-      <ErrorBoundary>
+      <AppGuard>
         <App />
-      </ErrorBoundary>
+      </AppGuard>
     </React.StrictMode>
   );
 }

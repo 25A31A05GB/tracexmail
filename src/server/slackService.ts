@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 import { encryptToken, decryptToken } from './compliance';
 
@@ -458,7 +459,7 @@ export async function sendSlackSecurityAlert(
   const minSeverity = config.minSeverity;
   const webhookUrl = config.webhookUrl;
 
-  const logId = `slack_log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const logId = `slack_log_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
   // 1. Check duplicate prevention
   if (!extraData?.isTestCall && alertId && sentAlertIds.has(alertId)) {
@@ -761,7 +762,7 @@ export async function sendTestSlackAlert(
   try {
     const log = await sendSlackSecurityAlert(testAlert, {
       confidence: '98%',
-      evidenceId: `EV-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      evidenceId: `EV-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
       verdict: 'MALICIOUS / PHISHING',
       isTestCall: true
     });

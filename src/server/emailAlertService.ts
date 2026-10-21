@@ -8,6 +8,7 @@
  * - ALERT_EMAIL_RECIPIENTS
  */
 
+import crypto from 'crypto';
 import axios from 'axios';
 import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 
@@ -196,7 +197,7 @@ export async function sendEmailAlert(alertData: {
 
   // Record dispatch log
   const logEntry: EmailAlertLog = {
-    id: `eml_log_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `eml_log_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
     timestamp: new Date().toISOString(),
     case_id: alertData.caseId && alertData.caseId !== 'N/A' ? alertData.caseId : undefined,
     subject: alertData.subject,

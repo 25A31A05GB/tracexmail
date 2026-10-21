@@ -140,7 +140,7 @@ export async function logAuditAction(
   supabase?: SupabaseClient | null
 ): Promise<AuditLogEntry> {
   const auditEntry: AuditLogEntry = {
-    id: entry.id || `audit_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    id: entry.id || `audit_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
     organization_id: entry.organization_id || 'org_acme_soc_01',
     case_id: entry.case_id || null,
     user_id: entry.user_id || 'system',

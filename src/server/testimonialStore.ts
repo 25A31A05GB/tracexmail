@@ -94,12 +94,19 @@ function syncTestimonialToDb(t: UserTestimonial): void {
 }
 
 function saveTestimonialsToDisk(testimonials: UserTestimonial[]): boolean {
+  // Always sync to Postgres database via Supabase
+  testimonials.forEach(syncTestimonialToDb);
+
+  // In production, testimonials are persisted strictly to Postgres; skip local JSON write
+  if (process.env.NODE_ENV === 'production') {
+    return true;
+  }
+
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     fs.writeFileSync(TESTIMONIALS_FILE, JSON.stringify(testimonials, null, 2), 'utf-8');
-    testimonials.forEach(syncTestimonialToDb);
     return true;
   } catch (err) {
     console.error('[testimonialStore] Failed to write testimonials to disk:', err);

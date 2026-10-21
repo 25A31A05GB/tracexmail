@@ -674,3 +674,18 @@ export async function getStoredTokens(): Promise<StoredTokens | null> {
 export async function saveTokens(tokens: StoredTokens): Promise<void> {
   storedTokensMemory = tokens;
 }
+
+/**
+ * Asserts that the persistent database is configured in production.
+ * Fails startup if the database is missing and in-memory persistence is attempted.
+ */
+export function assertProductionDatabaseReady(): void {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_IN_MEMORY_AUTH_IN_PRODUCTION !== 'true') {
+    const supabase = getSupabaseAdminClient();
+    if (!supabase) {
+      throw new Error(
+        '[FATAL] Production database (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY) is required for authTokenStore persistence. In-memory token storage is strictly forbidden in production.'
+      );
+    }
+  }
+}

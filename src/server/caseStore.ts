@@ -386,6 +386,10 @@ export function loadCasesFromDisk(): Map<string, PersistedCase> {
 }
 
 export function saveCasesToDisk(casesMap: Map<string, PersistedCase>): boolean {
+  // In production, cases are persisted strictly to Postgres (cases table in Supabase)
+  if (process.env.NODE_ENV === 'production') {
+    return true;
+  }
   ensureDataDir();
   try {
     const list = Array.from(casesMap.values());

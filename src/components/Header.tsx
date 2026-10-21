@@ -57,7 +57,6 @@ interface HeaderProps {
   onOpenUpgradeModal?: (featureName?: string) => void;
   onSignOut?: () => void;
   onOpenSettings?: () => void;
-  onSwitchRole?: (newRole: UserRole) => void;
   onOpenWalkthrough?: () => void;
   viewMode?: 'simple' | 'analyst';
   onSetViewMode?: (mode: 'simple' | 'analyst') => void;
@@ -89,7 +88,6 @@ export function Header({
   onOpenUpgradeModal,
   onSignOut,
   onOpenSettings,
-  onSwitchRole,
   onOpenWalkthrough,
   viewMode = 'simple',
   onSetViewMode,
@@ -492,50 +490,13 @@ export function Header({
                 </div>
               </div>
 
-              {/* RBAC Role Clearance Selector */}
-              {onSwitchRole && (
-                <div className="py-2 px-3.5 bg-[#14120e]">
-                  <div className="text-[10px] font-mono text-[#8a8070] uppercase mb-1.5 flex items-center justify-between">
-                    <span>RBAC Clearance Level:</span>
-                    <span className="text-[9.5px] text-amber-400 font-bold uppercase">{role}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => { onSwitchRole('admin'); setUserDropdownOpen(false); }}
-                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
-                        role === 'admin'
-                          ? 'bg-amber-950/80 border-amber-500 text-amber-300 font-bold'
-                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
-                      }`}
-                    >
-                      Admin
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { onSwitchRole('analyst'); setUserDropdownOpen(false); }}
-                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
-                        role === 'analyst'
-                          ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300 font-bold'
-                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
-                      }`}
-                    >
-                      Analyst
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { onSwitchRole('read_only'); setUserDropdownOpen(false); }}
-                      className={`px-1.5 py-1 text-[10px] font-mono rounded border transition-colors cursor-pointer text-center ${
-                        role === 'read_only'
-                          ? 'bg-slate-800 border-slate-500 text-slate-200 font-bold'
-                          : 'bg-[#1a1713] border-[#342e26] text-[#8a8070] hover:text-white'
-                      }`}
-                    >
-                      Auditor
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Server-Assigned Role (Read-Only) */}
+              <div className="py-2 px-3.5 bg-[#14120e] flex items-center justify-between text-xs font-mono border-b border-[#3a352c]/50">
+                <span className="text-[#8a8070] uppercase text-[10px] tracking-wider">Verified Server Role:</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#3a352c]/60 text-amber-300 border border-[#3a352c] uppercase">
+                  {role}
+                </span>
+              </div>
 
               {/* 2. Account Settings & 3. Preferences */}
               <div className="py-1">
