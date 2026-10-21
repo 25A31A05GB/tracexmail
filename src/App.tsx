@@ -711,7 +711,7 @@ export default function App() {
         <div className="flex items-center gap-3">
           <Loader2 className="w-5 h-5 animate-spin text-[#5b8dd6]" />
           <span className="font-mono text-xs tracking-wider text-[#7d8794]">
-            VERIFYING ENCLAVE CLEARANCE…
+            VERIFYING AUTHENTICATION SESSION…
           </span>
         </div>
       </div>

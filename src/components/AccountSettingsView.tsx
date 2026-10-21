@@ -1106,12 +1106,12 @@ export function AccountSettingsView({
             </div>
           </div>
 
-          {/* Section 4: Change Master Password */}
+          {/* Section 4: Change Password */}
           <div className="bg-[var(--ink-2)] border border-[var(--line)] rounded-[2px] p-5 space-y-4">
             <div className="border-b border-[var(--line)] pb-3">
               <div className="font-mono text-xs uppercase tracking-wider text-[var(--paper-dim)] flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-[var(--stamp)]" />
-                <span>CHANGE MASTER PASSWORD</span>
+                <span>CHANGE PASSWORD</span>
               </div>
               <div className="text-[11.5px] text-[var(--paper-dim)] mt-0.5">
                 Update your account's primary authentication passphrase.
@@ -1201,7 +1201,7 @@ export function AccountSettingsView({
                       <span>Updating Password…</span>
                     </>
                   ) : (
-                    <span>Update Master Password</span>
+                    <span>Update Password</span>
                   )}
                 </button>
               </div>

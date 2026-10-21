@@ -14,8 +14,22 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { classifyEmailForensics } from '../../src/server/classifier';
-import { normalizeVerdictToClass } from './run_tracexmail_classifier';
-import { SimpleTfidf, LABELS, type DatasetItem } from './benchmark';
+
+export const LABELS = ['Legitimate', 'Suspicious', 'Impersonated', 'Phishing', 'Fraud-related'] as const;
+
+export interface DatasetItem {
+  id: string;
+  source: string;
+  label: typeof LABELS[number];
+  language?: string;
+  sender_domain: string;
+  campaign_id?: string;
+  subject: string;
+  body: string;
+  text?: string;
+  headers?: any;
+  from?: string;
+}
 
 export interface ErrorRecord {
   id: string;

@@ -110,12 +110,12 @@ export const ROUTE_METADATA: Record<string, PageMetadata> = {
     robots: 'noindex, follow'
   },
   login: {
-    title: 'Sign In to Enclave | TraceXMail',
+    title: 'Sign In to Workspace | TraceXMail',
     description: 'Authenticate to access your TraceXMail forensic intelligence workspace and active cases.',
     canonicalPath: '/'
   },
   signup: {
-    title: 'Request Enclave Clearance | TraceXMail',
+    title: 'Create Account | TraceXMail',
     description: 'Register for TraceXMail pilot access or join your organization security operations team.',
     canonicalPath: '/'
   },

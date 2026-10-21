@@ -237,7 +237,7 @@ export function AcceptInviteView({ token, onSuccess, onBackToLogin }: AcceptInvi
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-mono font-medium text-[var(--paper-dim)] uppercase tracking-wider">
-                    Set Master Password *
+                    Set Password *
                   </label>
                   <span className="text-[10px] font-mono text-[var(--paper-dim)]">Min 12 characters</span>
                 </div>
@@ -250,7 +250,7 @@ export function AcceptInviteView({ token, onSuccess, onBackToLogin }: AcceptInvi
                     onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••••••••••"
                     className="w-full text-xs font-mono py-2 px-3 pr-10 bg-[var(--ink)] border border-[var(--line)] rounded-sm text-[var(--paper)] placeholder:text-[var(--paper-dim)]/40 focus:outline-none focus:border-[var(--stamp)]"
-                    aria-label="Set Master Password"
+                    aria-label="Set Password"
                   />
                   <button
                     type="button"
