@@ -540,7 +540,7 @@ export const CompleteProject3DShowcase: React.FC<CompleteProject3DShowcaseProps>
               <Sparkles className="w-3.5 h-3.5 text-[#c9a227]" />
               <span>Full Interactive 3D Architecture</span>
             </div>
-            <h2 className="font-['Fraunces',serif] text-[30px] sm:text-[40px] font-medium text-[#ede6d8] leading-[1.14] tracking-tight">
+            <h2 className="font-['Source_Serif_4',serif] text-[30px] sm:text-[40px] font-medium text-[#ede6d8] leading-[1.14] tracking-tight">
               Watch an attack dismantle across all four dimensions.
             </h2>
             <p className="mt-3 text-[15px] sm:text-[16px] text-[#b9af9c] leading-relaxed">
@@ -660,7 +660,7 @@ export const CompleteProject3DShowcase: React.FC<CompleteProject3DShowcaseProps>
                 <div className="text-[9.5px] font-['IBM_Plex_Mono',monospace] text-[#8e8574] uppercase font-bold tracking-wider">
                   {activeModeConfig.metricLabel}
                 </div>
-                <div className="text-[18px] sm:text-[20px] font-['Fraunces',serif] font-bold text-[#c9a227] leading-none mt-0.5">
+                <div className="text-[18px] sm:text-[20px] font-['Source_Serif_4',serif] font-bold text-[#c9a227] leading-none mt-0.5">
                   {activeModeConfig.metric}
                 </div>
               </div>
@@ -680,7 +680,7 @@ export const CompleteProject3DShowcase: React.FC<CompleteProject3DShowcaseProps>
                 <span>{activeModeConfig.badge}</span>
               </div>
 
-              <h3 className="font-['Fraunces',serif] text-[22px] sm:text-[24px] font-semibold text-[#ede6d8] leading-tight">
+              <h3 className="font-['Source_Serif_4',serif] text-[22px] sm:text-[24px] font-semibold text-[#ede6d8] leading-tight">
                 {activeModeConfig.title}
               </h3>
 

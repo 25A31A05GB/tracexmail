@@ -302,14 +302,14 @@ export function LandingView({
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#14120f] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0 pt-16">
+    <div className="w-full min-h-screen bg-[#100e0c] text-[#ede6d8] font-['IBM_Plex_Sans',sans-serif] text-[16px] leading-[1.6] antialiased selection:bg-[#b23a2e] selection:text-[#ede6d8] relative pb-20 sm:pb-0 pt-16">
       
       {/* Top Header Navigation: Fixed to top and visible while scrolling */}
-      <nav className="fixed top-0 left-0 right-0 w-full z-50 bg-[#14120f]/95 backdrop-blur-md border-b border-[#3a352c] shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
+      <nav className="fixed top-0 left-0 right-0 w-full z-50 bg-[#100e0c]/95 backdrop-blur-md border-b border-[#3a352c] shadow-[0_4px_24px_rgba(0,0,0,0.6)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <TraceXLogo size="sm" onClick={onOpenConsole} title="TraceXMail Forensic Core" />
-            <span className="font-['Fraunces',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8]">
+            <span className="font-['Source_Serif_4',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8]">
               TraceXMail
             </span>
             <div className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[2px] bg-[#1f1a14] border border-[#3a352c] text-[11px] font-['IBM_Plex_Mono',monospace] text-[#c9a227]">
@@ -632,7 +632,7 @@ export function LandingView({
       </section>
 
       {/* Real-Time Live Telemetry Ribbon Section */}
-      <section id="telemetry-feed" className="py-6 border-b border-[#3a352c] bg-[#181511]">
+      <section id="telemetry-feed" className="py-6 border-b border-[#3a352c] bg-[#14110d]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
           <LiveDynamicTelemetryRibbon
             onSelectCase={onSelectCase}
@@ -642,7 +642,7 @@ export function LandingView({
       </section>
 
       {/* Flagship SaaS Visual Growth Loop Animation Section */}
-      <section id="growth-loop" className="py-16 sm:py-24 border-b border-[#1b2b46]/60 bg-[#050B14] relative overflow-hidden">
+      <section id="growth-loop" className="py-16 sm:py-24 border-b border-[#3a352c] bg-[#14110d] relative overflow-hidden">
         {/* Subtle Cyber Grid & Ambient Glow Accents */}
         <div className="absolute inset-0 pointer-events-none opacity-40">
           <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[850px] h-[400px] bg-[radial-gradient(ellipse_at_center,rgba(6,182,212,0.12),transparent_70%)] blur-3xl" />
@@ -766,7 +766,7 @@ export function LandingView({
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
                 Corpus Proof &amp; Detection Output
               </div>
-              <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[34px] font-medium text-[#ede6d8]">
+              <h2 className="font-['Source_Serif_4',serif] text-[26px] sm:text-[34px] font-medium text-[#ede6d8]">
                 See it work on a real sample
               </h2>
               <p className="text-[#b9af9c] mt-2 text-[15px] max-w-[65ch]">
@@ -818,14 +818,14 @@ export function LandingView({
 
                     <div>
                       <div className="flex items-baseline gap-2 mb-1">
-                        <span className="font-['Fraunces',serif] text-[24px] font-semibold text-[#ede6d8]">
+                        <span className="font-['Source_Serif_4',serif] text-[24px] font-semibold text-[#ede6d8]">
                           {c.threatScore}
                         </span>
                         <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c]">
                           / 100 THREAT SCORE
                         </span>
                       </div>
-                      <h3 className="font-['Fraunces',serif] text-[16.5px] font-medium text-[#ede6d8] group-hover:text-white transition-colors leading-snug">
+                      <h3 className="font-['Source_Serif_4',serif] text-[16.5px] font-medium text-[#ede6d8] group-hover:text-white transition-colors leading-snug">
                         {c.name}
                       </h3>
                       <p className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#b9af9c] mt-1 truncate">
@@ -872,7 +872,7 @@ export function LandingView({
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[2px] bg-[#3a352c]/50 text-[#c9a227] font-['IBM_Plex_Mono',monospace] text-[11px] mb-2 uppercase">
               Production Workstation
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
+            <h2 className="font-['Source_Serif_4',serif] text-[28px] sm:text-[34px] font-medium text-[#ede6d8]">
               What your analysts actually open
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px]">
@@ -1406,7 +1406,7 @@ export function LandingView({
       {/* Final Call to Action */}
       <section className="py-20 bg-[radial-gradient(ellipse_800px_400px_at_50%_100%,rgba(178,58,46,0.12),transparent_70%)]">
         <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[38px] lg:text-[42px] font-medium text-[#ede6d8] max-w-[22ch]">
+          <h2 className="font-['Source_Serif_4',serif] text-[28px] sm:text-[38px] lg:text-[42px] font-medium text-[#ede6d8] max-w-[22ch]">
             Stop guessing where an email threat came from.
           </h2>
           <p className="text-[#b9af9c] my-4 text-[16px] max-w-[56ch] leading-relaxed">

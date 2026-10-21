@@ -1,0 +1,114 @@
+/**
+ * TraceXMail Design System - CSS Custom Properties
+ * Single Source of Truth for tokens across the entire application.
+ */
+
+/* Self-hosted font imports (no external requests) */
+@import "@fontsource/source-serif-4/400.css";
+@import "@fontsource/source-serif-4/600.css";
+@import "@fontsource/source-serif-4/700.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+:root {
+  /* Surfaces (Consolidated) */
+  --color-surface-page: #100e0c;
+  --color-surface-section: #14110d;
+  --color-surface-card: #171410;
+
+  /* Borders */
+  --color-border: #3a352c;
+  --color-border-subtle: rgba(58, 53, 44, 0.5);
+  --color-border-focus: #c9a227;
+
+  /* Typography Colors */
+  --color-text-primary: #ede6d8;
+  --color-text-muted: #8a8070;
+  --color-text-secondary: #94a3b8;
+  --color-text-inverse: #100e0c;
+
+  /* Accent Gold (Primary button, active nav, max 1 highlight per screen) */
+  --color-accent-gold: #c9a227;
+  --color-accent-gold-hover: #dec052;
+  --color-accent-gold-muted: rgba(201, 162, 39, 0.12);
+  --color-accent-gold-border: #5e4710;
+
+  /* Semantic - Verified (Green) */
+  --color-semantic-verified: #48a975;
+  --color-semantic-verified-subtle: rgba(72, 169, 117, 0.12);
+  --color-semantic-verified-border: #275c3f;
+
+  /* Semantic - Anomaly (Amber) */
+  --color-semantic-anomaly: #c9a227;
+  --color-semantic-anomaly-subtle: rgba(201, 162, 39, 0.12);
+  --color-semantic-anomaly-border: #5e4710;
+
+  /* Semantic - Alert (Red) */
+  --color-semantic-alert: #b23a2e;
+  --color-semantic-alert-subtle: rgba(178, 58, 46, 0.12);
+  --color-semantic-alert-border: #5a1e17;
+
+  /* Semantic - Destination (Violet) */
+  --color-semantic-destination: #8c58b0;
+  --color-semantic-destination-subtle: rgba(140, 88, 176, 0.12);
+  --color-semantic-destination-border: #432a54;
+
+  /* Semantic - Intelligence (Teal) */
+  --color-semantic-intelligence: #2dd4bf;
+  --color-semantic-intelligence-subtle: rgba(45, 212, 191, 0.12);
+  --color-semantic-intelligence-border: #134e4a;
+
+  /* Elevation */
+  --elevation-1: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --elevation-2: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --elevation-anomaly-glow: 0 0 16px rgba(201, 162, 39, 0.2);
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* Spacing */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* Layout */
+  --max-width-container: 1200px;
+
+  /* Typography Families */
+  --font-heading: 'Source Serif 4', 'Noto Serif', 'Noto Serif Devanagari', 'Noto Serif Arabic', 'Noto Serif SC', 'Noto Serif TC', 'Noto Serif JP', Georgia, serif;
+  --font-body: 'IBM Plex Sans', 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Arabic', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans JP', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Noto Sans Mono', monospace;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

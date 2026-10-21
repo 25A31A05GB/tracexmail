@@ -528,7 +528,7 @@ export const Forensic3DDataVisualizer: React.FC<Forensic3DDataVisualizerProps> =
             <span>Interactive 3D Email Journey Map</span>
           </div>
 
-          <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[34px] md:text-[38px] font-medium text-[#ede6d8] leading-tight">
+          <h2 className="font-['Source_Serif_4',serif] text-[26px] sm:text-[34px] md:text-[38px] font-medium text-[#ede6d8] leading-tight">
             See how the email traveled from attacker to your inbox
           </h2>
 

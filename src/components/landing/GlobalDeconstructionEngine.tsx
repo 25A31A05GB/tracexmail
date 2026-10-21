@@ -181,7 +181,7 @@ export const GlobalDeconstructionEngine: React.FC<GlobalDeconstructionEngineProp
               <span className={`w-2 h-2 rounded-full ${isLiveConnected ? 'bg-[#22c55e] animate-pulse' : 'bg-[#eab308]'}`} />
               <span>Interactive Security Breakdown</span>
             </div>
-            <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8] tracking-tight">
+            <h2 className="font-['Source_Serif_4',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8] tracking-tight">
               How TraceXMail Inspects Every Email
             </h2>
             <p className="text-[#b9af9c] text-[14px] sm:text-[15px] max-w-[65ch] leading-relaxed">

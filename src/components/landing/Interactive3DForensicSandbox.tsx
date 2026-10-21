@@ -446,7 +446,7 @@ export const Interactive3DForensicSandbox: React.FC<Interactive3DForensicSandbox
               <Sparkles className="w-3.5 h-3.5 text-[#c9a227] animate-pulse" />
               Interactive 3D Forensic Laboratory
             </div>
-            <h2 className="font-['Fraunces',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8] leading-[1.15]">
+            <h2 className="font-['Source_Serif_4',serif] text-[28px] sm:text-[36px] font-medium text-[#ede6d8] leading-[1.15]">
               Inspect live attack telemetry in full 3D space
             </h2>
             <p className="text-[#b9af9c] mt-3 text-[15px] sm:text-[16px] leading-relaxed max-w-[62ch]">
@@ -524,7 +524,7 @@ export const Interactive3DForensicSandbox: React.FC<Interactive3DForensicSandbox
                     {preset.threatScore} / 100
                   </span>
                 </div>
-                <h4 className="font-['Fraunces',serif] text-[14.5px] font-semibold text-[#ede6d8] truncate mb-0.5">
+                <h4 className="font-['Source_Serif_4',serif] text-[14.5px] font-semibold text-[#ede6d8] truncate mb-0.5">
                   {preset.name}
                 </h4>
                 <p className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574] truncate m-0">
@@ -642,12 +642,12 @@ export const Interactive3DForensicSandbox: React.FC<Interactive3DForensicSandbox
                   <span className="font-['IBM_Plex_Mono',monospace] text-[11px] text-[#8e8574] uppercase tracking-wider block">
                     Forensic Target Analysis
                   </span>
-                  <h3 className="font-['Fraunces',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8] mt-0.5">
+                  <h3 className="font-['Source_Serif_4',serif] text-[18px] sm:text-[20px] font-semibold text-[#ede6d8] mt-0.5">
                     {currentPreset.name}
                   </h3>
                 </div>
                 <div className="text-right">
-                  <div className="font-['Fraunces',serif] text-[26px] font-bold text-[#ede6d8]">
+                  <div className="font-['Source_Serif_4',serif] text-[26px] font-bold text-[#ede6d8]">
                     {currentPreset.threatScore}
                   </div>
                   <div className="font-['IBM_Plex_Mono',monospace] text-[10px] text-[#b9af9c]">

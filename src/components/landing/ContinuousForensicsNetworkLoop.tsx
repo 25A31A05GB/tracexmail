@@ -725,7 +725,7 @@ export function ContinuousForensicsNetworkLoop({
                 <TraceXLogo size="sm" />
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-base font-bold tracking-tight text-white font-['Fraunces',serif]">
+                    <span className="text-base font-bold tracking-tight text-white font-['Source_Serif_4',serif]">
                       TraceXMail
                     </span>
                     <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/80">

@@ -643,7 +643,7 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-[#c9a227] animate-ping shrink-0" />
                 <span className="truncate">{currentTarget.stageMetrics[activeStage]?.label || 'STAGE METRIC'}</span>
               </div>
-              <div className="font-['Fraunces',serif] text-[18px] sm:text-[24px] font-bold text-[#ede6d8] leading-none mt-1 truncate">
+              <div className="font-['Source_Serif_4',serif] text-[18px] sm:text-[24px] font-bold text-[#ede6d8] leading-none mt-1 truncate">
                 {currentTarget.stageMetrics[activeStage]?.value || currentTarget.distance}
               </div>
               <div className="text-[10px] sm:text-[11px] font-mono text-[#b9af9c] mt-1 sm:mt-1.5 leading-snug border-t border-[#3a352c]/60 pt-1 sm:pt-1.5 line-clamp-2">
@@ -675,7 +675,7 @@ export const FullForensicArchitecture3D: React.FC<Full3DArchitectureProps> = ({
                 <div className="inline-block px-2 py-0.5 rounded-[2px] bg-[#221e17] border border-[#3a352c] font-mono text-[9.5px] sm:text-[10.5px] uppercase font-bold text-[#c9a227] mb-2">
                   {currentStageMeta.headerTag}
                 </div>
-                <h2 className="font-['Fraunces',serif] text-[20px] sm:text-[24px] lg:text-[26px] font-semibold text-[#ede6d8] leading-tight">
+                <h2 className="font-['Source_Serif_4',serif] text-[20px] sm:text-[24px] lg:text-[26px] font-semibold text-[#ede6d8] leading-tight">
                   {currentStageMeta.h2}
                 </h2>
                 <p className="text-[#b9af9c] mt-2 text-[13px] sm:text-[14px] leading-relaxed">

@@ -121,7 +121,7 @@ export function NotFoundView({ pathname = typeof window !== 'undefined' ? window
         </div>
 
         {/* Heading */}
-        <h1 className="font-['Fraunces',serif] text-2xl sm:text-4xl lg:text-5xl font-semibold text-[#ede6d8] tracking-tight leading-tight max-w-[20ch]">
+        <h1 className="font-['Source_Serif_4',serif] text-2xl sm:text-4xl lg:text-5xl font-semibold text-[#ede6d8] tracking-tight leading-tight max-w-[20ch]">
           Evidence Docket Relocated or Missing
         </h1>
 

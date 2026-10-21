@@ -16,10 +16,14 @@
     "test:network": "tsx scripts/test_network_intelligence.ts",
     "worker": "tsx src/worker.ts",
     "test:unit": "vitest run",
-    "test": "vitest run && tsx scripts/test_forensics.ts && tsx scripts/test_intelligence.ts && tsx scripts/test_network_intelligence.ts",
+    "test:tokens": "tsx scripts/check-design-tokens.ts",
+    "test": "vitest run && tsx scripts/test_forensics.ts && tsx scripts/test_intelligence.ts && tsx scripts/test_network_intelligence.ts && tsx scripts/check-design-tokens.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/source-serif-4": "^5.3.1",
     "@google/genai": "*",
     "@opentelemetry/api": "*",
     "@react-three/drei": "*",

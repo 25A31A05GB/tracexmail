@@ -131,7 +131,7 @@ export function KnowledgeBaseView({ onNavigateHome, onNavigateToPath }: Knowledg
             <TraceXLogo size="sm" />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-bold tracking-tight text-[#ede6d8] block font-['Fraunces',serif]">
+                <span className="text-base font-bold tracking-tight text-[#ede6d8] block font-['Source_Serif_4',serif]">
                   TraceXMail
                 </span>
                 <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/25">
@@ -186,7 +186,7 @@ export function KnowledgeBaseView({ onNavigateHome, onNavigateToPath }: Knowledg
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white font-['Fraunces',serif]">
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-white font-['Source_Serif_4',serif]">
             Email Forensics &amp; Threat Intelligence Knowledge Base
           </h1>
           <p className="mt-2 text-sm text-[#b9af9c] leading-relaxed max-w-3xl">
@@ -365,7 +365,7 @@ export function KnowledgeBaseView({ onNavigateHome, onNavigateToPath }: Knowledg
       <footer className="border-t border-[#2d271f] bg-[#14110d] py-8 text-xs text-[#8a8070]">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <span className="font-bold text-[#ede6d8] font-['Fraunces',serif]">TraceXMail Forensic Intelligence Platform</span>
+            <span className="font-bold text-[#ede6d8] font-['Source_Serif_4',serif]">TraceXMail Forensic Intelligence Platform</span>
             <span className="block mt-0.5 text-[11px] text-[#8a8070]">
               &copy; {new Date().getFullYear()} TraceXMail. Research lead: Jayram Sappa (<a href="mailto:jayramsappa537@gmail.com" className="text-[#b9af9c] hover:underline">jayramsappa537@gmail.com</a>) &bull; Canonical: <a href="https://tracexmail.vercel.app" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">https://tracexmail.vercel.app</a>
             </span>

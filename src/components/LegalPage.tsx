@@ -139,7 +139,7 @@ export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: 
             <TraceXLogo size="sm" />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-base font-bold tracking-tight text-[#ede6d8] block font-['Fraunces',serif]">
+                <span className="text-base font-bold tracking-tight text-[#ede6d8] block font-['Source_Serif_4',serif]">
                   TraceXMail
                 </span>
                 <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/25">
@@ -255,7 +255,7 @@ export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: 
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-['Fraunces',serif]">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white font-['Source_Serif_4',serif]">
                 {activeTab === 'about' && 'About TraceXMail & Forensic Intelligence Mission'}
                 {activeTab === 'privacy' && 'Privacy Policy & Data Protection Standard'}
                 {activeTab === 'terms' && 'Terms of Service & Lawful Forensic Use'}
@@ -348,7 +348,7 @@ export function LegalPage({ type = 'about', onNavigateHome, onNavigateToPath }: 
       <footer className="border-t border-[#2d271f] bg-[#14110d] py-8 text-xs text-[#8a8070] print:hidden">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <span className="font-bold text-[#ede6d8] font-['Fraunces',serif]">TraceXMail Forensic Intelligence Platform</span>
+            <span className="font-bold text-[#ede6d8] font-['Source_Serif_4',serif]">TraceXMail Forensic Intelligence Platform</span>
             <span className="block mt-0.5 text-[11px] text-[#8a8070]">
               &copy; {new Date().getFullYear()} TraceXMail. All rights reserved. &bull; Lead Maintainer &amp; DPO: Jayram Sappa (<a href="mailto:tracexmailofficial@gmail.com" className="text-[#b9af9c] hover:underline">tracexmailofficial@gmail.com</a>) &bull; Canonical Origin: <a href="https://tracexmail.vercel.app" target="_blank" rel="noreferrer" className="text-amber-400 hover:underline">https://tracexmail.vercel.app</a>
             </span>
@@ -409,7 +409,7 @@ function Section({
   return (
     <section id={id} className="border border-[#2a241c] bg-[#16130f] rounded-lg p-5 sm:p-7 shadow-md space-y-3 transition-all hover:border-[#383025]">
       <div className="flex items-center justify-between gap-3 border-b border-[#262118] pb-3 flex-wrap">
-        <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5 font-['Fraunces',serif]">
+        <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2.5 font-['Source_Serif_4',serif]">
           <span className="w-1.5 h-4 bg-amber-400 rounded-sm inline-block shrink-0" />
           <span>{title}</span>
         </h2>
@@ -1301,7 +1301,7 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
           <div className="p-4 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2">
             <div className="text-xs font-mono text-[#8a8070] uppercase tracking-wider">Lead Developer &amp; Architect</div>
-            <div className="text-base font-bold text-white font-['Fraunces',serif]">Jayram Sappa</div>
+            <div className="text-base font-bold text-white font-['Source_Serif_4',serif]">Jayram Sappa</div>
             <div className="text-xs text-[#b9af9c]">Full-Stack Security &amp; Forensic Systems Engineer</div>
             <div className="pt-2 flex items-center justify-between">
               <a href="mailto:tracexmailofficial@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
@@ -1319,7 +1319,7 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
 
           <div className="p-4 bg-[#14110d] border border-[#2d271f] rounded-md space-y-2">
             <div className="text-xs font-mono text-[#8a8070] uppercase tracking-wider">Privacy &amp; Compliance Desk</div>
-            <div className="text-base font-bold text-white font-['Fraunces',serif]">Data Protection Office</div>
+            <div className="text-base font-bold text-white font-['Source_Serif_4',serif]">Data Protection Office</div>
             <div className="text-xs text-[#b9af9c]">GDPR, CCPA &amp; Google OAuth Verification</div>
             <div className="pt-2 flex items-center justify-between">
               <a href="mailto:tracexmailofficial@gmail.com" className="text-xs font-mono text-amber-400 hover:underline">
@@ -1341,7 +1341,7 @@ function ContactContent({ filter, onCopy, copiedKey }: { filter?: string; onCopy
         {formSent ? (
           <div className="p-6 bg-[#14110d] border border-emerald-500/30 rounded-md text-center space-y-3">
             <CheckCircle2 className="h-10 w-10 text-emerald-400 mx-auto" />
-            <h3 className="text-base font-bold text-white font-['Fraunces',serif]">Inquiry Docket Logged</h3>
+            <h3 className="text-base font-bold text-white font-['Source_Serif_4',serif]">Inquiry Docket Logged</h3>
             <p className="text-xs text-[#b9af9c] max-w-md mx-auto leading-relaxed">
               Your message has been assigned tracking docket <code className="px-1.5 py-0.5 rounded bg-[#1f1a14] border border-[#383025] text-emerald-400 font-mono text-xs font-bold">{ticketRef}</code>. We will respond directly to <span className="text-white font-mono">{formData.email}</span>.
             </p>
@@ -1478,7 +1478,7 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
           </div>
           <div className="space-y-1.5 text-xs text-[#b9af9c]">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white font-['Fraunces',serif]">Jayaram Sappa</span>
+              <span className="text-sm font-bold text-white font-['Source_Serif_4',serif]">Jayaram Sappa</span>
               <span className="text-[10px] font-mono bg-amber-400/10 text-amber-300 border border-amber-400/30 px-1.5 py-0.5 rounded">Founder &amp; Lead Researcher</span>
             </div>
             <p className="text-[12px] text-[#8a8070] leading-relaxed">

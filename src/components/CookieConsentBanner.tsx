@@ -113,7 +113,7 @@ export function CookieConsentBanner({
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold tracking-tight text-white font-['Fraunces',serif]">
+                  <h3 className="text-sm font-bold tracking-tight text-white font-['Source_Serif_4',serif]">
                     Privacy &amp; Local Storage Transparency
                   </h3>
                   <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-emerald-950/60 border border-emerald-700 text-emerald-300 font-bold">

@@ -1,10 +1,28 @@
 @import "tailwindcss";
+@import "./design-system/tokens.css";
 
 @theme {
-  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: 'Source Serif 4', 'Fraunces', Georgia, serif;
-  --font-serif: 'Source Serif 4', Georgia, serif;
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', 'Noto Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: 'Source Serif 4', 'Noto Serif', Georgia, serif;
+  --font-serif: 'Source Serif 4', 'Noto Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono', 'Noto Sans Mono', monospace;
+
+  /* Design System Surface Tokens (Design Prompt D) */
+  --color-surface-page: #100e0c;
+  --color-surface-section: #14110d;
+  --color-surface-card: #171410;
+
+  /* Design System Typography & Accent Tokens */
+  --color-text-primary: #ede6d8;
+  --color-text-muted: #8a8070;
+  --color-text-secondary: #94a3b8;
+  --color-accent-gold: #c9a227;
+  --color-border-default: #3a352c;
+
+  /* Design System Radius Tokens */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 
   /* Harmonize Slate & Zinc palette with the TraceXMail Forensic Dossier / SOC Aesthetic */
   --color-slate-950: #100e0c;
@@ -92,27 +110,30 @@
 
 @layer base {
   :root {
-    --ink: #14120f;
-    --ink-2: #1d1a15;
-    --ink-3: #26221b;
+    /* Consolidated Surface Tokens (Design Prompt D) */
+    --ink: #100e0c;      /* page surface */
+    --ink-2: #14110d;    /* section surface */
+    --ink-3: #171410;    /* card surface */
+    --surface: #14110d;  /* section surface */
+    --surface2: #171410; /* card surface */
+
     --paper: #ede6d8;
-    --paper-card: #f2ecdf;
-    --paper-dim: #b9af9c;
+    --paper-card: #ede6d8;
+    --paper-dim: #94a3b8;
+    --paper-muted: #8a8070;
     --thread: #b23a2e;
     --thread-dim: #7a2e26;
     --stamp: #c9a227;
-    --slate: #7fa3ba;
+    --slate: #94a3b8;
     --line: #3a352c;
-    --radius: 3px;
-    --maxw: 1180px;
+    --radius: 6px;
+    --maxw: 1200px;
 
     /* Semantic SOC tokens */
-    --surface: #1d1a15;
-    --surface2: #26221b;
     --red: #b23a2e;
     --green: #48a975;
     --amber: #c9a227;
-    --muted: #b9af9c;
+    --muted: #8a8070;
   }
 
   * {

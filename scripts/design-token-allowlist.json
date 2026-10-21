@@ -1,0 +1,522 @@
+{
+  "description": "Migration allowlist for design tokens. As components are redesigned in Prompts 2-16, budgets are ratcheted down toward 0.",
+  "permanentExceptions": [
+    "#4285F4",
+    "#34A853",
+    "#FBBC05",
+    "#EA4335",
+    "#00A4EF",
+    "#0078D4",
+    "#000000",
+    "#ffffff",
+    "#FFFFFF",
+    "#000",
+    "#fff"
+  ],
+  "migrationFileBudgets": {
+    "src/App.tsx": {
+      "maxHexViolations": 40,
+      "maxArbitraryTailwindViolations": 66
+    },
+    "src/components/3d/CompleteProject3DShowcase.tsx": {
+      "maxHexViolations": 91,
+      "maxArbitraryTailwindViolations": 142
+    },
+    "src/components/3d/FullForensicArchitecture3D.tsx": {
+      "maxHexViolations": 71,
+      "maxArbitraryTailwindViolations": 126
+    },
+    "src/components/3d/HeroForensicDeconstructor3D.tsx": {
+      "maxHexViolations": 73,
+      "maxArbitraryTailwindViolations": 105
+    },
+    "src/components/3d/Interactive3DTiltCard.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 2
+    },
+    "src/components/3d/TraceXLogo3D.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 2
+    },
+    "src/components/AICaseSummaryCard.tsx": {
+      "maxHexViolations": 13,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/AcceptInviteView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 12
+    },
+    "src/components/AccountSettingsView.tsx": {
+      "maxHexViolations": 8,
+      "maxArbitraryTailwindViolations": 101
+    },
+    "src/components/AlertToast.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 3
+    },
+    "src/components/AlertsView.tsx": {
+      "maxHexViolations": 10,
+      "maxArbitraryTailwindViolations": 44
+    },
+    "src/components/AnalysisProgressPanel.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 9
+    },
+    "src/components/AuthCallbackView.tsx": {
+      "maxHexViolations": 18,
+      "maxArbitraryTailwindViolations": 19
+    },
+    "src/components/AuthModal.tsx": {
+      "maxHexViolations": 4,
+      "maxArbitraryTailwindViolations": 8
+    },
+    "src/components/AutoRefreshControl.tsx": {
+      "maxHexViolations": 35,
+      "maxArbitraryTailwindViolations": 42
+    },
+    "src/components/BlastRadiusMatrix.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 15
+    },
+    "src/components/BulkThreatComparisonSummary.tsx": {
+      "maxHexViolations": 10,
+      "maxArbitraryTailwindViolations": 19
+    },
+    "src/components/CampaignsView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 53
+    },
+    "src/components/CaseRealtimeTriageCard.tsx": {
+      "maxHexViolations": 13,
+      "maxArbitraryTailwindViolations": 26
+    },
+    "src/components/CaseTagManager.tsx": {
+      "maxHexViolations": 10,
+      "maxArbitraryTailwindViolations": 18
+    },
+    "src/components/CasesView.tsx": {
+      "maxHexViolations": 3,
+      "maxArbitraryTailwindViolations": 51
+    },
+    "src/components/CommandPaletteModal.tsx": {
+      "maxHexViolations": 40,
+      "maxArbitraryTailwindViolations": 49
+    },
+    "src/components/ConnectGmailModal.tsx": {
+      "maxHexViolations": 70,
+      "maxArbitraryTailwindViolations": 79
+    },
+    "src/components/CookieConsentBanner.tsx": {
+      "maxHexViolations": 45,
+      "maxArbitraryTailwindViolations": 56
+    },
+    "src/components/D3MailActorGraph.tsx": {
+      "maxHexViolations": 129,
+      "maxArbitraryTailwindViolations": 109
+    },
+    "src/components/DashboardView.tsx": {
+      "maxHexViolations": 58,
+      "maxArbitraryTailwindViolations": 132
+    },
+    "src/components/DnsStatusSection.tsx": {
+      "maxHexViolations": 11,
+      "maxArbitraryTailwindViolations": 44
+    },
+    "src/components/EmailActorD3Graph.tsx": {
+      "maxHexViolations": 44,
+      "maxArbitraryTailwindViolations": 20
+    },
+    "src/components/EmlFormatGuide.tsx": {
+      "maxHexViolations": 106,
+      "maxArbitraryTailwindViolations": 120
+    },
+    "src/components/EnterpriseForensicDossier.tsx": {
+      "maxHexViolations": 4,
+      "maxArbitraryTailwindViolations": 6
+    },
+    "src/components/ErrorBoundary.tsx": {
+      "maxHexViolations": 30,
+      "maxArbitraryTailwindViolations": 39
+    },
+    "src/components/EvidenceTagCard.tsx": {
+      "maxHexViolations": 191,
+      "maxArbitraryTailwindViolations": 286
+    },
+    "src/components/FeedbackModerationPanel.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 12
+    },
+    "src/components/ForensicCaseTwoPanel.tsx": {
+      "maxHexViolations": 77,
+      "maxArbitraryTailwindViolations": 143
+    },
+    "src/components/ForensicScanAnimationModal.tsx": {
+      "maxHexViolations": 73,
+      "maxArbitraryTailwindViolations": 129
+    },
+    "src/components/ForensicWalkthroughModal.tsx": {
+      "maxHexViolations": 16,
+      "maxArbitraryTailwindViolations": 20
+    },
+    "src/components/ForgotPasswordView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 8
+    },
+    "src/components/GeoTracerUtility.tsx": {
+      "maxHexViolations": 7,
+      "maxArbitraryTailwindViolations": 45
+    },
+    "src/components/GlobalThreatActivityMap.tsx": {
+      "maxHexViolations": 12,
+      "maxArbitraryTailwindViolations": 20
+    },
+    "src/components/GmailConfigStatus.tsx": {
+      "maxHexViolations": 34,
+      "maxArbitraryTailwindViolations": 45
+    },
+    "src/components/GmailConnectionView.tsx": {
+      "maxHexViolations": 169,
+      "maxArbitraryTailwindViolations": 257
+    },
+    "src/components/GmailSecurityDefenseHub.tsx": {
+      "maxHexViolations": 4,
+      "maxArbitraryTailwindViolations": 20
+    },
+    "src/components/GoogleAuthButton.tsx": {
+      "maxHexViolations": 8,
+      "maxArbitraryTailwindViolations": 11
+    },
+    "src/components/GoogleVerificationGuideModal.tsx": {
+      "maxHexViolations": 32,
+      "maxArbitraryTailwindViolations": 42
+    },
+    "src/components/Header.tsx": {
+      "maxHexViolations": 85,
+      "maxArbitraryTailwindViolations": 145
+    },
+    "src/components/HopTracerouteView.tsx": {
+      "maxHexViolations": 13,
+      "maxArbitraryTailwindViolations": 33
+    },
+    "src/components/InactivityWarningModal.tsx": {
+      "maxHexViolations": 16,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/IngestionPipelineView.tsx": {
+      "maxHexViolations": 54,
+      "maxArbitraryTailwindViolations": 95
+    },
+    "src/components/InteractiveOnboardingTour.tsx": {
+      "maxHexViolations": 66,
+      "maxArbitraryTailwindViolations": 85
+    },
+    "src/components/InvestigationObjectiveModal.tsx": {
+      "maxHexViolations": 32,
+      "maxArbitraryTailwindViolations": 47
+    },
+    "src/components/InviteMemberModal.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 12
+    },
+    "src/components/KeyboardShortcutsModal.tsx": {
+      "maxHexViolations": 19,
+      "maxArbitraryTailwindViolations": 23
+    },
+    "src/components/KnowledgeBaseView.tsx": {
+      "maxHexViolations": 71,
+      "maxArbitraryTailwindViolations": 79
+    },
+    "src/components/LandingView.tsx": {
+      "maxHexViolations": 454,
+      "maxArbitraryTailwindViolations": 684
+    },
+    "src/components/LanguageSwitcher.tsx": {
+      "maxHexViolations": 17,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/LegalCustodyCertificate.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 17
+    },
+    "src/components/LegalPage.tsx": {
+      "maxHexViolations": 271,
+      "maxArbitraryTailwindViolations": 329
+    },
+    "src/components/LockedGate.tsx": {
+      "maxHexViolations": 70,
+      "maxArbitraryTailwindViolations": 88
+    },
+    "src/components/LoginView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 18
+    },
+    "src/components/MagicLinkVerifyView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 11
+    },
+    "src/components/MapView.tsx": {
+      "maxHexViolations": 30,
+      "maxArbitraryTailwindViolations": 38
+    },
+    "src/components/MitreAttackDossier.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 24
+    },
+    "src/components/MitreAttackMatrixModal.tsx": {
+      "maxHexViolations": 27,
+      "maxArbitraryTailwindViolations": 38
+    },
+    "src/components/ModeUpgradeModal.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 15
+    },
+    "src/components/NetworkFlowDiagram.tsx": {
+      "maxHexViolations": 7,
+      "maxArbitraryTailwindViolations": 12
+    },
+    "src/components/NetworkIntelligenceCard.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 19
+    },
+    "src/components/NewAnalysisModal.tsx": {
+      "maxHexViolations": 14,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/NonTechnicalEvidenceCard.tsx": {
+      "maxHexViolations": 124,
+      "maxArbitraryTailwindViolations": 195
+    },
+    "src/components/NotFoundView.tsx": {
+      "maxHexViolations": 143,
+      "maxArbitraryTailwindViolations": 157
+    },
+    "src/components/OAuthConsentScreen.tsx": {
+      "maxHexViolations": 49,
+      "maxArbitraryTailwindViolations": 54
+    },
+    "src/components/OrgUserManagementSection.tsx": {
+      "maxHexViolations": 437,
+      "maxArbitraryTailwindViolations": 491
+    },
+    "src/components/OrganizationView.tsx": {
+      "maxHexViolations": 176,
+      "maxArbitraryTailwindViolations": 214
+    },
+    "src/components/OverviewView.tsx": {
+      "maxHexViolations": 87,
+      "maxArbitraryTailwindViolations": 192
+    },
+    "src/components/PlainLanguageSummaryCard.tsx": {
+      "maxHexViolations": 6,
+      "maxArbitraryTailwindViolations": 11
+    },
+    "src/components/PrivacyComplianceModal.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 8
+    },
+    "src/components/QuickAnalyzeCard.tsx": {
+      "maxHexViolations": 51,
+      "maxArbitraryTailwindViolations": 66
+    },
+    "src/components/QuishingInspectorModal.tsx": {
+      "maxHexViolations": 26,
+      "maxArbitraryTailwindViolations": 36
+    },
+    "src/components/RawHeaderView.tsx": {
+      "maxHexViolations": 5,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/RelatedIncidentsWidget.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 17
+    },
+    "src/components/RelationshipGraphView.tsx": {
+      "maxHexViolations": 121,
+      "maxArbitraryTailwindViolations": 177
+    },
+    "src/components/ReportModal.tsx": {
+      "maxHexViolations": 8,
+      "maxArbitraryTailwindViolations": 73
+    },
+    "src/components/ResetPasswordView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 14
+    },
+    "src/components/SafeEmailSandbox.tsx": {
+      "maxHexViolations": 9,
+      "maxArbitraryTailwindViolations": 23
+    },
+    "src/components/SearchView.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 6
+    },
+    "src/components/ShareCaseModal.tsx": {
+      "maxHexViolations": 80,
+      "maxArbitraryTailwindViolations": 91
+    },
+    "src/components/Sidebar.tsx": {
+      "maxHexViolations": 121,
+      "maxArbitraryTailwindViolations": 174
+    },
+    "src/components/SignupView.tsx": {
+      "maxHexViolations": 3,
+      "maxArbitraryTailwindViolations": 30
+    },
+    "src/components/SoarActionModal.tsx": {
+      "maxHexViolations": 27,
+      "maxArbitraryTailwindViolations": 35
+    },
+    "src/components/SoarPlaybookConsole.tsx": {
+      "maxHexViolations": 1,
+      "maxArbitraryTailwindViolations": 12
+    },
+    "src/components/StixExportModal.tsx": {
+      "maxHexViolations": 34,
+      "maxArbitraryTailwindViolations": 39
+    },
+    "src/components/TeamView.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 52
+    },
+    "src/components/ThreatLogView.tsx": {
+      "maxHexViolations": 12,
+      "maxArbitraryTailwindViolations": 32
+    },
+    "src/components/ThreatTimelineView.tsx": {
+      "maxHexViolations": 50,
+      "maxArbitraryTailwindViolations": 87
+    },
+    "src/components/TurnstileWidget.tsx": {
+      "maxHexViolations": 1,
+      "maxArbitraryTailwindViolations": 5
+    },
+    "src/components/UltimateBossAdminView.tsx": {
+      "maxHexViolations": 29,
+      "maxArbitraryTailwindViolations": 44
+    },
+    "src/components/UserOnboardingModal.tsx": {
+      "maxHexViolations": 24,
+      "maxArbitraryTailwindViolations": 31
+    },
+    "src/components/WhyAffordance.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 5
+    },
+    "src/components/WorkspaceLockScreen.tsx": {
+      "maxHexViolations": 34,
+      "maxArbitraryTailwindViolations": 44
+    },
+    "src/components/common/CheckInboxScreen.tsx": {
+      "maxHexViolations": 27,
+      "maxArbitraryTailwindViolations": 28
+    },
+    "src/components/common/ForensicOfflineModeBanner.tsx": {
+      "maxHexViolations": 28,
+      "maxArbitraryTailwindViolations": 35
+    },
+    "src/components/common/PWAInstallButton.tsx": {
+      "maxHexViolations": 18,
+      "maxArbitraryTailwindViolations": 21
+    },
+    "src/components/common/TraceXLogo.tsx": {
+      "maxHexViolations": 13,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/components/landing/ContinuousForensicsNetworkLoop.tsx": {
+      "maxHexViolations": 124,
+      "maxArbitraryTailwindViolations": 117
+    },
+    "src/components/landing/Forensic3DDataVisualizer.tsx": {
+      "maxHexViolations": 131,
+      "maxArbitraryTailwindViolations": 189
+    },
+    "src/components/landing/ForensicEvidenceDossier.tsx": {
+      "maxHexViolations": 91,
+      "maxArbitraryTailwindViolations": 120
+    },
+    "src/components/landing/ForensicRouteDissector.tsx": {
+      "maxHexViolations": 99,
+      "maxArbitraryTailwindViolations": 141
+    },
+    "src/components/landing/GlobalDeconstructionEngine.tsx": {
+      "maxHexViolations": 207,
+      "maxArbitraryTailwindViolations": 284
+    },
+    "src/components/landing/HeaderXRayInspector.tsx": {
+      "maxHexViolations": 8,
+      "maxArbitraryTailwindViolations": 32
+    },
+    "src/components/landing/HeroEvidenceBoard.tsx": {
+      "maxHexViolations": 122,
+      "maxArbitraryTailwindViolations": 152
+    },
+    "src/components/landing/HeroForensicNexus3D.tsx": {
+      "maxHexViolations": 70,
+      "maxArbitraryTailwindViolations": 95
+    },
+    "src/components/landing/HumanExplainerInteractive.tsx": {
+      "maxHexViolations": 98,
+      "maxArbitraryTailwindViolations": 103
+    },
+    "src/components/landing/Interactive3DForensicSandbox.tsx": {
+      "maxHexViolations": 98,
+      "maxArbitraryTailwindViolations": 151
+    },
+    "src/components/landing/InteractiveHowItWorks.tsx": {
+      "maxHexViolations": 12,
+      "maxArbitraryTailwindViolations": 30
+    },
+    "src/components/landing/LiveDynamicTelemetryRibbon.tsx": {
+      "maxHexViolations": 52,
+      "maxArbitraryTailwindViolations": 78
+    },
+    "src/components/landing/LiveForensicSimulator.tsx": {
+      "maxHexViolations": 30,
+      "maxArbitraryTailwindViolations": 109
+    },
+    "src/components/landing/LiveUserFeedbackSection.tsx": {
+      "maxHexViolations": 163,
+      "maxArbitraryTailwindViolations": 209
+    },
+    "src/components/landing/RiveInteractiveVisual.tsx": {
+      "maxHexViolations": 30,
+      "maxArbitraryTailwindViolations": 42
+    },
+    "src/components/landing/ShaderGradientHero.tsx": {
+      "maxHexViolations": 8,
+      "maxArbitraryTailwindViolations": 2
+    },
+    "src/components/landing/UnicornStudioScene.tsx": {
+      "maxHexViolations": 7,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/index.css": {
+      "maxHexViolations": 44,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/server/authRoutes.ts": {
+      "maxHexViolations": 42,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/server/emailAlertService.ts": {
+      "maxHexViolations": 16,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/server/gmailService.ts": {
+      "maxHexViolations": 43,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/server/routes/cases.ts": {
+      "maxHexViolations": 1,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/utils/exportEvidence.ts": {
+      "maxHexViolations": 40,
+      "maxArbitraryTailwindViolations": 0
+    },
+    "src/utils/pdfDossierGenerator.ts": {
+      "maxHexViolations": 5,
+      "maxArbitraryTailwindViolations": 0
+    }
+  }
+}

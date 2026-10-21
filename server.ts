@@ -17,7 +17,12 @@ export async function startServer() {
   // Attach hardened WebSocket server (ticket-authenticated, tenant-isolated)
   setupWebSocket(server);
 
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  // Support CLI --port argument (e.g. server.ts --port 3000) or APP_PORT or fallback to 3000
+  const args = process.argv.slice(2);
+  const portArgIndex = args.indexOf('--port');
+  const cliPort = portArgIndex !== -1 && args[portArgIndex + 1] ? args[portArgIndex + 1] : undefined;
+  const rawPort = cliPort || process.env.APP_PORT || process.env.DEFAULT_APP_PORT || (process.env.PORT !== '8080' ? process.env.PORT : undefined) || '3000';
+  const PORT = parseInt(rawPort, 10);
 
   server.listen(PORT, '0.0.0.0', () => {
     logger.info(`[TraceXMail] Express + WebSocket server running on http://0.0.0.0:${PORT}`);

@@ -187,7 +187,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
               <FileSearch className="w-3.5 h-3.5 text-[#c9a227]" />
               <span>Step-by-Step Delivery Route</span>
             </div>
-            <h2 className="font-['Fraunces',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
+            <h2 className="font-['Source_Serif_4',serif] text-[26px] sm:text-[32px] font-medium text-[#ede6d8]">
               The Real Transmission Route: From Sender to Inbox
             </h2>
             <p className="text-[#b9af9c] text-[14px] sm:text-[15px] max-w-[65ch] leading-relaxed">
@@ -349,7 +349,7 @@ export const ForensicRouteDissector: React.FC<ForensicRouteDissectorProps> = ({
                 {activeStation.status === 'MALICIOUS' ? <ShieldAlert className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
               </div>
               <div>
-                <h3 className="font-['Fraunces',serif] text-[18px] sm:text-[21px] font-medium text-[#ede6d8]">
+                <h3 className="font-['Source_Serif_4',serif] text-[18px] sm:text-[21px] font-medium text-[#ede6d8]">
                   Stop {activeStation.number}: {activeStation.label} — {activeStation.sublabel}
                 </h3>
                 <div className="font-['IBM_Plex_Mono',monospace] text-[11px] sm:text-[11.5px] text-[#8e8574] flex items-center gap-2 mt-0.5 flex-wrap">

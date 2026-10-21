@@ -222,7 +222,7 @@ export function Header({
 
         <div className="flex items-center gap-2">
           <TraceXLogo3D size="sm" title="TraceXMail Cryptographic Core" />
-          <span className="font-['Fraunces',serif] font-bold text-sm tracking-tight text-[#ede6d8]">
+          <span className="font-['Source_Serif_4',serif] font-bold text-sm tracking-tight text-[#ede6d8]">
             TraceXMail
           </span>
           {/* Integrated Auto-Sync / Auto-Refresh Control */}
