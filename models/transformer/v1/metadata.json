@@ -1,0 +1,25 @@
+{
+  "name": "transformer",
+  "version": "v1",
+  "schema_version": "2.5.0",
+  "training_data_hash": "2c73f31a9fe9eda285566e44a5034fea728df4800c8040628c7740269ee5ee7b",
+  "git_commit": "c7f212a",
+  "training_date": "2026-10-21T19:40:00Z",
+  "hyperparameters": {
+    "base_model": "distilbert-base-multilingual-cased",
+    "header_injection": true,
+    "temperature": 0.5,
+    "quantization": "INT8"
+  },
+  "test_metrics": {
+    "macro_f1": 0.814,
+    "accuracy": 0.915,
+    "fpr_legitimate": 0.018,
+    "adversarial_holdout_accuracy": 0.9167,
+    "p95_latency_ms": 14.2
+  },
+  "artifacts": [
+    "model_quantized.onnx",
+    "metrics.json"
+  ]
+}

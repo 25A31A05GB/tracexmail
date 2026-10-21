@@ -1,0 +1,24 @@
+{
+  "name": "centroid_cosine",
+  "version": "v2.5",
+  "schema_version": "2.5.0",
+  "training_data_hash": "e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29",
+  "git_commit": "a9e144f",
+  "training_date": "2026-10-20T07:12:00Z",
+  "hyperparameters": {
+    "algorithm": "Centroid Cosine",
+    "temperature": 0.85,
+    "vocabulary_size": 1500,
+    "sublinear_tf": true
+  },
+  "test_metrics": {
+    "macro_f1": 0.785,
+    "accuracy": 0.898,
+    "fpr_legitimate": 0.015,
+    "adversarial_holdout_accuracy": 0.883,
+    "p95_latency_ms": 1.2
+  },
+  "artifacts": [
+    "trained_model.json"
+  ]
+}

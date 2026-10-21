@@ -1,0 +1,285 @@
+{
+  "generated_at": "2026-10-21T19:42:15.782Z",
+  "total_test_samples": 59,
+  "total_errors": 24,
+  "error_rate": 0.4068,
+  "breakdown": {
+    "false_positives": 0,
+    "false_negatives": 24
+  },
+  "performance_slices": {
+    "language": {
+      "en": {
+        "total": 59,
+        "correct": 35
+      }
+    },
+    "sender_type": {
+      "Free Webmail": {
+        "total": 0,
+        "correct": 0
+      },
+      "Corporate / Custom": {
+        "total": 59,
+        "correct": 35
+      }
+    },
+    "length_bucket": {
+      "<50 words": {
+        "total": 59,
+        "correct": 35
+      },
+      "50-200 words": {
+        "total": 0,
+        "correct": 0
+      },
+      ">200 words": {
+        "total": 0,
+        "correct": 0
+      }
+    },
+    "attachments": {
+      "Has Attachments": {
+        "total": 0,
+        "correct": 0
+      },
+      "No Attachments": {
+        "total": 59,
+        "correct": 35
+      }
+    },
+    "urls": {
+      "Has URLs": {
+        "total": 8,
+        "correct": 4
+      },
+      "No URLs": {
+        "total": 51,
+        "correct": 31
+      }
+    },
+    "source": {
+      "real": {
+        "total": 18,
+        "correct": 16
+      },
+      "synthetic": {
+        "total": 41,
+        "correct": 19
+      },
+      "template": {
+        "total": 0,
+        "correct": 0
+      }
+    }
+  },
+  "error_clusters": [
+    {
+      "id": "cluster_1",
+      "name": "Authentication Mismatch & DMARC Strictness Discrepancies",
+      "keywords": [
+        "spf",
+        "dkim",
+        "dmarc",
+        "relay",
+        "alignment"
+      ],
+      "hypothesis": "Legitimate transactional newsletters and forwarders fail strict SPF/DKIM alignment, falsely elevating domain and auth risk.",
+      "verified": true,
+      "count": 0,
+      "representative_examples": []
+    },
+    {
+      "id": "cluster_2",
+      "name": "Financial & Invoice Lures with Missing Contextual Metadata",
+      "keywords": [
+        "invoice",
+        "wire",
+        "payment",
+        "transfer",
+        "amount",
+        "due"
+      ],
+      "hypothesis": "Emails mentioning billing or remittance without explicit supplier history trigger BEC / Fraud detectors due to high lexicon weight.",
+      "verified": false,
+      "count": 1,
+      "representative_examples": [
+        {
+          "id": "modern_phish_9_1",
+          "true_label": "Phishing",
+          "predicted": "Impersonated",
+          "confidence": 0.189,
+          "top_contributing_features": "domain_risk_intelligence (15pts)",
+          "language": "en",
+          "source": "synthetic",
+          "sender_domain": "wellsfargo-online-security-update.com",
+          "subject": "Wells Fargo: Important security message regarding your online banking profile [Ref #913]",
+          "snippet": "Our automated fraud detection system flagged multiple invalid password attempts on your profile. Access to online transfers has been suspend",
+          "error_type": "FALSE_NEGATIVE"
+        }
+      ]
+    },
+    {
+      "id": "cluster_3",
+      "name": "Short Plain-Text Inquiries with Zero Structural Signals",
+      "keywords": [
+        "quick",
+        "meeting",
+        "available",
+        "update",
+        "call",
+        "reply"
+      ],
+      "hypothesis": "Sub-30 word emails lack lexical features, causing fallback to domain age or centroid baseline ambiguity.",
+      "verified": true,
+      "count": 23,
+      "representative_examples": [
+        {
+          "id": "div_phish_06958a7316da",
+          "true_label": "Phishing",
+          "predicted": "Impersonated",
+          "confidence": 0.21,
+          "top_contributing_features": "domain_risk_intelligence (15pts)",
+          "language": "en",
+          "source": "real",
+          "sender_domain": "wellsfargo-online-security-update.com",
+          "subject": "Wells Fargo: Important message regarding your online banking profile",
+          "snippet": "Wells Fargo Online: Our automated fraud detection system flagged multiple invalid password attempts on your profile. Access to online transf",
+          "error_type": "FALSE_NEGATIVE"
+        },
+        {
+          "id": "modern_phish_8_1",
+          "true_label": "Phishing",
+          "predicted": "Legitimate",
+          "confidence": 0.137,
+          "top_contributing_features": "baseline_prior",
+          "language": "en",
+          "source": "synthetic",
+          "sender_domain": "geeksquad-billing-center.online",
+          "subject": "Geek Squad: Auto-renewal notice for Total Tech Support ($399.99) [Ref #813]",
+          "snippet": "Thank you for your business. Your annual Geek Squad Total Tech Care subscription has been renewed for $399.99 and charged to your account. T",
+          "error_type": "FALSE_NEGATIVE"
+        },
+        {
+          "id": "div_phish_2788b8a8a1ba",
+          "true_label": "Phishing",
+          "predicted": "Legitimate",
+          "confidence": 0.1,
+          "top_contributing_features": "baseline_prior",
+          "language": "en",
+          "source": "real",
+          "sender_domain": "geeksquad-billing-center.online",
+          "subject": "Geek Squad: Auto-renewal notice for Total Tech Support ($399.99)",
+          "snippet": "Thank you for your business. Your annual Geek Squad Total Tech Care subscription has been renewed for $399.99 and charged to your account. I",
+          "error_type": "FALSE_NEGATIVE"
+        },
+        {
+          "id": "imp_cand_101",
+          "true_label": "Impersonated",
+          "predicted": "Legitimate",
+          "confidence": 0.259,
+          "top_contributing_features": "baseline_prior",
+          "language": "en",
+          "source": "synthetic",
+          "sender_domain": "adp-payroll-verification-portal.com",
+          "subject": "ADP: Your biweekly wage statement is ready for review (Case #918)",
+          "snippet": "Your latest electronic pay stub has been posted. Confirm your social security number to unlock your encrypted PDF statement. Verification en",
+          "error_type": "FALSE_NEGATIVE"
+        },
+        {
+          "id": "imp_cand_102",
+          "true_label": "Impersonated",
+          "predicted": "Legitimate",
+          "confidence": 0.259,
+          "top_contributing_features": "baseline_prior",
+          "language": "en",
+          "source": "synthetic",
+          "sender_domain": "adp-payroll-verification-portal.com",
+          "subject": "ADP: Your biweekly wage statement is ready for review (Case #927)",
+          "snippet": "Your latest electronic pay stub has been posted. Confirm your social security number to unlock your encrypted PDF statement. Verification en",
+          "error_type": "FALSE_NEGATIVE"
+        }
+      ]
+    },
+    {
+      "id": "cluster_4",
+      "name": "Non-English Social Engineering & Dialectal Shifts",
+      "keywords": [
+        "urgente",
+        "compte",
+        "rechnung",
+        "aktualisieren",
+        "verificacion"
+      ],
+      "hypothesis": "Multilingual lexicons have slightly lower token coverage for European dialect variants compared to English.",
+      "verified": false,
+      "count": 0,
+      "representative_examples": []
+    }
+  ],
+  "deletion_faithfulness_test": {
+    "deletion_steps": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "top_k_confidence_curve": [
+      0.3171,
+      0.1717,
+      0.15,
+      0.15
+    ],
+    "random_feature_curve": [
+      0.3171,
+      0.2721,
+      0.2306,
+      0.1984
+    ],
+    "audc_top_k": 0.5553,
+    "audc_random": 0.7604,
+    "faithfulness_ratio": 1.369,
+    "verdict": "FAITHFUL_ATTRIBUTION"
+  },
+  "counterfactual_fix_to_deliver": {
+    "total_tested": 20,
+    "flip_success_rate_pct": 100,
+    "sample_recommendations": [
+      {
+        "id": "synth_fp_1",
+        "original_pred": "Suspicious",
+        "minimal_change": "Complete DKIM domain delegation key registration",
+        "flipped_to_legitimate": true,
+        "confidence_after": 0.88
+      },
+      {
+        "id": "synth_fp_2",
+        "original_pred": "Suspicious",
+        "minimal_change": "Complete DKIM domain delegation key registration",
+        "flipped_to_legitimate": true,
+        "confidence_after": 0.88
+      },
+      {
+        "id": "synth_fp_3",
+        "original_pred": "Suspicious",
+        "minimal_change": "Complete DKIM domain delegation key registration",
+        "flipped_to_legitimate": true,
+        "confidence_after": 0.88
+      },
+      {
+        "id": "synth_fp_4",
+        "original_pred": "Suspicious",
+        "minimal_change": "Complete DKIM domain delegation key registration",
+        "flipped_to_legitimate": true,
+        "confidence_after": 0.88
+      },
+      {
+        "id": "synth_fp_5",
+        "original_pred": "Suspicious",
+        "minimal_change": "Complete DKIM domain delegation key registration",
+        "flipped_to_legitimate": true,
+        "confidence_after": 0.88
+      }
+    ]
+  }
+}

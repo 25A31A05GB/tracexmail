@@ -27,6 +27,7 @@ import { JargonTooltip } from './JargonTooltip';
 import { Interactive3DTiltCard, CyberThreatCore3D } from './3d';
 import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
 import { CaseRealtimeTriageCard } from './CaseRealtimeTriageCard';
+import { FeatureAttributionCard } from './FeatureAttributionCard';
 
 interface ForensicCaseTwoPanelProps {
   analysis: EmailAnalysis;
@@ -842,6 +843,17 @@ export function ForensicCaseTwoPanel({
               </div>
             </div>
           )}
+
+          {/* Prompt 30: Feature Attribution & Counterfactual Fix Card */}
+          <FeatureAttributionCard
+            threatScore={threatScore}
+            classification={verdictText}
+            features={(analysis as any)?.features || []}
+            authSignals={analysis?.auth}
+            domainAge={(analysis as any)?.domainAge}
+            fromDomain={(analysis as any)?.fromDomain || targetDomain}
+            replyTo={parsedReplyTo}
+          />
 
           {/* 2. LINKS AND ATTACHMENTS */}
           {evidenceCardData.findings && evidenceCardData.findings.length > 0 && (

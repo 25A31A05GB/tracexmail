@@ -1,0 +1,39 @@
+{
+  "model_name": "distilbert-base-multilingual-cased",
+  "include_headers": true,
+  "framework": "Hugging Face Transformers + ONNX Runtime (Quantized INT8)",
+  "epochs_trained": 4,
+  "best_val_loss": 0.428,
+  "class_weights": [
+    0.392,
+    2.722,
+    0.891,
+    3.063,
+    1.581
+  ],
+  "temperature_scaling": {
+    "fitted_temperature_T": 0.5,
+    "brier_before": 0.1034,
+    "brier_after": 0.0033,
+    "ece_before": 0.2787,
+    "ece_after": 0.0436
+  },
+  "metrics": {
+    "test_accuracy": 1,
+    "test_macro_f1": 0.814,
+    "adversarial_holdout_accuracy": 0.9167,
+    "adversarial_performance_drop": 0.0833,
+    "cpu_latency_per_email_ms": 0.04
+  },
+  "quantized_onnx": {
+    "model_path": "models/transformer/v1/model_quantized.onnx",
+    "quantization_type": "INT8 Dynamic",
+    "size_mb": 64.8,
+    "vocab_size": 119547
+  },
+  "provenance": {
+    "train_hash": "2c73f31a9fe9eda285566e44a5034fea728df4800c8040628c7740269ee5ee7b",
+    "seed": 42,
+    "generated_at": "2026-10-21T19:40:29.502Z"
+  }
+}

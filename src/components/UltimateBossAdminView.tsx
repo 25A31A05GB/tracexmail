@@ -46,6 +46,7 @@ import {
   LineChart as LineChartIcon,
   Radio
 } from 'lucide-react';
+import { ModelHealthDashboard } from './ModelHealthDashboard';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -110,6 +111,7 @@ export function UltimateBossAdminView({
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [timeframe, setTimeframe] = useState<TimeFrame>('7d');
   const [livePulse, setLivePulse] = useState<boolean>(true);
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'overview' | 'mlops'>('overview');
 
   // System Stats State
   const [systemStats, setSystemStats] = useState({
@@ -513,7 +515,40 @@ export function UltimateBossAdminView({
         </div>
       </div>
 
-      {/* Action Toast Alert */}
+      {/* Subtab Navigation: Platform Overview vs Model Health & MLOps */}
+      <div className="flex items-center gap-3 border-b border-stone-800 pb-3 pt-1">
+        <button
+          onClick={() => setActiveAdminSubTab('overview')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            activeAdminSubTab === 'overview'
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
+              : 'text-stone-400 hover:text-stone-200 border border-transparent'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <span>Platform Overview &amp; Users</span>
+        </button>
+        <button
+          onClick={() => setActiveAdminSubTab('mlops')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            activeAdminSubTab === 'mlops'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm'
+              : 'text-stone-400 hover:text-stone-200 border border-transparent'
+          }`}
+        >
+          <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Model Health &amp; MLOps (Prompt 31)</span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            ACTIVE
+          </span>
+        </button>
+      </div>
+
+      {activeAdminSubTab === 'mlops' ? (
+        <ModelHealthDashboard />
+      ) : (
+        <>
+          {/* Action Toast Alert */}
       {actionNotice && (
         <div className={`p-4 rounded-xl text-xs font-mono border flex items-center gap-3 animate-in fade-in shadow-lg ${
           actionNotice.type === 'success' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200' : 'bg-rose-950/40 border-rose-500/50 text-rose-200'
@@ -1085,6 +1120,8 @@ export function UltimateBossAdminView({
           </table>
         </div>
       </div>
+      </>
+      )}
 
       {/* Selected User Details Modal Drawer */}
       {selectedUser && (

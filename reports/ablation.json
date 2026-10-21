@@ -1,0 +1,626 @@
+{
+  "generated_at": "2026-10-21T19:37:41.296Z",
+  "test_records_count": 59,
+  "full_system_f1": 0.2812,
+  "removal_candidates": [
+    {
+      "layer": "tfidfCentroid",
+      "deltaF1": 0,
+      "costSavings": 0,
+      "latencySavingsMs": 1.7
+    },
+    {
+      "layer": "authenticationSignals",
+      "deltaF1": 0,
+      "costSavings": 0,
+      "latencySavingsMs": 0.7
+    },
+    {
+      "layer": "threatIntelSignals",
+      "deltaF1": 0,
+      "costSavings": 0.01,
+      "latencySavingsMs": 4.7
+    },
+    {
+      "layer": "weightedLexicons",
+      "deltaF1": 0,
+      "costSavings": 0,
+      "latencySavingsMs": 1.6
+    },
+    {
+      "layer": "embeddingSimilarity",
+      "deltaF1": 0,
+      "costSavings": 0.04,
+      "latencySavingsMs": 45.4
+    },
+    {
+      "layer": "llmLinguisticForensics",
+      "deltaF1": 0,
+      "costSavings": 0.7,
+      "latencySavingsMs": 240.5
+    },
+    {
+      "layer": "metaClassifier",
+      "deltaF1": 0,
+      "costSavings": 0,
+      "latencySavingsMs": 0.9
+    }
+  ],
+  "results": [
+    {
+      "configName": "Full System (All 8 Layers)",
+      "configType": "full",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 293.2,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude tfidfCentroid",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 1,
+      "ece": 0.0932,
+      "meanLatencyMs": 291.5,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude structuralHeaderFeatures",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2215,
+      "meanLatencyMs": 292.5,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Leave-One-Out: Exclude authenticationSignals",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 292.5,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude threatIntelSignals",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 288.5,
+      "costPer1kEmails": 0.39,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude weightedLexicons",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 291.6,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude embeddingSimilarity",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 247.8,
+      "costPer1kEmails": 0.36,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude llmLinguisticForensics",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 52.7,
+      "costPer1kEmails": -0.3,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Leave-One-Out: Exclude metaClassifier",
+      "configType": "leave-one-out",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 292.3,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Layer Alone: Only tfidfCentroid",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "tfidfCentroid"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2215,
+      "meanLatencyMs": 1.3,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only structuralHeaderFeatures",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "structuralHeaderFeatures"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 1,
+      "ece": 0.0932,
+      "meanLatencyMs": 0.5,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Layer Alone: Only authenticationSignals",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "authenticationSignals"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 0.4,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only threatIntelSignals",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "threatIntelSignals"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 4.2,
+      "costPer1kEmails": -0.34,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only weightedLexicons",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "weightedLexicons"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 1.1,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only embeddingSimilarity",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "embeddingSimilarity"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 45,
+      "costPer1kEmails": -0.31,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only llmLinguisticForensics",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 240,
+      "costPer1kEmails": 0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Layer Alone: Only metaClassifier",
+      "configType": "layer-alone",
+      "activeLayers": [
+        "metaClassifier"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 0.4,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Cumulative Stage 1: +authenticationSignals",
+      "configType": "cumulative",
+      "activeLayers": [
+        "authenticationSignals"
+      ],
+      "macroF1": 0.1256,
+      "accuracy": 0.4576,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0,
+      "fprAt95Recall": 1,
+      "ece": 0.0424,
+      "meanLatencyMs": 0.3,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": -0.1556
+    },
+    {
+      "configName": "Cumulative Stage 2: +structuralHeaderFeatures",
+      "configType": "cumulative",
+      "activeLayers": [
+        "structuralHeaderFeatures",
+        "authenticationSignals"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 1,
+      "ece": 0.0932,
+      "meanLatencyMs": 0.8,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 3: +tfidfCentroid",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 2.1,
+      "costPer1kEmails": -0.35,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 4: +threatIntelSignals",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 6.2,
+      "costPer1kEmails": -0.34,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 5: +weightedLexicons",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 7.3,
+      "costPer1kEmails": -0.34,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 6: +embeddingSimilarity",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "embeddingSimilarity"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 52.3,
+      "costPer1kEmails": -0.3,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 7: +llmLinguisticForensics",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 292.4,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Cumulative Stage 8: +metaClassifier",
+      "configType": "cumulative",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 292.7,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Adaptive Routing (LLM called only if cheap confidence < 0.6)",
+      "configType": "routing",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 293,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Adaptive Routing (LLM called only if cheap confidence < 0.7)",
+      "configType": "routing",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 293.1,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Adaptive Routing (LLM called only if cheap confidence < 0.8)",
+      "configType": "routing",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 293.1,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    },
+    {
+      "configName": "Adaptive Routing (LLM called only if cheap confidence < 0.9)",
+      "configType": "routing",
+      "activeLayers": [
+        "tfidfCentroid",
+        "structuralHeaderFeatures",
+        "authenticationSignals",
+        "threatIntelSignals",
+        "weightedLexicons",
+        "metaClassifier",
+        "embeddingSimilarity",
+        "llmLinguisticForensics"
+      ],
+      "macroF1": 0.2812,
+      "accuracy": 0.5932,
+      "maliciousPrecision": 1,
+      "maliciousRecall": 0.3125,
+      "fprAt95Recall": 0.963,
+      "ece": 0.2756,
+      "meanLatencyMs": 293.1,
+      "costPer1kEmails": 0.4,
+      "deltaMacroF1FromFull": 0
+    }
+  ]
+}

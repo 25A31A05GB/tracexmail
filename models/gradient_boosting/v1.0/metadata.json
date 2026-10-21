@@ -1,0 +1,24 @@
+{
+  "name": "gradient_boosting",
+  "version": "v1.0",
+  "schema_version": "2.5.0",
+  "training_data_hash": "e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29",
+  "git_commit": "b4d990e",
+  "training_date": "2026-10-21T06:30:00Z",
+  "hyperparameters": {
+    "trees": 35,
+    "max_depth": 5,
+    "learning_rate": 0.3,
+    "features": "TF-IDF + Structural/Header"
+  },
+  "test_metrics": {
+    "macro_f1": 0.849,
+    "accuracy": 0.932,
+    "fpr_legitimate": 0.012,
+    "adversarial_holdout_accuracy": 0.895,
+    "p95_latency_ms": 4.8
+  },
+  "artifacts": [
+    "gb_model.json"
+  ]
+}
