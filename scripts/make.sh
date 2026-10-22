@@ -6,27 +6,27 @@ target="${1:-help}"
 case "$target" in
   data)
     echo "[+] Building clean, leak-free evaluation dataset (Prompt 25)..."
-    bun scripts/ml/build_eval_dataset.ts
+    npx tsx scripts/ml/build_eval_dataset.ts
     ;;
   baselines)
     echo "[+] Running baseline models and benchmark harness (Prompt 26)..."
-    bun scripts/ml/benchmark.ts
+    npx tsx scripts/ml/benchmark.ts
     ;;
   ablation)
     echo "[+] Executing layered pipeline ablation study (Prompt 27)..."
-    bun scripts/ml/ablation.ts --offline
+    npx tsx scripts/ml/ablation.ts --offline
     ;;
   llm-eval)
     echo "[+] Evaluating LLM linguistic forensics and prompt injection defense (Prompt 28)..."
-    bun scripts/ml/eval_llm.ts
+    npx tsx scripts/ml/eval_llm.ts
     ;;
   finetune-smoke)
     echo "[+] Executing Transformer fine-tuning smoke run (Prompt 29)..."
-    bun scripts/ml/finetune_transformer.ts
+    npx tsx scripts/ml/finetune_transformer.ts
     ;;
   errors)
     echo "[+] Running error analysis, slice metrics, and explanation tests (Prompt 30)..."
-    bun scripts/ml/error_analysis.ts
+    npx tsx scripts/ml/error_analysis.ts
     ;;
   report)
     echo "[+] Assembling consolidated evaluation report..."

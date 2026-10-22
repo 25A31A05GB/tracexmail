@@ -6,7 +6,6 @@
   --font-display: 'Source Serif 4', 'Noto Serif', Georgia, serif;
   --font-serif: 'Source Serif 4', 'Noto Serif', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Noto Sans Mono', monospace;
-  --font-hop: 'TraceX Hop', sans-serif;
 
   /* Design System Surface Tokens (Design Prompt D) */
   --color-surface-page: #100e0c;
@@ -152,7 +151,7 @@
   body {
     background-color: var(--ink);
     color: var(--paper);
-    font-family: var(--font-sans);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 16px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -188,17 +187,17 @@
   }
 
   h1, h2, h3, h4, h5, h6, .font-serif, .font-display {
-    font-family: var(--font-display);
+    font-family: 'Sora', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-weight: 600;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
 
   .mono, code, pre, .font-mono {
-    font-family: var(--font-mono);
+    font-family: 'JetBrains Mono', monospace;
   }
 
   .font-sans {
-    font-family: var(--font-sans);
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
   ::selection {
@@ -710,7 +709,7 @@
   border: 1px solid var(--ec-line);
   position: relative;
   overflow: hidden;
-  font-family: var(--font-sans);
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ec-text);
   box-sizing: border-box;
   border-radius: 12px;
