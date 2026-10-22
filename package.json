@@ -18,6 +18,7 @@
     "test:unit": "vitest run",
     "test": "vitest run && tsx scripts/test_forensics.ts && tsx scripts/test_intelligence.ts && tsx scripts/test_network_intelligence.ts",
     "lint": "tsc --noEmit",
+    "check:tokens": "bun scripts/check-design-tokens.ts",
     "model:list": "bun scripts/ml/model_registry.ts list",
     "model:promote": "bun scripts/ml/model_registry.ts promote",
     "model:rollback": "bun scripts/ml/model_registry.ts rollback",

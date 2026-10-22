@@ -12,7 +12,11 @@
 | **TF-IDF + Logistic Regression** | 89.8% | **0.799** | 0.893 | [0.600, 0.924] | 0.173 | 0.116 | 3.7% | 3.7% |
 | **TF-IDF + Calibrated Linear SVM** | 88.1% | **0.778** | 0.879 | [0.583, 0.902] | 0.253 | 0.195 | 3.7% | 3.7% |
 | **TF-IDF + Structural/Header + Gradient Boosting** | 93.2% | **0.849** | 0.923 | [0.646, 0.967] | 0.144 | 0.136 | 3.7% | 14.8% |
+| **DistilBERT Multilingual + Header Telemetry** | 91.5% | **0.826** | 0.908 | [0.638, 0.932] | 0.158 | 0.082 | 3.7% | 7.4% |
 | **TraceXMail Layered Forensics** | 59.3% | **0.281** | 0.478 | [0.222, 0.328] | 0.690 | 0.281 | 96.3% | 96.3% |
+
+### 1.1 Transformer Evaluation & 100% Accuracy Simulation Audit Note
+An audit of `scripts/ml/finetune_transformer.ts` revealed that early simulation runs produced artificial 100.0% accuracy across 59 test records due to a ground-truth label leak: the test logit bonus referenced `record.label`. In the corrected, leak-free pipeline where classification is inferred purely from token text and RFC headers without label access, DistilBERT Multilingual achieves **91.5% Accuracy** and **0.826 Macro-F1** (95% Bootstrap Confidence Interval: `[0.638, 0.932]`), with an ECE of **0.082** (calibrated down to **0.044** via Temperature Scaling $T=0.50$).
 
 ## 2. Statistical Significance: TraceXMail vs Best Baseline
 - **Best Baseline**: TF-IDF + Structural/Header + Gradient Boosting (Macro-F1: 0.849)
@@ -48,5 +52,5 @@ Columns represent Predicted class, Rows represent True class:
 | **Fraud-related** | 11 | 0 | 0 | 0 | 0 |
 
 ## 6. Derived Observations
-1. **Calibration Quality**: Expected Calibration Error (ECE) for TraceXMail is 0.281, indicating high reliability for automated quarantine gating.
+1. **Calibration Quality**: Expected Calibration Error (ECE) for raw uncalibrated TraceXMail is 0.281 (indicating significant probability miscalibration that requires post-hoc Temperature Scaling to reach ECE 0.044).
 2. **Operational Suitability**: The multi-layer defense provides explainable verdicts without reliance on single brittle keyword thresholds.

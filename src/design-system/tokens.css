@@ -14,6 +14,17 @@
 @import "@fontsource/jetbrains-mono/500.css";
 @import "@fontsource/jetbrains-mono/600.css";
 
+/* Original Display Typeface for TraceXMail */
+@font-face {
+  font-family: 'TraceX Hop';
+  src: url('/fonts/TraceXHop-Regular.woff2') format('woff2'),
+       url('/fonts/TraceXHop-Regular.woff') format('woff'),
+       url('/fonts/TraceXHop-Regular.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Surfaces (Consolidated) */
   --color-surface-page: #100e0c;

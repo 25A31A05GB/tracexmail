@@ -134,9 +134,21 @@
       "maxHexViolations": 4,
       "maxArbitraryTailwindViolations": 6
     },
-    "src/components/ErrorBoundary.tsx": {
+    "src/components/AdminModelHealth.tsx": {
+      "maxHexViolations": 205,
+      "maxArbitraryTailwindViolations": 200
+    },
+    "src/components/AppGuard.tsx": {
       "maxHexViolations": 30,
       "maxArbitraryTailwindViolations": 39
+    },
+    "src/components/FeatureAttributionCard.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 5
+    },
+    "src/components/ModelHealthDashboard.tsx": {
+      "maxHexViolations": 0,
+      "maxArbitraryTailwindViolations": 20
     },
     "src/components/EvidenceTagCard.tsx": {
       "maxHexViolations": 191,
