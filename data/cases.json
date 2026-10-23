@@ -1108,5 +1108,97 @@
     "assigned_user": "analyst@org-alpha.sec",
     "source": "manual",
     "raw_analysis": null
+  },
+  {
+    "id": "case-1792753237484",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Legitimate Analyst Incident Case",
+    "description": "",
+    "status": "OPEN",
+    "severity": "HIGH",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-23T11:00:37.484Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_alpha_tenant_1792753237506",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Top Secret Alpha Threat",
+    "description": "",
+    "status": "OPEN",
+    "severity": "CRITICAL",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-23T11:00:37.509Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case-1792753813624",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Legitimate Analyst Incident Case",
+    "description": "",
+    "status": "OPEN",
+    "severity": "HIGH",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-23T11:10:13.624Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_alpha_tenant_1792753813643",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Top Secret Alpha Threat",
+    "description": "",
+    "status": "OPEN",
+    "severity": "CRITICAL",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-23T11:10:13.646Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
   }
 ]
