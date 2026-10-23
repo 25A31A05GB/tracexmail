@@ -7,32 +7,45 @@
   --font-serif: 'Source Serif 4', 'Noto Serif', Georgia, serif;
   --font-mono: 'JetBrains Mono', 'Noto Sans Mono', monospace;
 
-  /* Design System Surface Tokens (Design Prompt D) */
+  /* Design System Surface Tokens (Design Prompt D2) */
   --color-surface-page: #100e0c;
   --color-surface-section: #14110d;
   --color-surface-card: #171410;
+  --color-surface-raised: #1d1a15;
 
   /* Design System Typography & Accent Tokens */
   --color-text-primary: #ede6d8;
-  --color-text-muted: #8a8070;
-  --color-text-secondary: #94a3b8;
+  --color-text-secondary: #b9af9c;
+  --color-text-muted: #8e8574;
+  --color-text-inverse: #100e0c;
   --color-accent-gold: #c9a227;
+  --color-accent-gold-hover: #d8b035;
   --color-border-default: #3a352c;
+
+  /* Semantic Forensics D2 Tokens */
+  --color-semantic-verified: #22c55e;
+  --color-semantic-verified-text: #4ade80;
+  --color-semantic-verified-deep: #2e7a4a;
+  --color-semantic-anomaly: #fb923c;
+  --color-semantic-anomaly-solid: #f97316;
+  --color-semantic-alert: #b23a2e;
+  --color-semantic-alert-text: #ff8d7d;
+  --color-semantic-info: #b9af9c;
 
   /* Design System Radius Tokens */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
 
-  /* Harmonize Slate & Zinc palette with the TraceXMail Forensic Dossier / SOC Aesthetic */
+  /* Harmonize Slate & Zinc palette with D2 Stone/Charcoal */
   --color-slate-950: #100e0c;
-  --color-slate-900: #16130f;
-  --color-slate-850: #1b1712;
-  --color-slate-800: #221e17;
-  --color-slate-750: #2b251d;
+  --color-slate-900: #14110d;
+  --color-slate-850: #171410;
+  --color-slate-800: #1d1a15;
+  --color-slate-750: #26221b;
   --color-slate-700: #3a352c;
   --color-slate-600: #574f42;
-  --color-slate-500: #8a8070;
+  --color-slate-500: #8e8574;
   --color-slate-400: #b9af9c;
   --color-slate-300: #d6cebf;
   --color-slate-200: #ede6d8;
@@ -40,100 +53,61 @@
   --color-slate-50: #faf7f2;
 
   --color-zinc-950: #100e0c;
-  --color-zinc-900: #16130f;
-  --color-zinc-800: #221e17;
+  --color-zinc-900: #14110d;
+  --color-zinc-800: #171410;
   --color-zinc-700: #3a352c;
   --color-zinc-600: #574f42;
-  --color-zinc-500: #8a8070;
+  --color-zinc-500: #8e8574;
   --color-zinc-400: #b9af9c;
   --color-zinc-300: #d6cebf;
   --color-zinc-200: #ede6d8;
   --color-zinc-100: #f5f0e6;
 
-  /* Forensic Wiretap & Telemetry Steel-Slate Cyan */
-  --color-blue-950: #121820;
-  --color-blue-900: #182330;
-  --color-blue-800: #22364a;
-  --color-blue-700: #315170;
-  --color-blue-600: #4a759c;
-  --color-blue-500: #6d9bbd;
-  --color-blue-400: #7fa3ba;
-  --color-blue-300: #a7c5d9;
-  --color-blue-200: #d2e4f0;
-  --color-blue-100: #edf4fa;
-
-  /* Red Thread Threat Forensics */
-  --color-rose-950: #200c0a;
-  --color-rose-900: #33120e;
-  --color-rose-800: #5a1e17;
-  --color-rose-700: #852a20;
-  --color-rose-600: #b23a2e;
-  --color-rose-500: #c94a3d;
-  --color-rose-400: #e27267;
-  --color-rose-300: #f1a39b;
-
-  /* Forensic Seal Gold & Warning Stamp */
-  --color-amber-950: #1f1806;
-  --color-amber-900: #332709;
-  --color-amber-800: #5e4710;
-  --color-amber-700: #8c6a18;
-  --color-amber-600: #b5891e;
-  --color-amber-500: #c9a227;
-  --color-amber-400: #dec052;
-  --color-amber-300: #eed885;
-
-  /* Cryptographic & Domain Violet */
-  --color-purple-950: #1d1324;
-  --color-purple-900: #2b1c36;
-  --color-purple-800: #432a54;
-  --color-purple-700: #653f7f;
-  --color-purple-600: #8c58b0;
-  --color-purple-500: #a975cf;
-  --color-purple-400: #c499e3;
-
-  /* Authentic Forensic Tokens */
-  --color-forensic-ink: #14120f;
-  --color-forensic-surface: #1a1712;
-  --color-forensic-card: #221e17;
-  --color-forensic-card-elevated: #28241c;
+  /* Authentic Forensic Tokens (D2) */
+  --color-forensic-ink: #100e0c;
+  --color-forensic-surface: #14110d;
+  --color-forensic-card: #171410;
+  --color-forensic-card-elevated: #1d1a15;
   --color-forensic-line: #3a352c;
   --color-forensic-line-light: #4a4438;
   --color-forensic-paper: #ede6d8;
   --color-forensic-paper-dim: #b9af9c;
-  --color-forensic-paper-muted: #8a8070;
+  --color-forensic-paper-muted: #8e8574;
   --color-forensic-thread: #b23a2e;
-  --color-forensic-thread-glow: rgba(178, 58, 46, 0.25);
   --color-forensic-stamp: #c9a227;
-  --color-forensic-green: #48a975;
-  --color-forensic-slate: #7fa3ba;
+  --color-forensic-green: #22c55e;
+  --color-forensic-slate: #b9af9c;
 }
 
 @layer base {
   :root {
-    /* Consolidated Surface Tokens (Design Prompt D) */
+    /* Consolidated Surface Tokens (Design Prompt D2) */
     --ink: #100e0c;      /* page surface */
     --ink-2: #14110d;    /* section surface */
     --ink-3: #171410;    /* card surface */
     --surface: #14110d;  /* section surface */
     --surface2: #171410; /* card surface */
+    --surface-raised: #1d1a15; /* raised surface */
 
     --paper: #ede6d8;
     --paper-card: #ede6d8;
-    --paper-dim: #94a3b8;
-    --paper-muted: #8a8070;
+    --paper-dim: #b9af9c;
+    --paper-muted: #8e8574;
     --thread: #b23a2e;
     --thread-dim: #7a2e26;
+    --thread-text: #ff8d7d;
     --stamp: #c9a227;
-    --slate: #94a3b8;
+    --slate: #b9af9c;
     --line: #3a352c;
     --radius: 6px;
     --maxw: 1200px;
 
     /* Semantic SOC tokens */
     --red: #b23a2e;
-    --green: #48a975;
-    --amber: #c9a227;
-    --muted: #8a8070;
+    --red-text: #ff8d7d;
+    --green: #22c55e;
+    --amber: #fb923c;
+    --muted: #8e8574;
   }
 
   * {

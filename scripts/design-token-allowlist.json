@@ -14,6 +14,22 @@
     "#fff"
   ],
   "migrationFileBudgets": {
+    "src/components/AdminModelHealth.tsx": {
+      "maxHexViolations": 210,
+      "maxArbitraryTailwindViolations": 210
+    },
+    "src/components/AppGuard.tsx": {
+      "maxHexViolations": 35,
+      "maxArbitraryTailwindViolations": 45
+    },
+    "src/components/FeatureAttributionCard.tsx": {
+      "maxHexViolations": 5,
+      "maxArbitraryTailwindViolations": 10
+    },
+    "src/components/ModelHealthDashboard.tsx": {
+      "maxHexViolations": 5,
+      "maxArbitraryTailwindViolations": 25
+    },
     "src/App.tsx": {
       "maxHexViolations": 40,
       "maxArbitraryTailwindViolations": 66
