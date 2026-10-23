@@ -53,7 +53,7 @@ import { lookupMaxMindGeo } from '../utils/maxmindService';
 import { WhyAffordance } from './WhyAffordance';
 import { PlainLanguageSummaryCard } from './PlainLanguageSummaryCard';
 import { NonTechnicalEvidenceCard } from './NonTechnicalEvidenceCard';
-import { exportEvidenceAsPdf, exportEvidenceAsImage } from '../utils/exportEvidence';
+import { exportEvidenceAsPdf, exportEvidenceAsImage, exportEvidenceAsEml } from '../utils/exportEvidence';
 import { getStandardizedVerdict } from '../utils/verdict';
 import { JargonTooltip } from './JargonTooltip';
 import { RelatedIncidentsWidget } from './RelatedIncidentsWidget';
@@ -726,15 +726,7 @@ export function OverviewView({
 
   const handleDownloadRawEml = () => {
     if (!analysis) return;
-    const blob = new Blob([analysis.rawEml || ''], { type: 'message/rfc822' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${analysis.name || effectiveEvidenceId}.eml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    exportEvidenceAsEml(analysis, { filename: `${analysis.name || effectiveEvidenceId}.eml` });
   };
 
   if (!analysis) {
@@ -927,10 +919,10 @@ export function OverviewView({
             <button
               onClick={handleDownloadRawEml}
               className="px-3 py-1.5 rounded bg-[#1D2027] hover:bg-[#2A2D34] border border-[#2A2D34] text-xs text-neutral-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Download original, unaltered RFC 822 .eml bytes"
+              title="Download processed email forensic object as RFC 822 .eml"
             >
               <Download className="w-3.5 h-3.5 text-neutral-400" />
-              <span>Raw .EML</span>
+              <span>Download as EML</span>
             </button>
           </div>
 
@@ -1157,10 +1149,10 @@ export function OverviewView({
               <button
                 onClick={handleDownloadRawEml}
                 className="px-2.5 py-1.5 rounded bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-xs text-blue-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Download original, unaltered RFC 822 .eml bytes"
+                title="Download processed email forensic object as RFC 822 .eml"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Raw .EML</span>
+                <span>Download as EML</span>
               </button>
             </div>
           </div>

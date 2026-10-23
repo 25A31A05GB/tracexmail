@@ -126,3 +126,88 @@ ${rawHeaders}
 
   return report;
 }
+
+/**
+ * Formats an EmailAnalysis object into a standard, compliant RFC 5322 EML format string,
+ * including all headers, authentication results, MTA hop traces, and body content.
+ */
+export function formatAnalysisToEml(analysis: EmailAnalysis): string {
+  if (!analysis) return '';
+
+  // 1. If rawEml already exists and is non-empty, prefer it directly
+  if (analysis.rawEml && analysis.rawEml.trim().length > 0) {
+    return analysis.rawEml.trim();
+  }
+
+  const lines: string[] = [];
+
+  // 2. Core RFC 5322 Headers
+  const messageId = analysis.messageId || analysis.headers?.messageId || `<${analysis.id || 'case-' + Date.now()}@tracexmail.internal>`;
+  const date = analysis.date || analysis.headers?.date || analysis.analyzedAt || new Date().toUTCString();
+  const from = analysis.from || analysis.headers?.from || 'unknown@domain.com';
+  const to = analysis.to || analysis.headers?.to || 'recipient@domain.com';
+  const subject = analysis.subject || analysis.headers?.subject || 'No Subject';
+  const replyTo = analysis.replyTo || analysis.headers?.replyTo;
+  const returnPath = analysis.returnPath || analysis.headers?.returnPath;
+
+  lines.push(`Message-ID: ${messageId}`);
+  lines.push(`Date: ${date}`);
+  lines.push(`From: ${from}`);
+  lines.push(`To: ${to}`);
+  lines.push(`Subject: ${subject}`);
+  if (replyTo) lines.push(`Reply-To: ${replyTo}`);
+  if (returnPath) lines.push(`Return-Path: ${returnPath}`);
+
+  // 3. MIME Headers
+  lines.push('MIME-Version: 1.0');
+  lines.push('Content-Type: text/plain; charset=utf-8');
+
+  // 4. Custom TraceXMail Forensic Headers
+  lines.push(`X-TraceXMail-Verdict: ${analysis.threatVerdict || 'UNKNOWN'}`);
+  lines.push(`X-TraceXMail-ThreatScore: ${analysis.threatScore ?? 0}`);
+  const sha256 = analysis.sha256Hash || analysis.sha256 || analysis.custodyHash;
+  if (sha256) lines.push(`X-TraceXMail-SHA256: ${sha256}`);
+
+  // 5. Authentication Results & Received-SPF (RFC 8601)
+  const spfStat = analysis.authResults?.spf?.status || analysis.auth?.spf?.status || 'none';
+  const dkimStat = analysis.authResults?.dkim?.status || analysis.auth?.dkim?.status || 'none';
+  const dmarcStat = analysis.authResults?.dmarc?.status || analysis.auth?.dmarc?.status || 'none';
+  const fromDomain = from.includes('@') ? from.split('@')[1] : 'sender.com';
+
+  lines.push(`Received-SPF: ${spfStat} (mx.corporate.com: domain of ${fromDomain} designates permitted sender)`);
+  lines.push(`Authentication-Results: mx.corporate.com; spf=${spfStat} smtp.mailfrom=${fromDomain}; dkim=${dkimStat}; dmarc=${dmarcStat}`);
+
+  // 6. Received Hop Headers (chronological MTA traversal)
+  if (Array.isArray(analysis.hops) && analysis.hops.length > 0) {
+    analysis.hops.forEach((hop) => {
+      const fromHost = hop.fromHost || hop.fromIp || 'mail.relay.net';
+      const byHost = hop.byHost || 'mx.corporate.com';
+      const protocol = hop.protocol || 'ESMTPS';
+      const hopTime = hop.timestamp || date;
+      lines.push(`Received: from ${fromHost} (${hop.fromIp ? `[${hop.fromIp}]` : 'unknown'})\r\n  by ${byHost} with ${protocol}\r\n  for <${to}>; ${hopTime}`);
+    });
+  }
+
+  // 7. If rawHeaders string exists, append any non-duplicate headers
+  if (analysis.rawHeaders) {
+    const rawHeaderLines = analysis.rawHeaders.split(/\r?\n/);
+    rawHeaderLines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && trimmed.includes(':')) {
+        const key = trimmed.split(':')[0].toLowerCase();
+        if (!['message-id', 'date', 'from', 'to', 'subject', 'mime-version', 'content-type', 'x-tracexmail-verdict'].includes(key)) {
+          lines.push(trimmed);
+        }
+      }
+    });
+  }
+
+  // 8. Header-Body separator
+  lines.push('');
+
+  // 9. Body Content
+  const bodyContent = analysis.bodyText || analysis.body || 'No body content available.';
+  lines.push(bodyContent);
+
+  return lines.join('\r\n');
+}

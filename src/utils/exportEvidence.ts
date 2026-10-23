@@ -627,6 +627,24 @@ function escapeCsv(val: any): string {
 /**
  * Exports complete forensic dossier and telemetry as a structured JSON file.
  */
+import { formatAnalysisToEml } from './formatEvidenceReport';
+
+/**
+ * Exports the email analysis as an RFC 822 .eml file.
+ * Prefers rawEml or rawHeaders if available, or constructs a compliant RFC 822 MIME structure.
+ */
+export function exportEvidenceAsEml(analysis?: EmailAnalysis, options?: ExportEvidenceOptions): void {
+  if (!analysis) return;
+
+  const caseId = options?.caseId || analysis.id || 'case-' + Date.now();
+  const filename = options?.filename || `${analysis.name || caseId}.eml`;
+
+  const rawContent = formatAnalysisToEml(analysis);
+
+  const blob = new Blob([rawContent], { type: 'message/rfc822' });
+  downloadBlob(blob, filename.endsWith('.eml') ? filename : `${filename}.eml`);
+}
+
 export function exportEvidenceAsJson(analysis?: EmailAnalysis, options?: ExportEvidenceOptions): void {
   const caseId = options?.caseId || analysis?.id || 'case-' + Date.now();
   const evidenceId = options?.evidenceId || analysis?.evidenceId || 'EVD-' + Date.now();
