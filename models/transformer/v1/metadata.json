@@ -19,6 +19,7 @@
     "p95_latency_ms": 14.2
   },
   "artifacts": [
+    "model_quantized.onnx",
     "metrics.json"
   ]
 }

@@ -1,15 +1,11 @@
 /**
  * TraceXMail Design System - Color Tokens
- * Governed by Design Prompt D2:
- * - Surfaces: page #100e0c, section #14110d, card #171410, raised #1d1a15
+ * Governed by Design Prompt D:
+ * - Surfaces: page #100e0c, section #14110d, card #171410
  * - Border: #3a352c
- * - Text: primary #ede6d8, secondary #b9af9c, muted #8e8574, inverse #100e0c
- * - Brand & Primary Action: gold #c9a227 (hover #d8b035)
- * - Verified: green #22c55e (text #4ade80, deep fill #2e7a4a)
- * - Alert: red #b23a2e (text #ff8d7d for 4.5:1 AA contrast on dark)
- * - Anomaly / Warning: orange #fb923c (solid #f97316)
- * - Neutral Information: stone #b9af9c
- * - REMOVED: teal/cyan, violet/purple, blue, slate, emerald
+ * - Text: #ede6d8, muted #8a8070, secondary #94a3b8
+ * - Accent: gold #c9a227 (primary button, active nav, max 1 highlight per screen)
+ * - Semantic: green (verified), amber (anomaly), red (alert), violet (destination), teal (intelligence)
  */
 
 export const colors = {
@@ -18,7 +14,6 @@ export const colors = {
     page: '#100e0c',
     section: '#14110d',
     card: '#171410',
-    raised: '#1d1a15',
   },
 
   // Borders & Dividers
@@ -31,59 +26,64 @@ export const colors = {
   // Typography
   text: {
     primary: '#ede6d8',
-    secondary: '#b9af9c',
-    muted: '#8e8574',
+    muted: '#8a8070',
+    secondary: '#94a3b8',
     inverse: '#100e0c',
   },
 
   // Brand Accent (Used strictly on primary actions, active nav, max 1 highlight per screen)
   accent: {
     gold: '#c9a227',
-    goldHover: '#d8b035',
+    goldHover: '#dec052',
     goldMuted: 'rgba(201, 162, 39, 0.12)',
     goldBorder: '#5e4710',
   },
 
-  // Semantic Forensics Status Colors (D2 Palette: Verified Green, Anomaly Orange, Alert Red, Stone Info)
+  // Semantic Forensics Status Colors (solid, subtle-background, and border variants)
   semantic: {
     // Verified / Safe / Legitimate
     verified: {
-      solid: '#22c55e',
-      deep: '#2e7a4a',
-      subtle: 'rgba(34, 197, 94, 0.12)',
-      border: '#2e7a4a',
-      text: '#4ade80',
+      solid: '#48a975',
+      subtle: 'rgba(72, 169, 117, 0.12)',
+      border: '#275c3f',
+      text: '#48a975',
     },
-    // Anomaly / Warning (Orange - clearly distinct from gold)
+    // Anomaly / Warning / Suspicious
     anomaly: {
-      solid: '#f97316',
-      subtle: 'rgba(249, 115, 22, 0.12)',
-      border: '#9a3412',
-      text: '#fb923c',
+      solid: '#c9a227',
+      subtle: 'rgba(201, 162, 39, 0.12)',
+      border: '#5e4710',
+      text: '#c9a227',
     },
-    // Alert / Threat / Phishing / Quarantined (Red text #ff8d7d meets 4.5:1 WCAG AA)
+    // Alert / Threat / Phishing / Quarantined
     alert: {
       solid: '#b23a2e',
-      hover: '#c94a3d',
       subtle: 'rgba(178, 58, 46, 0.12)',
-      border: '#b23a2e',
-      text: '#ff8d7d',
+      border: '#5a1e17',
+      text: '#f1a39b',
     },
-    // Neutral Information (Stone outline + icon, replaces teal and violet)
-    info: {
-      solid: '#b9af9c',
-      subtle: 'rgba(185, 175, 156, 0.12)',
-      border: '#3a352c',
-      text: '#b9af9c',
+    // Destination / Delivery / Hop Route
+    destination: {
+      solid: '#8c58b0',
+      subtle: 'rgba(140, 88, 176, 0.12)',
+      border: '#432a54',
+      text: '#c499e3',
+    },
+    // Intelligence / IOC / Enrichment
+    intelligence: {
+      solid: '#2dd4bf',
+      subtle: 'rgba(45, 212, 191, 0.12)',
+      border: '#134e4a',
+      text: '#2dd4bf',
     },
   },
 
-  // Elevation Shadows (No glow effects, max 2 levels)
+  // Elevation Shadows
   elevation: {
     level1: '0 4px 12px rgba(0, 0, 0, 0.4)',
     level2: '0 12px 32px rgba(0, 0, 0, 0.6)',
+    anomalyGlow: '0 0 16px rgba(201, 162, 39, 0.2)',
   },
 } as const;
 
-export const colorTokens = colors;
 export type ColorTokens = typeof colors;

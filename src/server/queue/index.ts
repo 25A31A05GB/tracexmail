@@ -70,8 +70,12 @@ if (redisUrl) {
     }
     logger.info('BullMQ initialized with Redis');
   } catch (err: any) {
-    logger.warn({ error: err.message }, 'Redis initialization notice; operating background queue in resilient in-process mode');
-    redisConnection = null;
+    if (isProduction) {
+      throw new Error(`Failed to initialize BullMQ Redis in production: ${err.message}`);
+    } else {
+      logger.warn({ error: err.message }, 'Redis initialization failed; falling back to in-process queue');
+      redisConnection = null;
+    }
   }
 } else {
   logger.info('Running with in-process background job queues (dev mode)');

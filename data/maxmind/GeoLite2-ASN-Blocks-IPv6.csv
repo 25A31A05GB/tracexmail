@@ -1,0 +1,32 @@
+network,autonomous_system_number,autonomous_system_organization
+2607:f8b0::/32,15169,Google LLC
+2001:4860::/32,15169,Google LLC
+2a01:111::/32,8075,Microsoft Corporation
+2603:10a6::/32,8075,Microsoft Corporation
+2603:10b6::/32,8075,Microsoft Corporation
+2603:10c6::/32,8075,Microsoft Corporation
+2603:10d6::/32,8075,Microsoft Corporation
+2603:10e6::/32,8075,Microsoft Corporation
+2603:10f6::/32,8075,Microsoft Corporation
+2620:10d:c000::/40,55113,LinkedIn Corporation
+2620:10d:c000::/44,55113,LinkedIn Corporation
+2620:10d:c000::/48,55113,LinkedIn Corporation
+2620:109:c000::/44,55113,LinkedIn Corporation
+2606:4700::/32,13335,Cloudflare Inc
+2803:f800::/32,13335,Cloudflare Inc
+2405:b500::/32,13335,Cloudflare Inc
+2400:cb00::/32,13335,Cloudflare Inc
+2620:149::/32,714,Apple Inc
+2a01:b740::/32,714,Apple Inc
+2600:1f00::/24,16509,Amazon.com Inc / AWS
+2a05:d000::/26,16509,Amazon.com Inc / AWS
+2406:da00::/28,16509,Amazon.com Inc / AWS
+2a04:4e40::/32,54113,Fastly Inc
+2604:a880::/32,54113,Fastly Inc
+2600:1400::/28,20940,Akamai International B.V.
+2001:500::/32,20940,Akamai International B.V.
+2001:4998::/32,36647,Yahoo Inc
+2001:4998:c000::/36,36647,Yahoo Inc
+2a0b:3e00::/32,208323,Proton AG
+2001:67c:289c::/48,200548,Zettahost Cyber Ltd Tor Relay
+2a01:4f8::/32,24940,Hetzner Online GmbH

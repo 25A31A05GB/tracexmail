@@ -951,7 +951,7 @@ export function LandingView({
               Four Pillars of the Forensic Reconstruction Engine
             </h2>
             <p className="text-[#b9af9c] mt-2 text-[15px] leading-relaxed">
-              Deterministic architectures engineered for court-admissible audit trails, immutable cryptographic ledgers, and RFC-compliant hop isolation.
+              Deterministic architectures engineered for hash-verified/tamper-evident audit trails, immutable cryptographic ledgers, and RFC-compliant hop isolation.
             </p>
           </div>
 
@@ -1056,7 +1056,7 @@ export function LandingView({
                 <div className="space-y-1">
                   <div className="font-mono text-[#22c55e] font-bold text-[11px] uppercase">02. Defensible Custody</div>
                   <p className="text-[#8e8574] text-[11.5px] leading-snug">
-                    SHA-256 immutable hashes formatted for court-admissible audit trails.
+                    SHA-256 immutable hashes formatted for hash-verified/tamper-evident audit trails.
                   </p>
                 </div>
                 <div className="space-y-1">

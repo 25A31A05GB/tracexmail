@@ -1,0 +1,18 @@
+geoname_id,locale_code,continent_code,continent_name,country_iso_code,country_name,subdivision_1_iso_code,subdivision_1_name,subdivision_2_iso_code,subdivision_2_name,city_name,metro_code,time_zone,is_in_european_union
+727011,en,EU,Europe,BG,Bulgaria,22,Sofia-Grad,,,Sofia,,Europe/Sofia,1
+2925533,en,EU,Europe,DE,Germany,HE,Hesse,,,Frankfurt am Main,,Europe/Berlin,1
+2759794,en,EU,Europe,NL,Netherlands,NH,North Holland,,,Amsterdam,,Europe/Amsterdam,1
+683506,en,EU,Europe,RO,Romania,B,Bucuresti,,,Bucharest,,Europe/Bucharest,1
+756135,en,EU,Europe,PL,Poland,MZ,Mazovia,,,Warsaw,,Europe/Warsaw,1
+2643743,en,EU,Europe,GB,United Kingdom,ENG,England,,,London,,Europe/London,0
+5391959,en,NA,North America,US,United States,CA,California,,,San Francisco,807,America/Los_Angeles,0
+5375480,en,NA,North America,US,United States,CA,California,,,Mountain View,807,America/Los_Angeles,0
+5392171,en,NA,North America,US,United States,CA,California,,,San Jose,807,America/Los_Angeles,0
+5341145,en,NA,North America,US,United States,CA,California,,,Cupertino,807,America/Los_Angeles,0
+5372223,en,NA,North America,US,United States,CA,California,,,Menlo Park,807,America/Los_Angeles,0
+4852924,en,NA,North America,US,United States,IA,Iowa,,,Council Bluffs,652,America/Chicago,0
+4853828,en,NA,North America,US,United States,IA,Iowa,,,Des Moines,679,America/Chicago,0
+4744870,en,NA,North America,US,United States,VA,Virginia,,,Ashburn,511,America/New_York,0
+5809844,en,NA,North America,US,United States,WA,Washington,,,Seattle,819,America/Los_Angeles,0
+5808079,en,NA,North America,US,United States,WA,Washington,,,Redmond,819,America/Los_Angeles,0
+5128581,en,NA,North America,US,United States,NY,New York,,,New York,501,America/New_York,0

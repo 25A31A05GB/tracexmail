@@ -1,7 +1,6 @@
 /**
  * TraceXMail Design System - CSS Custom Properties
  * Single Source of Truth for tokens across the entire application.
- * Strictly implements Design Prompt D2 Palette.
  */
 
 /* Self-hosted font imports (no external requests) */
@@ -16,87 +15,57 @@
 @import "@fontsource/jetbrains-mono/600.css";
 
 :root {
-  /* Surfaces (D2 Palette) */
+  /* Surfaces (Consolidated) */
   --color-surface-page: #100e0c;
   --color-surface-section: #14110d;
   --color-surface-card: #171410;
-  --color-surface-raised: #1d1a15;
-
-  /* Legacy aliases for backwards compatibility */
-  --surface-page: var(--color-surface-page);
-  --surface-section: var(--color-surface-section);
-  --surface-card: var(--color-surface-card);
-  --surface-card-elevated: var(--color-surface-raised);
 
   /* Borders */
   --color-border: #3a352c;
   --color-border-subtle: rgba(58, 53, 44, 0.5);
   --color-border-focus: #c9a227;
-  --border-default: var(--color-border);
-  --border-subtle: var(--color-border-subtle);
-  --border-focus: var(--color-border-focus);
 
   /* Typography Colors */
   --color-text-primary: #ede6d8;
-  --color-text-secondary: #b9af9c;
-  --color-text-muted: #8e8574;
+  --color-text-muted: #8a8070;
+  --color-text-secondary: #94a3b8;
   --color-text-inverse: #100e0c;
-  --text-primary: var(--color-text-primary);
-  --text-secondary: var(--color-text-secondary);
-  --text-muted: var(--color-text-muted);
 
-  /* Brand Accent (Gold: Primary button, active nav, focus rings, max 1 highlight per screen) */
+  /* Accent Gold (Primary button, active nav, max 1 highlight per screen) */
   --color-accent-gold: #c9a227;
-  --color-accent-gold-hover: #d8b035;
+  --color-accent-gold-hover: #dec052;
   --color-accent-gold-muted: rgba(201, 162, 39, 0.12);
   --color-accent-gold-border: #5e4710;
-  --accent-gold: var(--color-accent-gold);
-  --accent-gold-hover: var(--color-accent-gold-hover);
-  --accent-gold-subtle: var(--color-accent-gold-muted);
-  --accent-gold-border: var(--color-accent-gold-border);
 
   /* Semantic - Verified (Green) */
-  --color-semantic-verified: #22c55e;
-  --color-semantic-verified-text: #4ade80;
-  --color-semantic-verified-deep: #2e7a4a;
-  --color-semantic-verified-subtle: rgba(34, 197, 94, 0.12);
-  --color-semantic-verified-border: #2e7a4a;
-  --semantic-verified: var(--color-semantic-verified);
-  --semantic-verified-text: var(--color-semantic-verified-text);
-  --semantic-verified-subtle: var(--color-semantic-verified-subtle);
-  --semantic-verified-border: var(--color-semantic-verified-border);
+  --color-semantic-verified: #48a975;
+  --color-semantic-verified-subtle: rgba(72, 169, 117, 0.12);
+  --color-semantic-verified-border: #275c3f;
 
-  /* Semantic - Anomaly / Warning (Orange - clearly distinct from gold) */
-  --color-semantic-anomaly: #fb923c;
-  --color-semantic-anomaly-solid: #f97316;
-  --color-semantic-anomaly-text: #fb923c;
-  --color-semantic-anomaly-subtle: rgba(249, 115, 22, 0.12);
-  --color-semantic-anomaly-border: #9a3412;
-  --semantic-anomaly: var(--color-semantic-anomaly);
-  --semantic-anomaly-text: var(--color-semantic-anomaly-text);
-  --semantic-anomaly-subtle: var(--color-semantic-anomaly-subtle);
-  --semantic-anomaly-border: var(--color-semantic-anomaly-border);
+  /* Semantic - Anomaly (Amber) */
+  --color-semantic-anomaly: #c9a227;
+  --color-semantic-anomaly-subtle: rgba(201, 162, 39, 0.12);
+  --color-semantic-anomaly-border: #5e4710;
 
-  /* Semantic - Alert (Brick Red fills/borders #b23a2e, text #ff8d7d for 4.5:1 AA contrast) */
+  /* Semantic - Alert (Red) */
   --color-semantic-alert: #b23a2e;
-  --color-semantic-alert-hover: #c94a3d;
-  --color-semantic-alert-text: #ff8d7d;
   --color-semantic-alert-subtle: rgba(178, 58, 46, 0.12);
-  --color-semantic-alert-border: #b23a2e;
-  --semantic-alert: var(--color-semantic-alert);
-  --semantic-alert-text: var(--color-semantic-alert-text);
-  --semantic-alert-subtle: var(--color-semantic-alert-subtle);
-  --semantic-alert-border: var(--color-semantic-alert-border);
+  --color-semantic-alert-border: #5a1e17;
 
-  /* Semantic - Neutral Information (Stone - replaces destination/intelligence colored chips) */
-  --color-semantic-info: #b9af9c;
-  --color-semantic-info-text: #b9af9c;
-  --color-semantic-info-subtle: rgba(185, 175, 156, 0.12);
-  --color-semantic-info-border: #3a352c;
+  /* Semantic - Destination (Violet) */
+  --color-semantic-destination: #8c58b0;
+  --color-semantic-destination-subtle: rgba(140, 88, 176, 0.12);
+  --color-semantic-destination-border: #432a54;
 
-  /* Elevation (No glow effects, max 2 levels) */
+  /* Semantic - Intelligence (Teal) */
+  --color-semantic-intelligence: #2dd4bf;
+  --color-semantic-intelligence-subtle: rgba(45, 212, 191, 0.12);
+  --color-semantic-intelligence-border: #134e4a;
+
+  /* Elevation */
   --elevation-1: 0 4px 12px rgba(0, 0, 0, 0.4);
   --elevation-2: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --elevation-anomaly-glow: 0 0 16px rgba(201, 162, 39, 0.2);
 
   /* Radii */
   --radius-sm: 6px;
@@ -120,11 +89,11 @@
   --max-width-container: 1200px;
 
   /* Typography Families */
-  --font-heading: 'Source Serif 4', 'Noto Serif', Georgia, serif;
-  --font-body: 'IBM Plex Sans', 'Noto Sans', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Source Serif 4', 'Noto Serif', 'Noto Serif Devanagari', 'Noto Serif Arabic', 'Noto Serif SC', 'Noto Serif TC', 'Noto Serif JP', Georgia, serif;
+  --font-body: 'IBM Plex Sans', 'Noto Sans', 'Noto Sans Devanagari', 'Noto Sans Arabic', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans JP', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Noto Sans Mono', monospace;
 
-  /* Motion: 150/250/400ms, one easing curve, no looping animations */
+  /* Motion */
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --duration-slow: 400ms;

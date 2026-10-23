@@ -1,0 +1,17 @@
+network,autonomous_system_number,autonomous_system_organization
+185.220.101.0/24,200548,Zettahost Cyber Ltd
+185.220.100.0/24,208294,Calyx Institute Tor Exit Node
+194.26.29.0/24,49453,Global Layer B.V.
+89.144.20.0/24,9009,M247 Europe SRL
+81.18.87.0/24,12741,Netia S.A. Broadband
+198.51.100.0/24,15169,Google LLC
+8.8.8.0/24,15169,Google LLC Public DNS
+1.1.1.0/24,13335,Cloudflare Inc
+52.0.0.0/8,16509,Amazon.com Inc / AWS us-east-1
+54.0.0.0/8,16509,Amazon.com Inc / AWS
+40.0.0.0/8,8075,Microsoft Corporation
+20.0.0.0/8,8075,Microsoft Azure Cloud
+104.244.42.0/24,13414,Twitter / X Corp
+157.240.0.0/16,32934,Meta Platforms Inc
+17.0.0.0/8,714,Apple Inc
+185.199.108.0/22,36459,GitHub Inc

@@ -3,7 +3,6 @@ import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors, { CorsOptions } from 'cors';
 import path from 'path';
-import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { validateStartupEnv } from './envValidation';
 import { assertEncryptionKeyConfigured, authenticateUser } from './compliance';
@@ -36,7 +35,7 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
   // 2. Reverse Proxy Trust (Single hop for Render / Cloud Run)
   app.set('trust proxy', 1);
 
-  // 3. Security Headers via Helmet (configured to support AI Studio preview iframe)
+  // 3. Security Headers via Helmet
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -45,7 +44,6 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
           scriptSrc: [
             "'self'",
             "'unsafe-inline'",
-            "'unsafe-eval'",
             'https://challenges.cloudflare.com',
             'https://*.cloudflare.com',
             'https://*.sentry.io',
@@ -58,23 +56,20 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
           connectSrc: [
             "'self'",
             'https:',
-            'http:',
             'wss:',
-            'ws:',
             ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : ['https://*.supabase.co']),
             'https://challenges.cloudflare.com'
           ],
-          frameSrc: ["'self'", 'https:', 'http:', 'https://challenges.cloudflare.com'],
-          frameAncestors: ["'self'", 'https:', 'http:'],
+          frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
+          frameAncestors: ["'none'"],
           objectSrc: ["'none'"],
           baseUri: ["'self'"]
         }
       },
-      frameguard: false,
-      hsts: process.env.NODE_ENV === 'production' ? {
+      hsts: {
         maxAge: 15552000,
         includeSubDomains: true
-      } : false,
+      },
       referrerPolicy: {
         policy: 'strict-origin-when-cross-origin'
       }
@@ -181,17 +176,17 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
   registerScimRoutes(app);
 
   // 9. Client SPA static files or Vite dev server
+  const isProduction = process.env.NODE_ENV === 'production';
   const isVitest = Boolean(process.env.VITEST);
-  const distPath = path.join(process.cwd(), 'dist');
-  const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
 
-  if (!hasDist && !isVitest && !options?.skipVite) {
+  if (!isProduction && !isVitest && !options?.skipVite) {
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true, hmr: false },
       appType: 'spa'
     });
     app.use(vite.middlewares);
-  } else if (hasDist) {
+  } else if (isProduction) {
+    const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get(/(.*)/, (_req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));

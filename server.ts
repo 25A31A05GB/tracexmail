@@ -3,6 +3,7 @@ import http from 'http';
 import { createApp } from './src/server/app';
 import { setupWebSocket } from './src/server/websocket';
 import { syncGmailConnectionFromDb } from './src/server/gmailService';
+import { initializeLocalEmbeddingModel } from './src/server/semanticSimilarity';
 import { runRetentionCleanup } from './src/server/compliance';
 import { getSupabaseClient, DEFAULT_ORG_ID } from './src/server/supabase';
 import { logger } from './src/server/logger';
@@ -16,8 +17,12 @@ export async function startServer() {
   // Attach hardened WebSocket server (ticket-authenticated, tenant-isolated)
   setupWebSocket(server);
 
-  // Support process.env.PORT or default to 3000 as required in AI Studio
-  const PORT = parseInt(process.env.PORT || '3000', 10);
+  // Support CLI --port argument (e.g. server.ts --port 3000) or APP_PORT or fallback to 3000
+  const args = process.argv.slice(2);
+  const portArgIndex = args.indexOf('--port');
+  const cliPort = portArgIndex !== -1 && args[portArgIndex + 1] ? args[portArgIndex + 1] : undefined;
+  const rawPort = cliPort || process.env.APP_PORT || process.env.DEFAULT_APP_PORT || (process.env.PORT !== '8080' ? process.env.PORT : undefined) || '3000';
+  const PORT = parseInt(rawPort, 10);
 
   server.listen(PORT, '0.0.0.0', () => {
     logger.info(`[TraceXMail] Express + WebSocket server running on http://0.0.0.0:${PORT}`);
@@ -27,6 +32,10 @@ export async function startServer() {
       logger.warn({ error: err?.message || err }, '[TraceXMail] Notice initializing stored Gmail connection');
     });
 
+    // Cold-start download & initialization of offline semantic transformer model
+    initializeLocalEmbeddingModel().catch((err) => {
+      logger.warn({ error: err?.message || err }, '[TraceXMail] Notice warming up offline local embedding model');
+    });
 
     // Automated background retention cleanup schedule if RETENTION_PURGE_INTERVAL_MS is configured
     const purgeIntervalMs = parseInt(process.env.RETENTION_PURGE_INTERVAL_MS || '0', 10);
