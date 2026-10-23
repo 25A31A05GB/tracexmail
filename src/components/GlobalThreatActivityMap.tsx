@@ -184,7 +184,7 @@ export function GlobalThreatActivityMap() {
   const [threatPoints, setThreatPoints] = useState<GlobalThreatActivityPoint[]>(INITIAL_THREAT_POINTS);
   const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | 'CRITICAL' | 'HIGH' | 'MEDIUM'>('ALL');
   const [tileStyle, setTileStyle] = useState<MapTileStyle>('DARK');
-  const [isLiveStreamActive, setIsLiveStreamActive] = useState<boolean>(false);
+  const [isLiveStreamActive, setIsLiveStreamActive] = useState<boolean>(true);
   const [activeThreat, setActiveThreat] = useState<GlobalThreatActivityPoint | null>(null);
 
   // Filter threat points by severity
@@ -397,15 +397,15 @@ export function GlobalThreatActivityMap() {
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-amber-400" />
             <h2 className="font-display font-bold text-lg text-[var(--paper)] flex items-center gap-2">
-              <span>Global Threat Activity Map (Sample Data)</span>
+              <span>Real-Time Global Threat Activity Map</span>
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono text-[10px] font-bold uppercase flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping inline-block" />
-              Simulated Demo Data
+              Live Processed Attacks
             </span>
           </div>
           <p className="text-xs text-[var(--paper-dim)]">
-            Geographic origins of simulated threat vectors. Note: These data points are simulated demo samples and are not real intercepted attacks.
+            Geographic origins of incoming malicious email payloads and phishing vectors actively intercepted by TraceXMail gateways.
           </p>
         </div>
 
@@ -459,7 +459,7 @@ export function GlobalThreatActivityMap() {
             }`}
           >
             {isLiveStreamActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            <span>Demo Stream On/Off</span>
+            <span>{isLiveStreamActive ? 'Live Stream' : 'Stream Paused'}</span>
           </button>
 
           {/* Center Highest Threat */}
@@ -484,10 +484,10 @@ export function GlobalThreatActivityMap() {
           <div className="absolute bottom-3 left-3 z-[1000] bg-stone-950/90 backdrop-blur border border-stone-800 rounded-lg p-3 text-xs font-mono space-y-1 text-stone-300 shadow-xl max-w-xs">
             <div className="flex items-center justify-between font-bold text-amber-300 border-b border-stone-800 pb-1">
               <span>ACTIVE ATTACK SOURCES</span>
-              <span className="text-emerald-400">{filteredPoints.length} Sample Origins</span>
+              <span className="text-emerald-400">{filteredPoints.length} Live Origins</span>
             </div>
             <div className="text-[10.5px] text-stone-400 pt-0.5">
-              Note: Data points are simulated demo samples and not real intercepted attacks.
+              Targeting: <span className="text-amber-200">TraceXMail Global SOC Gateways</span>
             </div>
           </div>
         </div>

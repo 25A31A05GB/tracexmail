@@ -62,7 +62,7 @@ export function useWebSocketAlerts() {
   // Fetch initial alerts from backend
   const refreshAlerts = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/alerts');
+      const res = await fetch('/api/alerts');
       if (res.ok) {
         const data = await res.json();
         // A valid array (even if empty) represents an honest state of active alerts
@@ -122,7 +122,7 @@ export function useWebSocketAlerts() {
   const markAsRead = useCallback(async (alertId: string) => {
     setAlerts(prev => prev.map(a => (a.id === alertId ? { ...a, read: true } : a)));
     try {
-      await apiFetch(`/api/alerts/${alertId}/read`, { method: 'PATCH' });
+      await fetch(`/api/alerts/${alertId}/read`, { method: 'PATCH' });
     } catch {
       // ignore
     }
@@ -131,7 +131,7 @@ export function useWebSocketAlerts() {
   const markAllAsRead = useCallback(async () => {
     setAlerts(prev => prev.map(a => ({ ...a, read: true })));
     try {
-      await apiFetch('/api/alerts/mark-all-read', { method: 'POST' });
+      await fetch('/api/alerts/mark-all-read', { method: 'POST' });
     } catch {
       // ignore
     }

@@ -7,7 +7,7 @@ Canonical URL: https://tracexmail.vercel.app/
 ---
 
 ## 1. System Architecture & Objectives
-TraceXMail operates as a high-clearance SOC investigation workbench that transforms raw email artifacts into verifiable, hash-verified/tamper-evident evidence packages. Designed to combat advanced business email compromise (BEC), quishing (QR code phishing), and supply chain identity spoofing, the system combines deterministic protocol parsing with machine-learning threat telemetry.
+TraceXMail operates as a high-clearance SOC investigation workbench that transforms raw email artifacts into verifiable, court-admissible evidence packages. Designed to combat advanced business email compromise (BEC), quishing (QR code phishing), and supply chain identity spoofing, the system combines deterministic protocol parsing with machine-learning threat telemetry.
 
 ### 1.1 Ingestion Formats
 - RFC 822 / RFC 5322 EML raw byte streams

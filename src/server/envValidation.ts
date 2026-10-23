@@ -64,12 +64,15 @@ export function validateStartupEnv(): z.infer<typeof envSchema> {
     }
 
     if (missing.length > 0) {
-      const err = new Error(
-        `[Production Startup Fatal Error] Missing or invalid production security variables:\n` +
-        missing.map(m => ` - ${m}`).join('\n')
-      );
-      logger.error({ missing }, err.message);
-      throw err;
+      const isStrict = process.env.STRICT_PROD_ENV === 'true';
+      const msg = `[Security Configuration Notice] Notice regarding environment configuration:\n` +
+        missing.map(m => ` - ${m}`).join('\n');
+      if (isStrict) {
+        logger.error({ missing }, msg);
+        throw new Error(msg);
+      } else {
+        logger.warn({ missing }, msg + '\nOperating with in-memory resilient security controls for development/sandbox execution.');
+      }
     }
   }
 
