@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow | TraceXMail</title>
+    <meta name="description" content="A systematic 10-step SOC incident response checklist for ingesting, analyzing, and mitigating suspicious phishing emails and BEC campaigns." />
+    <link rel="canonical" href="https://tracexmail.vercel.app/knowledge/phishing-email-triage-checklist" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- OpenGraph & Twitter Social Cards -->
+    <meta property="og:title" content="Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow" />
+    <meta property="og:description" content="Step-by-step incident response playbook for Tier 1 and Tier 2 security analysts investigating suspicious emails, weaponized attachments, and credential harvesters." />
+    <meta property="og:url" content="https://tracexmail.vercel.app/knowledge/phishing-email-triage-checklist" />
+    <meta property="og:image" content="https://tracexmail.vercel.app/og-image.png" />
+    <meta property="og:type" content="article" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow" />
+    <meta name="twitter:description" content="Step-by-step incident response playbook for Tier 1 and Tier 2 security analysts investigating suspicious emails, weaponized attachments, and credential harvesters." />
+    <meta name="twitter:image" content="https://tracexmail.vercel.app/og-image.png" />
+
+    <!-- Google AdSense Account Verification -->
+    <meta name="google-adsense-account" content="ca-pub-9357545069587539" />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9357545069587539" crossorigin="anonymous"></script>
+
+    <!-- Schema.org Article & Breadcrumbs Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow",
+      "description": "Standard operating procedure and structured 10-step checklist for SOC analysts triaging suspected email lures, malicious attachments, and compromised accounts.",
+      "author": {
+        "@type": "Organization",
+        "name": "TraceXMail Forensic Intelligence",
+        "url": "https://tracexmail.vercel.app/"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "TraceXMail Forensic Intelligence",
+        "url": "https://tracexmail.vercel.app/"
+      },
+      "datePublished": "2026-10-23",
+      "dateModified": "2026-10-23"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://tracexmail.vercel.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Knowledge Base",
+          "item": "https://tracexmail.vercel.app/knowledge"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Phishing Email Triage Checklist",
+          "item": "https://tracexmail.vercel.app/knowledge/phishing-email-triage-checklist"
+        }
+      ]
+    }
+    </script>
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: #14120f;
+        color: #ede6d8;
+        line-height: 1.8;
+        margin: 0;
+        padding: 24px;
+      }
+      .container {
+        max-width: 880px;
+        margin: 0 auto;
+        background: #1b1814;
+        border: 1px solid #2e2922;
+        border-radius: 8px;
+        padding: 40px;
+      }
+      .nav {
+        margin-bottom: 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #2e2922;
+        padding-bottom: 16px;
+      }
+      .nav a {
+        text-decoration: none;
+        color: #ede6d8;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      .nav a.back {
+        color: #e87063;
+        font-size: 13px;
+      }
+      h1 {
+        color: #ffffff;
+        font-size: 32px;
+        margin-top: 0;
+        line-height: 1.3;
+      }
+      h2 {
+        color: #f3efe6;
+        font-size: 22px;
+        margin-top: 36px;
+        border-bottom: 1px solid #2e2922;
+        padding-bottom: 8px;
+      }
+      h3 {
+        color: #e6dfd1;
+        font-size: 17px;
+        margin-top: 24px;
+      }
+      p, li {
+        color: #b9af9c;
+        font-size: 15px;
+      }
+      code, pre {
+        font-family: "JetBrains Mono", Consolas, monospace;
+        background: #14120f;
+        border: 1px solid #332d25;
+        border-radius: 4px;
+      }
+      code {
+        padding: 2px 6px;
+        color: #c9a227;
+        font-size: 13px;
+      }
+      pre {
+        padding: 16px;
+        overflow-x: auto;
+        color: #ede6d8;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      a {
+        color: #e87063;
+        text-decoration: underline;
+      }
+      .box {
+        background: #14120f;
+        border: 1px solid #3a352c;
+        padding: 20px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+      .badge {
+        display: inline-block;
+        background: #24201a;
+        border: 1px solid #3a352c;
+        color: #c9a227;
+        font-size: 11px;
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-family: monospace;
+        margin-bottom: 12px;
+      }
+      .step-card {
+        background: #14120f;
+        border: 1px solid #2e2922;
+        border-left: 3px solid #c9a227;
+        border-radius: 4px;
+        padding: 16px 20px;
+        margin: 16px 0;
+      }
+      .step-card h3 {
+        margin: 0 0 8px 0;
+        color: #ffffff;
+        font-size: 16px;
+      }
+      footer {
+        border-top: 1px solid #2e2922;
+        margin-top: 48px;
+        padding-top: 24px;
+        font-size: 13px;
+        color: #8a8070;
+        text-align: center;
+      }
+      footer a {
+        color: #ede6d8;
+        text-decoration: none;
+        margin: 0 8px;
+      }
+      footer a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <nav class="nav">
+        <a href="/">🛡️ TraceXMail Forensics</a>
+        <a href="/knowledge" class="back">← Back to Knowledge Base</a>
+      </nav>
+
+      <span class="badge">SOC OPERATIONS • INCIDENT RESPONSE PLAYBOOK</span>
+      <h1>Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow</h1>
+      <p style="color: #8a8070; font-size: 13px;">
+        Published by the TraceXMail team • Updated October 23, 2026
+      </p>
+
+      <h2>1. The Importance of Standardized Phishing Triage</h2>
+      <p>
+        In an enterprise Security Operations Center (SOC), email alerts frequently represent the highest volume of inbound user reports. An ad-hoc investigation method invites human error, creates blind spots around lateral movement, and risks executing live malicious payloads.
+      </p>
+      <p>
+        This 10-step workflow provides a deterministic, repeatable procedure for analyzing suspicious RFC 822 / RFC 5322 artifacts from initial receipt through manual containment.
+      </p>
+
+      <div class="step-card">
+        <h3>Step 1: Secure Ingestion &amp; Evidence Preservation</h3>
+        <p>
+          Never inspect suspicious emails directly inside an active desktop mail client. Export the message as a raw <code>.eml</code> or <code>.msg</code> byte stream. Compute an immediate SHA-256 hash of the artifact to establish a tamper-evident baseline before beginning any processing.
+        </p>
+        <pre>sha256sum suspicious_sample.eml &gt; sample_evidence.sha256</pre>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 2: Transport &amp; MTA Hop Route Analysis</h3>
+        <p>
+          Parse the <code>Received:</code> header chain chronologically from bottom (origin client) to top (internal border gateway). Identify the connecting IP address of the first public SMTP hop (e.g., <code>198.51.100.42</code>), resolve its Autonomous System Number (ASN), and inspect reverse DNS (PTR) records for bulletproof hosting or dynamic ISP pools.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 3: Cryptographic Authentication Evaluation</h3>
+        <p>
+          Inspect the perimeter gateway's <code>Authentication-Results:</code> header (RFC 8601). Check the SPF verdict on the envelope Return-Path, DKIM cryptographic signature validity, and DMARC alignment against the visible RFC 5322 From domain. Note whether ARC (RFC 8617) preserves authentication from an intermediate forwarder.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 4: Identity &amp; Sender Header Triangulation</h3>
+        <p>
+          Cross-examine the three sender identities: <code>Return-Path</code>, <code>From</code>, and <code>Reply-To</code>. Look for classic BEC indicators, such as an executive display name paired with an external lookalike domain, or an internal corporate From address that routes replies to a free disposable webmail account.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 5: Content &amp; Social Engineering Heuristics</h3>
+        <p>
+          Evaluate the body text for psychological manipulation patterns. High-risk indicators include artificial urgency ("account suspension within 2 hours"), wire transfer requests bypassing dual authorization, payroll deposit updates, and vendor bank account modifications.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 6: Hyperlink &amp; Domain Inspection</h3>
+        <p>
+          Extract all embedded URLs without clicking them. Defang URLs (e.g., <code>hxxps://login[.]example[.]com</code>) before sharing. Inspect for Punycode IDN homoglyphs (e.g., Cyrillic 'а' replacing Latin 'a'), open redirects (e.g., OAuth or cloud storage URL wrappers), and newly registered top-level domains.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 7: Attachment &amp; Payload Triaging</h3>
+        <p>
+          If attachments are present, compute their cryptographic hashes (SHA-256) and extract metadata. Flag dangerous extensions disguised by right-to-left override characters or double extensions (e.g., <code>invoice.pdf.iso</code>). Inspect HTML attachments for obfuscated JavaScript or SVG files used for credential smuggling.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 8: MITRE ATT&amp;CK Matrix Mapping</h3>
+        <p>
+          Align the verified tactics to standard cybersecurity matrices:
+        </p>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li><strong>T1566.001 (Spearphishing Attachment):</strong> Weaponized office documents or archive files.</li>
+          <li><strong>T1566.002 (Spearphishing Link):</strong> Credential harvesting landing pages.</li>
+          <li><strong>T1586.002 (Compromised Email Account):</strong> Internal spearphishing originating from a hijacked corporate mailbox.</li>
+        </ul>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 9: Blast Radius &amp; Exposure Assessment</h3>
+        <p>
+          Query mail server logs (e.g., Google Workspace Admin audit log or Microsoft 365 Message Trace) using the subject line, sending IP, and Message-ID. Determine how many internal mailboxes received the identical lure and identify whether any users interacted with embedded links or submitted credentials.
+        </p>
+      </div>
+
+      <div class="step-card">
+        <h3>Step 10: Manual Containment &amp; Remediation</h3>
+        <p>
+          Execute defensive response actions across security tools (automated containment actions are not yet connected directly to external firewalls or identity providers, so manual coordination is required):
+        </p>
+        <ul style="margin: 0; padding-left: 20px;">
+          <li>Perform an administrative search-and-purge to remove copies from all recipient inboxes.</li>
+          <li>Block malicious sender domains and destination IPs on network firewalls and secure web gateways.</li>
+          <li>If credentials were submitted, initiate password resets and revoke active OAuth tokens.</li>
+          <li>Brief the reporting user with positive feedback to encourage future threat reporting.</li>
+        </ul>
+      </div>
+
+      <!-- Related Guides Box -->
+      <div class="box" style="margin-top: 36px;">
+        <h3 style="margin-top: 0; color: #f3efe6;">Related Forensic Guides</h3>
+        <ul style="padding-left: 20px; margin-bottom: 16px;">
+          <li><a href="/knowledge/understanding-spf-dkim-dmarc">Understanding Email Authentication: A Complete Guide to SPF, DKIM, and DMARC</a></li>
+          <li><a href="/knowledge/email-header-forensics-guide">The Definitive Guide to Email Header Forensics &amp; Hop Traceroutes</a></li>
+          <li><a href="/knowledge/detecting-phishing-and-bec">Detecting Advanced Phishing and Business Email Compromise: SOC Playbook</a></li>
+          <li><a href="/knowledge/reading-authentication-results-header">Reading the Authentication-Results Header: RFC 8601 &amp; ARC Forensics</a></li>
+          <li><a href="/knowledge/from-reply-to-return-path-mismatch">From, Reply-To, and Return-Path Mismatch: Benign vs Malicious Triage</a></li>
+        </ul>
+        <p style="margin: 0;">
+          <a href="/" style="font-weight: 600;">Analyze an email in the TraceXMail console &rarr;</a>
+        </p>
+      </div>
+
+      <footer>
+        <p>
+          <a href="/">Console</a> | 
+          <a href="/about">About Us</a> | 
+          <a href="/knowledge">Knowledge Base</a> | 
+          <a href="/privacy">Privacy Policy</a> | 
+          <a href="/terms">Terms of Service</a> | 
+          <a href="/cookies">Cookie Policy</a> | 
+          <a href="/domains">Authorized Domains</a> | 
+          <a href="/contact">Contact</a>
+        </p>
+        <p style="margin-top: 10px; font-size: 12px; color: #6b6254;">
+          &copy; 2026 TraceXMail Forensic Intelligence Platform. All rights reserved.
+        </p>
+      </footer>
+    </div>
+  </body>
+</html>

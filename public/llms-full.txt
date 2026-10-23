@@ -7,7 +7,7 @@ Canonical URL: https://tracexmail.vercel.app/
 ---
 
 ## 1. System Architecture & Objectives
-TraceXMail operates as a high-clearance SOC investigation workbench that transforms raw email artifacts into verifiable, court-admissible evidence packages. Designed to combat advanced business email compromise (BEC), quishing (QR code phishing), and supply chain identity spoofing, the system combines deterministic protocol parsing with machine-learning threat telemetry.
+TraceXMail operates as a high-clearance SOC investigation workbench that transforms raw email artifacts into verifiable, tamper-evident evidence packages. Designed to combat advanced business email compromise (BEC), quishing (QR code phishing), and supply chain identity spoofing, the system combines deterministic protocol parsing with machine-learning threat telemetry.
 
 ### 1.1 Ingestion Formats
 - RFC 822 / RFC 5322 EML raw byte streams
@@ -36,8 +36,8 @@ TraceXMail deterministically evaluates inbound authentication headers against au
 ## 3. Threat Hunting & SOC Workflows
 - **Sandbox Detonation**: Isolates suspect HTML/CSS payloads inside zero-script sandbox iframes to inspect hidden links, obfuscated JavaScript, and malicious redirects without security exposure.
 - **MITRE ATT&CK Matrix**: Correlates identified artifacts directly into security industry matrices (T1566.001, T1566.002, T1586, T1534, T1114.002).
-- **SOAR Automation**: Triggers automated playbooks for immediate token revocation, host quarantine, multi-mailbox threat purging, and SIGMA detection rule creation.
-- **FRE 902 Evidence Custody**: Formats digital certificates compliant with U.S. Federal Rules of Evidence FRE 902(13) and FRE 902(14) using bit-exact SHA-256 digests and RFC 3161 atomic timestamping.
+- **SOAR Playbook Guidance**: Response playbook guidance for token revocation, host quarantine, multi-mailbox threat purging, and SIGMA detection rule creation; automated actions are not yet connected.
+- **Evidence Integrity Manifest**: Evidence integrity manifest (SHA-256 + UTC custody log) intended to support a qualified person's own certification; not legal advice.
 
 ---
 

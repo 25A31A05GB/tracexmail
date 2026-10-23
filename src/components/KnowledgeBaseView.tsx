@@ -41,7 +41,7 @@ const ARTICLES: KnowledgeBaseArticle[] = [
     readTime: '8 min read',
     summary: 'A definitive engineering reference detailing Sender Policy Framework (RFC 7208), DomainKeys Identified Mail (RFC 6376), and DMARC (RFC 7489) identifier alignment mechanics, DNS records, and evaluation flows.',
     rfcReferences: ['RFC 7208', 'RFC 6376', 'RFC 7489', 'RFC 8617 (ARC)'],
-    htmlPath: '/knowledge/understanding-spf-dkim-dmarc.html',
+    htmlPath: '/knowledge/understanding-spf-dkim-dmarc',
     keyPoints: [
       'SPF checks the connecting MTA IP against the Return-Path (Mail From) domain DNS TXT record.',
       'DKIM signs header blocks and body hashes with RSA/Ed25519 private keys verified via DNS public keys.',
@@ -57,7 +57,7 @@ const ARTICLES: KnowledgeBaseArticle[] = [
     readTime: '10 min read',
     summary: 'How to decode RFC 5322 Received headers chronologically from bottom to top, identify injected forged hops, compute network MTA transfer latencies, and expose spoofed Message-IDs.',
     rfcReferences: ['RFC 5322', 'RFC 2821', 'RFC 3834', 'NIST SP 800-86'],
-    htmlPath: '/knowledge/email-header-forensics-guide.html',
+    htmlPath: '/knowledge/email-header-forensics-guide',
     keyPoints: [
       'Received headers prepend from bottom (origin client / submission) to top (final recipient MX gateway).',
       'The bottom-most trustworthy Received header is where origin forensic analysis begins.',
@@ -73,12 +73,60 @@ const ARTICLES: KnowledgeBaseArticle[] = [
     readTime: '12 min read',
     summary: 'A step-by-step SOC Tier 1/2 playbook for dissecting high-risk Business Email Compromise (BEC), Internationalized Domain Name (IDN) homoglyph spoofing, and weaponized hyperlink evasions.',
     rfcReferences: ['MITRE ATT&CK T1566', 'MITRE ATT&CK T1586', 'RFC 5890 (IDNA)'],
-    htmlPath: '/knowledge/detecting-phishing-and-bec.html',
+    htmlPath: '/knowledge/detecting-phishing-and-bec',
     keyPoints: [
       'Executive display name spoofing frequently pairs an authentic VIP name with a disparate free webmail or spoofed domain.',
       'Cousin domain punycode (xn--) exploits visually identical Cyrillic/Greek characters to deceive victims.',
       'Defanged URL detonation in sandbox prevents zero-day drive-by downloads and token theft.',
-      'Evidentiary SHA-256 chain of custody ensures forensic dossiers remain admissible in formal proceedings.'
+      'Evidentiary SHA-256 chain of custody generates a tamper-evident audit trail for incident response.'
+    ]
+  },
+  {
+    id: 'auth-results',
+    slug: 'reading-authentication-results-header',
+    title: 'Reading the Authentication-Results Header: RFC 8601 & ARC Forensics',
+    category: 'Cryptographic Protocols',
+    readTime: '9 min read',
+    summary: 'Master the syntax of RFC 8601 Authentication-Results headers, verify boundary authserv-id identifiers, evaluate SPF/DKIM/DMARC verdicts, and audit multi-hop ARC chains.',
+    rfcReferences: ['RFC 8601', 'RFC 8617 (ARC)', 'RFC 7489', 'RFC 7208'],
+    htmlPath: '/knowledge/reading-authentication-results-header',
+    keyPoints: [
+      'authserv-id defines the perimeter gateway boundary and dictates header trustworthiness.',
+      'SPF verdicts report whether connecting MTA socket IPs match domain TXT records.',
+      'DMARC verifies identifier alignment with the visible RFC 5322 From header.',
+      'ARC seals preserve authentication state across intermediate mailing lists and forwarders.'
+    ]
+  },
+  {
+    id: 'sender-mismatch',
+    slug: 'from-reply-to-return-path-mismatch',
+    title: 'From, Reply-To, and Return-Path Mismatch: Benign vs Malicious Triage',
+    category: 'Forensic Analysis',
+    readTime: '8 min read',
+    summary: 'A deep forensic breakdown of why envelope Return-Path, header From, and Reply-To addresses diverge, featuring a structured SOC analyst triage matrix.',
+    rfcReferences: ['RFC 5321', 'RFC 5322', 'RFC 7489'],
+    htmlPath: '/knowledge/from-reply-to-return-path-mismatch',
+    keyPoints: [
+      'Return-Path defines envelope bounce handling and determines SPF evaluation.',
+      'RFC 5322 From is rendered visually by email clients and governs DMARC alignment.',
+      'Reply-To redirects human responses to an alternative destination, a key BEC vector.',
+      'Legitimate mismatches in SaaS mailers align via valid DKIM domain signatures.'
+    ]
+  },
+  {
+    id: 'phishing-checklist',
+    slug: 'phishing-email-triage-checklist',
+    title: 'Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow',
+    category: 'Threat Intelligence',
+    readTime: '8 min read',
+    summary: 'A systematic 10-step incident response playbook for Tier 1 and Tier 2 analysts investigating suspicious lures, weaponized attachments, and BEC.',
+    rfcReferences: ['MITRE ATT&CK T1566', 'NIST SP 800-61r2', 'RFC 822 / 5322'],
+    htmlPath: '/knowledge/phishing-email-triage-checklist',
+    keyPoints: [
+      'Preserve raw EML artifacts and compute SHA-256 evidence baselines before analysis.',
+      'Trace reverse-chronological Received hops to isolate origin MTA socket IPs.',
+      'Safely inspect hyperlinks and attachments inside isolated detonation sandboxes.',
+      'Conduct manual search-and-purge and block verified malicious IOCs across defenses.'
     ]
   }
 ];

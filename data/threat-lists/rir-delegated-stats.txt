@@ -686,7 +686,7 @@
 5.39.216.0/21|NL|ripencc
 5.39.224.0/21|FR|ripencc
 5.39.232.0/21|FR|ripencc
-5.39.240.0/21|DE|ripencc
+5.39.240.0/21|NO|ripencc
 5.39.248.0/21|GB|ripencc
 5.40.0.0/16|ES|ripencc
 5.41.0.0/16|SA|ripencc
@@ -1424,13 +1424,13 @@
 5.179.120.0/21|FR|ripencc
 5.179.128.0/18|IT|ripencc
 5.179.192.0/21|FR|ripencc
-5.179.200.0/21|DE|ripencc
-5.179.208.0/21|DE|ripencc
-5.179.216.0/21|DE|ripencc
-5.179.224.0/21|DE|ripencc
-5.179.232.0/21|DE|ripencc
-5.179.240.0/21|DE|ripencc
-5.179.248.0/21|DE|ripencc
+5.179.200.0/21|NO|ripencc
+5.179.208.0/21|NO|ripencc
+5.179.216.0/21|NO|ripencc
+5.179.224.0/21|NO|ripencc
+5.179.232.0/21|NO|ripencc
+5.179.240.0/21|NO|ripencc
+5.179.248.0/21|NO|ripencc
 5.180.0.0/22|SE|ripencc
 5.180.4.0/22|MD|ripencc
 5.180.8.0/22|IN|ripencc
@@ -1457,7 +1457,7 @@
 5.180.84.0/22|NL|ripencc
 5.180.88.0/22|DE|ripencc
 5.180.92.0/22|RU|ripencc
-5.180.96.0/22|GB|ripencc
+5.180.96.0/22|JP|ripencc
 5.180.100.0/24|SC|ripencc
 5.180.101.0/24|RU|ripencc
 5.180.102.0/23|CZ|ripencc
@@ -4953,7 +4953,7 @@
 45.10.164.0/22|RU|ripencc
 45.10.168.0/22|CH|ripencc
 45.10.172.0/23|AE|ripencc
-45.10.174.0/23|GB|ripencc
+45.10.174.0/23|JP|ripencc
 45.10.176.0/22|CH|ripencc
 45.10.180.0/22|FR|ripencc
 45.10.184.0/22|NL|ripencc
@@ -4993,7 +4993,7 @@
 45.11.64.0/22|ES|ripencc
 45.11.68.0/22|FR|ripencc
 45.11.72.0/22|BH|ripencc
-45.11.76.0/22|GB|ripencc
+45.11.76.0/22|JP|ripencc
 45.11.80.0/22|DE|ripencc
 45.11.84.0/22|FI|ripencc
 45.11.88.0/22|CA|ripencc

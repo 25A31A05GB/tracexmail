@@ -1450,7 +1450,7 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
     <>
       <Section id="about-mission" title="1. Platform Mission & Engineering Philosophy" filter={filter}>
         <p className="text-xs sm:text-sm text-[#b9af9c] leading-relaxed">
-          TraceXMail was engineered to bring absolute transparency, mathematical rigor, and court-admissible forensic verification to email threat detection. Over 85% of corporate cyber breaches initiate via deceptive email lures. Traditional gateways often output opaque verdicts without showing analysts the underlying transport layer evidence.
+          TraceXMail was engineered to bring absolute transparency, mathematical rigor, and tamper-evident forensic verification to email threat detection. Over 85% of corporate cyber breaches initiate via deceptive email lures. Traditional gateways often output opaque verdicts without showing analysts the underlying transport layer evidence.
         </p>
         <p className="mt-2 text-xs sm:text-sm text-[#b9af9c] leading-relaxed">
           Our platform deconstructs raw RFC 822 / RFC 5322 payloads down to every individual Mail Transfer Agent (MTA) hop, validates cryptographic public key DNS proofs (SPF, DKIM, DMARC, ARC), and exposes forged headers without hallucination.
@@ -1461,8 +1461,8 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
             <div className="text-[11px] text-[#8a8070] mt-1">Bit-exact reverse chronological Received hop deconstruction.</div>
           </div>
           <div className="bg-[#120f0c] p-3 rounded border border-[#2d271f]">
-            <div className="text-xs font-mono text-cyan-400 font-bold">FRE 902 Custody</div>
-            <div className="text-[11px] text-[#8a8070] mt-1">Court-admissible electronic digital records with SHA-256 digests.</div>
+            <div className="text-xs font-mono text-cyan-400 font-bold">Evidence Custody</div>
+            <div className="text-[11px] text-[#8a8070] mt-1">Evidence integrity manifests with SHA-256 digests and UTC custody logs.</div>
           </div>
           <div className="bg-[#120f0c] p-3 rounded border border-[#2d271f]">
             <div className="text-xs font-mono text-green-400 font-bold">Zero-Retention Enclave</div>
@@ -1526,7 +1526,7 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <a
-            href="/knowledge/understanding-spf-dkim-dmarc.html"
+            href="/knowledge/understanding-spf-dkim-dmarc"
             className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
           >
             <div className="text-xs font-bold text-white mb-1">SPF, DKIM &amp; DMARC</div>
@@ -1534,7 +1534,7 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
             <div className="text-[11px] text-amber-400 mt-2 font-mono">Read Guide &rarr;</div>
           </a>
           <a
-            href="/knowledge/email-header-forensics-guide.html"
+            href="/knowledge/email-header-forensics-guide"
             className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
           >
             <div className="text-xs font-bold text-white mb-1">Header Forensics</div>
@@ -1542,7 +1542,7 @@ function AboutContent({ filter, onCopy, copiedKey }: { filter: string; onCopy: (
             <div className="text-[11px] text-amber-400 mt-2 font-mono">Read Guide &rarr;</div>
           </a>
           <a
-            href="/knowledge/detecting-phishing-and-bec.html"
+            href="/knowledge/detecting-phishing-and-bec"
             className="p-3 rounded bg-[#120f0c] border border-[#2d271f] hover:border-amber-400 transition-colors block text-left no-underline"
           >
             <div className="text-xs font-bold text-white mb-1">Phishing &amp; BEC Playbook</div>

@@ -8,8 +8,8 @@ TraceXMail is an enterprise digital forensics and email security platform. It de
 - **Safe Visual Email Sandbox**: DOM-isolated zero-script rendering environment for live inspection of malicious lures, embedded links, and attachments without client-side exploitation risk.
 - **Organizational Blast Radius & Telemetry**: Evaluates identity breach spread, compromised user tokens, affected Active Directory / Google Workspace nodes, and lateral movement timelines.
 - **MITRE ATT&CK Correlation**: Automated mapping of email attack vectors against enterprise matrix techniques (e.g., T1566 Phishing, T1566.001 Spearphishing Attachment, T1566.002 Spearphishing Link, T1586 Compromised Accounts).
-- **1-Click SOAR Playbook Console**: Automated security orchestration actions including host isolation, Google Workspace OAuth revocation, native domain blacklisting, and SIGMA/YARA detection rule generation.
-- **FRE 902 / ISO 27037 Legal Custody Certificate**: Self-authenticating digital evidence generation under Federal Rules of Evidence 902(13) and 902(14) with bit-exact SHA-256 cryptographic hashing and atomic UTC timestamps.
+- **SOAR Playbook Guidance**: Response playbook guidance for host isolation, Google Workspace OAuth revocation, native domain blacklisting, and SIGMA/YARA detection rule generation; automated actions are not yet connected.
+- **Evidence Integrity Manifest**: Evidence integrity manifest (SHA-256 + UTC custody log) intended to support a qualified person's own certification; not legal advice.
 - **Google Workspace Enterprise Defense & Threat Hunter**: Direct Gmail API integration for organization-wide cross-mailbox threat queries, automated quarantine routing, and native filter creation.
 
 ## Key Technical Specifications
@@ -18,8 +18,17 @@ TraceXMail is an enterprise digital forensics and email security platform. It de
 - Geolocation: MaxMind GeoLite2 & RIR database routing
 - ML Models: 5-class nearest centroid cosine vector classification & logistic regression
 
+## Knowledge Base Guides
+- Understanding Email Authentication (SPF, DKIM, DMARC): https://tracexmail.vercel.app/knowledge/understanding-spf-dkim-dmarc
+- Email Header Forensics & Hop Traceroutes: https://tracexmail.vercel.app/knowledge/email-header-forensics-guide
+- Detecting Advanced Phishing and Business Email Compromise: https://tracexmail.vercel.app/knowledge/detecting-phishing-and-bec
+- Reading the Authentication-Results Header: https://tracexmail.vercel.app/knowledge/reading-authentication-results-header
+- From, Reply-To, and Return-Path Mismatch: https://tracexmail.vercel.app/knowledge/from-reply-to-return-path-mismatch
+- Phishing Email Triage Checklist: https://tracexmail.vercel.app/knowledge/phishing-email-triage-checklist
+
 ## Official Links & Endpoints
 - Web Console: https://tracexmail.vercel.app/
+- Knowledge Base: https://tracexmail.vercel.app/knowledge
 - Full LLM Documentation: https://tracexmail.vercel.app/llms-full.txt
 - Security Policy: https://tracexmail.vercel.app/security
 - Domain & SPF Guide: https://tracexmail.vercel.app/domains

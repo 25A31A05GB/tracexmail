@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Detecting Phishing &amp; BEC: SOC Analyst Playbook | TraceXMail</title>
     <meta name="description" content="A comprehensive SOC Tier 1/2 investigation playbook for dissecting Business Email Compromise (BEC), homoglyph domain attacks, and weaponized payloads." />
-    <link rel="canonical" href="https://tracexmail.vercel.app/knowledge/detecting-phishing-and-bec.html" />
+    <link rel="canonical" href="https://tracexmail.vercel.app/knowledge/detecting-phishing-and-bec" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="shortcut icon" href="/favicon.ico" />
@@ -34,6 +34,32 @@
       },
       "datePublished": "2026-09-28",
       "dateModified": "2026-10-09"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://tracexmail.vercel.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Knowledge Base",
+          "item": "https://tracexmail.vercel.app/knowledge"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Detecting Phishing & BEC",
+          "item": "https://tracexmail.vercel.app/knowledge/detecting-phishing-and-bec"
+        }
+      ]
     }
     </script>
 
@@ -234,8 +260,23 @@ Return-Path: bounce@newsletter-relay.biz</pre>
         <li><strong>Inspect Initial Ingress IP:</strong> Review the bottom-most <code>Received:</code> hop. Is the IP assigned to an unexpected cloud provider or residential ISP?</li>
         <li><strong>Defang and Scan Hyperlinks:</strong> Check URL destinations against URLhaus and threat reputation feeds before interacting.</li>
         <li><strong>Examine Attached Hash Signatures:</strong> Extract attachment SHA-256 digests and query threat intelligence databases.</li>
-        <li><strong>Execute Containment SOAR Playbook:</strong> Revoke active session tokens, purge matching Message-IDs from organization mailboxes, and block the offending sender domain in the email gateway.</li>
+        <li><strong>Execute Incident Response Playbook:</strong> Revoke active session tokens, purge matching Message-IDs from organization mailboxes, and block offending sender domains in email gateways (manual coordination required; automated containment is not connected).</li>
       </ol>
+
+      <!-- Related Guides Box -->
+      <div class="box" style="margin-top: 36px;">
+        <h3 style="margin-top: 0; color: #f3efe6;">Related Forensic Guides</h3>
+        <ul style="padding-left: 20px; margin-bottom: 16px;">
+          <li><a href="/knowledge/understanding-spf-dkim-dmarc">Understanding Email Authentication: A Complete Guide to SPF, DKIM, and DMARC</a></li>
+          <li><a href="/knowledge/email-header-forensics-guide">The Definitive Guide to Email Header Forensics &amp; Hop Traceroutes</a></li>
+          <li><a href="/knowledge/reading-authentication-results-header">Reading the Authentication-Results Header: RFC 8601 &amp; ARC Forensics</a></li>
+          <li><a href="/knowledge/from-reply-to-return-path-mismatch">From, Reply-To, and Return-Path Mismatch: Benign vs Malicious Triage</a></li>
+          <li><a href="/knowledge/phishing-email-triage-checklist">Phishing Email Triage Checklist: 10-Step SOC Analyst Workflow</a></li>
+        </ul>
+        <p style="margin: 0;">
+          <a href="/" style="font-weight: 600;">Analyze an email in the TraceXMail console &rarr;</a>
+        </p>
+      </div>
 
       <footer>
         <p>
