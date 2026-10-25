@@ -13,7 +13,6 @@ Allow: /llms-full.txt
 Allow: /ads.txt
 Disallow: /api/
 Disallow: /oauth/
-Disallow: /auth/
 
 # Google AdSense Crawlers
 User-agent: Mediapartners-Google

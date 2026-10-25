@@ -1,0 +1,18 @@
+{
+  "manifest_hash": "e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29",
+  "created_at": "2026-10-25T17:04:25.591Z",
+  "protocol": "Stratified Group Splitting (sender_domain isolation)",
+  "total_samples": 353,
+  "splits": {
+    "train_count": 245,
+    "val_count": 49,
+    "test_count": 59
+  },
+  "test_class_distribution": {
+    "Legitimate": 27,
+    "Suspicious": 4,
+    "Impersonated": 13,
+    "Phishing": 4,
+    "Fraud-related": 11
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "configuration": "Gemini 2.5 Flash + Prompt v1 (Zero-Shot)",
+  "jsonValidity": "100.0%",
+  "agreement": "67.8%",
+  "selfConsistency": "96.6%",
+  "hallucinatedEvidenceRate": "6.8%",
+  "ece": 0.142,
+  "latencyP50P95": "148.1ms / 185.3ms",
+  "costPer1kMails": "$0.18"
+}

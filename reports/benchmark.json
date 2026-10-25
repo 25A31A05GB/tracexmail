@@ -1,6 +1,6 @@
 {
   "manifest_hash": "e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29",
-  "evaluated_at": "2026-10-21T19:37:36.052Z",
+  "evaluated_at": "2026-10-25T17:10:53.874Z",
   "evaluation_seed": 42,
   "splits": {
     "train_count": 245,
@@ -14,8 +14,8 @@
       "accuracy": 0.4576,
       "macroF1": 0.1256,
       "weightedF1": 0.2873,
-      "brierScore": 0.7045,
-      "ece": 0.0526,
+      "brierScore": 1.0847,
+      "ece": 0.5424,
       "bootstrapF1_95ci": [
         0.1013,
         0.1489
@@ -89,19 +89,19 @@
           0
         ]
       ],
-      "fprAt90Recall": 1,
-      "fprAt95Recall": 1
+      "fprAt90Recall": 0,
+      "fprAt95Recall": 0
     },
     {
       "name": "TF-IDF + Logistic Regression",
-      "accuracy": 0.8983,
-      "macroF1": 0.7988,
-      "weightedF1": 0.893,
-      "brierScore": 0.1727,
-      "ece": 0.1157,
+      "accuracy": 0.9492,
+      "macroF1": 0.9228,
+      "weightedF1": 0.9477,
+      "brierScore": 0.113,
+      "ece": 0.2229,
       "bootstrapF1_95ci": [
-        0.6001,
-        0.9243
+        0.7322,
+        1
       ],
       "perClass": {
         "Legitimate": {
@@ -112,26 +112,26 @@
         },
         "Suspicious": {
           "precision": 1,
-          "recall": 0.5,
-          "f1": 0.6667,
+          "recall": 0.75,
+          "f1": 0.8571,
           "support": 4
         },
         "Impersonated": {
-          "precision": 0.9167,
-          "recall": 0.8462,
-          "f1": 0.88,
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
           "support": 13
         },
         "Phishing": {
-          "precision": 0.5,
-          "recall": 0.5,
-          "f1": 0.5,
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
           "support": 4
         },
         "Fraud-related": {
           "precision": 1,
-          "recall": 1,
-          "f1": 1,
+          "recall": 0.9091,
+          "f1": 0.9524,
           "support": 11
         }
       },
@@ -144,174 +144,8 @@
           0
         ],
         [
-          2,
-          2,
-          0,
-          0,
-          0
-        ],
-        [
-          0,
-          0,
-          11,
-          2,
-          0
-        ],
-        [
           1,
-          0,
-          1,
-          2,
-          0
-        ],
-        [
-          0,
-          0,
-          0,
-          0,
-          11
-        ]
-      ],
-      "fprAt90Recall": 0.037,
-      "fprAt95Recall": 0.037
-    },
-    {
-      "name": "TF-IDF + Calibrated Linear SVM",
-      "accuracy": 0.8814,
-      "macroF1": 0.7784,
-      "weightedF1": 0.8789,
-      "brierScore": 0.2534,
-      "ece": 0.1953,
-      "bootstrapF1_95ci": [
-        0.5827,
-        0.9022
-      ],
-      "perClass": {
-        "Legitimate": {
-          "precision": 0.9,
-          "recall": 1,
-          "f1": 0.9474,
-          "support": 27
-        },
-        "Suspicious": {
-          "precision": 1,
-          "recall": 0.5,
-          "f1": 0.6667,
-          "support": 4
-        },
-        "Impersonated": {
-          "precision": 0.9091,
-          "recall": 0.7692,
-          "f1": 0.8333,
-          "support": 13
-        },
-        "Phishing": {
-          "precision": 0.4,
-          "recall": 0.5,
-          "f1": 0.4444,
-          "support": 4
-        },
-        "Fraud-related": {
-          "precision": 1,
-          "recall": 1,
-          "f1": 1,
-          "support": 11
-        }
-      },
-      "confusionMatrix": [
-        [
-          27,
-          0,
-          0,
-          0,
-          0
-        ],
-        [
-          2,
-          2,
-          0,
-          0,
-          0
-        ],
-        [
-          0,
-          0,
-          10,
           3,
-          0
-        ],
-        [
-          1,
-          0,
-          1,
-          2,
-          0
-        ],
-        [
-          0,
-          0,
-          0,
-          0,
-          11
-        ]
-      ],
-      "fprAt90Recall": 0.037,
-      "fprAt95Recall": 0.037
-    },
-    {
-      "name": "TF-IDF + Structural/Header + Gradient Boosting",
-      "accuracy": 0.9322,
-      "macroF1": 0.8487,
-      "weightedF1": 0.9226,
-      "brierScore": 0.1445,
-      "ece": 0.1359,
-      "bootstrapF1_95ci": [
-        0.6458,
-        0.967
-      ],
-      "perClass": {
-        "Legitimate": {
-          "precision": 0.9,
-          "recall": 1,
-          "f1": 0.9474,
-          "support": 27
-        },
-        "Suspicious": {
-          "precision": 1,
-          "recall": 0.5,
-          "f1": 0.6667,
-          "support": 4
-        },
-        "Impersonated": {
-          "precision": 0.9286,
-          "recall": 1,
-          "f1": 0.963,
-          "support": 13
-        },
-        "Phishing": {
-          "precision": 1,
-          "recall": 0.5,
-          "f1": 0.6667,
-          "support": 4
-        },
-        "Fraud-related": {
-          "precision": 1,
-          "recall": 1,
-          "f1": 1,
-          "support": 11
-        }
-      },
-      "confusionMatrix": [
-        [
-          27,
-          0,
-          0,
-          0,
-          0
-        ],
-        [
-          2,
-          2,
           0,
           0,
           0
@@ -326,37 +160,286 @@
         [
           1,
           0,
+          0,
+          3,
+          0
+        ],
+        [
           1,
-          2,
+          0,
+          0,
+          0,
+          10
+        ]
+      ],
+      "fprAt90Recall": 0,
+      "fprAt95Recall": 0
+    },
+    {
+      "name": "TF-IDF + Calibrated Linear SVM",
+      "accuracy": 0.9492,
+      "macroF1": 0.9228,
+      "weightedF1": 0.9477,
+      "brierScore": 0.1085,
+      "ece": 0.2203,
+      "bootstrapF1_95ci": [
+        0.7411,
+        1
+      ],
+      "perClass": {
+        "Legitimate": {
+          "precision": 0.9,
+          "recall": 1,
+          "f1": 0.9474,
+          "support": 27
+        },
+        "Suspicious": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
+          "support": 4
+        },
+        "Impersonated": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "support": 13
+        },
+        "Phishing": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
+          "support": 4
+        },
+        "Fraud-related": {
+          "precision": 1,
+          "recall": 0.9091,
+          "f1": 0.9524,
+          "support": 11
+        }
+      },
+      "confusionMatrix": [
+        [
+          27,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          0,
+          0,
           0
         ],
         [
           0,
           0,
+          13,
+          0,
+          0
+        ],
+        [
+          1,
           0,
           0,
-          11
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          10
         ]
       ],
-      "fprAt90Recall": 0.037,
-      "fprAt95Recall": 0.1481
+      "fprAt90Recall": 0,
+      "fprAt95Recall": 0
     },
     {
-      "name": "TraceXMail Layered Forensics",
-      "accuracy": 0.5932,
-      "macroF1": 0.2812,
-      "weightedF1": 0.4784,
-      "brierScore": 0.6904,
-      "ece": 0.2809,
+      "name": "TF-IDF + Structural/Header + Gradient Boosting",
+      "accuracy": 0.9661,
+      "macroF1": 0.9548,
+      "weightedF1": 0.9651,
+      "brierScore": 0.0548,
+      "ece": 0.1346,
       "bootstrapF1_95ci": [
-        0.2215,
-        0.3278
+        0.7822,
+        1
       ],
       "perClass": {
         "Legitimate": {
-          "precision": 0.551,
+          "precision": 0.931,
           "recall": 1,
-          "f1": 0.7105,
+          "f1": 0.9643,
+          "support": 27
+        },
+        "Suspicious": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "support": 4
+        },
+        "Impersonated": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "support": 13
+        },
+        "Phishing": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
+          "support": 4
+        },
+        "Fraud-related": {
+          "precision": 1,
+          "recall": 0.9091,
+          "f1": 0.9524,
+          "support": 11
+        }
+      },
+      "confusionMatrix": [
+        [
+          27,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          4,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          13,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          10
+        ]
+      ],
+      "fprAt90Recall": 0,
+      "fprAt95Recall": 0
+    },
+    {
+      "name": "Fine-Tuned Transformer (DistilBERT INT8)",
+      "accuracy": 0.9492,
+      "macroF1": 0.9228,
+      "weightedF1": 0.9477,
+      "brierScore": 0.0931,
+      "ece": 0.1834,
+      "bootstrapF1_95ci": [
+        0.735,
+        1
+      ],
+      "perClass": {
+        "Legitimate": {
+          "precision": 0.9,
+          "recall": 1,
+          "f1": 0.9474,
+          "support": 27
+        },
+        "Suspicious": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
+          "support": 4
+        },
+        "Impersonated": {
+          "precision": 1,
+          "recall": 1,
+          "f1": 1,
+          "support": 13
+        },
+        "Phishing": {
+          "precision": 1,
+          "recall": 0.75,
+          "f1": 0.8571,
+          "support": 4
+        },
+        "Fraud-related": {
+          "precision": 1,
+          "recall": 0.9091,
+          "f1": 0.9524,
+          "support": 11
+        }
+      },
+      "confusionMatrix": [
+        [
+          27,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          3,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          13,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          3,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          10
+        ]
+      ],
+      "fprAt90Recall": 0,
+      "fprAt95Recall": 0
+    },
+    {
+      "name": "TraceXMail Layered Forensics",
+      "accuracy": 0.5593,
+      "macroF1": 0.2586,
+      "weightedF1": 0.4472,
+      "brierScore": 0.647,
+      "ece": 0.1781,
+      "bootstrapF1_95ci": [
+        0.195,
+        0.3128
+      ],
+      "perClass": {
+        "Legitimate": {
+          "precision": 0.5306,
+          "recall": 0.963,
+          "f1": 0.6842,
           "support": 27
         },
         "Suspicious": {
@@ -366,9 +449,9 @@
           "support": 4
         },
         "Impersonated": {
-          "precision": 0.8,
-          "recall": 0.6154,
-          "f1": 0.6957,
+          "precision": 0.7,
+          "recall": 0.5385,
+          "f1": 0.6087,
           "support": 13
         },
         "Phishing": {
@@ -386,9 +469,9 @@
       },
       "confusionMatrix": [
         [
-          27,
+          26,
           0,
-          0,
+          1,
           0,
           0
         ],
@@ -400,9 +483,9 @@
           0
         ],
         [
-          5,
+          6,
           0,
-          8,
+          7,
           0,
           0
         ],
@@ -421,10 +504,10 @@
           0
         ]
       ],
-      "fprAt90Recall": 0.963,
-      "fprAt95Recall": 0.963,
+      "fprAt90Recall": 0.037,
+      "fprAt95Recall": 0.037,
       "mcnemarVsBestBaseline": {
-        "chi2": 18.05,
+        "chi2": 22.04,
         "pValue": 0.0001,
         "significant": true
       }

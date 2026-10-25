@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
-import { getSupabaseAdminClient } from './supabase';
+import { getSupabaseAdminClient, DEFAULT_ORG_ID } from './supabase';
 import { encryptToken, decryptToken } from './compliance';
 import { TokenBucket, SlidingWindowLimiter } from './rateLimiter';
 
@@ -462,7 +462,7 @@ export function getGmailStatus(userEmail?: string) {
 /**
  * Updates the Quarantine / Hold configuration.
  */
-export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId?: string) {
+export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId: string = DEFAULT_ORG_ID) {
   if (typeof config.enabled === 'boolean') state.quarantine.enabled = config.enabled;
   if (typeof config.threshold === 'number') state.quarantine.threshold = Math.max(0, Math.min(100, config.threshold));
   if (config.quarantineLabelName) state.quarantine.quarantineLabelName = config.quarantineLabelName;
@@ -473,7 +473,7 @@ export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId?
   if (typeof config.includeAuthDetails === 'boolean') state.quarantine.includeAuthDetails = config.includeAuthDetails;
 
   const supabase = getSupabaseAdminClient();
-  if (supabase && orgId) {
+  if (supabase) {
     supabase.from('gmail_connections')
       .update({
         quarantine_enabled: state.quarantine.enabled,
@@ -495,13 +495,13 @@ export function updateQuarantineConfig(config: Partial<QuarantineConfig>, orgId?
 /**
  * Updates Cloud Pub/Sub Watch configuration.
  */
-export function updateWatchConfig(config: Partial<WatchConfig>, orgId?: string) {
+export function updateWatchConfig(config: Partial<WatchConfig>, orgId: string = DEFAULT_ORG_ID) {
   if (typeof config.enabled === 'boolean') state.watch.enabled = config.enabled;
   if (config.topicName) state.watch.topicName = config.topicName;
   if (config.subscription) state.watch.subscription = config.subscription;
 
   const supabase = getSupabaseAdminClient();
-  if (supabase && orgId) {
+  if (supabase) {
     supabase.from('gmail_connections')
       .update({
         watch_enabled: state.watch.enabled,
@@ -1807,7 +1807,6 @@ export async function processInboundQuarantineGate(params: {
   threatScore: number;
   verdict: string;
   isPushInterception?: boolean;
-  orgId?: string;
 }): Promise<{
   deliveryStage: 'pre-delivery-hold' | 'post-delivery-alert';
   isQuarantined: boolean;
@@ -1876,13 +1875,12 @@ export async function processInboundQuarantineGate(params: {
 
   // Persist to Supabase quarantine_audit_log and update metrics in gmail_connections
   const supabase = getSupabaseAdminClient();
-  const effectiveOrgId = params.orgId || state.organizationId;
-  if (supabase && effectiveOrgId) {
+  if (supabase) {
     if (canPersistQuarantineAuditLog) {
       supabase.from('quarantine_audit_log')
         .insert({
           id: logEntry.id,
-          organization_id: effectiveOrgId,
+          organization_id: DEFAULT_ORG_ID,
           timestamp: logEntry.timestamp,
           message_id: logEntry.messageId,
           subject: logEntry.subject,
@@ -1927,7 +1925,7 @@ export async function processInboundQuarantineGate(params: {
           },
           updated_at: new Date().toISOString()
         })
-        .eq('organization_id', effectiveOrgId)
+        .eq('organization_id', DEFAULT_ORG_ID)
         .then(({ error }) => {
           if (error) {
             const isMissingColumn =
@@ -1942,7 +1940,7 @@ export async function processInboundQuarantineGate(params: {
               // Retry update without metrics column
               supabase.from('gmail_connections')
                 .update({ updated_at: new Date().toISOString() })
-                .eq('organization_id', effectiveOrgId)
+                .eq('organization_id', DEFAULT_ORG_ID)
                 .then(() => {});
             } else {
               console.warn('[GmailQuarantine] Error updating metrics in DB:', error.message);
@@ -1954,7 +1952,7 @@ export async function processInboundQuarantineGate(params: {
         .update({
           updated_at: new Date().toISOString()
         })
-        .eq('organization_id', effectiveOrgId)
+        .eq('organization_id', DEFAULT_ORG_ID)
         .then(() => {});
     }
   }
@@ -2072,8 +2070,7 @@ export function getQuarantineAuditLog() {
 /**
  * Fetches durable quarantine audit logs from Supabase with in-memory fallback.
  */
-export async function fetchQuarantineAuditLogs(orgId?: string) {
-  if (!orgId) return state.quarantineAuditLog;
+export async function fetchQuarantineAuditLogs(orgId: string = DEFAULT_ORG_ID) {
   const supabase = getSupabaseAdminClient();
   if (supabase && canPersistQuarantineAuditLog) {
     try {
@@ -2120,23 +2117,18 @@ export async function fetchQuarantineAuditLogs(orgId?: string) {
  * Saves Gmail Connection with encrypted tokens into Supabase `gmail_connections` table.
  */
 export async function saveGmailConnectionToDb(params: {
-  orgId: string;
+  orgId?: string;
   emailAddress: string;
   accessToken?: string;
   refreshToken?: string;
   expiresInSeconds?: number;
   isConnected?: boolean;
 }): Promise<boolean> {
-  const orgId = params.orgId;
-  if (!orgId) {
-    console.warn('[GmailService] saveGmailConnectionToDb called without orgId');
-    return false;
-  }
+  const orgId = params.orgId || DEFAULT_ORG_ID;
   const supabase = getSupabaseAdminClient();
 
   state.isConnected = params.isConnected ?? true;
   state.emailAddress = params.emailAddress;
-  state.organizationId = orgId;
   if (params.accessToken) state.accessToken = params.accessToken;
   if (params.refreshToken) state.refreshToken = params.refreshToken;
   if (params.expiresInSeconds) {
@@ -2176,7 +2168,7 @@ export async function saveGmailConnectionToDb(params: {
           total_ingested: state.metrics.totalIngested,
           pre_delivery_quarantined: state.metrics.preDeliveryQuarantined,
           post_delivery_alerts: state.metrics.postDeliveryAlerts,
-          last_delivery_stage: deliveryStageOrNull(state.metrics.lastDeliveryStage),
+          last_delivery_stage: state.metrics.lastDeliveryStage,
           last_quarantine_at: state.metrics.lastQuarantineAt
         }
       }),
@@ -2214,15 +2206,10 @@ export async function saveGmailConnectionToDb(params: {
   }
 }
 
-function deliveryStageOrNull(stage: any): string | null {
-  return stage || null;
-}
-
 /**
  * Loads and decrypts Gmail Connection from Supabase `gmail_connections` table.
  */
-export async function syncGmailConnectionFromDb(orgId?: string): Promise<void> {
-  if (!orgId) return;
+export async function syncGmailConnectionFromDb(orgId: string = DEFAULT_ORG_ID): Promise<void> {
   const supabase = getSupabaseAdminClient();
   let loadedFromSupabase = false;
 
@@ -2239,7 +2226,6 @@ export async function syncGmailConnectionFromDb(orgId?: string): Promise<void> {
       if (!error && data) {
         state.isConnected = data.is_connected ?? true;
         state.emailAddress = data.email_address || state.emailAddress;
-        state.organizationId = orgId;
         if (data.access_token_encrypted) {
           try {
             state.accessToken = decryptToken(data.access_token_encrypted);
@@ -2285,7 +2271,12 @@ export async function syncGmailConnectionFromDb(orgId?: string): Promise<void> {
       console.warn('[GmailService] Failed syncing gmail_connections from DB:', err);
     }
   }
+
+
 }
+
+// Kick off initial sync asynchronously
+syncGmailConnectionFromDb().catch(() => {});
 
 /**
  * ==============================================================================
@@ -2296,8 +2287,7 @@ export async function syncGmailConnectionFromDb(orgId?: string): Promise<void> {
 /**
  * Refreshes Google OAuth access token using stored refresh token.
  */
-export async function refreshGmailAccessToken(orgId?: string): Promise<{ success: boolean; accessToken?: string; error?: string }> {
-  const effectiveOrgId = orgId || state.organizationId;
+export async function refreshGmailAccessToken(orgId: string = DEFAULT_ORG_ID): Promise<{ success: boolean; accessToken?: string; error?: string }> {
   const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GMAIL_CLIENT_SECRET;
   const refreshToken = state.refreshToken;
@@ -2336,7 +2326,7 @@ export async function refreshGmailAccessToken(orgId?: string): Promise<{ success
 
       // Persist refreshed credentials to Supabase
       const supabase = getSupabaseAdminClient();
-      if (supabase && effectiveOrgId) {
+      if (supabase) {
         try {
           const encryptedAccess = encryptToken(newAccessToken);
           await supabase
@@ -2347,7 +2337,7 @@ export async function refreshGmailAccessToken(orgId?: string): Promise<{ success
               last_refreshed_at: refreshedAt,
               updated_at: refreshedAt
             })
-            .eq('organization_id', effectiveOrgId);
+            .eq('organization_id', orgId);
         } catch (dbErr: any) {
           console.warn('[GmailAuth] Failed updating refreshed token in DB:', dbErr?.message);
         }
@@ -2369,7 +2359,7 @@ export async function refreshGmailAccessToken(orgId?: string): Promise<{ success
  * Ensures access token is fresh before making Gmail API requests.
  * Proactively refreshes if token expires within 5 minutes.
  */
-export async function ensureFreshAccessToken(orgId?: string): Promise<string | null> {
+export async function ensureFreshAccessToken(orgId: string = DEFAULT_ORG_ID): Promise<string | null> {
   const isRealToken = Boolean(state.accessToken && !state.accessToken.startsWith('mock_'));
   if (!isRealToken) return state.accessToken;
 
@@ -2399,12 +2389,10 @@ const processedMessageIdSet = new Set<string>();
 /**
  * Checks if a Gmail message has already been processed by the pipeline.
  */
-export async function isMessageAlreadyProcessed(messageId: string, orgId?: string): Promise<boolean> {
+export async function isMessageAlreadyProcessed(messageId: string, orgId: string = DEFAULT_ORG_ID): Promise<boolean> {
   if (!messageId) return false;
-  const effectiveOrgId = orgId || state.organizationId;
-  if (!effectiveOrgId) return false;
 
-  const memKey = `${effectiveOrgId}:${messageId}`;
+  const memKey = `${orgId}:${messageId}`;
   if (processedMessageIdSet.has(memKey)) {
     return true;
   }
@@ -2416,7 +2404,7 @@ export async function isMessageAlreadyProcessed(messageId: string, orgId?: strin
     const { data, error } = await supabase
       .from('gmail_processed_messages')
       .select('id')
-      .eq('organization_id', effectiveOrgId)
+      .eq('organization_id', orgId)
       .eq('message_id', messageId)
       .maybeSingle();
 
@@ -2444,8 +2432,7 @@ export async function markMessageProcessed(params: {
   quarantined?: boolean;
   details?: any;
 }): Promise<void> {
-  const orgId = params.orgId || state.organizationId;
-  if (!orgId) return;
+  const orgId = params.orgId || DEFAULT_ORG_ID;
   const memKey = `${orgId}:${params.messageId}`;
   processedMessageIdSet.add(memKey);
 
@@ -2493,7 +2480,7 @@ export interface DisconnectResult {
  * are wiped even if the Gmail API returns 404/410 when attempting to stop an already expired push watch.
  */
 export async function disconnectGmail(
-  orgId: string,
+  orgId: string = DEFAULT_ORG_ID,
   options: DisconnectOptions = {}
 ): Promise<DisconnectResult> {
   let watchStoppedCleanly = false;
@@ -2539,7 +2526,7 @@ export async function disconnectGmail(
   // 4. Asynchronously clear database tokens in Supabase so they are not resurrected
   try {
     const supabase = getSupabaseAdminClient();
-    if (supabase && orgId) {
+    if (supabase) {
       await supabase.from('gmail_connections')
         .update({
           is_connected: false,
@@ -2585,19 +2572,18 @@ let isSyncCycleActive = false;
  * Runs a single polling cycle to query and evaluate new unread emails from the connected Gmail account.
  * Guarantees message deduplication via persistent ledger and immediately clears UNREAD state.
  */
-export async function runAutoSyncCycle(explicitOrgId?: string): Promise<{ count: number; error?: string }> {
+export async function runAutoSyncCycle(): Promise<{ count: number; error?: string }> {
   if (!state.isConnected) {
     stopAutoSyncLoop();
     return { count: 0, error: 'Gmail is disconnected' };
   }
   if (isSyncCycleActive) return { count: 0 };
   isSyncCycleActive = true;
-  const effectiveOrgId = explicitOrgId || state.organizationId || undefined;
   try {
     state.lastPolledAt = new Date().toISOString();
 
     // Ensure access token is fresh (proactively refreshes within 5 minutes of expiration)
-    await ensureFreshAccessToken(effectiveOrgId);
+    await ensureFreshAccessToken();
 
     const isLiveToken = Boolean(
       state.accessToken &&
@@ -2623,7 +2609,7 @@ export async function runAutoSyncCycle(explicitOrgId?: string): Promise<{ count:
           // Retry once on 401 Unauthorized by refreshing token
           if (apiErr?.response?.status === 401) {
             console.log('[GmailSyncLoop] Received 401 Unauthorized from Gmail API. Attempting token refresh...');
-            const refreshRes = await refreshGmailAccessToken(effectiveOrgId);
+            const refreshRes = await refreshGmailAccessToken();
             if (refreshRes.success && state.accessToken) {
               listResp = await axios.get(
                 'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
@@ -2643,7 +2629,7 @@ export async function runAutoSyncCycle(explicitOrgId?: string): Promise<{ count:
         const messages = listResp?.data?.messages || [];
         for (const msg of messages) {
           // Check persistent deduplication ledger
-          const alreadyProcessed = effectiveOrgId ? await isMessageAlreadyProcessed(msg.id, effectiveOrgId) : false;
+          const alreadyProcessed = await isMessageAlreadyProcessed(msg.id, DEFAULT_ORG_ID);
           if (alreadyProcessed) {
             // Still ensure UNREAD label is removed so Gmail stops matching is:unread
             if (state.accessToken) {
@@ -2657,13 +2643,11 @@ export async function runAutoSyncCycle(explicitOrgId?: string): Promise<{ count:
             fetchedCount++;
 
             // Record in deduplication ledger immediately
-            if (effectiveOrgId) {
-              await markMessageProcessed({
-                messageId: msg.id,
-                threadId: msg.threadId,
-                orgId: effectiveOrgId
-              });
-            }
+            await markMessageProcessed({
+              messageId: msg.id,
+              threadId: msg.threadId,
+              orgId: DEFAULT_ORG_ID
+            });
 
             // Queue immediately for automated forensic analysis
             queueEmailForAnalysis({
@@ -2672,8 +2656,7 @@ export async function runAutoSyncCycle(explicitOrgId?: string): Promise<{ count:
               source: 'gmail_sync_loop',
               emailAddress: state.emailAddress || undefined,
               rawEml: raw,
-              deliveryStage: 'pre-delivery-hold',
-              organizationId: effectiveOrgId
+              deliveryStage: 'pre-delivery-hold'
             });
 
             // Remove UNREAD label immediately so it stops matching is:unread on next cycle

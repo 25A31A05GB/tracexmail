@@ -237,8 +237,7 @@ export default function App() {
       updatePageMetadata({
         title: 'Google OAuth Consent | TraceXMail',
         description: 'Authorize TraceXMail to perform read-only email threat analysis via Gmail API.',
-        canonicalPath: currentPath,
-        robots: 'noindex, nofollow'
+        canonicalPath: currentPath
       });
     } else if (['/about', '/privacy', '/terms', '/cookies', '/domains', '/contact', '/security'].includes(currentPath)) {
       const key = currentPath.replace(/^\//, '');

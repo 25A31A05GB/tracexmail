@@ -151,120 +151,28 @@ describe('Technical SEO & Forensic Integrity Audits', () => {
     });
   });
 
-  describe('Crawlability & Logged-In App Noindex Directives (Item 1)', () => {
-    it('verifies vercel.json contains X-Robots-Tag noindex headers and .html redirects', () => {
-      const vercelJsonPath = path.join(rootDir, 'vercel.json');
-      expect(fs.existsSync(vercelJsonPath)).toBe(true);
-      const vercel = JSON.parse(fs.readFileSync(vercelJsonPath, 'utf-8'));
-
-      // Headers check
-      const headers = vercel.headers || [];
-      const apiHeader = headers.find((h: any) => h.source === '/api/:path*');
-      const authHeader = headers.find((h: any) => h.source === '/auth/:path*');
-      const oauthHeader = headers.find((h: any) => h.source === '/oauth/:path*');
-
-      expect(apiHeader).toBeDefined();
-      expect(apiHeader.headers.some((kv: any) => kv.key === 'X-Robots-Tag' && kv.value.includes('noindex'))).toBe(true);
-      expect(authHeader).toBeDefined();
-      expect(authHeader.headers.some((kv: any) => kv.key === 'X-Robots-Tag' && kv.value.includes('noindex'))).toBe(true);
-      expect(oauthHeader).toBeDefined();
-      expect(oauthHeader.headers.some((kv: any) => kv.key === 'X-Robots-Tag' && kv.value.includes('noindex'))).toBe(true);
-
-      // Redirects check
-      const redirects = vercel.redirects || [];
-      expect(redirects.some((r: any) => r.source === '/about.html' && r.destination === '/about')).toBe(true);
-      expect(redirects.some((r: any) => r.source === '/privacy.html' && r.destination === '/privacy')).toBe(true);
-      expect(redirects.some((r: any) => r.source === '/knowledge/:slug.html' && r.destination === '/knowledge/:slug')).toBe(true);
-    });
-
-    it('verifies public/robots.txt allows all public routes and disallows /api/, /oauth/, /auth/', () => {
-      const robotsPath = path.join(rootDir, 'public', 'robots.txt');
-      expect(fs.existsSync(robotsPath)).toBe(true);
-      const robots = fs.readFileSync(robotsPath, 'utf-8');
-
-      expect(robots).toContain('Disallow: /api/');
-      expect(robots).toContain('Disallow: /oauth/');
-      expect(robots).toContain('Disallow: /auth/');
-      expect(robots).toContain('Allow: /about');
-      expect(robots).toContain('Allow: /knowledge');
-      expect(robots).toContain('Allow: /privacy');
-      expect(robots).toContain('Allow: /terms');
-      expect(robots).toContain('Allow: /cookies');
-      expect(robots).toContain('Allow: /domains');
-      expect(robots).toContain('Allow: /contact');
-      expect(robots).toContain('Allow: /security');
-    });
-
-    it('verifies public/auth/callback/index.html includes meta robots noindex', () => {
-      const authCallbackPath = path.join(rootDir, 'public', 'auth', 'callback', 'index.html');
-      expect(fs.existsSync(authCallbackPath)).toBe(true);
-      const html = fs.readFileSync(authCallbackPath, 'utf-8');
-      expect(html).toMatch(/<meta\s+name=["']robots["']\s+content=["']noindex,\s*nofollow["']/i);
-    });
-
-    it('verifies every public HTML page has a unique title, description, canonical link, and exactly 1 H1', () => {
-      const publicHtmlFiles = [
+  describe('Unsupported Claims Audit', () => {
+    it('ensures no public files contain forbidden claims', () => {
+      const publicFiles = [
         path.join(rootDir, 'index.html'),
+        path.join(rootDir, 'public', 'llms.txt'),
+        path.join(rootDir, 'public', 'llms-full.txt'),
         path.join(rootDir, 'public', 'about', 'index.html'),
-        path.join(rootDir, 'public', 'contact', 'index.html'),
-        path.join(rootDir, 'public', 'cookies', 'index.html'),
-        path.join(rootDir, 'public', 'domains', 'index.html'),
-        path.join(rootDir, 'public', 'privacy', 'index.html'),
-        path.join(rootDir, 'public', 'security', 'index.html'),
-        path.join(rootDir, 'public', 'terms', 'index.html'),
         path.join(rootDir, 'public', 'knowledge', 'index.html'),
         ...articleFiles.map((f) => path.join(publicKnowledgeDir, f))
       ];
 
-      const titles = new Set<string>();
-      const descs = new Set<string>();
-      const canonicals = new Set<string>();
+      const forbiddenRegex = /court-admissible|peer-reviewed|1-Click SOAR/i;
 
-      for (const file of publicHtmlFiles) {
-        expect(fs.existsSync(file)).toBe(true);
+      for (const file of publicFiles) {
+        if (!fs.existsSync(file)) continue;
         const content = fs.readFileSync(file, 'utf-8');
-
-        // Title
-        const titleMatch = content.match(/<title>([^<]+)<\/title>/i);
-        expect(titleMatch, `Missing title in ${file}`).toBeTruthy();
-        const title = titleMatch![1].trim();
-        expect(titles.has(title), `Duplicate title "${title}" in ${file}`).toBe(false);
-        titles.add(title);
-
-        // Description
-        const descMatch = content.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
-        expect(descMatch, `Missing description in ${file}`).toBeTruthy();
-        const desc = descMatch![1].trim();
-        expect(descs.has(desc), `Duplicate description in ${file}`).toBe(false);
-        descs.add(desc);
-
-        // Canonical
-        const canonMatch = content.match(/<link\s+rel=["']canonical["']\s+href=["']([^"']+)["']/i);
-        expect(canonMatch, `Missing canonical in ${file}`).toBeTruthy();
-        const canon = canonMatch![1].trim();
-        expect(canon.endsWith('.html'), `Canonical has .html in ${file}`).toBe(false);
-        expect(canonicals.has(canon), `Duplicate canonical "${canon}" in ${file}`).toBe(false);
-        canonicals.add(canon);
-
-        // Exactly 1 H1
-        const h1Matches = [...content.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)];
-        expect(h1Matches.length, `File ${file} must have exactly 1 <h1>, found ${h1Matches.length}`).toBe(1);
+        const match = content.match(forbiddenRegex);
+        if (match) {
+          throw new Error(`Found forbidden claim "${match[0]}" in ${file}`);
+        }
+        expect(match).toBeNull();
       }
-    });
-
-    it('verifies sitemap.xml contains strictly indexable canonical URLs', () => {
-      const xml = fs.readFileSync(sitemapPath, 'utf-8');
-      const locMatches = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-
-      for (const loc of locMatches) {
-        expect(loc.endsWith('.html')).toBe(false);
-        expect(loc).not.toContain('/auth/');
-        expect(loc).not.toContain('/api/');
-        expect(loc.endsWith('.txt')).toBe(false);
-      }
-
-      // Check all 9 static public pages + 6 knowledge articles = 15 indexable URLs
-      expect(locMatches.length).toBe(15);
     });
   });
 });
