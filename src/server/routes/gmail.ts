@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { publicLimiter, authenticatedLimiter, strictRateLimiter, gmailDisconnectLimiter } from '../rateLimiter';
 import { requireAuth, requireRole, type AuthenticatedRequest, encryptToken } from '../compliance';
-import { getSupabaseAdminClient, getSupabaseClient, DEFAULT_ORG_ID } from '../supabase';
+import { getSupabaseAdminClient, getSupabaseClient } from '../supabase';
 import { broadcastWebSocketEvent } from '../websocket';
 import { getPersistedCase } from '../caseStore';
 import {
@@ -45,16 +45,25 @@ import { parseRawEmailToAnalysis, verifyGooglePubSubPushToken } from '../forensi
 import { logger } from '../logger';
 
 // Server-side OAuth state storage
-const oauthStateNonces = new Map<string, { user_id: string; created_at: number }>();
+export interface OAuthNonceRecord {
+  user_id: string;
+  organization_id: string;
+  created_at: number;
+}
+export const oauthStateNonces = new Map<string, OAuthNonceRecord>();
 
 export function registerGmailRoutes(app: express.Express): void {
   // 1. Gmail Integration Status
-  app.get('/api/gmail/status', publicLimiter, (_req: Request, res: Response) => {
-    res.json(getGmailStatus());
+  app.get('/api/gmail/status', publicLimiter, (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    res.json(getGmailStatus(orgId));
   });
 
   // 2. OAuth Start Endpoint (Validates redirect_uri and stores CSRF state)
-  app.get(['/api/gmail/oauth/start', '/api/auth/url'], publicLimiter, (req: Request, res: Response) => {
+  app.get(['/api/gmail/oauth/start', '/api/auth/url'], authenticatedLimiter, (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const userOrgId = user?.organizationId || '';
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = (req.query.redirect_uri as string) || (req.query.redirectUri as string) || '';
 
@@ -78,17 +87,21 @@ export function registerGmailRoutes(app: express.Express): void {
       }
     }
 
+    const stateNonce = crypto.randomBytes(32).toString('base64url');
+    oauthStateNonces.set(stateNonce, {
+      user_id: user?.id || user?.userId || 'oauth_flow',
+      organization_id: userOrgId,
+      created_at: Date.now()
+    });
+
     if (!clientId) {
       if (process.env.NODE_ENV === 'production' && process.env.ALLOW_MOCK_OAUTH !== 'true') {
         return res.status(503).json({ error: 'google_credentials_missing', message: 'Google OAuth Client ID is not configured.' });
       }
       return res.json({
-        url: `${req.protocol}://${req.get('host')}/oauth/gmail/callback?code=mock_oauth_code_${Date.now()}&state=local_dev`
+        url: `${req.protocol}://${req.get('host')}/oauth/gmail/callback?code=mock_oauth_code_${Date.now()}&state=${encodeURIComponent(stateNonce)}`
       });
     }
-
-    const stateNonce = crypto.randomBytes(32).toString('base64url');
-    oauthStateNonces.set(stateNonce, { user_id: 'oauth_flow', created_at: Date.now() });
 
     const scopes = [
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -153,9 +166,13 @@ export function registerGmailRoutes(app: express.Express): void {
     const code = (req.query.code as string | undefined) || (req.body?.code as string | undefined);
     const error = (req.query.error as string | undefined) || (req.body?.error as string | undefined);
     const errorDesc = (req.query.error_description as string | undefined) || (req.body?.error_description as string | undefined) || error;
-    const orgId = (req.query.org_id as string | undefined) || (req.body?.org_id as string | undefined) || DEFAULT_ORG_ID;
-    const returnBase = (req.query.state as string | undefined) || '/';
+    const stateParam = (req.query.state as string | undefined) || (req.body?.state as string | undefined) || '';
+    const storedState = stateParam ? oauthStateNonces.get(stateParam) : undefined;
+    if (stateParam) {
+      oauthStateNonces.delete(stateParam);
+    }
 
+    const returnBase = '/';
     const getRedirectUrl = (params: Record<string, string>) => {
       const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
       let target: URL;
@@ -169,6 +186,14 @@ export function registerGmailRoutes(app: express.Express): void {
       }
       return target.pathname + target.search;
     };
+
+    const orgId = storedState?.organization_id;
+    if (!orgId) {
+      return res.status(400).redirect(getRedirectUrl({
+        gmail_auth: 'error',
+        error: 'Invalid or missing OAuth state nonce. Organization could not be verified from server-stored session.'
+      }));
+    }
 
     if (error || !code) {
       const failureReason = errorDesc || 'Missing authorization code from Google OAuth callback';
@@ -328,14 +353,19 @@ export function registerGmailRoutes(app: express.Express): void {
   });
 
   // 7. Connect Token Directly
-  app.post('/api/gmail/connect-token', authenticatedLimiter, async (req: Request, res: Response) => {
+  app.post('/api/gmail/connect-token', authenticatedLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
-      const { access_token, refresh_token, email, expires_in_seconds, org_id } = req.body || {};
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ status: 'error', error: 'Unauthorized: Missing verified organization context' });
+      }
+
+      const { access_token, refresh_token, email, expires_in_seconds } = req.body || {};
       if (!access_token || !email) {
         return res.status(400).json({ status: 'error', error: 'Missing access_token or email' });
       }
 
-      const orgId = org_id || DEFAULT_ORG_ID;
       await saveGmailConnectionToDb({
         orgId,
         emailAddress: email.trim(),
@@ -754,7 +784,10 @@ export function registerGmailRoutes(app: express.Express): void {
   app.post('/api/gmail/disconnect', gmailDisconnectLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req: Request, res: Response) => {
     try {
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: Missing verified organization context' });
+      }
       const force = Boolean(req.body?.force);
       const result = await disconnectGmail(orgId, { force });
 

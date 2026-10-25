@@ -117,32 +117,38 @@ export const ROUTE_METADATA: Record<string, PageMetadata> = {
   login: {
     title: 'Sign In to Workspace | TraceXMail',
     description: 'Authenticate to access your TraceXMail forensic intelligence workspace and active cases.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   signup: {
     title: 'Create Account | TraceXMail',
     description: 'Register for TraceXMail pilot access or join your organization security operations team.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   'forgot-password': {
     title: 'Password Recovery | TraceXMail',
     description: 'Request a password recovery link or magic authentication token for your TraceXMail account.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   'reset-password': {
     title: 'Reset Enclave Password | TraceXMail',
     description: 'Set a new cryptographic password for your TraceXMail analyst account.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   'magic-link': {
     title: 'Verify Enclave Magic Link | TraceXMail',
     description: 'Verifying one-time magic link token for passwordless enclave access.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   'accept-invite': {
     title: 'Accept Team Invitation | TraceXMail',
     description: 'Accept organizational team invitation to join TraceXMail Security Operations Center.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   }
 };
 
@@ -150,86 +156,103 @@ export const TAB_METADATA: Record<string, PageMetadata> = {
   ingest: {
     title: 'Email Ingestion & Raw RFC822 Parser | TraceXMail',
     description: 'Upload or paste raw RFC822 email messages, EML files, or headers for instant cryptographic analysis.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   overview: {
     title: 'Case Overview & Evidence Tag | TraceXMail',
     description: 'Comprehensive email analysis overview with cryptographic SPF, DKIM, and DMARC verification statuses and origin hop telemetry.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   dashboard: {
     title: 'SOC Operations Dashboard | TraceXMail',
     description: 'High-level threat operations dashboard with aggregate severity metrics, active phishing waves, and triage status.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   cases: {
     title: 'Forensic Case Dossiers & Archive | TraceXMail',
     description: 'Browse, filter, and review verified email forensic cases, audit history, and investigator notes.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   campaigns: {
     title: 'Adversary Attack Campaigns | TraceXMail',
     description: 'Cluster concurrent phishing waves sharing infrastructure, malicious ASNs, and lookalike domain patterns.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   search: {
     title: 'Global IOC & Header Search | TraceXMail',
     description: 'Search across all investigated email cases by IP address, domain, subject, ASN, or SHA-256 hash.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   hops: {
     title: 'MTA Relay Hop Traceroute | TraceXMail',
     description: 'Trace email routing backwards across intermediate MTAs to isolate untrusted perimeter hops.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   map: {
     title: 'Threat Origin Geolocation Map | TraceXMail',
     description: 'Interactive global map plotting physical ingress hops, autonomous system networks, and Tor exit relays.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   logs: {
     title: 'Forensic Audit Logs & Telemetry | TraceXMail',
     description: 'Immutable chronological audit logs capturing parser events, DNS lookups, and VirusTotal telemetry.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   headers: {
     title: 'Raw RFC822 Header Inspector | TraceXMail',
     description: 'Searchable, categorized breakdown of all message headers with decoded parameters and values.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   graph: {
     title: 'Entity Relationship & Infrastructure Graph | TraceXMail',
     description: 'Interactive node graph connecting sender domains, intermediate relays, recipient inboxes, and external URLs.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   timeline: {
     title: 'Chronological Investigation Timeline | TraceXMail',
     description: 'Visual event timeline tracking attack campaign progression and repeat offender activity.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   alerts: {
     title: 'Live Threat Alerts & WebSockets Feed | TraceXMail',
     description: 'Real-time security operations alerts, triage notifications, and incoming case broadcasts.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   gmail: {
     title: 'Gmail Live Sync Pipeline | TraceXMail',
     description: 'Connect Google Workspace or Gmail inboxes for automated background threat scanning.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   organization: {
     title: 'Organization & Policy Controls | TraceXMail',
     description: 'Manage enterprise security policies, tenant domains, and compliance configurations.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   team: {
     title: 'SOC Team & Access Control | TraceXMail',
     description: 'Role-based access control, team member provisioning, and operational clearances.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   },
   settings: {
     title: 'Account & Security Settings | TraceXMail',
     description: 'Manage analyst clearance, session timeouts, API credentials, and personal workspace preferences.',
-    canonicalPath: '/'
+    canonicalPath: '/',
+    robots: 'noindex, nofollow'
   }
 };

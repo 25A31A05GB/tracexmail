@@ -174,6 +174,7 @@ export interface LocalUserAccount {
   passwordHash: string;
   fullName: string;
   orgName: string;
+  organizationId?: string;
   role: UserRole;
   accountType: 'personal' | 'organization';
   emailVerified: boolean;
@@ -191,6 +192,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: bossPasswordHash,
     fullName: 'Ultimate Boss Admin',
     orgName: 'TraceXMail Official HQ',
+    organizationId: 'org_tracexmail_hq',
     role: 'admin',
     accountType: 'organization',
     emailVerified: true,
@@ -202,6 +204,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: bossPasswordHash,
     fullName: 'Chief Executive Commander',
     orgName: 'TraceXMail Official HQ',
+    organizationId: 'org_tracexmail_hq',
     role: 'admin',
     accountType: 'organization',
     emailVerified: true,
@@ -213,6 +216,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'SOC Lead Analyst',
     orgName: 'Acme Cyber Defense SOC',
+    organizationId: 'org_enterprise_corp',
     role: 'analyst',
     accountType: 'organization',
     emailVerified: true,
@@ -224,6 +228,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'SOC Commander Admin',
     orgName: 'TraceXMail Global Defense',
+    organizationId: 'org_tracexmail_defense',
     role: 'admin',
     accountType: 'organization',
     emailVerified: true,
@@ -235,6 +240,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'Senior Threat Analyst',
     orgName: 'Acme Cyber Defense SOC',
+    organizationId: 'org_acme_soc_01',
     role: 'analyst',
     accountType: 'organization',
     emailVerified: true,
@@ -246,6 +252,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'Compliance Auditor',
     orgName: 'Acme Cyber Defense SOC',
+    organizationId: 'org_acme_soc_01',
     role: 'read_only',
     accountType: 'organization',
     emailVerified: true,
@@ -257,6 +264,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'Jayram Sappa',
     orgName: 'TraceXMail Cyber Defense SOC',
+    organizationId: 'org_tracexmail_official',
     role: 'admin',
     accountType: 'organization',
     emailVerified: true,
@@ -268,6 +276,7 @@ const SEED_ACCOUNTS: LocalUserAccount[] = [
     passwordHash: defaultPasswordHash,
     fullName: 'Jayram Sappa',
     orgName: 'TraceXMail Cyber Defense SOC',
+    organizationId: 'org_jayramsappa',
     role: 'admin',
     accountType: 'organization',
     emailVerified: true,
@@ -520,15 +529,16 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       const orgAuth = authenticateOrgUser(cleanEmail, cleanPassword);
       if (orgAuth.authenticated && orgAuth.user) {
         resetFailedLoginCounters(ip, orgAuth.user.email);
+        const userOrgId = orgAuth.user.organizationId;
         const enclaveToken = signUserToken({
           userId: orgAuth.user.id,
           email: orgAuth.user.email,
-          organizationId: orgAuth.user.organizationId || DEFAULT_ORG_ID,
+          organizationId: userOrgId,
           role: orgAuth.user.role
         });
 
         await logAuditAction({
-          organization_id: orgAuth.user.organizationId || DEFAULT_ORG_ID,
+          organization_id: userOrgId,
           user_id: orgAuth.user.id,
           user_email: orgAuth.user.email,
           user_role: orgAuth.user.role,
@@ -550,8 +560,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             id: orgAuth.user.id,
             email: orgAuth.user.email,
             role: orgAuth.user.role,
-            organizationId: orgAuth.user.organizationId || DEFAULT_ORG_ID,
-            organizationName: orgAuth.user.organizationName || 'Acme Cyber Defense SOC',
+            organizationId: userOrgId,
+            organizationName: orgAuth.user.organizationName || 'TraceXMail SOC',
             fullName: orgAuth.user.name,
             employeeId: orgAuth.user.employeeId,
             permissions: orgAuth.user.permissions,
@@ -572,42 +582,43 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
         if (bcrypt.compareSync(cleanPassword, localAccount.passwordHash)) {
           resetFailedLoginCounters(ip, cleanEmail);
+          const userOrgId = localAccount.organizationId || (localAccount.id ? `org_${localAccount.id.replace(/[^a-zA-Z0-9]/g, '_')}` : `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || 'soc'}`);
           const enclaveToken = signUserToken({
             userId: localAccount.id,
             email: cleanEmail,
-            organizationId: DEFAULT_ORG_ID,
+            organizationId: userOrgId,
             role: localAccount.role
           });
 
-        await logAuditAction({
-          organization_id: DEFAULT_ORG_ID,
-          user_id: localAccount.id,
-          user_email: cleanEmail,
-          user_role: localAccount.role,
-          action: 'AUTH_LOGIN_SUCCESS',
-          resource_type: 'auth',
-          details: {
-            auth_provider: 'enclave_local',
-            mfa_level: 'aal1'
-          },
-          ip_address: ip,
-          status: 'SUCCESS'
-        }).catch(err => console.warn('[AuthAudit] Failed logging login success:', err));
+          await logAuditAction({
+            organization_id: userOrgId,
+            user_id: localAccount.id,
+            user_email: cleanEmail,
+            user_role: localAccount.role,
+            action: 'AUTH_LOGIN_SUCCESS',
+            resource_type: 'auth',
+            details: {
+              auth_provider: 'enclave_local',
+              mfa_level: 'aal1'
+            },
+            ip_address: ip,
+            status: 'SUCCESS'
+          }).catch(err => console.warn('[AuthAudit] Failed logging login success:', err));
 
-        return res.json({
-          status: 'success',
-          token: enclaveToken,
-          user: {
-            id: localAccount.id,
-            email: cleanEmail,
-            role: localAccount.role,
-            organizationId: DEFAULT_ORG_ID,
-            fullName: localAccount.fullName,
-            emailVerified: localAccount.emailVerified
-          }
-        });
+          return res.json({
+            status: 'success',
+            token: enclaveToken,
+            user: {
+              id: localAccount.id,
+              email: cleanEmail,
+              role: localAccount.role,
+              organizationId: userOrgId,
+              fullName: localAccount.fullName,
+              emailVerified: localAccount.emailVerified
+            }
+          });
+        }
       }
-    }
 
       const supabase = getSupabaseClient();
       let authSuccess = false;
@@ -640,12 +651,15 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             ? verifiedDbRole
             : 'analyst';
 
+          const resolvedOrgId = profileData?.organization_id || `org_${authenticatedUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
           // Synchronize to localUserAccounts and userProfileStore for offline/session resiliency
           const profileRecord = {
             id: authenticatedUser.id,
             email: cleanEmail,
             fullName: profileData?.full_name || cleanEmail.split('@')[0],
-            orgName: profileData?.organization_name || 'Acme Cyber Defense SOC',
+            orgName: profileData?.organization_name || 'TraceXMail SOC',
+            organizationId: resolvedOrgId,
             role: assignedRole,
             accountType: 'organization' as const,
             emailVerified: true,
@@ -659,16 +673,17 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
           await saveStoredProfile({
             ...profileRecord,
-            organizationId: profileData?.organization_id || DEFAULT_ORG_ID
+            organizationId: resolvedOrgId
           });
         }
       }
 
       if (authSuccess && authenticatedUser) {
         resetFailedLoginCounters(ip, cleanEmail);
+        const resolvedOrgId = profileData?.organization_id || `org_${authenticatedUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
         await logAuditAction({
-          organization_id: profileData?.organization_id || DEFAULT_ORG_ID,
+          organization_id: resolvedOrgId,
           user_id: authenticatedUser.id,
           user_email: cleanEmail,
           user_role: profileData?.role || 'analyst',
@@ -689,7 +704,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             id: authenticatedUser.id,
             email: cleanEmail,
             role: profileData?.role || 'analyst',
-            organizationId: profileData?.organization_id || DEFAULT_ORG_ID,
+            organizationId: resolvedOrgId,
             fullName: profileData?.full_name || cleanEmail.split('@')[0],
             emailVerified: Boolean(authenticatedUser.email_confirmed_at)
           }
@@ -703,7 +718,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       recordFailedLogin(ip, cleanEmail, broadcastAlertFn);
 
       await logAuditAction({
-        organization_id: DEFAULT_ORG_ID,
         user_id: 'unknown',
         user_email: cleanEmail,
         user_role: 'unauthenticated',
@@ -831,13 +845,15 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
           });
         }
 
+        const userOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || (data.user?.id || 'soc').replace(/[^a-zA-Z0-9]/g, '_')}`;
+
         // If user created, ensure profile is initialized
         if (data.user && supabaseAdmin) {
           try {
             await supabaseAdmin.from('profiles').upsert({
               id: data.user.id,
               email: cleanEmail,
-              organization_id: DEFAULT_ORG_ID,
+              organization_id: userOrgId,
               role: assignedRole,
               full_name: fullName?.trim() || cleanEmail.split('@')[0],
               account_type: accountType || 'personal',
@@ -849,8 +865,9 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         }
       }
 
+      const auditOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || 'soc'}`;
       await logAuditAction({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: auditOrgId,
         user_email: cleanEmail,
         user_role: assignedRole,
         action: 'AUTH_SIGNUP',
@@ -1091,10 +1108,12 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
             }
           }
 
+          const otpUserOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || supabaseUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
           await supabaseAdmin.from('profiles').upsert({
             id: supabaseUserId,
             email: cleanEmail,
-            organization_id: DEFAULT_ORG_ID,
+            organization_id: otpUserOrgId,
             role: assignedRole,
             full_name: assignedName,
             account_type: accountType || 'personal',
@@ -1106,6 +1125,8 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         }
       }
 
+      const otpUserOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || supabaseUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
       // Also persist to localUserAccounts for offline/session resiliency
       if (password) {
         localUserAccounts.set(cleanEmail, {
@@ -1114,6 +1135,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
           passwordHash: bcrypt.hashSync(String(password), 10),
           fullName: assignedName,
           orgName: assignedOrg,
+          organizationId: otpUserOrgId,
           role: assignedRole,
           accountType: accountType || 'personal',
           emailVerified: true,
@@ -1124,12 +1146,12 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       const signedToken = signUserToken({
         userId: supabaseUserId,
         email: cleanEmail,
-        organizationId: DEFAULT_ORG_ID,
+        organizationId: otpUserOrgId,
         role: assignedRole
       });
 
       await logAuditAction({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: otpUserOrgId,
         user_id: supabaseUserId,
         user_email: cleanEmail,
         user_role: assignedRole,
@@ -1151,7 +1173,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
           id: supabaseUserId,
           email: cleanEmail,
           role: assignedRole,
-          organizationId: DEFAULT_ORG_ID,
+          organizationId: otpUserOrgId,
           fullName: assignedName,
           accountType: accountType || 'personal',
           emailVerified: true
@@ -1163,8 +1185,9 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       const resetToken = `rst_${crypto.randomBytes(24).toString('hex')}`;
       await saveResetToken(resetToken, cleanEmail, now + 30 * 60 * 1000);
 
+      const recoveryOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || 'soc'}`;
       await logAuditAction({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: recoveryOrgId,
         user_email: cleanEmail,
         user_role: 'unauthenticated',
         action: 'AUTH_RECOVERY_OTP_VERIFIED',
@@ -1527,13 +1550,15 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       existingAccount = newAcc;
     }
 
+    const userOrgId = existingAccount?.organizationId || `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || finalUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
     // Sync with Supabase profiles if configured
     if (supabaseAdmin) {
       try {
         await supabaseAdmin.from('profiles').upsert({
           id: finalUserId,
           email: cleanEmail,
-          organization_id: DEFAULT_ORG_ID,
+          organization_id: userOrgId,
           role: existingAccount?.role || assignedRole,
           full_name: existingAccount?.fullName || assignedName,
           account_type: existingAccount?.accountType || accountType,
@@ -1548,12 +1573,12 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const signedToken = signUserToken({
       userId: finalUserId,
       email: cleanEmail,
-      organizationId: DEFAULT_ORG_ID,
+      organizationId: userOrgId,
       role: existingAccount?.role || assignedRole
     });
 
     await logAuditAction({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: userOrgId,
       user_id: finalUserId,
       user_email: cleanEmail,
       user_role: existingAccount?.role || assignedRole,
@@ -1577,7 +1602,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         id: finalUserId,
         email: cleanEmail,
         role: existingAccount?.role || assignedRole,
-        organizationId: DEFAULT_ORG_ID,
+        organizationId: userOrgId,
         fullName: existingAccount?.fullName || assignedName,
         accountType: existingAccount?.accountType || accountType,
         emailVerified: true
@@ -1736,9 +1761,11 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       console.warn('[AuthRouter] Password change notification email notice:', mailErr);
     }
 
+    const userOrgId = updatedUser.organizationId || (updatedUser.id ? `org_${updatedUser.id.replace(/[^a-zA-Z0-9]/g, '_')}` : `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || 'soc'}`);
+
     // 5. Write audit log entry
     await logAuditAction({
-      organization_id: DEFAULT_ORG_ID,
+      organization_id: userOrgId,
       user_email: cleanEmail,
       user_role: updatedUser.role,
       action: 'AUTH_PASSWORD_RESET_SUCCESS',
@@ -1755,7 +1782,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         id: updatedUser.id,
         email: cleanEmail,
         role: updatedUser.role,
-        organizationId: DEFAULT_ORG_ID,
+        organizationId: userOrgId,
         fullName: updatedUser.fullName,
         emailVerified: true
       }
@@ -1776,12 +1803,15 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
    */
   const handleListInvites = async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing verified organization context' });
+    }
     const invites = activeTeamInvites.filter(inv => inv.organization_id === orgId);
     return res.json(invites);
   };
 
-  router.get('/invites', handleListInvites);
+  router.get('/invites', requireAuth, handleListInvites);
 
   /**
    * POST /api/auth/invites (and /api/team/invite)
@@ -1790,7 +1820,10 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
   const handleCreateInvite = async (req: Request, res: Response) => {
     const ip = getClientIp(req);
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing verified organization context', code: 'MISSING_ORG' });
+    }
     const { email, role = 'analyst', fullName, department = 'SOC Cyber Defense', expiresInDays = 7 } = req.body || {};
 
     if (!email) {
@@ -1805,7 +1838,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     const newInvite: TeamInvitationRecord = {
       id: `inv_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
       organization_id: orgId,
-      organization_name: 'Acme Cyber Defense SOC',
+      organization_name: user?.organizationName || 'TraceXMail SOC',
       email: cleanEmail,
       full_name: fullName?.trim() || cleanEmail.split('@')[0],
       role: assignedRole,
@@ -1814,7 +1847,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
       status: 'PENDING',
       created_at: new Date().toISOString(),
       expires_at: expiresAt,
-      invited_by: user?.email || 'admin@acmedefense.sec'
+      invited_by: user?.email || 'admin@tracexmail.sec'
     };
 
     activeTeamInvites.unshift(newInvite);
@@ -1822,7 +1855,7 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     await logAuditAction({
       organization_id: orgId,
       user_id: user?.userId || 'admin_action',
-      user_email: user?.email || 'admin@acmedefense.sec',
+      user_email: user?.email || 'admin@tracexmail.sec',
       user_role: user?.role || 'admin',
       action: 'AUTH_INVITE_SENT',
       resource_type: 'invite',
@@ -1849,15 +1882,20 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
     });
   };
 
-  router.post('/invites', handleCreateInvite);
+  router.post('/invites', requireAuth, handleCreateInvite);
 
   /**
    * POST /api/auth/invites/:inviteId/resend
    * Resends invitation and extends its expiration.
    */
-  router.post('/invites/:inviteId/resend', async (req: Request, res: Response) => {
+  router.post('/invites/:inviteId/resend', requireAuth, async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing verified organization context' });
+    }
     const { inviteId } = req.params;
-    const invite = activeTeamInvites.find(i => i.id === inviteId || i.token === inviteId);
+    const invite = activeTeamInvites.find(i => (i.id === inviteId || i.token === inviteId) && i.organization_id === orgId);
 
     if (!invite) {
       return res.status(404).json({ error: 'Invitation record not found.' });
@@ -1881,9 +1919,14 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
    * DELETE /api/auth/invites/:inviteId
    * Revokes an active invitation.
    */
-  router.delete('/invites/:inviteId', async (req: Request, res: Response) => {
+  router.delete('/invites/:inviteId', requireAuth, async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: Missing verified organization context' });
+    }
     const { inviteId } = req.params;
-    const invite = activeTeamInvites.find(i => i.id === inviteId || i.token === inviteId);
+    const invite = activeTeamInvites.find(i => (i.id === inviteId || i.token === inviteId) && i.organization_id === orgId);
 
     if (!invite) {
       return res.status(404).json({ error: 'Invitation record not found.' });
@@ -2175,8 +2218,9 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
         ).catch(() => {});
       }
 
+      const resetOrgId = `org_${cleanEmail.split('@')[1]?.replace(/[^a-zA-Z0-9]/g, '_') || 'soc'}`;
       await logAuditAction({
-        organization_id: DEFAULT_ORG_ID,
+        organization_id: resetOrgId,
         user_email: cleanEmail,
         user_role: 'user',
         action: 'AUTH_PASSWORD_RESET_REQUESTED',
