@@ -133,7 +133,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   res.on('finish', () => {
     const duration = Date.now() - startTime;
     const user = (req as any).user;
-    const orgId = user?.organizationId || req.headers['x-organization-id'];
+    const orgId = user?.organizationId;
     const userId = user?.id || user?.userId;
 
     const logPayload = {

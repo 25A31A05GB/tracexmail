@@ -48,6 +48,7 @@ import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 import { GoogleVerificationGuideModal } from './GoogleVerificationGuideModal';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
 import { API_URL, apiFetch } from '../lib/api';
+import { googleSignIn, getAccessToken } from '../lib/firebaseClient';
 
 export interface SyncedEmailItem {
   id: string;
@@ -846,65 +847,76 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
     setSyncResult(null);
     setBlockedAuthUrl(null);
 
-    let authUrl = '';
-
     try {
-      // 1. Primary: Request OAuth authorization URL from backend
-      try {
-        const res = await apiFetch('/api/gmail/oauth/start');
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.url) {
-            authUrl = data.url;
-          }
-        }
-      } catch (apiErr: any) {
-        console.warn('[GmailOAuth] apiFetch failed, trying direct relative fetch:', apiErr);
+      console.log('[GmailConnection] Initiating Google sign-in popup for Gmail readonly permissions...');
+      const authResult = await googleSignIn();
+      const user = authResult?.user || (authResult as any)?.data?.user;
+      const accessToken = authResult?.accessToken || (authResult as any)?.data?.accessToken;
+
+      if (!user?.email || !accessToken) {
+        throw new Error('Google sign-in completed but failed to retrieve access token.');
       }
 
-      // 2. Direct relative fetch fallback without custom preflight headers
-      if (!authUrl) {
-        try {
-          const directRes = await fetch('/api/gmail/oauth/start');
-          if (directRes.ok) {
-            const data = await directRes.json();
-            if (data?.url) {
-              authUrl = data.url;
+      const email = user.email;
+      setDirectEmail(email);
+
+      // Connect token to backend enclave
+      const connectRes = await apiFetch('/api/gmail/connect-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_token: accessToken,
+          email,
+          expires_in_seconds: 3600
+        })
+      });
+
+      if (!connectRes.ok) {
+        const errData = await connectRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to register connected Gmail account with security enclave.');
+      }
+
+      // Also persist user session if not logged in
+      const existingSession = localStorage.getItem('tracexmail_enclave_session');
+      if (!existingSession) {
+        const localSession = {
+          token: 'fb_session_' + user.uid,
+          user: {
+            id: user.uid,
+            email: user.email,
+            email_confirmed_at: new Date().toISOString(),
+            user_metadata: {
+              full_name: user.displayName || user.email.split('@')[0],
+              avatar_url: user.photoURL,
+              email: user.email,
+              role: 'analyst'
             }
-          }
-        } catch (directErr) {
-          console.warn('[GmailOAuth] Direct relative fetch failed:', directErr);
-        }
+          },
+          profile: {
+            id: user.uid,
+            email: user.email,
+            full_name: user.displayName || user.email.split('@')[0],
+            role: 'analyst',
+            account_type: 'organization'
+          },
+          storedAt: Date.now()
+        };
+        localStorage.setItem('tracexmail_enclave_session', JSON.stringify(localSession));
+        localStorage.setItem('user_email', user.email);
       }
 
-      // 3. Client-side resilience fallback: construct provider OAuth URL directly
-      if (!authUrl) {
-        const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
-        const baseUrl = window.location.origin;
-        const redirectUri = `${baseUrl}/api/v1/gmail/callback`;
-        const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
-        authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
-      }
-
-      // 4. Open Google authorization popup directly
-      const popup = window.open(
-        authUrl,
-        'TraceXMailGmailOAuth',
-        'width=600,height=700,resizable=yes,scrollbars=yes'
-      );
-
-      if (!popup) {
-        setBlockedAuthUrl(authUrl);
-        setErrorMsg('OAuth popup window was blocked by your browser. Please use the button below to authorize Gmail.');
-      }
+      setSyncResult(`Google Workspace connected for ${email}! Initializing real email threat analysis...`);
+      await fetchStatus();
+      await handleSyncNow();
     } catch (err: any) {
-      console.error('[GmailOAuth] Unexpected error starting OAuth:', err);
-      const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || (import.meta as any).env?.VITE_GMAIL_CLIENT_ID || 'tracexmail-soc-client';
-      const redirectUri = `${window.location.origin}/api/v1/gmail/callback`;
-      const scopes = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
-      const fallbackUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scopes}&access_type=offline&prompt=consent`;
-      setBlockedAuthUrl(fallbackUrl);
-      setErrorMsg('Could not open popup automatically. Please use the button below to authorize Gmail directly.');
+      console.error('[GmailConnectionView] Google Sign-In error:', err);
+      if (err?.code === 'auth/popup-closed-by-user') {
+        setErrorMsg('Sign-in cancelled: popup was closed before completing Google authorization.');
+      } else if (err?.code === 'auth/popup-blocked') {
+        setErrorMsg('Google sign-in popup was blocked by your browser. Please allow popups and try again.');
+      } else {
+        setErrorMsg(err?.message || 'Failed to authenticate with Google. Please try again.');
+      }
     } finally {
       setStartingOAuth(false);
     }
@@ -940,14 +952,17 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
     try {
       const targetEmail = directEmail.trim() || currentUserEmail || status?.email_address || '';
+      const liveToken = await getAccessToken();
       const res = await fetchWithExponentialBackoff('/api/gmail/poll-now', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-email': targetEmail
+          'x-user-email': targetEmail,
+          ...(liveToken ? { Authorization: `Bearer ${liveToken}` } : {})
         },
         body: JSON.stringify({
-          user_email: targetEmail
+          user_email: targetEmail,
+          ...(liveToken ? { access_token: liveToken } : {})
         })
       }, 2, 1500);
 

@@ -156,8 +156,8 @@ export function getDlqJobs(orgId?: string): StoredJobRecord[] {
 /**
  * Retries a job from the Dead Letter Queue.
  */
-export async function retryDlqJob(jobId: string): Promise<boolean> {
-  const idx = dlqStore.findIndex(j => j.id === jobId);
+export async function retryDlqJob(jobId: string, orgId?: string): Promise<boolean> {
+  const idx = dlqStore.findIndex(j => j.id === jobId && (!orgId || j.organizationId === orgId));
   if (idx === -1) return false;
 
   const [job] = dlqStore.splice(idx, 1);
@@ -252,7 +252,7 @@ export async function addNotificationJob(payload: NotificationJobPayload): Promi
 export function getJob(jobId: string, organizationId?: string): StoredJobRecord | null {
   const job = inMemoryJobs.get(jobId);
   if (!job) return null;
-  if (organizationId && job.organizationId !== organizationId && job.organizationId !== 'default-org') {
+  if (organizationId && job.organizationId !== organizationId) {
     return null; // Tenant isolation: access denied
   }
   return job;

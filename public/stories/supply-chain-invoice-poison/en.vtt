@@ -1,0 +1,28 @@
+WEBVTT - Supply Chain Infiltration: The Counterfeit Vendor (English)
+
+00:00:00.000 --> 00:00:18.000
+The most dangerous scam is one that arrives inside an ongoing conversation with someone you trust.
+
+00:00:18.000 --> 00:00:36.000
+For two weeks, a manufacturing plant had been emailing with their steel supplier. On day fourteen, an invoice arrived with new bank details.
+
+00:00:36.000 --> 00:00:55.000
+Even though the supplier's account was hacked, if the victim hit 'Reply', the real supplier would answer and expose the scam.
+
+00:00:55.000 --> 00:01:15.000
+So the attacker set a hidden trapdoor called a 'Reply-To' divergence. TraceXMail spotted it immediately.
+
+00:01:15.000 --> 00:01:28.000
+While the letter showed the supplier's name, any reply would secretly be diverted to a scammer's private inbox.
+
+00:01:28.000 --> 00:01:50.000
+TraceXMail examined the attached invoice inside a safe quarantine container. It revealed altered bank account numbers.
+
+00:01:50.000 --> 00:02:12.000
+TraceXMail built a clear timeline showing the exact half-hour window when the hacker broke into the email and altered the bill.
+
+00:02:12.000 --> 00:02:30.000
+The purchasing manager called the supplier directly to alert them. The payment was held, saving $680,000.
+
+00:02:30.000 --> 00:02:48.000
+With TraceXMail’s easy report, the supplier was able to clean up their compromised account and protect their partnership.

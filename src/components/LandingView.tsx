@@ -33,7 +33,8 @@ import {
   Fingerprint,
   Globe,
   Cpu,
-  AlertOctagon
+  AlertOctagon,
+  Film
 } from 'lucide-react';
 import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from '../data/samples';
 import { EmailAnalysis } from '../types';
@@ -47,6 +48,7 @@ import { ShaderGradientHero } from './landing/ShaderGradientHero';
 import { UnicornStudioScene } from './landing/UnicornStudioScene';
 import { RevealBlock } from '../hooks/useScrollReveal';
 import { LiveUserFeedbackSection } from './landing/LiveUserFeedbackSection';
+import { HeroLoop } from './stories/HeroLoop';
 import { 
   motion, 
   useMotionValue, 
@@ -54,6 +56,11 @@ import {
   useSpring, 
   type Variants 
 } from 'motion/react';
+
+// Code-split CaseFilesSection with React.lazy so video components do not grow the main bundle
+const CaseFilesSection = React.lazy(() =>
+  import('./stories/CaseFilesSection').then((m) => ({ default: m.CaseFilesSection }))
+);
 
 const HEADLINE_WORDS = [
   'Every', 'phishing', 'email', 'leaves', 'a', 'trail.', 'We', 'follow', 'it', 'to', 'the', 'source.'
@@ -115,13 +122,15 @@ interface LandingViewProps {
   onOpenTrace: () => void;
   onRequestAccess?: () => void;
   onSelectCase?: (analysis: EmailAnalysis) => void;
+  onOpenStories?: () => void;
 }
 
 export function LandingView({
   onOpenConsole,
   onOpenTrace,
   onRequestAccess,
-  onSelectCase
+  onSelectCase,
+  onOpenStories
 }: LandingViewProps) {
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -343,6 +352,10 @@ export function LandingView({
             <button data-scroll-to="exhibits" onClick={() => scrollToSection('exhibits')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Engineering
             </button>
+            <button data-scroll-to="case-files" onClick={() => scrollToSection('case-files')} className="text-[#c9a227] hover:text-[#ede6d8] font-semibold transition-colors bg-transparent border-none cursor-pointer link-basement flex items-center gap-1.5">
+              <Film className="w-3.5 h-3.5 text-[#c9a227]" />
+              <span>Case Files</span>
+            </button>
             <button data-scroll-to="team" onClick={() => scrollToSection('team')} className="text-[#b9af9c] hover:text-[#ede6d8] transition-colors bg-transparent border-none cursor-pointer link-basement">
               Team
             </button>
@@ -476,6 +489,15 @@ export function LandingView({
               </button>
               <button
                 type="button"
+                data-scroll-to="case-files"
+                onClick={() => { scrollToSection('case-files'); setMobileMenuOpen(false); }}
+                className="text-left text-[#c9a227] font-semibold py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center gap-2"
+              >
+                <Film className="w-4 h-4 text-[#c9a227]" />
+                <span>Case Files (Films)</span>
+              </button>
+              <button
+                type="button"
                 data-scroll-to="reviews"
                 onClick={() => { scrollToSection('reviews'); setMobileMenuOpen(false); }}
                 className="text-left text-[#c9a227] font-semibold py-2.5 px-3 rounded hover:bg-[#26221b] text-[14.5px] cursor-pointer min-h-[44px] flex items-center justify-between"
@@ -529,6 +551,7 @@ export function LandingView({
           className="absolute inset-0 pointer-events-none"
           style={{ x: bgX, y: bgY }}
         >
+          <HeroLoop className="absolute inset-0 w-full h-full opacity-40" />
           <ShaderGradientHero />
         </motion.div>
 
@@ -1274,6 +1297,21 @@ export function LandingView({
         </div>
       </section>
 
+      {/* Case Files & Multilingual Forensic Incident Films (Code-split with React.lazy) */}
+      <React.Suspense
+        fallback={
+          <div className="py-20 text-center bg-[#14110d] border-t border-[#3a352c] text-xs font-mono text-[#8a8070]">
+            <span className="inline-block w-4 h-4 border-2 border-[#c9a227] border-t-transparent rounded-full animate-spin mr-2" />
+            Loading Forensic Case Files &amp; Overview Films...
+          </div>
+        }
+      >
+        <CaseFilesSection
+          onAnalyzeEmail={onOpenConsole}
+          onViewAllStories={onOpenStories}
+        />
+      </React.Suspense>
+
       {/* Live Practitioner Reviews & Community Feedback Section - NO FAKE REVIEWS */}
       <LiveUserFeedbackSection onOpenConsole={onOpenConsole} />
 
@@ -1459,6 +1497,18 @@ export function LandingView({
               className="link-basement text-[#ede6d8] hover:text-[#c9a227] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#c9a227]"
             >
               Knowledge Base
+            </a>
+            <a
+              id="footer-link-stories"
+              href="/stories"
+              onClick={(e) => {
+                e.preventDefault();
+                if (onOpenStories) onOpenStories();
+                else window.history.pushState({}, '', '/stories');
+              }}
+              className="link-basement text-[#c9a227] hover:text-[#f3cc52] transition-colors underline underline-offset-4 decoration-[#3a352c] hover:decoration-[#c9a227]"
+            >
+              Case Films
             </a>
             <a
               id="footer-link-privacy"

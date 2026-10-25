@@ -170,6 +170,7 @@ describe('API Integration Test Suite', () => {
 
       const res = await request(app)
         .post('/api/analyze')
+        .set('Authorization', `Bearer ${validAnalystToken}`)
         .send({ raw_email: rawContent });
 
       expect([200, 202]).toContain(res.status);
@@ -185,6 +186,7 @@ describe('API Integration Test Suite', () => {
     it('handles malformed EML upload gracefully without crashing', async () => {
       const res = await request(app)
         .post('/api/analyze')
+        .set('Authorization', `Bearer ${validAnalystToken}`)
         .send({ raw_email: 'INVALID NON-MIME GARBAGE CONTENT !@#$%^&*()' });
 
       expect([200, 400]).toContain(res.status);
@@ -205,7 +207,8 @@ describe('API Integration Test Suite', () => {
   describe('6. OAuth Redirect & CSRF Validation', () => {
     it('rejects disallowed redirect_uri on /api/gmail/oauth/start', async () => {
       const res = await request(app)
-        .get('/api/gmail/oauth/start?redirect_uri=https://evil-hacker.com/steal-creds');
+        .get('/api/gmail/oauth/start?redirect_uri=https://evil-hacker.com/steal-creds')
+        .set('Authorization', `Bearer ${validAdminToken}`);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('invalid_request');
@@ -216,7 +219,9 @@ describe('API Integration Test Suite', () => {
       process.env.NODE_ENV = 'production';
       try {
         const res = await request(app)
-          .get('/api/gmail/oauth/start?redirect_uri=http://attacker.org/callback');
+          .get('/api/gmail/oauth/start?redirect_uri=http://attacker.org/callback')
+          .set('Authorization', `Bearer ${validAdminToken}`);
+
         expect(res.status).toBe(400);
       } finally {
         process.env.NODE_ENV = originalNodeEnv;

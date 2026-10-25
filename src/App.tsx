@@ -72,6 +72,7 @@ import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { updatePageMetadata, ROUTE_METADATA, TAB_METADATA } from './utils/seo';
 import { trackPageView } from './utils/analytics';
 const OAuthConsentScreen = lazyWithRetry(() => import('./components/OAuthConsentScreen').then(m => ({ default: m.OAuthConsentScreen })), 'OAuthConsentScreen');
+const StoriesPageView = lazyWithRetry(() => import('./components/stories/StoriesPageView').then(m => ({ default: m.StoriesPageView })), 'StoriesPageView');
 
 function ViewSuspenseLoader() {
   return (
@@ -763,6 +764,25 @@ export default function App() {
     );
   }
 
+  // Case Files & Forensic Films route (/stories)
+  if (currentPath === '/stories' || currentPath.startsWith('/stories')) {
+    return (
+      <Suspense fallback={<ViewSuspenseLoader />}>
+        <StoriesPageView
+          onNavigateHome={() => navigateToPath('/')}
+          onAnalyzeEmail={() => {
+            navigateToPath('/');
+            if (session) {
+              setActiveTab('overview');
+            } else {
+              setAuthView('login');
+            }
+          }}
+        />
+      </Suspense>
+    );
+  }
+
   // 404 Route handling for any unmatched path
   if (currentPath !== '/' && currentPath !== '/index.html' && currentPath !== '') {
     return (
@@ -904,6 +924,7 @@ export default function App() {
               setCurrentAnalysis(sample);
               setAuthView('login');
             }}
+            onOpenStories={() => navigateToPath('/stories')}
           />
         )}
         <CookieConsentBanner onNavigateToLegal={(type) => navigateToPath('/' + type)} />

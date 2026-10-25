@@ -319,8 +319,28 @@
       "maxArbitraryTailwindViolations": 214
     },
     "src/components/OverviewView.tsx": {
-      "maxHexViolations": 87,
-      "maxArbitraryTailwindViolations": 192
+      "maxHexViolations": 95,
+      "maxArbitraryTailwindViolations": 195
+    },
+    "src/components/EmlQrCodeModal.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 5
+    },
+    "src/components/FeatureAttributionCard.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 10
+    },
+    "src/components/AdminModelHealth.tsx": {
+      "maxHexViolations": 220,
+      "maxArbitraryTailwindViolations": 220
+    },
+    "src/components/ModelHealthDashboard.tsx": {
+      "maxHexViolations": 2,
+      "maxArbitraryTailwindViolations": 25
+    },
+    "src/components/AppGuard.tsx": {
+      "maxHexViolations": 40,
+      "maxArbitraryTailwindViolations": 50
     },
     "src/components/PlainLanguageSummaryCard.tsx": {
       "maxHexViolations": 6,

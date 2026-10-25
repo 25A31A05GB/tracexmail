@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { publicLimiter, authenticatedLimiter } from '../rateLimiter';
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../compliance';
-import { getSupabaseClient, DEFAULT_ORG_ID } from '../supabase';
+import { getSupabaseClient } from '../supabase';
 import { getPersistedCases, getPersistedCase } from '../caseStore';
 import { generateCampaignNarrative, detectCampaignsWithAi } from '../aiCampaignService';
 import { generateAiNarrativeForCase } from '../forensicPipeline';
@@ -13,21 +13,19 @@ export function registerCampaignsRoutes(app: express.Express): void {
   // Campaigns List (Tenant Filtered)
   app.get('/api/campaigns', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
-    const includeDemo = process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true';
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        let q = supabase.from('campaigns').select('*').order('last_seen', { ascending: false });
-        if (orgId) {
-          if (includeDemo) {
-            q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-          } else {
-            q = q.eq('organization_id', orgId);
-          }
-        }
-        const { data, error } = await q;
+        const { data, error } = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('last_seen', { ascending: false });
         if (!error && Array.isArray(data)) {
           return res.json(data);
         }
@@ -37,20 +35,25 @@ export function registerCampaignsRoutes(app: express.Express): void {
     res.json([]);
   });
 
-  // Single Campaign by ID (Tenant Scoped)
+  // Single Campaign by ID (Tenant Scoped - returns 404 for other tenants)
   app.get('/api/campaigns/:campaignId', publicLimiter, async (req: Request, res: Response) => {
     const { campaignId } = req.params;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string);
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        let q = supabase.from('campaigns').select('*').eq('id', campaignId);
-        if (orgId) {
-          q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        }
-        const { data } = await q.maybeSingle();
+        const { data } = await supabase
+          .from('campaigns')
+          .select('*')
+          .eq('id', campaignId)
+          .eq('organization_id', orgId)
+          .maybeSingle();
+
         if (data) return res.json(data);
       } catch {}
     }
@@ -94,7 +97,10 @@ export function registerCampaignsRoutes(app: express.Express): void {
     const emailId = req.params.emailId;
     const supabase = getSupabaseClient();
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     let allCases = getPersistedCases(orgId);
     let dbCampaigns: any[] = [];
 
@@ -108,7 +114,7 @@ export function registerCampaignsRoutes(app: express.Express): void {
       } catch {}
     }
 
-    const target = allCases.find((c: any) => c.id === emailId) || getPersistedCase(emailId);
+    const target = allCases.find((c: any) => c.id === emailId) || getPersistedCase(emailId, orgId);
     if (!target) {
       return res.status(404).json({ error: 'Email or Case not found' });
     }
@@ -224,9 +230,13 @@ export function registerCampaignsRoutes(app: express.Express): void {
   });
 
   // Campaign Auto-Correlate
+  // Campaign Auto-Correlate
   app.post(['/api/campaigns/auto-correlate', '/api/correlation/run'], publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const cases = getPersistedCases(orgId);
 
     const domainGroups: Record<string, string[]> = {};
@@ -253,7 +263,10 @@ export function registerCampaignsRoutes(app: express.Express): void {
   // AI Campaign Detection & Narrative
   app.post('/api/campaigns/ai-detect', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const cases = getPersistedCases(orgId);
 
     try {
@@ -267,7 +280,19 @@ export function registerCampaignsRoutes(app: express.Express): void {
   app.post('/api/campaigns/:campaignId/ai-narrative', publicLimiter, async (req: Request, res: Response) => {
     const { campaignId } = req.params;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data: camp } = await supabase.from('campaigns').select('*').eq('id', campaignId).eq('organization_id', orgId).maybeSingle();
+      if (!camp) {
+        return res.status(404).json({ error: `Campaign '${campaignId}' not found.` });
+      }
+    }
+
     const cases = getPersistedCases(orgId);
 
     try {
@@ -299,7 +324,19 @@ export function registerCampaignsRoutes(app: express.Express): void {
   app.get('/api/campaigns/:campaignId/timeline', publicLimiter, async (req: Request, res: Response) => {
     const { campaignId } = req.params;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      const { data: camp } = await supabase.from('campaigns').select('*').eq('id', campaignId).eq('organization_id', orgId).maybeSingle();
+      if (!camp) {
+        return res.status(404).json({ error: `Campaign '${campaignId}' not found.` });
+      }
+    }
+
     const cases = getPersistedCases(orgId).filter((c: any) => c.campaign_id === campaignId);
 
     const timeline = cases.map((c) => ({
@@ -318,7 +355,10 @@ export function registerCampaignsRoutes(app: express.Express): void {
   // Temporal Analysis (Strictly Tenant-Scoped)
   app.get('/api/temporal-analysis', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const cases = getPersistedCases(orgId);
 
     const hourlyMap: Record<number, number> = {};
@@ -339,10 +379,16 @@ export function registerCampaignsRoutes(app: express.Express): void {
     });
   });
 
-  // Case Relationship Graph
+  // Case Relationship Graph (Tenant isolated)
   app.get(['/api/cases/:caseId/graph', '/api/v1/cases/:caseId/graph'], publicLimiter, async (req: Request, res: Response) => {
     const { caseId } = req.params;
-    const c = getPersistedCase(caseId);
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+
+    const c = getPersistedCase(caseId, orgId);
     if (!c) return res.status(404).json({ error: 'Case not found' });
 
     const nodes = [
@@ -350,6 +396,7 @@ export function registerCampaignsRoutes(app: express.Express): void {
       { id: `domain-${c.from_domain}`, label: c.from_domain, type: 'domain' },
       { id: `ip-${c.origin_ip}`, label: c.origin_ip, type: 'ip' }
     ];
+
     const edges = [
       { from: c.id, to: `domain-${c.from_domain}`, relation: 'origin_domain' },
       { from: c.id, to: `ip-${c.origin_ip}`, relation: 'origin_relay' }
@@ -358,13 +405,23 @@ export function registerCampaignsRoutes(app: express.Express): void {
     res.json({ nodes, edges });
   });
 
-  // AI Narrative for Single Case
+  // AI Narrative for Single Case (Tenant isolated)
   const handleAiNarrative = async (req: Request, res: Response) => {
     const caseId = req.params.caseId;
-    let targetCase: any = caseId ? getPersistedCase(caseId) : null;
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+
+    let targetCase: any = caseId ? getPersistedCase(caseId, orgId) : null;
     if (!targetCase && req.body?.subject) {
       targetCase = req.body;
     }
+    if (caseId && !targetCase) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
     const narrative = await generateAiNarrativeForCase(targetCase);
     res.json(narrative);
   };

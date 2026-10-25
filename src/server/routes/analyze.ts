@@ -48,7 +48,10 @@ export function registerAnalyzeRoutes(app: express.Express): void {
       }
 
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || 'default-org';
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const userId = user?.userId;
 
       // If async explicitly requested, offload directly to queue
@@ -129,7 +132,10 @@ export function registerAnalyzeRoutes(app: express.Express): void {
       }
 
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || 'default-org';
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const userId = user?.userId;
 
       // Batch uploads always return 202 Accepted with jobIds
@@ -171,11 +177,14 @@ export function registerAnalyzeRoutes(app: express.Express): void {
   const handleGetJob = async (req: Request, res: Response) => {
     const jobId = req.params.jobId;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || undefined;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
     const job = getJob(jobId, orgId);
     if (!job) {
-      return res.status(404).json({ error: 'Job not found or access denied for this organization' });
+      return res.status(404).json({ error: 'Job not found' });
     }
 
     res.json({
@@ -210,7 +219,9 @@ export function registerAnalyzeRoutes(app: express.Express): void {
   });
 
   app.post('/api/admin/dlq/retry/:jobId', publicLimiter, async (req: Request, res: Response) => {
-    const success = await retryDlqJob(req.params.jobId);
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    const success = await retryDlqJob(req.params.jobId, orgId);
     if (!success) {
       return res.status(404).json({ error: 'DLQ job not found' });
     }

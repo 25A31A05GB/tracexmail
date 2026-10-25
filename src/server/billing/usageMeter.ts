@@ -179,7 +179,10 @@ export function checkAnalysisQuota(
  */
 export function enforceUsageLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
   const user = (req as any).user;
-  const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || 'default-org';
+  const orgId = user?.organizationId;
+  if (!orgId) {
+    return next();
+  }
   const planId = user?.planId || 'free';
 
   const quota = checkAnalysisQuota(orgId, planId);

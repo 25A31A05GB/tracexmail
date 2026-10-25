@@ -98,6 +98,11 @@ export const ROUTE_METADATA: Record<string, PageMetadata> = {
     description: 'Learn about TraceXMail, our cybersecurity mission, email header forensic standards (RFC 5322, RFC 7208, RFC 6376), and founder Jayaram Sappa.',
     canonicalPath: '/about'
   },
+  stories: {
+    title: 'Case Files & Forensic Incident Films | TraceXMail',
+    description: 'Deconstruct real-world email attacks to the source. Interactive case study films in English, Hindi, and Telugu with forensic proofs and chapters.',
+    canonicalPath: '/stories'
+  },
   knowledge: {
     title: 'Email Forensics & Threat Intelligence Knowledge Base | TraceXMail',
     description: 'Cybersecurity and email forensics tutorials, RFC 5322 header analysis guides, SPF/DKIM/DMARC protocols, and SOC phishing investigation playbooks.',

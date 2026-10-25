@@ -20,7 +20,7 @@ import {
   inMemoryStore,
   type PersistedCase
 } from '../caseStore';
-import { getSupabaseClient, DEFAULT_ORG_ID } from '../supabase';
+import { getSupabaseClient } from '../supabase';
 import { generateSocReport, validateAndSanitizeSocReport } from '../socReportService';
 import { correlateCaseWithCases } from '../correlationEngine';
 import {
@@ -38,7 +38,10 @@ export function registerCasesRoutes(app: express.Express): void {
   const handleStatsResponse = async (req: Request, res: Response) => {
     try {
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const supabase = getSupabaseClient();
       const includeDemo = process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true';
 
@@ -109,19 +112,20 @@ export function registerCasesRoutes(app: express.Express): void {
   // Cases List (Filtered by verified tenant)
   app.get('/api/cases', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const includeDemo = process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true';
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
         let q = supabase.from('cases').select('*').order('created_at', { ascending: false });
-        if (orgId) {
-          if (includeDemo) {
-            q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-          } else {
-            q = q.eq('organization_id', orgId);
-          }
+        if (includeDemo) {
+          q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
+        } else {
+          q = q.eq('organization_id', orgId);
         }
         const { data, error } = await q;
         if (!error && Array.isArray(data)) {
@@ -137,20 +141,24 @@ export function registerCasesRoutes(app: express.Express): void {
     res.json(localList);
   });
 
-  // Single Case by ID (Tenant isolated)
+  // Single Case by ID (Tenant isolated - returns 404 for other tenants)
   app.get('/api/cases/:caseId', publicLimiter, async (req: Request, res: Response) => {
     const { caseId } = req.params;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string);
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        let q = supabase.from('cases').select('*').eq('id', caseId);
-        if (orgId) {
-          q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
-        }
-        const { data } = await q.maybeSingle();
+        const { data } = await supabase
+          .from('cases')
+          .select('*')
+          .eq('id', caseId)
+          .eq('organization_id', orgId)
+          .maybeSingle();
         if (data) return res.json(data);
       } catch {}
     }
@@ -165,7 +173,10 @@ export function registerCasesRoutes(app: express.Express): void {
   app.get('/api/cases/:caseId/correlation', publicLimiter, async (req: Request, res: Response) => {
     const { caseId } = req.params;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string);
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
     const c = getPersistedCase(caseId, orgId);
     if (!c) {
@@ -179,8 +190,13 @@ export function registerCasesRoutes(app: express.Express): void {
 
   // SOC Report (Generate or Fetch)
   app.post('/api/cases/:caseId/soc-report', publicLimiter, async (req: Request, res: Response) => {
-    const { caseId } = req.params;
-    const c = getPersistedCase(caseId);
+    const caseId = req.params.caseId;
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+    const c = getPersistedCase(caseId, orgId);
     if (!c) {
       return res.status(404).json({ error: `Case '${caseId}' not found.` });
     }
@@ -196,8 +212,13 @@ export function registerCasesRoutes(app: express.Express): void {
   });
 
   app.get('/api/cases/:caseId/soc-report', publicLimiter, async (req: Request, res: Response) => {
-    const { caseId } = req.params;
-    const c = getPersistedCase(caseId);
+    const caseId = req.params.caseId;
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+    const c = getPersistedCase(caseId, orgId);
     if (!c) {
       return res.status(404).json({ error: `Case '${caseId}' not found.` });
     }
@@ -354,9 +375,12 @@ export function registerCasesRoutes(app: express.Express): void {
   app.get('/api/emails/:emailId/related-incidents', publicLimiter, async (req: Request, res: Response) => {
     const emailId = req.params.emailId;
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const pool = getPersistedCases(orgId);
-    const target = pool.find((c: any) => c.id === emailId) || getPersistedCase(emailId);
+    const target = pool.find((c: any) => c.id === emailId) || getPersistedCase(emailId, orgId);
     if (!target) {
       return res.status(404).json({ error: 'Email or Case not found' });
     }
@@ -375,7 +399,10 @@ export function registerCasesRoutes(app: express.Express): void {
 
   app.post('/api/emails/related-incidents', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const pool = getPersistedCases(orgId);
     const target = req.body?.analysis || req.body?.case || req.body;
     if (!target || (!target.id && !target.headers && !target.from && !target.domain)) {
@@ -431,9 +458,12 @@ export function registerCasesRoutes(app: express.Express): void {
     }
 
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const allCases = getPersistedCases(orgId);
-    const target = allCases.find((c: any) => c.id === caseId) || getPersistedCase(caseId);
+    const target = allCases.find((c: any) => c.id === caseId) || getPersistedCase(caseId, orgId);
     if (!target) {
       return res.status(404).json({ error: 'Target case not found' });
     }
@@ -588,10 +618,15 @@ export function registerCasesRoutes(app: express.Express): void {
     res.json({ status: 'success', message: 'Note deleted' });
   });
 
-  // Case Evidence (With default PII masking for read_only and anonymous users)
+  // Case Evidence (Tenant isolated, with default PII masking for read_only and anonymous users)
   app.get('/api/cases/:caseId/evidence', authenticatedLimiter, requireAuth, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
     const { caseId } = req.params;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
+
     const shouldMask = !user || user.role === 'read_only' || req.query.mask_pii === 'true';
 
     const supabase = getSupabaseClient();
@@ -601,6 +636,7 @@ export function registerCasesRoutes(app: express.Express): void {
           .from('evidence')
           .select('*')
           .eq('case_id', caseId)
+          .eq('organization_id', orgId)
           .maybeSingle();
 
         if (!error && data) {
@@ -622,8 +658,12 @@ export function registerCasesRoutes(app: express.Express): void {
       }
     }
 
-    const c = getPersistedCase(caseId);
-    let rawContent = c?.raw_analysis?.rawEml || '';
+    const c = getPersistedCase(caseId, orgId);
+    if (!c) {
+      return res.status(404).json({ error: `Case '${caseId}' not found.` });
+    }
+
+    let rawContent = c.raw_analysis?.rawEml || '';
     if (shouldMask && rawContent) {
       rawContent = rawContent
         .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[REDACTED_EMAIL]')
@@ -634,16 +674,21 @@ export function registerCasesRoutes(app: express.Express): void {
       case_id: caseId,
       status: 'AVAILABLE',
       raw_content: rawContent,
-      sha256: c?.raw_analysis?.sha256 || crypto.createHash('sha256').update(rawContent).digest('hex'),
+      sha256: c.raw_analysis?.sha256 || crypto.createHash('sha256').update(rawContent).digest('hex'),
       is_masked: shouldMask
     });
   });
 
-  // Evidence Verification Endpoint (Verifies against database stored raw bytes)
+  // Evidence Verification Endpoint (Verifies against database stored raw bytes, tenant-scoped)
   app.all('/api/evidence/:id/verify', authenticatedLimiter, requireAuth, async (req: Request, res: Response) => {
     const { id } = req.params;
-    const supabase = getSupabaseClient();
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
 
+    const supabase = getSupabaseClient();
     let storedBytes: string | null = null;
     let expectedHash: string | null = null;
     let verifiedFrom = 'persisted_storage';
@@ -654,6 +699,7 @@ export function registerCasesRoutes(app: express.Express): void {
           .from('evidence')
           .select('*')
           .or(`id.eq.${id},case_id.eq.${id}`)
+          .eq('organization_id', orgId)
           .maybeSingle();
 
         if (!error && data && data.raw_content) {
@@ -665,7 +711,7 @@ export function registerCasesRoutes(app: express.Express): void {
     }
 
     if (!storedBytes) {
-      const c = getPersistedCase(id);
+      const c = getPersistedCase(id, orgId);
       if (c && c.raw_analysis?.rawEml) {
         storedBytes = c.raw_analysis.rawEml;
         expectedHash = c.raw_analysis.sha256 || c.raw_analysis.custodyHash || null;
@@ -703,7 +749,13 @@ export function registerCasesRoutes(app: express.Express): void {
     publicLimiter,
     async (req: Request, res: Response) => {
       const { caseId } = req.params;
-      const c = getPersistedCase(caseId);
+      const user = (req as AuthenticatedRequest).user;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
+
+      const c = getPersistedCase(caseId, orgId);
 
       if (!c) {
         return res.status(404).json({ error: `Case '${caseId}' not found.` });
@@ -750,7 +802,10 @@ export function registerCasesRoutes(app: express.Express): void {
   // Global Tenant-Filtered Search
   app.get('/api/search', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const query = String(req.query.q || '').toLowerCase();
 
     const cases = getPersistedCases(orgId);
@@ -812,10 +867,10 @@ export function registerCasesRoutes(app: express.Express): void {
   // Compliance Audit Logs & Retention
   app.get('/api/compliance/audit-logs', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
     try {
-      const { organization_id, case_id, action, search, limit, offset } = req.query;
+      const { case_id, action, search, limit, offset } = req.query;
       const user = (req as AuthenticatedRequest).user!;
       const result = await getAuditLogs({
-        organization_id: (organization_id as string) || user.organizationId,
+        organization_id: user.organizationId,
         case_id: case_id as string,
         action: action as string,
         search: search as string,

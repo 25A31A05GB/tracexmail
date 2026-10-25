@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { validateStartupEnv } from './envValidation';
-import { assertEncryptionKeyConfigured, authenticateUser } from './compliance';
+import { assertEncryptionKeyConfigured, authenticateUser, requireAuth, AuthenticatedRequest } from './compliance';
 import { errorHandler } from './errorHandler';
 import { logger } from './logger';
 
@@ -128,9 +128,6 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
       'Authorization',
       'x-api-key',
       'apikey',
-      'x-organization-id',
-      'x-user-id',
-      'x-user-email',
       'x-goog-pubsub-token',
       'x-request-id'
     ]
@@ -163,6 +160,62 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
 
   // 8. Authentication & Context Resolution Middleware
   app.use(authenticateUser);
+
+  // 8b. Metrics Endpoint Protection (/metrics)
+  app.use('/metrics', (req: Request, res: Response, next: NextFunction) => {
+    const internalToken = req.headers['x-internal-token'];
+    if (internalToken && process.env.INTERNAL_SERVICE_TOKEN && internalToken === process.env.INTERNAL_SERVICE_TOKEN) {
+      return next();
+    }
+    const user = (req as AuthenticatedRequest).user;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Forbidden: Prometheus metrics endpoint requires admin authorization or valid internal service token.',
+        code: 'ERR_FORBIDDEN'
+      });
+    }
+    return next();
+  });
+
+  // 8c. SEC-1 Global Default-Deny Authentication Gate for /api/*
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    const rawPath = req.path || '';
+    const fullPath = (req.baseUrl || '/api') + rawPath;
+
+    // Explicit Public Allowlist
+    const isPublic =
+      fullPath.startsWith('/api/health') ||
+      fullPath.startsWith('/api/auth/') ||
+      fullPath === '/api/auth' ||
+      fullPath.startsWith('/api/v1/gmail/callback') ||
+      fullPath.startsWith('/oauth/') ||
+      fullPath.startsWith('/api/oauth/') ||
+      fullPath === '/api/gmail/pubsub/push' ||
+      fullPath === '/api/mail/m365/webhook' ||
+      (process.env.PUBLIC_ANALYZE_ENABLED === 'true' && fullPath.startsWith('/api/analyze'));
+
+    if (isPublic) {
+      return next();
+    }
+
+    // Bandwidth payload endpoint protection
+    if (fullPath === '/api/network/bandwidth-payload') {
+      const internalToken = req.headers['x-internal-token'];
+      if (internalToken && process.env.INTERNAL_SERVICE_TOKEN && internalToken === process.env.INTERNAL_SERVICE_TOKEN) {
+        return next();
+      }
+      const user = (req as AuthenticatedRequest).user;
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({
+          error: 'Forbidden: Bandwidth test payload requires admin role or internal service token.',
+          code: 'ERR_FORBIDDEN'
+        });
+      }
+    }
+
+    // Require Auth for all non-public /api routes
+    return requireAuth(req, res, next);
+  });
 
   // 9. Register Domain Route Modules
   registerHealthRoutes(app);

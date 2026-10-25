@@ -1,0 +1,31 @@
+WEBVTT - The Evilginx Trap: Reverse Proxy Session Hijack (English)
+
+00:00:00.000 --> 00:00:25.000
+Late at night, an IT administrator received an urgent message: 'Your login session is about to expire.'
+
+00:00:25.000 --> 00:00:50.000
+The page looked identical to his company’s login screen. Attackers set up a digital two-way mirror between him and the real site.
+
+00:00:50.000 --> 00:01:15.000
+This technique is called a reverse proxy. When you type your password, the fake page passes your information to the real website.
+
+00:01:15.000 --> 00:01:35.000
+The real site logs you in—but the attacker sitting in the middle steals your digital session pass.
+
+00:01:35.000 --> 00:01:50.000
+TraceXMail discovered that the link didn't point to the company’s portal at all, but to a hidden relay server.
+
+00:01:50.000 --> 00:02:15.000
+TraceXMail spotted the trick by measuring speed. An email passing directly moves in milliseconds.
+
+00:02:15.000 --> 00:02:35.000
+Here, there was an unnatural delay of over 400 milliseconds—proof of an invisible detour through an encrypted tunnel.
+
+00:02:35.000 --> 00:02:55.000
+TraceXMail unmasked the hidden detour before the engineer could log in.
+
+00:02:55.000 --> 00:03:20.000
+By looking at the physical transmission route rather than just web page appearance, TraceXMail stopped the attack.
+
+00:03:20.000 --> 00:03:45.000
+The administrator's access stayed safe, company cloud systems remained secure, and the incident was closed without a breach.

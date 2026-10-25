@@ -1,13 +1,16 @@
 import express, { Request, Response } from 'express';
 import { requireAuth, requireRole, AuthenticatedRequest } from '../compliance';
-import { publicLimiter } from '../rateLimiter';
+import { authenticatedLimiter } from '../rateLimiter';
 import { verifyAuditChain, exportAuditLogsAsCsv, exportAuditLogsAsJson } from '../audit/immutableLog';
 
 export function registerAuditRoutes(app: express.Express): void {
-  // Verification endpoint: checks cryptographic hash chain integrity
-  app.get('/api/audit/verify', publicLimiter, (req: Request, res: Response) => {
+  // Verification endpoint: checks cryptographic hash chain integrity (Admin only)
+  app.get('/api/audit/verify', authenticatedLimiter, requireAuth, requireRole(['admin']), (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const result = verifyAuditChain(orgId);
 
     if (!result.valid) {
@@ -26,16 +29,19 @@ export function registerAuditRoutes(app: express.Express): void {
     });
   });
 
-  // Export audit logs (CSV or JSON)
-  app.get('/api/audit/export', publicLimiter, (req: Request, res: Response) => {
+  // Export audit logs (CSV or JSON) (Admin only)
+  app.get('/api/audit/export', authenticatedLimiter, requireAuth, requireRole(['admin']), (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
     const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const format = (req.query.format as string)?.toLowerCase() || 'json';
 
     if (format === 'csv') {
       const csv = exportAuditLogsAsCsv(orgId);
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="audit_log_${orgId || 'all'}_${Date.now()}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="audit_log_${orgId}_${Date.now()}.csv"`);
       return res.send(csv);
     }
 

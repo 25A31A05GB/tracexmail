@@ -1,0 +1,46 @@
+WEBVTT - TraceXMail Forensic Architecture Overview (English)
+
+00:00:00.000 --> 00:00:15.000
+Most people believe that dangerous emails are easy to spot—full of spelling mistakes, strange greetings, or suspicious promises.
+
+00:00:15.000 --> 00:00:30.000
+Today’s cyber attackers don't work that way. They write polite, professional messages that look exactly like everyday business.
+
+00:00:30.000 --> 00:00:45.000
+When your normal email filter checks an incoming message, it usually just reads the words on the screen and checks if the sender's address looks familiar.
+
+00:00:45.000 --> 00:00:55.000
+Standard filters read the letter inside, but they never inspect the digital envelope that carried it.
+
+00:00:55.000 --> 00:01:15.000
+Think of sending a physical package through the mail. Every postal office and shipping depot that touches that package stamps it with an ink postmark.
+
+00:01:15.000 --> 00:01:35.000
+Email works the exact same way. Beneath what you see on your screen, every email has hidden routing stamps—called 'Received headers'.
+
+00:01:35.000 --> 00:01:50.000
+No matter what name the scammer puts in the 'From' field, they cannot erase these stamps.
+
+00:01:50.000 --> 00:02:10.000
+TraceXMail reads this hidden postmark trail from the very first computer that sent it, exposing servers thousands of miles away.
+
+00:02:10.000 --> 00:02:25.000
+Next, TraceXMail checks the digital wax seal. Centuries ago, kings sealed letters with a personal wax stamp to prove authenticity.
+
+00:02:25.000 --> 00:02:45.000
+Today, companies use digital cryptographic signatures called DKIM. TraceXMail compares the seal on the message with the company's verified signature.
+
+00:02:45.000 --> 00:03:00.000
+If a scammer tries to fake an email from your bank, their seal will not match.
+
+00:03:00.000 --> 00:03:15.000
+TraceXMail combines the postal trail and broken seal into an objective safety score with zero guesswork.
+
+00:03:15.000 --> 00:03:35.000
+When an attack happens, you need irrefutable evidence. TraceXMail wraps the entire story into a certified, tamper-proof PDF report.
+
+00:03:35.000 --> 00:03:55.000
+Every routing stamp, fake seal, and suspicious server is locked with an unchangeable digital fingerprint ready for legal audit.
+
+00:03:55.000 --> 00:04:12.000
+TraceXMail takes the mystery out of email security, turning hidden technical tricks into crystal-clear facts.

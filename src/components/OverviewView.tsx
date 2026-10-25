@@ -39,8 +39,10 @@ import {
   Mail,
   AlignLeft,
   Code,
-  Search
+  Search,
+  QrCode
 } from 'lucide-react';
+import { EmlQrCodeModal } from './EmlQrCodeModal';
 import { EmailAnalysis, AINarrative } from '../types';
 import { resolveOrigin, extractReceivedChainHops } from '../utils/originResolution';
 import { sha256Sync } from '../utils/crypto';
@@ -330,6 +332,7 @@ export function OverviewView({
   const [isTechnicalExpanded, setIsTechnicalExpanded] = useState<boolean>(viewMode === 'analyst' || userPersona === 'technical');
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingPng, setExportingPng] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [caseTags, setCaseTags] = useState<string[]>(() => {
     return Array.isArray(analysis?.tags) ? [...analysis.tags] : [];
   });
@@ -924,6 +927,14 @@ export function OverviewView({
               <Download className="w-3.5 h-3.5 text-neutral-400" />
               <span>Download as EML</span>
             </button>
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className="px-3 py-1.5 rounded bg-[#1D2027] hover:bg-[#2A2D34] border border-[#2A2D34] text-xs text-neutral-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Generate scannable QR code to import EML directly on mobile devices"
+            >
+              <QrCode className="w-3.5 h-3.5 text-neutral-400" />
+              <span>QR Code</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap bg-[#1d2028] p-1.5 rounded border border-[#2A2D34]">
@@ -1153,6 +1164,14 @@ export function OverviewView({
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download as EML</span>
+              </button>
+              <button
+                onClick={() => setIsQrModalOpen(true)}
+                className="px-2.5 py-1.5 rounded bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-xs text-blue-300 font-mono flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Generate scannable QR code to import EML directly on mobile devices"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>QR Code</span>
               </button>
             </div>
           </div>
@@ -2237,6 +2256,13 @@ export function OverviewView({
           }}
         />
       )}
+
+      {/* Mobile EML Import QR Code Modal */}
+      <EmlQrCodeModal
+        isOpen={isQrModalOpen}
+        onClose={() => setIsQrModalOpen(false)}
+        analysis={analysis}
+      />
     </div>
   );
 }

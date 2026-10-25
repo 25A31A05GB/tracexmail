@@ -1,0 +1,297 @@
+{
+  "version": "1.0.0",
+  "statusLegend": {
+    "in_app": {
+      "label": "In the app",
+      "description": "Functional capability live in the TraceXMail forensic analysis platform."
+    },
+    "concept": {
+      "label": "Concept",
+      "description": "Fictional scenario or research concept for narrative demonstration; not an existing automated platform action."
+    }
+  },
+  "languages": [
+    { "code": "en", "label": "EN", "name": "English" },
+    { "code": "hi", "label": "हिन्दी", "name": "Hindi" },
+    { "code": "te", "label": "తెలుగు", "name": "Telugu" }
+  ],
+  "notice": "Fictional scenario · sample data · AI-generated narration",
+  "overview": {
+    "id": "film_overview_01",
+    "slug": "overview",
+    "isOverview": true,
+    "title": "Inside TraceXMail: Forensic Deconstruction Architecture",
+    "hook": "A technical walkthrough of how TraceXMail follows sophisticated email attacks from delivery back to infrastructure origin.",
+    "tags": ["Architecture", "Forensics", "Hop Tracing", "Zero-Hallucination"],
+    "runtime": "4:12",
+    "durationSeconds": 252,
+    "isoDuration": "PT4M12S",
+    "poster": "/overview/poster.jpg",
+    "languages": ["en", "hi", "te"],
+    "chapters": [
+      { "title": "The Flaw in Conventional Gateway Filters", "time": 0 },
+      { "title": "Deep Envelope & RFC 822 MTA Hop Tracing", "time": 55 },
+      { "title": "Multi-Signal Forensic Scoring Engine", "time": 130 },
+      { "title": "Cryptographic Proof & Chain of Custody", "time": 195 }
+    ],
+    "features": [
+      {
+        "label": "Deterministic RFC 822 Hop Deconstruction",
+        "status": "in_app",
+        "description": "Extracts and validates each Received header with BGP and ASN correlation."
+      },
+      {
+        "label": "Zero-Hallucination Threat Breakdown",
+        "status": "in_app",
+        "description": "Explains verdicts using deterministic mathematical scores, never speculative generative prose."
+      },
+      {
+        "label": "Global Autonomous Threat Topology Graph",
+        "status": "concept",
+        "description": "Hypothetical global real-time mesh mapping adversary infrastructure before email delivery."
+      },
+      {
+        "label": "Court-Admissible Evidence Dossier Export",
+        "status": "in_app",
+        "description": "SHA-256 cryptographic chain-of-custody export ready for law enforcement and legal audit."
+      }
+    ],
+    "transcripts": {
+      "en": "Most people believe dangerous emails are full of obvious typos, but modern cyber attacks look like routine business. While standard email filters only read the words on the page, TraceXMail inspects the hidden digital envelope—reading the indelible postal stamps and verifying the sender's cryptographic wax seal from origin server to your inbox.",
+      "hi": "ज्यादातर लोग सोचते हैं कि फर्जी ईमेल में गलत स्पेलिंग होती है, लेकिन आज के साइबर हमले बिल्कुल असली दिखते हैं। साधारण फिल्टर सिर्फ स्क्रीन के शब्दों को पढ़ते हैं, जबकि TraceXMail डिजिटल लिफाफे की जांच करता है—हर कंप्यूटर की डाक मुहर और डिजिटल लाख की मुहर को परखकर सच्चाई सामने लाता है।",
+      "te": "చాలామంది ప్రమాదకరమైన ఇమెయిల్స్‌లో తప్పులు ఉంటాయని అనుకుంటారు, కానీ నేటి సైబర్ దాడులు అచ్చం నిజమైన ఆఫీస్ మెయిల్స్ లాగే ఉంటాయి. సాధారణ ఫిల్టర్లు కేవలం అక్షరాలను మాత్రమే చదువుతాయి, కానీ TraceXMail డిజిటల్ ఎన్వలప్‌ను తనిఖీ చేసి, పోస్టల్ స్టాంపులు మరియు డిజిటల్ సీల్ ద్వారా అసలు నిజాన్ని బయటపెడుతుంది."
+    }
+  },
+  "stories": [
+    {
+      "id": "film_story_01",
+      "slug": "ceo-fraud-wire-redirect",
+      "isOverview": false,
+      "title": "The $4.2M Payroll Divert: BEC Wire Redirection",
+      "hook": "How an attacker weaponized lookalike domains and thread hijacking to redirect vendor escrow payments.",
+      "tags": ["BEC", "Wire Fraud", "Thread Hijacking", "Financial"],
+      "runtime": "3:14",
+      "durationSeconds": 194,
+      "isoDuration": "PT3M14S",
+      "poster": "/stories/ceo-fraud-wire-redirect/poster.jpg",
+      "languages": ["en", "hi", "te"],
+      "chapters": [
+        { "title": "The Urgent Escrow Payment Request", "time": 0 },
+        { "title": "Header Inspection & Intermediate Relay", "time": 42 },
+        { "title": "DKIM Cryptographic Key Mismatch", "time": 95 },
+        { "title": "Zero-Trace Dossier & Incident Resolution", "time": 140 }
+      ],
+      "features": [
+        {
+          "label": "RFC 822 Relay Hop Deconstruction",
+          "status": "in_app",
+          "description": "Identified intermediate spoofed MTA hop routing through Bulletproof Hosting AS49870."
+        },
+        {
+          "label": "DKIM Cryptographic Signature Validation",
+          "status": "in_app",
+          "description": "Flagged RSA signature mismatch between envelope sender and header domain."
+        },
+        {
+          "label": "Automated Banking API Escrow Freeze",
+          "status": "concept",
+          "description": "Direct automated interface halting outgoing wire transactions in real-time."
+        },
+        {
+          "label": "One-Click Legal Evidence Export",
+          "status": "in_app",
+          "description": "Exported immutable PDF dossier with SHA-256 hash proofs for federal reporting."
+        }
+      ],
+      "transcripts": {
+        "en": "At 08:14 AM, an accountant received an email from her CEO requesting an emergency $4.2M wire before 10 AM. It looked real to the naked eye, but TraceXMail inspected the digital postmarks and discovered the letter was sent from an overseas server in Bulgaria, using a lookalike domain with a zero replacing the letter 'O' to forge the company's seal.",
+        "hi": "सुबह 8:14 बजे फाइनेंस मैनेजर को सीईओ के नाम से 4.2 मिलियन डॉलर तुरंत ट्रांसफर करने का ईमेल मिला। देखने में यह बिल्कुल असली था, लेकिन TraceXMail ने डाक मुहरों की जांच की और पाया कि यह बुल्गारिया के एक अनजान सर्वर से भेजा गया था, जिसमें कंपनी के नाम में 'O' की जगह शून्य (0) लगाकर फर्जी मुहर लगाई गई थी।",
+        "te": "ఉదయం 8:14 గంటలకు సీఈవో పేరుతో 4.2 మిలియన్ డాలర్ల అత్యవసర బ్యాంక్ బదిలీ ఈమెయిల్ వచ్చింది. చూడటానికి ఇది నిజమైనట్లే ఉన్నా, TraceXMail పరిశీలనలో ఇది బల్గేరియా నుండి వచ్చిందని, కంపెనీ పేరులోని 'O' స్థానంలో సున్నా (0) పెట్టి నకిలీ సీల్ సృష్టించారని తేలింది."
+      }
+    },
+    {
+      "id": "film_story_02",
+      "slug": "supply-chain-invoice-poison",
+      "isOverview": false,
+      "title": "Supply Chain Infiltration: The Counterfeit Vendor",
+      "hook": "A compromised supplier mailbox injects authentic thread history with a poisoned banking attachment.",
+      "tags": ["Supply Chain", "Vendor Compromise", "PDF Exploit", "B2B"],
+      "runtime": "2:48",
+      "durationSeconds": 168,
+      "isoDuration": "PT2M48S",
+      "poster": "/stories/supply-chain-invoice-poison/poster.jpg",
+      "languages": ["en", "hi", "te"],
+      "chapters": [
+        { "title": "Authentic Supplier Conversation Injected", "time": 0 },
+        { "title": "Return-Path Divergence Identified", "time": 36 },
+        { "title": "Micro-PDF Attachment Exploit Parsing", "time": 88 },
+        { "title": "Vendor Threat Advisory Generation", "time": 132 }
+      ],
+      "features": [
+        {
+          "label": "Return-Path & Reply-To Discrepancy Check",
+          "status": "in_app",
+          "description": "Detected concealed Reply-To pointing to an adversary-controlled catchall domain."
+        },
+        {
+          "label": "DMARC Policy Compliance Breakdown",
+          "status": "in_app",
+          "description": "Flagged aligned domain mismatch despite valid SPF passes on third-party ESP."
+        },
+        {
+          "label": "Autonomous Global Vendor Network Isolation",
+          "status": "concept",
+          "description": "Collaborative enterprise inter-tenant broadcast isolating the compromised supplier across industry SOCs."
+        },
+        {
+          "label": "Timeline Reconstruction Matrix",
+          "status": "in_app",
+          "description": "Reconstructed the 14-day negotiation chronology to identify exact point of attacker infiltration."
+        }
+      ],
+      "transcripts": {
+        "en": "For two weeks, a manufacturing plant had been emailing with their steel supplier. On day fourteen, an invoice arrived with altered banking details. The sender's account was compromised, but TraceXMail detected a hidden 'Reply-To' divergence that diverted all replies to a scammer's private inbox, saving $680,000.",
+        "hi": "दो हफ्तों से एक फैक्ट्री अपने स्टील सप्लायर से ईमेल पर बात कर रही थी। चौदहवें दिन, बदले हुए बैंक खाते का बिल आया। सप्लायर का ईमेल हैक हो चुका था, लेकिन TraceXMail ने एक छिपे हुए 'Reply-To' धोखे को पकड़ लिया जो जवाबों को हैकर के इनबॉक्स में मोड़ रहा था। इससे 680,000 डॉलर बच गए।",
+        "te": "రెండు వారాలుగా ఒక ఫ్యాక్టరీ తమ స్టీల్ సరఫరాదారుతో చర్చిస్తోంది. 14వ రోజున బ్యాంక్ వివరాలు మార్చబడిన బిల్లు వచ్చింది. సరఫరాదారు ఖాతా హ్యాక్ అయినప్పటికీ, రిప్లైలు హ్యాకర్‌కు వెళ్లేలా ఉన్న రహస్య 'రిప్లై-టు' చిరునామాను TraceXMail గుర్తించి 680,000 డాలర్ల నష్టాన్ని నివారించింది."
+      }
+    },
+    {
+      "id": "film_story_03",
+      "slug": "mfa-session-hijack",
+      "isOverview": false,
+      "title": "The Evilginx Trap: Reverse Proxy Session Hijack",
+      "hook": "Adversary-in-the-Middle bypasses hardware tokens through transparent reverse proxy infrastructure.",
+      "tags": ["AitM", "Evilginx", "Session Hijack", "Reverse Proxy"],
+      "runtime": "3:45",
+      "durationSeconds": 225,
+      "isoDuration": "PT3M45S",
+      "poster": "/stories/mfa-session-hijack/poster.jpg",
+      "languages": ["en", "hi", "te"],
+      "chapters": [
+        { "title": "Urgent Re-Authentication Notification", "time": 0 },
+        { "title": "Reverse Proxy ASN Infrastructure Hop", "time": 50 },
+        { "title": "BGP Anomaly & Reverse Tunnel Unmasking", "time": 110 },
+        { "title": "Forensic Invalidation & Threat Defense", "time": 175 }
+      ],
+      "features": [
+        {
+          "label": "Reverse Proxy Infrastructure Detection",
+          "status": "in_app",
+          "description": "Matched origin MTA relays to known AitM proxy node clusters and commercial VPN CIDRs."
+        },
+        {
+          "label": "Geographic Hop Traceroute Graph",
+          "status": "in_app",
+          "description": "Rendered step-by-step latency hops showing a 400ms anomaly indicative of live session interception."
+        },
+        {
+          "label": "Real-time Identity Provider Token Killswitch",
+          "status": "concept",
+          "description": "Simulated zero-latency cross-session token revocation wiping all active adversary cookies."
+        },
+        {
+          "label": "Deterministic Security Scorecard",
+          "status": "in_app",
+          "description": "Delivered non-subjective forensic rating highlighting AitM markers with full evidentiary audit."
+        }
+      ],
+      "transcripts": {
+        "en": "Late at night, an IT administrator received a notice to re-authenticate his corporate session. Scammers had set up an invisible digital two-way mirror between him and the real site to siphon his master key. TraceXMail detected an unnatural 400ms delay in the packet route, exposing the detour and protecting all cloud workloads.",
+        "hi": "देर रात एक आईटी इंजीनियर को अपना लॉगिन सेशन री-वेरीफाई करने का संदेश मिला। हैकर्स ने मास्टर की चुराने के लिए असली वेबसाइट और इंजीनियर के बीच शीशे की अदृश्य दीवार खड़ी की थी। TraceXMail ने 400 मिलीसेकंड की असामान्य लेटेंसी पकड़कर इस धोखे का पर्दाफाश किया।",
+        "te": "రాత్రి వేళ ఒక ఐటీ ఇంజనీర్‌కు రీ-లాగిన్ కావాలంటూ మెయిల్ వచ్చింది. పాస్‌వర్డ్ మరియు సెషన్ టోకెన్లు దొంగిలించడానికి హ్యాకర్లు ఒక అద్దాల గదిని ఏర్పాటు చేశారు. TraceXMail 400 మిల్లీసెకన్ల నెట్‌వర్క్ ఆలస్యాన్ని పసిగట్టి, రహస్య దారిని బయటపెట్టి క్లౌడ్ సిస్టమ్స్‌ను కాపాడింది."
+      }
+    },
+    {
+      "id": "film_story_04",
+      "slug": "fake-okta-migration",
+      "isOverview": false,
+      "title": "Operation Ghost Portal: The IT Helpdesk Mimic",
+      "hook": "Typosquatted domain with valid TLS certificates targeting high-privilege engineering credentials.",
+      "tags": ["Credential Harvesting", "Typosquatting", "IT Impersonation"],
+      "runtime": "2:32",
+      "durationSeconds": 152,
+      "isoDuration": "PT2M32S",
+      "poster": "/stories/fake-okta-migration/poster.jpg",
+      "languages": ["en", "hi", "te"],
+      "chapters": [
+        { "title": "Mandatory SSO Migration Broadcast", "time": 0 },
+        { "title": "Punycode & Homoglyph Character Analysis", "time": 40 },
+        { "title": "Originating IP Infrastructure Extraction", "time": 85 },
+        { "title": "Incident Dossier & Registrar Alerting", "time": 120 }
+      ],
+      "features": [
+        {
+          "label": "Punycode & Homoglyph Character Analysis",
+          "status": "in_app",
+          "description": "Flagged Cyrillic character substitution mimicking internal enterprise identity portal."
+        },
+        {
+          "label": "MTA Signature & X-Originating-IP Extract",
+          "status": "in_app",
+          "description": "Extracted real client workstation IP obscured behind cloud mail delivery relays."
+        },
+        {
+          "label": "Autonomous Domain Takedown API",
+          "status": "concept",
+          "description": "Hypothetical automated abuse reporting pipeline terminating registrar DNS records in minutes."
+        },
+        {
+          "label": "Executive Threat Briefing PDF",
+          "status": "in_app",
+          "description": "Compiled executive-ready visual breakdown of target user profiles and exposure window."
+        }
+      ],
+      "transcripts": {
+        "en": "Engineers received an urgent IT notice to verify helpdesk credentials. The domain looked identical to the real company site, but TraceXMail caught an optical illusion: an English letter 'o' had been replaced with a foreign lookalike character. The fake portal was blocked with zero passwords lost.",
+        "hi": "इंजीनियरों को हेल्पडेस्क पासवर्ड वेरीफाई करने का नोटिस मिला। वेबसाइट देखने में बिल्कुल असली थी, लेकिन TraceXMail ने आँखों के धोखे को पकड़ लिया: अंग्रेजी के 'o' की जगह एक हमशक्ल विदेशी अक्षर डाला गया था। किसी भी कर्मचारी का पासवर्ड चोरी नहीं हुआ।",
+        "te": "ఇంజనీరింగ్ టీమ్‌కు పాస్‌వర్డ్ అప్‌డేట్ చేయాలంటూ మెయిల్ వచ్చింది. సైట్ నిజమైనట్లే ఉన్నా, TraceXMail అక్షరాల మాయను కనిపెట్టింది: ఇంగ్లీష్ 'o' స్థానంలో విదేశీ అక్షరాన్ని పెట్టారు. ఒక్క పాస్‌వర్డ్ కూడా పోకుండా నకిలీ సైట్‌ను బ్లాక్ చేశారు."
+      }
+    },
+    {
+      "id": "film_story_05",
+      "slug": "healthcare-ransomware-stager",
+      "isOverview": false,
+      "title": "Clinical Vector: The Urgent Patient Referral Payload",
+      "hook": "Hospital network targeted during night shift with weaponized medical diagnostic archive.",
+      "tags": ["Ransomware", "Healthcare", "Payload Stager", "C2 Beacon"],
+      "runtime": "3:05",
+      "durationSeconds": 185,
+      "isoDuration": "PT3M05S",
+      "poster": "/stories/healthcare-ransomware-stager/poster.jpg",
+      "languages": ["en", "hi", "te"],
+      "chapters": [
+        { "title": "Emergency Referral Inbound Delivery", "time": 0 },
+        { "title": "Obfuscated Container Parsing", "time": 45 },
+        { "title": "Feodo Tracker Botnet C2 Cross-Check", "time": 105 },
+        { "title": "Autonomous SOC Playbook Containment", "time": 150 }
+      ],
+      "features": [
+        {
+          "label": "Botnet C2 & Feodo Tracker Threat Match",
+          "status": "in_app",
+          "description": "Cross-referenced originating server against live Abuse.ch Feodo botnet C2 blocklist."
+        },
+        {
+          "label": "Container Envelope & Forensic Header Extraction",
+          "status": "in_app",
+          "description": "Extracted hidden sender routing anomalies embedded in multipart MIME structures."
+        },
+        {
+          "label": "Air-Gap Network Segmentation Enforcement",
+          "status": "concept",
+          "description": "Concept autonomous firewall isolation cutting network links to patient telemetry systems."
+        },
+        {
+          "label": "NIST SP 800-61 Incident Timeline",
+          "status": "in_app",
+          "description": "Chronological audit log charting infection stages with UTC forensic timestamps."
+        }
+      ],
+      "transcripts": {
+        "en": "At 2:40 AM in an emergency trauma center, an urgent patient record arrived with supposed brain scans attached. TraceXMail intercepted the file, unmasking a Trojan horse program designed to lock hospital files for ransom, linked directly to an international cybercrime syndicate's server.",
+        "hi": "रात 2:40 बजे एक अस्पताल के इमरजेंसी वार्ड में मरीज के स्कैन के नाम पर एक ईमेल भेजा गया। TraceXMail ने फाइल को रोककर एक खतरनाक ट्रोजन हॉर्स रैनसमवेयर का भंडाफोड़ किया, जो अस्पतालों से फिरौती वसूलने वाले अंतरराष्ट्रीय गिरोह से जुड़ा था।",
+        "te": "రాత్రి 2:40 గంటలకు ఒక ఆసుపత్రి ఎమర్జెన్సీ వార్డుకు పేషెంట్ స్కాన్ రిపోర్టుల పేరుతో మెయిల్ వచ్చింది. TraceXMail ఆ ఫైల్‌ను నిలువరించి, ఆసుపత్రి వ్యవస్థలను లాక్ చేసి డబ్బులు డిమాండ్ చేసే అంతర్జాతీయ ముఠా కుట్రను భగ్నం చేసింది."
+      }
+    }
+  ]
+}

@@ -360,15 +360,15 @@ export function registerMlRoutes(app: express.Express): void {
     }
   };
 
-  // Mount endpoints
-  app.get('/api/admin/models/registry', handleGetRegistry);
-  app.get('/api/ml/registry', handleGetRegistry);
-  app.get('/api/admin/models/shadow-report', handleGetShadowReport);
-  app.get('/api/ml/shadow-report', handleGetShadowReport);
-  app.get('/api/admin/models/drift', handleGetDrift);
-  app.get('/api/ml/drift', handleGetDrift);
-  app.post('/api/admin/models/rollback', handleRollback);
-  app.post('/api/ml/rollback', handleRollback);
-  app.post('/api/admin/models/promote', handlePromote);
-  app.post('/api/ml/promote', handlePromote);
+  // Mount endpoints (Admin only)
+  app.get('/api/admin/models/registry', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetRegistry);
+  app.get('/api/ml/registry', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetRegistry);
+  app.get('/api/admin/models/shadow-report', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetShadowReport);
+  app.get('/api/ml/shadow-report', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetShadowReport);
+  app.get('/api/admin/models/drift', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetDrift);
+  app.get('/api/ml/drift', authenticatedLimiter, requireAuth, requireRole(['admin']), handleGetDrift);
+  app.post('/api/admin/models/rollback', authenticatedLimiter, requireAuth, requireRole(['admin']), handleRollback);
+  app.post('/api/ml/rollback', authenticatedLimiter, requireAuth, requireRole(['admin']), handleRollback);
+  app.post('/api/admin/models/promote', authenticatedLimiter, requireAuth, requireRole(['admin']), handlePromote);
+  app.post('/api/ml/promote', authenticatedLimiter, requireAuth, requireRole(['admin']), handlePromote);
 }

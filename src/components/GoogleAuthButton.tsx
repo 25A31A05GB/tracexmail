@@ -75,8 +75,25 @@ export function GoogleAuthButton({
         const user = authRes?.user || authRes?.data?.user;
         const accessToken = authRes?.accessToken || authRes?.data?.accessToken || '';
         if (user && user.email) {
+          // Connect real token to backend enclave
+          if (accessToken) {
+            try {
+              await fetch('/api/gmail/connect-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  access_token: accessToken,
+                  email: user.email,
+                  expires_in_seconds: 3600
+                })
+              });
+            } catch (connErr) {
+              console.warn('[GoogleAuthButton] Notice connecting token to backend:', connErr);
+            }
+          }
+
           const localSession = {
-            token: accessToken,
+            token: 'fb_session_' + user.uid,
             user: {
               id: user.uid,
               email: user.email,
@@ -103,7 +120,6 @@ export function GoogleAuthButton({
           };
           localStorage.setItem('tracexmail_enclave_session', JSON.stringify(localSession));
           localStorage.setItem('user_email', user.email);
-          localStorage.setItem('google_access_token', accessToken);
 
           if (onSuccess) {
             onSuccess(localSession.user);
@@ -114,8 +130,8 @@ export function GoogleAuthButton({
         }
       } catch (fbErr: any) {
         console.warn('[GoogleAuthButton] Firebase popup failed or closed, checking fallback:', fbErr);
-        // If user actively cancelled popup, don't fallback to demo
         if (fbErr?.code === 'auth/popup-closed-by-user') {
+          if (onError) onError('Sign in was cancelled (popup was closed).');
           return;
         }
       }

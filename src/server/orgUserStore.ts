@@ -690,7 +690,7 @@ export async function updateOrgUser(
   }
 ): Promise<OrgUser> {
   const user = findOrgUser(userId);
-  if (!user) {
+  if (!user || (organizationId && user.organizationId !== organizationId)) {
     throw new Error('User not found.');
   }
 
@@ -745,7 +745,7 @@ export async function resetOrgUserPassword(
   newPassword?: string
 ): Promise<{ user: OrgUser; newPassword: string }> {
   const user = findOrgUser(userId);
-  if (!user) {
+  if (!user || (organizationId && user.organizationId !== organizationId)) {
     throw new Error('User not found.');
   }
 
@@ -777,7 +777,7 @@ export async function resetOrgUserPassword(
  */
 export async function deleteOrgUser(organizationId: string, userId: string): Promise<boolean> {
   const user = findOrgUser(userId);
-  if (!user) return false;
+  if (!user || (organizationId && user.organizationId !== organizationId)) return false;
 
   orgUsersMap.delete(user.id);
   orgUsersMap.delete(user.email.toLowerCase());

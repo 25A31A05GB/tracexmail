@@ -33,3 +33,8 @@ data/datasets/real_corpus.json
 
 # Platform & artifacts directory
 .aistudio/
+
+# Media assets (never commit video files)
+public/stories/**/*.mp4
+public/overview/*.mp4
+public/hero/*.mp4

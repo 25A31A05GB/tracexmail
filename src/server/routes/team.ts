@@ -9,7 +9,7 @@ import {
   deleteOrgUser,
   authenticateOrgUser
 } from '../orgUserStore';
-import { getSupabaseAdminClient, DEFAULT_ORG_ID } from '../supabase';
+import { getSupabaseAdminClient } from '../supabase';
 import { logger } from '../logger';
 
 const memoryInvitations: any[] = [];
@@ -19,7 +19,10 @@ export function registerTeamRoutes(app: express.Express): void {
   app.get('/api/team/members', publicLimiter, async (req: Request, res: Response) => {
     try {
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const users = getOrgUsers(orgId);
       const members = users.map((u) => ({
         id: u.id,
@@ -41,7 +44,10 @@ export function registerTeamRoutes(app: express.Express): void {
   app.post('/api/team/create-employee', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
     try {
       const caller = (req as AuthenticatedRequest).user!;
-      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const orgId = caller.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const { name, email, password, role, employeeId } = req.body || {};
 
       const { user, generatedPassword } = await createOrgUser({
@@ -109,7 +115,10 @@ export function registerTeamRoutes(app: express.Express): void {
       }
 
       const caller = (req as AuthenticatedRequest).user!;
-      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const orgId = caller.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
 
       await updateOrgUser(orgId, memberId, { role: role as any });
 
@@ -121,7 +130,8 @@ export function registerTeamRoutes(app: express.Express): void {
       });
     } catch (err: any) {
       logger.error({ error: err?.message }, '[TeamAPI] Error updating member role');
-      res.status(500).json({ error: err?.message || 'Failed to update member role' });
+      const status = err?.message?.includes('not found') ? 404 : 500;
+      res.status(status).json({ error: err?.message || 'Failed to update member role' });
     }
   });
 
@@ -130,9 +140,15 @@ export function registerTeamRoutes(app: express.Express): void {
     try {
       const memberId = req.params.id;
       const caller = (req as AuthenticatedRequest).user!;
-      const orgId = caller.organizationId || DEFAULT_ORG_ID;
+      const orgId = caller.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
 
-      await deleteOrgUser(orgId, memberId);
+      const deleted = await deleteOrgUser(orgId, memberId);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Team member not found' });
+      }
 
       return res.json({
         status: 'success',
@@ -160,6 +176,7 @@ export function registerTeamRoutes(app: express.Express): void {
 
     const invitationObj = {
       id: inviteId,
+      organization_id: caller.organizationId,
       name: name || email.split('@')[0],
       email: email.trim(),
       role: inviteRole,
@@ -207,8 +224,16 @@ export function registerTeamRoutes(app: express.Express): void {
   app.delete('/api/team/invite/:id', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
     const inviteId = req.params.id;
     const caller = (req as AuthenticatedRequest).user!;
-    const memIdx = memoryInvitations.findIndex((i) => i.id === inviteId);
-    if (memIdx !== -1) memoryInvitations.splice(memIdx, 1);
+    const memIdx = memoryInvitations.findIndex((i) => i.id === inviteId && i.organization_id === caller.organizationId);
+    if (memIdx !== -1) {
+      memoryInvitations.splice(memIdx, 1);
+    } else {
+      // Check if it exists in another org to return 404
+      const foreignIdx = memoryInvitations.findIndex((i) => i.id === inviteId);
+      if (foreignIdx !== -1) {
+        return res.status(404).json({ error: 'Invitation not found' });
+      }
+    }
 
     const supabase = getSupabaseAdminClient();
     if (supabase) {

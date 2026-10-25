@@ -865,12 +865,10 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
   if (!userContext && process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_HEADER_AUTH === 'true') {
     const headerUserId = (req.headers['x-user-id'] as string) || (req.query.user_id as string);
     const headerEmail = (req.headers['x-user-email'] as string) || (req.query.user_email as string);
-    const headerOrgId = (req.headers['x-organization-id'] as string) || (req.query.organization_id as string);
-
     if (headerUserId || headerEmail) {
       const derivedUserId = headerUserId || (headerEmail ? `usr_${headerEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : 'usr_anon');
       const derivedEmail = headerEmail || `${derivedUserId}@local.sec`;
-      const derivedOrgId = headerOrgId || `org_${derivedUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const derivedOrgId = `org_${derivedUserId.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
       let requestedRole = (req.headers['x-user-role'] as UserRole) || 'analyst';
       if (requestedRole === 'admin') {
@@ -897,6 +895,25 @@ export async function authenticateUser(req: Request, _res: Response, next: NextF
  * Middleware: Requires a valid verified authentication context with a valid role.
  * Rejects unverified requests rather than defaulting to full access.
  */
+export function generateMockToken(user: {
+  userId: string;
+  email: string;
+  role: UserRole;
+  organizationId: string;
+}): string {
+  const secret = process.env.JWT_SECRET?.trim() || resolveMasterSecret();
+  const payload = {
+    sub: user.userId,
+    email: user.email,
+    role: user.role,
+    org_id: user.organizationId,
+    organizationId: user.organizationId,
+    iat: Math.floor(Date.now() / 1000),
+    exp: Math.floor(Date.now() / 1000) + 3600
+  };
+  return jwt.sign(payload, secret, { algorithm: 'HS256' });
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const user = (req as AuthenticatedRequest).user;
   if (!user || !user.role || !['admin', 'analyst', 'read_only'].includes(user.role)) {

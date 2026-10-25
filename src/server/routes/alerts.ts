@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { publicLimiter, authenticatedLimiter } from '../rateLimiter';
 import { requireAuth, requireRole, type AuthenticatedRequest } from '../compliance';
-import { getSupabaseClient, DEFAULT_ORG_ID } from '../supabase';
+import { getSupabaseClient } from '../supabase';
 import { createWebSocketTicket, broadcastAlert } from '../websocket';
 import {
   getSlackStatus,
@@ -18,7 +18,10 @@ export function registerAlertsRoutes(app: express.Express): void {
   // Alerts List (Tenant Scoped)
   app.get('/api/alerts', publicLimiter, async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user;
-    const orgId = user?.organizationId || (req.headers['x-organization-id'] as string) || DEFAULT_ORG_ID;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const supabase = getSupabaseClient();
 
     if (supabase) {
@@ -26,7 +29,7 @@ export function registerAlertsRoutes(app: express.Express): void {
         const { data, error } = await supabase
           .from('alerts')
           .select('*')
-          .or(`organization_id.eq.${orgId},organization_id.is.null`)
+          .eq('organization_id', orgId)
           .order('timestamp', { ascending: false })
           .limit(50);
         if (!error && Array.isArray(data)) {
@@ -53,13 +56,22 @@ export function registerAlertsRoutes(app: express.Express): void {
     });
   });
 
-  // Mark Alert Read
+  // Mark Alert Read (Scoped to tenant; returns 404 if not found in org)
   app.patch('/api/alerts/:alertId/read', publicLimiter, async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const { alertId } = req.params;
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
-        await supabase.from('alerts').update({ read: true }).eq('id', alertId);
+        const { data: existing } = await supabase.from('alerts').select('*').eq('id', alertId).maybeSingle();
+        if (!existing || existing.organization_id !== orgId) {
+          return res.status(404).json({ error: 'Alert not found' });
+        }
+        await supabase.from('alerts').update({ read: true }).eq('id', alertId).eq('organization_id', orgId);
       } catch {}
     }
     res.json({ status: 'success', alert_id: alertId, read: true });
@@ -168,7 +180,10 @@ export function registerAlertsRoutes(app: express.Express): void {
   app.get('/api/slack/deliveries', publicLimiter, async (req: Request, res: Response) => {
     try {
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      const orgId = user?.organizationId;
+      if (!orgId) {
+        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+      }
       const deliveries = await fetchSlackDeliveries(orgId);
       res.json(deliveries);
     } catch {
@@ -177,16 +192,21 @@ export function registerAlertsRoutes(app: express.Express): void {
   });
 
   app.post('/api/slack/send-case/:caseId', authenticatedLimiter, requireAuth, async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user;
+    const orgId = user?.organizationId;
+    if (!orgId) {
+      return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
+    }
     const caseId = req.params.caseId;
     const supabase = getSupabaseClient();
     if (!supabase) {
       return res.status(503).json({ error: 'Database not configured' });
     }
-    const { data: targetCase } = await supabase.from('cases').select('*').eq('id', caseId).maybeSingle();
+    const { data: targetCase } = await supabase.from('cases').select('*').eq('id', caseId).eq('organization_id', orgId).maybeSingle();
     if (!targetCase) {
       return res.status(404).json({ error: 'Case not found' });
     }
-    const { data: matchingAlert } = await supabase.from('alerts').select('*').eq('case_id', caseId).maybeSingle();
+    const { data: matchingAlert } = await supabase.from('alerts').select('*').eq('case_id', caseId).eq('organization_id', orgId).maybeSingle();
     const resultLog = await dispatchSlackCaseAlert({
       caseItem: targetCase,
       alertItem: matchingAlert,

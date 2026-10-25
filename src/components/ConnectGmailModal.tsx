@@ -478,7 +478,8 @@ export function ConnectGmailModal({
 
                   <div className="py-2">
                     <GoogleAuthButton
-                      onSuccess={async (email) => {
+                      onSuccess={async (resUser: any) => {
+                        const email = typeof resUser === 'string' ? resUser : (resUser?.email || effectiveEmail);
                         setSuccessMsg(`Google Workspace authorized for ${email}!`);
                         await onConnected(email);
                         setTimeout(() => onClose(), 1200);
