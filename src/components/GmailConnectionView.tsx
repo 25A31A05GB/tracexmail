@@ -219,6 +219,9 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
   const [topicName, setTopicName] = useState<string>('projects/tracexmail-enterprise/topics/inbox-watch');
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+  const [settingUpLabels, setSettingUpLabels] = useState<boolean>(false);
+  const [labelSetupResult, setLabelSetupResult] = useState<string | null>(null);
+  const [syncingDelta, setSyncingDelta] = useState<boolean>(false);
 
   const pushWebhookUrl = typeof window !== 'undefined' ? `${window.location.origin}/api/gmail/pubsub/push` : '/api/gmail/pubsub/push';
 
@@ -648,6 +651,74 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       setErrorMsg('Renewal error: ' + err.message);
     } finally {
       setRenewingWatch(false);
+    }
+  };
+
+  const handleSetupSocLabels = async () => {
+    setSettingUpLabels(true);
+    setLabelSetupResult(null);
+    setErrorMsg(null);
+    try {
+      const liveToken = await getAccessToken();
+      const res = await apiFetch('/api/gmail/labels/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(liveToken ? { Authorization: `Bearer ${liveToken}` } : {})
+        },
+        body: JSON.stringify({
+          access_token: liveToken || undefined
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLabelSetupResult('⚡ SOC triage labels (TraceXMail/Quarantined, Suspicious, Clean, Investigating) verified & active in your Gmail mailbox!');
+        fetchStatus();
+      } else {
+        throw new Error(data.error || 'Failed to setup SOC labels in Gmail.');
+      }
+    } catch (err: any) {
+      setErrorMsg('SOC Labels setup warning: ' + err.message);
+    } finally {
+      setSettingUpLabels(false);
+      setTimeout(() => setLabelSetupResult(null), 8000);
+    }
+  };
+
+  const handleSyncDelta = async () => {
+    if (syncingDelta) return;
+    setSyncingDelta(true);
+    setSyncResult(null);
+    setErrorMsg(null);
+    try {
+      const liveToken = await getAccessToken();
+      const res = await apiFetch('/api/gmail/sync-delta', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(liveToken ? { Authorization: `Bearer ${liveToken}` } : {})
+        },
+        body: JSON.stringify({
+          start_history_id: status?.history_id || undefined,
+          access_token: liveToken || undefined
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const count = data.processed_count || 0;
+        setSyncResult(`⚡ Delta Cursor Sync: ${count} new email(s) processed. History cursor: ${data.history_id || 'active'}`);
+        if (count > 0 && onNewCasesProcessed) {
+          onNewCasesProcessed();
+        }
+        fetchStatus();
+        fetchSyncedEmails();
+      } else {
+        throw new Error(data.error || 'Failed to execute delta sync.');
+      }
+    } catch (err: any) {
+      setErrorMsg('Delta sync error: ' + err.message);
+    } finally {
+      setSyncingDelta(false);
     }
   };
 
@@ -1563,6 +1634,14 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
         </div>
       )}
 
+      {/* SOC Label Setup Feedback */}
+      {labelSetupResult && (
+        <div className="p-4 bg-purple-950/40 border border-purple-500/50 rounded-xl text-purple-200 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+          <span>{labelSetupResult}</span>
+        </div>
+      )}
+
       {/* Live Sync Master Control Strip & Real Gmail In-Thread Report Info */}
       {status?.is_connected && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -1578,15 +1657,15 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                   {isPollingStopped ? 'Live Ingestion Paused' : 'Live Ingestion Active & Monitoring'}
                 </span>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#201c17] text-[#a89d8d] border border-[#383126]">
-                {isPollingStopped ? 'Manual Mode' : 'Push & Poll Stream'}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#201c17] text-amber-300 border border-amber-500/30">
+                {status?.history_id ? `Cursor #${status.history_id}` : 'Push & Poll Stream'}
               </span>
             </div>
 
             <p className="text-[11.5px] text-[#a89d8d] leading-relaxed">
               {isPollingStopped 
                 ? 'Automated background scanning is currently paused. No background requests are being dispatched to Google API.' 
-                : 'TraceXMail is actively monitoring your mailbox for incoming emails, performing pre-delivery evaluation on arrival.'}
+                : 'TraceXMail is actively monitoring your mailbox via Google Cloud Pub/Sub and incremental delta cursor synchronization.'}
             </p>
 
             <div className="flex items-center gap-2 pt-1 flex-wrap">
@@ -1612,40 +1691,68 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
 
               <button
                 type="button"
+                onClick={handleSyncDelta}
+                disabled={syncingDelta}
+                className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                title="Incremental sync using Gmail users.history.list cursor"
+              >
+                <Zap className={`w-3.5 h-3.5 text-amber-400 ${syncingDelta ? 'animate-pulse' : ''}`} />
+                <span>{syncingDelta ? 'Delta Syncing...' : 'Delta Cursor Sync'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleSyncNow}
                 disabled={syncing}
                 className="px-3 py-1.5 bg-[#26211a] hover:bg-[#322c22] border border-[#443c30] text-[#ede6d8] rounded-lg text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${syncing ? 'animate-spin' : ''}`} />
-                <span>{syncing ? 'Syncing...' : 'Sync Now (Force Pull)'}</span>
+                <span>{syncing ? 'Syncing...' : 'Full Pull'}</span>
               </button>
             </div>
           </div>
 
-          {/* Box 2: Where to find reports in real Gmail */}
+          {/* Box 2: SOC Labels & Report Location */}
           <div className="p-4 bg-[#14120f] border border-blue-500/30 rounded-xl space-y-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono font-bold text-blue-300 uppercase tracking-wider">
                 <Mail className="w-3.5 h-3.5 text-blue-400" />
-                <span>Real Gmail Mailbox Report Location</span>
+                <span>SOC Labeling &amp; Mailbox Remediation</span>
               </div>
               <span className="text-[10px] font-mono text-emerald-400 font-semibold flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
-                <span>Auto-Synced</span>
+                <span>Auto-Remediation</span>
               </span>
             </div>
 
             <div className="text-[11.5px] text-[#a89d8d] leading-relaxed space-y-1 font-sans">
               <p>
-                <b>Where is the report in your Gmail app?</b>
+                <b>Automated triage label mapping:</b>
               </p>
-              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#c6d7e8]">
-                <li>Quarantined emails are moved to the red <code className="text-rose-300 font-mono">TraceXMail-Quarantine</code> label in your Gmail sidebar.</li>
-                <li>The forensic investigation briefing is attached as an <b>in-thread reply message</b> directly inside the email conversation.</li>
-              </ul>
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5 pb-1">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-red-950/80 text-red-300 border border-red-700/60 font-semibold">
+                  TraceXMail/Quarantined
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950/80 text-amber-300 border border-amber-700/60 font-semibold">
+                  TraceXMail/Suspicious
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-700/60 font-semibold">
+                  TraceXMail/Clean
+                </span>
+              </div>
             </div>
 
             <div className="pt-1 flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleSetupSocLabels}
+                disabled={settingUpLabels}
+                className="px-3 py-1.5 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-600/60 text-purple-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+              >
+                <ShieldCheck className={`w-3.5 h-3.5 text-purple-400 ${settingUpLabels ? 'animate-spin' : ''}`} />
+                <span>{settingUpLabels ? 'Verifying Labels...' : 'Configure SOC Labels'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleSyncQuarantineReports}
@@ -1653,7 +1760,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                 className="px-3 py-1.5 bg-blue-950/60 hover:bg-blue-900/80 border border-blue-600/60 text-blue-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50"
               >
                 <FileText className={`w-3.5 h-3.5 text-blue-400 ${syncingReports ? 'animate-spin' : ''}`} />
-                <span>{syncingReports ? 'Syncing Reports...' : 'Sync & Insert Reports to Gmail'}</span>
+                <span>{syncingReports ? 'Syncing...' : 'Insert In-Thread Notes'}</span>
               </button>
             </div>
           </div>

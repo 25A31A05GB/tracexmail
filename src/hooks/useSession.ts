@@ -105,7 +105,7 @@ export function useSession(): UseSessionReturn {
 
       // 3. Self-healing fallback: attempt to insert the user's profile record if missing
       try {
-        const defaultRole = (currentUser.email === 'arfathof@gmail.com' || currentUser.user_metadata?.role === 'admin')
+        const defaultRole = (currentUser.email === 'arfathof@gmail.com' || currentUser.email === 'jayramsappa537@gmail.com' || currentUser.user_metadata?.role === 'admin')
           ? 'admin'
           : (currentUser.user_metadata?.role || 'analyst');
         const defaultOrg = currentUser.user_metadata?.organization_id || `org_${currentUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -186,7 +186,7 @@ export function useSession(): UseSessionReturn {
     const prof = await fetchProfile(currentUser);
     setProfile(prof);
 
-    const role: UserRole = (prof?.role as UserRole) || (currentUser.email === 'arfathof@gmail.com' || currentUser.user_metadata?.role === 'admin' ? 'admin' : ((currentUser.user_metadata?.role as UserRole) || 'analyst'));
+    const role: UserRole = (prof?.role as UserRole) || (currentUser.email === 'arfathof@gmail.com' || currentUser.email === 'jayramsappa537@gmail.com' || currentUser.user_metadata?.role === 'admin' ? 'admin' : ((currentUser.user_metadata?.role as UserRole) || 'analyst'));
     
     const defaultUserOrg = `org_${currentUser.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const organizationId = prof?.organization_id && prof.organization_id !== 'org_acme_soc_01'

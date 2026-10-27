@@ -1294,26 +1294,7 @@
     "raw_analysis": null
   },
   {
-    "id": "case_test_alpha_1792948088783",
-    "organization_id": "org_sec2_alpha",
-    "title": "Confidential Threat Case Alpha",
-    "severity": "HIGH",
-    "threat_score": 91,
-    "from_domain": "malicious-alpha.xyz",
-    "origin_ip": "198.51.100.12",
-    "created_at": "2026-10-25T17:08:08.902Z",
-    "evidence_chain": [
-      {
-        "id": "evi_case_test_alpha_1792948088783_1",
-        "type": "HEADER",
-        "name": "DKIM Fail Proof",
-        "timestamp": "2026-10-25T17:08:08.902Z",
-        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-      }
-    ]
-  },
-  {
-    "id": "case-1792948099692",
+    "id": "case-1793038105483",
     "organization_id": "org_alpha",
     "user_id": "usr_analyst_1",
     "user_email": "analyst@org-alpha.sec",
@@ -1324,7 +1305,7 @@
     "severity": "HIGH",
     "threat_score": 50,
     "classification": "Suspicious",
-    "created_at": "2026-10-25T17:08:19.692Z",
+    "created_at": "2026-10-26T18:08:25.483Z",
     "from_domain": "",
     "origin_ip": "",
     "origin_country": "",
@@ -1336,7 +1317,7 @@
     "raw_analysis": null
   },
   {
-    "id": "case_alpha_tenant_1792948099798",
+    "id": "case_alpha_tenant_1793038105508",
     "organization_id": "org_alpha",
     "user_id": "usr_analyst_1",
     "user_email": "analyst@org-alpha.sec",
@@ -1347,7 +1328,7 @@
     "severity": "CRITICAL",
     "threat_score": 50,
     "classification": "Suspicious",
-    "created_at": "2026-10-25T17:08:19.801Z",
+    "created_at": "2026-10-26T18:08:25.511Z",
     "from_domain": "",
     "origin_ip": "",
     "origin_country": "",
@@ -1357,5 +1338,219 @@
     "assigned_user": "analyst@org-alpha.sec",
     "source": "manual",
     "raw_analysis": null
+  },
+  {
+    "id": "case_test_alpha_1793038118903",
+    "organization_id": "org_sec2_alpha",
+    "title": "Confidential Threat Case Alpha",
+    "severity": "HIGH",
+    "threat_score": 91,
+    "from_domain": "malicious-alpha.xyz",
+    "origin_ip": "198.51.100.12",
+    "created_at": "2026-10-26T18:08:38.945Z",
+    "evidence_chain": [
+      {
+        "id": "evi_case_test_alpha_1793038118903_1",
+        "type": "HEADER",
+        "name": "DKIM Fail Proof",
+        "timestamp": "2026-10-26T18:08:38.945Z",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  {
+    "id": "case_test_alpha_1793038479436",
+    "organization_id": "org_sec2_alpha",
+    "title": "Confidential Threat Case Alpha",
+    "severity": "HIGH",
+    "threat_score": 91,
+    "from_domain": "malicious-alpha.xyz",
+    "origin_ip": "198.51.100.12",
+    "created_at": "2026-10-26T18:14:39.474Z",
+    "evidence_chain": [
+      {
+        "id": "evi_case_test_alpha_1793038479436_1",
+        "type": "HEADER",
+        "name": "DKIM Fail Proof",
+        "timestamp": "2026-10-26T18:14:39.474Z",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  {
+    "id": "case-1793038520592",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Legitimate Analyst Incident Case",
+    "description": "",
+    "status": "OPEN",
+    "severity": "HIGH",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-26T18:15:20.592Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_alpha_tenant_1793038520620",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Top Secret Alpha Threat",
+    "description": "",
+    "status": "OPEN",
+    "severity": "CRITICAL",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-26T18:15:20.623Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case-1793115990989",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Legitimate Analyst Incident Case",
+    "description": "",
+    "status": "OPEN",
+    "severity": "HIGH",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-27T15:46:30.989Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_alpha_tenant_1793115991018",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Top Secret Alpha Threat",
+    "description": "",
+    "status": "OPEN",
+    "severity": "CRITICAL",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-27T15:46:31.021Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_test_alpha_1793116004113",
+    "organization_id": "org_sec2_alpha",
+    "title": "Confidential Threat Case Alpha",
+    "severity": "HIGH",
+    "threat_score": 91,
+    "from_domain": "malicious-alpha.xyz",
+    "origin_ip": "198.51.100.12",
+    "created_at": "2026-10-27T15:46:44.167Z",
+    "evidence_chain": [
+      {
+        "id": "evi_case_test_alpha_1793116004113_1",
+        "type": "HEADER",
+        "name": "DKIM Fail Proof",
+        "timestamp": "2026-10-27T15:46:44.167Z",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  {
+    "id": "case-1793117632806",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Legitimate Analyst Incident Case",
+    "description": "",
+    "status": "OPEN",
+    "severity": "HIGH",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-27T16:13:52.806Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_alpha_tenant_1793117632829",
+    "organization_id": "org_alpha",
+    "user_id": "usr_analyst_1",
+    "user_email": "analyst@org-alpha.sec",
+    "created_by": "usr_analyst_1",
+    "title": "Top Secret Alpha Threat",
+    "description": "",
+    "status": "OPEN",
+    "severity": "CRITICAL",
+    "threat_score": 50,
+    "classification": "Suspicious",
+    "created_at": "2026-10-27T16:13:52.832Z",
+    "from_domain": "",
+    "origin_ip": "",
+    "origin_country": "",
+    "tags": [
+      "Manual Ingest"
+    ],
+    "assigned_user": "analyst@org-alpha.sec",
+    "source": "manual",
+    "raw_analysis": null
+  },
+  {
+    "id": "case_test_alpha_1793117645948",
+    "organization_id": "org_sec2_alpha",
+    "title": "Confidential Threat Case Alpha",
+    "severity": "HIGH",
+    "threat_score": 91,
+    "from_domain": "malicious-alpha.xyz",
+    "origin_ip": "198.51.100.12",
+    "created_at": "2026-10-27T16:14:05.989Z",
+    "evidence_chain": [
+      {
+        "id": "evi_case_test_alpha_1793117645948_1",
+        "type": "HEADER",
+        "name": "DKIM Fail Proof",
+        "timestamp": "2026-10-27T16:14:05.989Z",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
   }
 ]

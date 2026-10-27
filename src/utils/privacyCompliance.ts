@@ -49,12 +49,14 @@ export function savePrivacyConfig(config: PrivacyConfig): void {
   }
 }
 
+import { apiFetch } from '../lib/api';
+
 /**
  * Fetches organization PrivacyConfig from server endpoint with fallback to localStorage
  */
 export async function fetchOrgPrivacyConfigServer(): Promise<PrivacyConfig> {
   try {
-    const res = await fetch('/api/organization/privacy-config');
+    const res = await apiFetch('/api/organization/privacy-config');
     if (res.ok) {
       const data = await res.json();
       if (data && typeof data === 'object') {
@@ -75,7 +77,7 @@ export async function fetchOrgPrivacyConfigServer(): Promise<PrivacyConfig> {
 export async function saveOrgPrivacyConfigServer(config: PrivacyConfig): Promise<PrivacyConfig> {
   savePrivacyConfig(config);
   try {
-    const res = await fetch('/api/organization/privacy-config', {
+    const res = await apiFetch('/api/organization/privacy-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config)

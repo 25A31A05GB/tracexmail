@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Loader2, ShieldCheck, Sparkles, X, ArrowRight } from 'lucide-react';
 import { signInWithGoogleOAuth, signInWithGoogleDemoSession } from '../lib/supabaseGoogleAuth';
 import { googleSignIn } from '../lib/firebaseClient';
+import { apiFetch } from '../lib/api';
 
 export interface GoogleAuthButtonProps {
   mode?: 'signin' | 'signup' | 'continue';
@@ -78,7 +79,7 @@ export function GoogleAuthButton({
           // Connect real token to backend enclave
           if (accessToken) {
             try {
-              await fetch('/api/gmail/connect-token', {
+              await apiFetch('/api/gmail/connect-token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

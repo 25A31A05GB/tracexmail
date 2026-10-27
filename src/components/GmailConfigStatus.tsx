@@ -32,6 +32,9 @@ export interface OAuthScopesStatus {
   active_scopes: string[];
   has_readonly: boolean;
   has_modify: boolean;
+  has_labels?: boolean;
+  has_metadata?: boolean;
+  has_send?: boolean;
   has_userinfo: boolean;
   token_status: 'active' | 'expiring_soon' | 'expired' | 'missing_scopes' | 'disconnected';
   last_refreshed_at: string | null;
@@ -122,6 +125,9 @@ export function GmailConfigStatus({
           scopes: [
             'https://www.googleapis.com/auth/gmail.readonly',
             'https://www.googleapis.com/auth/gmail.modify',
+            'https://www.googleapis.com/auth/gmail.labels',
+            'https://www.googleapis.com/auth/gmail.metadata',
+            'https://www.googleapis.com/auth/gmail.send',
             'https://www.googleapis.com/auth/userinfo.email'
           ],
           expires_in_seconds: 3600
@@ -140,7 +146,7 @@ export function GmailConfigStatus({
 
       setStatusMessage({
         type: 'success',
-        text: 'Permissions successfully renewed. All security integrations are active.'
+        text: 'Permissions successfully renewed. All elevated Gmail SOC integrations are active.'
       });
 
       if (onRefreshSuccess) {
@@ -157,7 +163,7 @@ export function GmailConfigStatus({
     }
   };
 
-  const handleToggleScopeSimulation = async (scopeName: 'gmail.readonly' | 'gmail.modify' | 'userinfo.email', currentGranted: boolean) => {
+  const handleToggleScopeSimulation = async (scopeName: string, currentGranted: boolean) => {
     setTestingScope(scopeName);
     try {
       const res = await fetch(`${API_URL}/api/gmail/oauth/toggle-scope`, {
@@ -179,9 +185,12 @@ export function GmailConfigStatus({
     }
   };
 
-  const hasReadonly = scopesData ? scopesData.has_readonly : true;
-  const hasModify = scopesData ? scopesData.has_modify : true;
-  const allHealthy = hasReadonly && hasModify && countdown > 0;
+  const hasReadonly = scopesData ? Boolean(scopesData.has_readonly) : true;
+  const hasModify = scopesData ? Boolean(scopesData.has_modify) : true;
+  const hasLabels = scopesData ? (scopesData.has_labels ?? true) : true;
+  const hasMetadata = scopesData ? (scopesData.has_metadata ?? true) : true;
+  const hasSend = scopesData ? (scopesData.has_send ?? true) : true;
+  const allHealthy = hasReadonly && hasModify && hasLabels && hasMetadata && hasSend && countdown > 0;
 
   return (
     <div
@@ -202,12 +211,12 @@ export function GmailConfigStatus({
               {allHealthy ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Active &amp; Protected
+                  Full SOC Protection (5/5 Scopes)
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-950/60 text-amber-400 border border-amber-500/30">
                   <AlertTriangle className="w-3 h-3" />
-                  Action Required
+                  Elevated Scopes Required
                 </span>
               )}
             </div>
@@ -239,7 +248,7 @@ export function GmailConfigStatus({
             }`}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
-            <span>{refreshing ? 'Updating...' : 'Refresh Permissions'}</span>
+            <span>{refreshing ? 'Updating...' : 'Renew Permissions'}</span>
           </button>
         </div>
       </div>
@@ -266,73 +275,152 @@ export function GmailConfigStatus({
         </div>
       )}
 
-      {/* Scope Cards: Clean, High-Level, Non-Intimidating */}
+      {/* 5 Full SOC Scopes Grid */}
       <div className="p-5 sm:p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
           {/* Scope 1: Readonly */}
           <div
-            className={`p-4 rounded-xl border transition-all ${
-              hasReadonly
-                ? 'bg-[#1f1b16] border-[#342e26]'
-                : 'bg-amber-950/20 border-amber-700/40'
+            className={`p-3.5 rounded-xl border transition-all ${
+              hasReadonly ? 'bg-[#1f1b16] border-[#342e26]' : 'bg-amber-950/20 border-amber-700/40'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <h4 className="text-sm font-semibold text-[#f4efe6]">Email Threat Analysis</h4>
+                <h4 className="text-xs font-semibold text-[#f4efe6]">Threat Ingestion</h4>
               </div>
               {hasReadonly ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  <Check className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <Check className="w-2.5 h-2.5" />
                   Granted
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded-md border border-red-500/20">
-                  <XCircle className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/20">
+                  <XCircle className="w-2.5 h-2.5" />
                   Missing
                 </span>
               )}
             </div>
-            <p className="text-xs text-[#a89d8d] leading-relaxed">
-              Scans incoming message headers, authentication signatures (SPF, DKIM, DMARC), and links to flag malicious phishing attacks.
+            <p className="text-[11px] text-[#a89d8d] leading-relaxed">
+              Scans raw RFC 822 email headers, MIME structures, and attachments for phishing forensics.
             </p>
-            <div className="mt-3 text-[11px] text-[#786e60] font-mono">
-              Scope: gmail.readonly
-            </div>
+            <div className="mt-2 text-[10px] text-[#786e60] font-mono">gmail.readonly</div>
           </div>
 
           {/* Scope 2: Modify */}
           <div
-            className={`p-4 rounded-xl border transition-all ${
-              hasModify
-                ? 'bg-[#1f1b16] border-[#342e26]'
-                : 'bg-amber-950/20 border-amber-700/40'
+            className={`p-3.5 rounded-xl border transition-all ${
+              hasModify ? 'bg-[#1f1b16] border-[#342e26]' : 'bg-amber-950/20 border-amber-700/40'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-purple-400" />
-                <h4 className="text-sm font-semibold text-[#f4efe6]">Automated Quarantine</h4>
+                <h4 className="text-xs font-semibold text-[#f4efe6]">Automated Quarantine</h4>
               </div>
               {hasModify ? (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                  <Check className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <Check className="w-2.5 h-2.5" />
                   Granted
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded-md border border-red-500/20">
-                  <XCircle className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/20">
+                  <XCircle className="w-2.5 h-2.5" />
                   Missing
                 </span>
               )}
             </div>
-            <p className="text-xs text-[#a89d8d] leading-relaxed">
-              Automatically isolates confirmed threats by applying the TraceXMail-Quarantine tag and moving high-risk emails safely out of your Inbox.
+            <p className="text-[11px] text-[#a89d8d] leading-relaxed">
+              Isolates threats by removing INBOX and attaching quarantine labels to protect users.
             </p>
-            <div className="mt-3 text-[11px] text-[#786e60] font-mono">
-              Scope: gmail.modify
+            <div className="mt-2 text-[10px] text-[#786e60] font-mono">gmail.modify</div>
+          </div>
+
+          {/* Scope 3: Labels */}
+          <div
+            className={`p-3.5 rounded-xl border transition-all ${
+              hasLabels ? 'bg-[#1f1b16] border-[#342e26]' : 'bg-amber-950/20 border-amber-700/40'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <h4 className="text-xs font-semibold text-[#f4efe6]">SOC Label Hierarchy</h4>
+              </div>
+              {hasLabels ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <Check className="w-2.5 h-2.5" />
+                  Granted
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/20">
+                  <XCircle className="w-2.5 h-2.5" />
+                  Missing
+                </span>
+              )}
             </div>
+            <p className="text-[11px] text-[#a89d8d] leading-relaxed">
+              Auto-creates and color-codes labels: TraceXMail/Quarantined, Suspicious, Clean.
+            </p>
+            <div className="mt-2 text-[10px] text-[#786e60] font-mono">gmail.labels</div>
+          </div>
+
+          {/* Scope 4: Metadata */}
+          <div
+            className={`p-3.5 rounded-xl border transition-all ${
+              hasMetadata ? 'bg-[#1f1b16] border-[#342e26]' : 'bg-amber-950/20 border-amber-700/40'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                <h4 className="text-xs font-semibold text-[#f4efe6]">Delta Cursor Sync</h4>
+              </div>
+              {hasMetadata ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <Check className="w-2.5 h-2.5" />
+                  Granted
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/20">
+                  <XCircle className="w-2.5 h-2.5" />
+                  Missing
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#a89d8d] leading-relaxed">
+              High-speed historyId delta tracking with minimal quota consumption.
+            </p>
+            <div className="mt-2 text-[10px] text-[#786e60] font-mono">gmail.metadata</div>
+          </div>
+
+          {/* Scope 5: Send */}
+          <div
+            className={`p-3.5 rounded-xl border transition-all md:col-span-2 lg:col-span-2 ${
+              hasSend ? 'bg-[#1f1b16] border-[#342e26]' : 'bg-amber-950/20 border-amber-700/40'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <h4 className="text-xs font-semibold text-[#f4efe6]">Incident Escalation Dispatch</h4>
+              </div>
+              {hasSend ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <Check className="w-2.5 h-2.5" />
+                  Granted
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-400 bg-red-950/50 px-2 py-0.5 rounded border border-red-500/20">
+                  <XCircle className="w-2.5 h-2.5" />
+                  Missing
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[#a89d8d] leading-relaxed">
+              Dispatches automated security warnings to employees and alert notifications to SOC escalation channels.
+            </p>
+            <div className="mt-2 text-[10px] text-[#786e60] font-mono">gmail.send</div>
           </div>
         </div>
 
@@ -355,15 +443,15 @@ export function GmailConfigStatus({
         {showDevOptions && (
           <div className="p-3.5 bg-[#14120e] rounded-xl border border-[#2b251d] text-xs text-[#a89d8d] space-y-2.5 animate-in fade-in duration-150">
             <div className="flex items-center justify-between">
-              <span className="text-stone-400">OAuth Grant Mode: Google Cloud Pub/Sub &amp; REST</span>
-              <span className="text-stone-400 font-mono text-[11px]">Access: Offline</span>
+              <span className="text-stone-400">OAuth Engine: Full Workspace Permissions (5 Scopes)</span>
+              <span className="text-stone-400 font-mono text-[11px]">Mode: REST + Pub/Sub Push</span>
             </div>
-            <div className="pt-2 border-t border-[#221d17] flex items-center gap-3">
-              <span className="text-[11px] text-[#887e6f]">Simulate state for testing:</span>
+            <div className="pt-2 border-t border-[#221d17] flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-[#887e6f]">Simulate toggle:</span>
               <button
                 onClick={() => handleToggleScopeSimulation('gmail.readonly', hasReadonly)}
                 disabled={testingScope === 'gmail.readonly'}
-                className="text-[11px] text-amber-400/90 hover:underline cursor-pointer"
+                className="text-[10px] text-amber-400/90 hover:underline cursor-pointer"
               >
                 {hasReadonly ? 'Revoke Read' : 'Grant Read'}
               </button>
@@ -371,9 +459,33 @@ export function GmailConfigStatus({
               <button
                 onClick={() => handleToggleScopeSimulation('gmail.modify', hasModify)}
                 disabled={testingScope === 'gmail.modify'}
-                className="text-[11px] text-purple-400/90 hover:underline cursor-pointer"
+                className="text-[10px] text-purple-400/90 hover:underline cursor-pointer"
               >
                 {hasModify ? 'Revoke Modify' : 'Grant Modify'}
+              </button>
+              <span className="text-[#453f35]">•</span>
+              <button
+                onClick={() => handleToggleScopeSimulation('gmail.labels', hasLabels)}
+                disabled={testingScope === 'gmail.labels'}
+                className="text-[10px] text-red-400/90 hover:underline cursor-pointer"
+              >
+                {hasLabels ? 'Revoke Labels' : 'Grant Labels'}
+              </button>
+              <span className="text-[#453f35]">•</span>
+              <button
+                onClick={() => handleToggleScopeSimulation('gmail.metadata', hasMetadata)}
+                disabled={testingScope === 'gmail.metadata'}
+                className="text-[10px] text-cyan-400/90 hover:underline cursor-pointer"
+              >
+                {hasMetadata ? 'Revoke Metadata' : 'Grant Metadata'}
+              </button>
+              <span className="text-[#453f35]">•</span>
+              <button
+                onClick={() => handleToggleScopeSimulation('gmail.send', hasSend)}
+                disabled={testingScope === 'gmail.send'}
+                className="text-[10px] text-emerald-400/90 hover:underline cursor-pointer"
+              >
+                {hasSend ? 'Revoke Send' : 'Grant Send'}
               </button>
             </div>
           </div>

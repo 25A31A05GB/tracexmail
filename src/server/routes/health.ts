@@ -21,7 +21,6 @@ export async function checkDatabaseReadiness(): Promise<{ ready: boolean; latenc
 
   const supabase = getSupabaseAdminClient() || getSupabaseClient();
   if (!supabase) {
-    // In dev without Supabase, in-memory is acceptable unless in production
     if (process.env.NODE_ENV === 'production') {
       return { ready: false, latencyMs: 0, error: 'Supabase database not configured in production' };
     }
@@ -31,7 +30,7 @@ export async function checkDatabaseReadiness(): Promise<{ ready: boolean; latenc
   const start = Date.now();
   try {
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Database ping timeout (>2000ms)')), 2000)
+      setTimeout(() => reject(new Error('Database ping timeout (>5000ms)')), 5000)
     );
 
     const queryPromise = supabase.from('schema_version').select('*').limit(1);
@@ -46,18 +45,15 @@ export async function checkDatabaseReadiness(): Promise<{ ready: boolean; latenc
   }
 }
 
-export async function checkRedisReadiness(): Promise<{ ready: boolean; latencyMs: number; error?: string }> {
+export async function checkRedisReadiness(): Promise<{ ready: boolean; latencyMs: number; error?: string; status?: string }> {
   if (process.env.__TEST_FORCE_REDIS_DOWN === 'true') {
-    return { ready: false, latencyMs: 0, error: 'Redis simulated failure' };
+    return { ready: false, latencyMs: 0, error: 'Redis simulated failure', status: 'DOWN' };
   }
 
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    // If Redis is not configured in development, queue falls back to in-process memory queue
-    if (process.env.NODE_ENV === 'production') {
-      return { ready: false, latencyMs: 0, error: 'REDIS_URL missing in production' };
-    }
-    return { ready: true, latencyMs: 0 };
+    // When REDIS_URL is not configured, queue falls back safely to in-process memory queue
+    return { ready: true, latencyMs: 0, status: 'IN_PROCESS_MEMORY' };
   }
 
   const start = Date.now();
@@ -77,23 +73,22 @@ export async function checkRedisReadiness(): Promise<{ ready: boolean; latencyMs
 
     await Promise.race([client.ping(), timeoutPromise]);
     try { await client.quit(); } catch { client.disconnect(); }
-    return { ready: true, latencyMs: Date.now() - start };
+    return { ready: true, latencyMs: Date.now() - start, status: 'CONNECTED' };
   } catch (err: any) {
     if (client) {
       try { client.disconnect(); } catch {}
     }
-    return { ready: false, latencyMs: Date.now() - start, error: err?.message || 'Redis unreachable' };
+    return { ready: false, latencyMs: Date.now() - start, error: err?.message || 'Redis unreachable', status: 'DOWN' };
   }
 }
 
-export function checkEmailReadiness(): { ready: boolean; error?: string } {
-  const isProduction = process.env.NODE_ENV === 'production';
+export function checkEmailReadiness(): { ready: boolean; configured: boolean; error?: string } {
   const hasEmail = Boolean(process.env.RESEND_API_KEY?.trim() || process.env.SMTP_HOST?.trim());
-  if (isProduction && !hasEmail) {
-    console.error('[HealthCheck] Production readiness failure: email delivery provider (RESEND_API_KEY or SMTP_HOST) is not configured.');
-    return { ready: false, error: 'Email delivery provider not configured in production' };
-  }
-  return { ready: true };
+  return {
+    ready: true,
+    configured: hasEmail,
+    ...(hasEmail ? {} : { error: 'Email alert delivery provider not configured (auxiliary alert sink; in-app and webhook alerts active)' })
+  };
 }
 
 export function registerHealthRoutes(app: express.Express): void {
@@ -122,7 +117,7 @@ export function registerHealthRoutes(app: express.Express): void {
     ]);
     const emailCheck = checkEmailReadiness();
 
-    const isReady = dbCheck.ready && redisCheck.ready && emailCheck.ready;
+    const isReady = dbCheck.ready && redisCheck.ready;
     const statusCode = isReady ? 200 : 503;
 
     const memory = process.memoryUsage();
@@ -139,10 +134,16 @@ export function registerHealthRoutes(app: express.Express): void {
         redis: {
           status: redisCheck.ready ? 'up' : 'down',
           latencyMs: redisCheck.latencyMs,
+          mode: redisCheck.status || (process.env.REDIS_URL ? 'redis' : 'in_process_memory'),
           ...(redisCheck.error ? { error: redisCheck.error } : {})
         },
         queue: {
-          status: redisCheck.ready ? 'up' : 'degraded'
+          status: redisCheck.ready ? 'up' : 'degraded',
+          mode: process.env.REDIS_URL ? 'redis' : 'in_process_memory'
+        },
+        email: {
+          status: emailCheck.configured ? 'configured' : 'optional_unconfigured',
+          ...(emailCheck.error ? { note: emailCheck.error } : {})
         }
       },
       components: {
@@ -166,13 +167,8 @@ export function registerHealthRoutes(app: express.Express): void {
 
     const emailCfg = getEmailAlertConfig();
     const hasEmailConfigured = Boolean(emailCfg.resendApiKey || process.env.SMTP_HOST);
-    const emailReady = process.env.NODE_ENV === 'production' ? hasEmailConfigured : true;
 
-    if (process.env.NODE_ENV === 'production' && !hasEmailConfigured) {
-      console.error('[HealthCheck:CRITICAL] Email delivery is not configured in production. Readiness check failed.');
-    }
-
-    const isReady = dbCheck.ready && redisCheck.ready && emailReady;
+    const isReady = dbCheck.ready && redisCheck.ready;
     const statusCode = isReady ? 200 : 503;
     const memory = process.memoryUsage();
 
@@ -185,8 +181,8 @@ export function registerHealthRoutes(app: express.Express): void {
       environment: process.env.NODE_ENV || 'development',
       dependencies: {
         database: dbCheck.ready ? 'CONNECTED' : 'UNREACHABLE',
-        redis: redisCheck.ready ? 'CONNECTED' : 'UNREACHABLE',
-        email: hasEmailConfigured ? 'CONNECTED' : (process.env.NODE_ENV === 'production' ? 'UNCONFIGURED_FAIL' : 'DEVELOPMENT_UNCONFIGURED')
+        redis: redisCheck.ready ? (process.env.REDIS_URL ? 'CONNECTED' : 'IN_PROCESS_MEMORY') : 'UNREACHABLE',
+        email: hasEmailConfigured ? 'CONNECTED' : 'OPTIONAL_UNCONFIGURED'
       },
       components: {
         maxmind: maxMindDb.getStatus().status,

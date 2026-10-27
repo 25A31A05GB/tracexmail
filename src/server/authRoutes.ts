@@ -7,6 +7,7 @@ import { logAuditAction, AuthenticatedRequest, requireAuth, requireRole, UserRol
 import { authLimiter, getClientIp } from './rateLimiter';
 import { getEmailAlertConfig } from './emailAlertService';
 import { verifyTurnstileToken } from './turnstile';
+import { isPasswordLoginForbiddenForEmail } from './identity/sso';
 import {
   createAndStoreToken,
   consumeToken,
@@ -508,7 +509,6 @@ export function createAuthRouter(options: AuthSecurityOptions): Router {
 
     try {
       // Check SSO enforcement
-      const { isPasswordLoginForbiddenForEmail } = require('./identity/sso');
       if (isPasswordLoginForbiddenForEmail(cleanEmail)) {
         return res.status(403).json({
           error: 'SSO_ENFORCED: Your organization requires Single Sign-On (SSO). Password login is disabled.',

@@ -39,7 +39,11 @@ import {
   getSyncedEmails,
   getIngestionQueue,
   getAutoSyncConfig,
-  setAutoSyncConfig
+  setAutoSyncConfig,
+  ensureSocLabels,
+  sendIncidentEscalationEmail,
+  syncGmailDeltaHistory,
+  SOC_LABELS
 } from '../gmailService';
 import { parseRawEmailToAnalysis, verifyGooglePubSubPushToken } from '../forensicPipeline';
 import { logger } from '../logger';
@@ -94,6 +98,8 @@ export function registerGmailRoutes(app: express.Express): void {
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.modify',
       'https://www.googleapis.com/auth/gmail.labels',
+      'https://www.googleapis.com/auth/gmail.metadata',
+      'https://www.googleapis.com/auth/gmail.send',
       'https://www.googleapis.com/auth/userinfo.email'
     ].join(' ');
 
@@ -115,7 +121,7 @@ export function registerGmailRoutes(app: express.Express): void {
       const clientId = process.env.GOOGLE_CLIENT_ID || 'tracexmail-soc-client';
       const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
       const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${baseUrl}/api/v1/gmail/callback`;
-      const scopesParam = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.insert https://www.googleapis.com/auth/userinfo.email');
+      const scopesParam = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/gmail.metadata https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email');
 
       res.json({
         status: 'ok',
@@ -747,6 +753,82 @@ export function registerGmailRoutes(app: express.Express): void {
       res.json(results);
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Search failed' });
+    }
+  });
+
+  // 15. SOC Label Setup & Colorization
+  app.post('/api/gmail/labels/setup', authenticatedLimiter, async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+      const token = req.body?.access_token || bearerToken || storedToken;
+
+      const labels = await ensureSocLabels(token);
+      res.json({
+        status: 'ok',
+        message: 'SOC triage labels verified and active in Gmail mailbox.',
+        labels,
+        definitions: SOC_LABELS
+      });
+    } catch (err: any) {
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed ensuring SOC labels' });
+    }
+  });
+
+  // 16. Incremental Delta Cursor Sync
+  app.post('/api/gmail/sync-delta', authenticatedLimiter, async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+      const token = req.body?.access_token || bearerToken || storedToken;
+      const startHistoryId = req.body?.start_history_id || req.body?.historyId;
+
+      const delta = await syncGmailDeltaHistory(startHistoryId, token);
+      res.json({
+        status: 'ok',
+        processed_count: delta.count,
+        history_id: delta.historyId,
+        message: `Delta sync processed ${delta.count} new message(s). Cursor at ${delta.historyId || 'initial'}.`
+      });
+    } catch (err: any) {
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed executing delta sync' });
+    }
+  });
+
+  // 17. Send Incident Escalation Alert Email
+  app.post('/api/gmail/send-alert', authenticatedLimiter, async (req: Request, res: Response) => {
+    try {
+      const { to, subject, body_html, bodyHtml, case_id, caseId, threat_score, threatScore, verdict } = req.body || {};
+      if (!to || !subject) {
+        return res.status(400).json({ error: 'Parameters "to" and "subject" are required.' });
+      }
+
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const freshStoredToken = await ensureFreshAccessToken();
+      const storedToken = freshStoredToken || getGmailAccessToken();
+      const token = req.body?.access_token || bearerToken || storedToken;
+
+      const result = await sendIncidentEscalationEmail({
+        to,
+        subject,
+        bodyHtml: body_html || bodyHtml || `<p>TraceXMail Security Incident Escalation for Case ${case_id || caseId || 'N/A'}</p>`,
+        caseId: case_id || caseId,
+        threatScore: threat_score ?? threatScore,
+        verdict,
+        accessToken: token
+      });
+
+      if (!result.success) {
+        return res.status(500).json(result);
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ status: 'error', error: err?.message || 'Failed sending alert email' });
     }
   });
 

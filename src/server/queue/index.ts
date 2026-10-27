@@ -246,6 +246,46 @@ export async function addNotificationJob(payload: NotificationJobPayload): Promi
   return enqueueJob('notifications', payload, payload.organizationId);
 }
 
+export const STALLED_JOB_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
+/**
+ * Periodically identifies abandoned or hanging jobs, retries them up to maxAttempts,
+ * or moves them to DLQ with an explicit failure reason.
+ */
+export function recoverStalledJobs(): number {
+  const now = Date.now();
+  let recoveredCount = 0;
+  for (const [id, job] of inMemoryJobs.entries()) {
+    if ((job.status === 'active' || job.status === 'queued') && (now - job.updatedAt > STALLED_JOB_TIMEOUT_MS)) {
+      job.attempts = (job.attempts || 0) + 1;
+      if (job.attempts >= (job.maxAttempts || 3)) {
+        sendToDlq(job, `Job execution timed out after ${STALLED_JOB_TIMEOUT_MS / 1000}s and exceeded max attempts (${job.attempts}/${job.maxAttempts || 3})`);
+        updateJobStatus(id, { status: 'failed', error: 'Job execution timed out and exceeded max retries' });
+      } else {
+        job.status = 'queued';
+        job.updatedAt = now;
+        logger.warn({ jobId: id, attempts: job.attempts }, '[Queue Recovery] Re-queuing stalled job');
+        setImmediate(async () => {
+          try {
+            const { processLocalJob } = await import('./workers');
+            await processLocalJob(job);
+          } catch (err: any) {
+            updateJobStatus(id, { status: 'failed', error: err.message });
+            sendToDlq(job, err.message);
+          }
+        });
+      }
+      recoveredCount++;
+    }
+  }
+  return recoveredCount;
+}
+
+// Start periodic stalled job recovery sweep
+if (typeof setInterval !== 'undefined') {
+  setInterval(recoverStalledJobs, 60000).unref();
+}
+
 /**
  * Retrieves a job status record, enforcing tenant organization isolation.
  */

@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { publicLimiter, authenticatedLimiter } from '../rateLimiter';
-import { requireAuth, requireRole, type AuthenticatedRequest } from '../compliance';
+import { requireAuth, requireRole, type AuthenticatedRequest, getOrgPrivacyConfig, saveOrgPrivacyConfig } from '../compliance';
 import {
   getOrgUsers,
   findOrgUser,
@@ -184,17 +184,16 @@ export function registerOrganizationRoutes(app: express.Express): void {
     });
   });
 
-  // Privacy Config
-  app.get('/api/organization/privacy-config', publicLimiter, (_req: Request, res: Response) => {
-    res.json({
-      pii_masking_default: true,
-      retention_period_days: 90,
-      data_anonymization: 'SHA-256 pseudonymization',
-      gdpr_compliant: true
-    });
+  // Privacy Config (Authenticated & Scoped to verified user's organization)
+  app.get('/api/organization/privacy-config', authenticatedLimiter, requireAuth, async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user!;
+    const config = await getOrgPrivacyConfig(user.organizationId);
+    res.json(config);
   });
 
-  app.post('/api/organization/privacy-config', authenticatedLimiter, requireAuth, requireRole(['admin']), (req: Request, res: Response) => {
-    res.json({ status: 'updated', config: req.body });
+  app.post('/api/organization/privacy-config', authenticatedLimiter, requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+    const user = (req as AuthenticatedRequest).user!;
+    const saved = await saveOrgPrivacyConfig(user.organizationId, req.body);
+    res.json({ status: 'updated', config: saved });
   });
 }

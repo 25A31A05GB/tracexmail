@@ -16,11 +16,13 @@ import {
   getPersistedCases,
   getPersistedCase,
   upsertPersistedCase,
+  upsertPersistedCaseAsync,
   deletePersistedCase,
+  deletePersistedCaseAsync,
   inMemoryStore,
   type PersistedCase
 } from '../caseStore';
-import { getSupabaseClient } from '../supabase';
+import { getSupabaseClient, DEFAULT_ORG_ID } from '../supabase';
 import { generateSocReport, validateAndSanitizeSocReport } from '../socReportService';
 import { correlateCaseWithCases } from '../correlationEngine';
 import {
@@ -34,17 +36,20 @@ import { REAL_WORLD_THREAT_FEED, createDynamicRealWorldCase } from '../realWorld
 import { logger } from '../logger';
 
 export function registerCasesRoutes(app: express.Express): void {
-  // Stats Endpoint (Strictly Tenant-Scoped)
+  // Stats Endpoint (Strictly Tenant-Scoped, with public baseline telemetry for unauthenticated callers)
   const handleStatsResponse = async (req: Request, res: Response) => {
     try {
       const user = (req as AuthenticatedRequest).user;
-      const orgId = user?.organizationId;
-      if (!orgId) {
-        return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
-      }
-      const supabase = getSupabaseClient();
-      const includeDemo = process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true';
+      const isPublicCaller = !user?.organizationId;
+      const orgId = user?.organizationId || DEFAULT_ORG_ID;
+      const excludeDemoQuery = req.query.exclude_demo;
+      const includeDemo = isPublicCaller
+        ? true
+        : (excludeDemoQuery !== undefined
+            ? (excludeDemoQuery === 'false' || excludeDemoQuery === '0')
+            : (process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true'));
 
+      const supabase = getSupabaseClient();
       let casesList: any[] = [];
       if (supabase) {
         try {
@@ -85,7 +90,7 @@ export function registerCasesRoutes(app: express.Express): void {
         : 0;
 
       res.json({
-        organization_id: orgId,
+        organization_id: isPublicCaller ? 'public' : orgId,
         total_cases: totalCount,
         open_cases: openCount,
         quarantined_cases: quarantinedCount,
@@ -97,7 +102,7 @@ export function registerCasesRoutes(app: express.Express): void {
           medium: mediumCount,
           low: lowCount
         },
-        cases: casesList.slice(0, 10)
+        cases: isPublicCaller ? [] : casesList.slice(0, 10)
       });
     } catch (err: any) {
       logger.error({ error: err?.message }, '[Stats] Error building stats');
@@ -116,7 +121,15 @@ export function registerCasesRoutes(app: express.Express): void {
     if (!orgId) {
       return res.status(401).json({ error: 'Unauthorized: missing verified organization context' });
     }
-    const includeDemo = process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true';
+    const excludeDemoQuery = req.query.exclude_demo;
+    const includeDemo =
+      excludeDemoQuery !== undefined
+        ? (excludeDemoQuery === 'false' || excludeDemoQuery === '0')
+        : (process.env.ENABLE_DEMO_SEED === 'true' || req.query.include_demo === 'true');
+
+    const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string || '100', 10)));
+    const offset = (page - 1) * limit;
 
     const supabase = getSupabaseClient();
     if (supabase) {
@@ -126,6 +139,9 @@ export function registerCasesRoutes(app: express.Express): void {
           q = q.or(`organization_id.eq.${orgId},is_demo.eq.true`);
         } else {
           q = q.eq('organization_id', orgId);
+        }
+        if (req.query.limit || req.query.page) {
+          q = q.range(offset, offset + limit - 1);
         }
         const { data, error } = await q;
         if (!error && Array.isArray(data)) {
@@ -137,6 +153,9 @@ export function registerCasesRoutes(app: express.Express): void {
     let localList = getPersistedCases(orgId);
     if (!includeDemo) {
       localList = localList.filter((c) => !c.is_demo);
+    }
+    if (req.query.limit || req.query.page) {
+      localList = localList.slice(offset, offset + limit);
     }
     res.json(localList);
   });
@@ -238,29 +257,50 @@ export function registerCasesRoutes(app: express.Express): void {
   app.post('/api/cases', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req: Request, res: Response) => {
     const user = (req as AuthenticatedRequest).user!;
     const body = req.body || {};
+
+    const rawTitle = typeof body.title === 'string' ? body.title.trim() : '';
+    const title = rawTitle.slice(0, 200) || 'Manual Forensic Incident';
+
+    const rawDesc = typeof body.description === 'string' ? body.description.trim() : '';
+    const description = rawDesc.slice(0, 10000);
+
+    const validSeverities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    const severity = validSeverities.includes(String(body.severity).toUpperCase())
+      ? String(body.severity).toUpperCase()
+      : 'MEDIUM';
+
+    const validStatuses = ['OPEN', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED', 'CLOSED'];
+    const status = validStatuses.includes(String(body.status).toUpperCase())
+      ? String(body.status).toUpperCase()
+      : 'OPEN';
+
+    const rawTags = Array.isArray(body.tags)
+      ? body.tags.filter((t: any) => typeof t === 'string').map((t: string) => t.trim().slice(0, 50)).slice(0, 20)
+      : ['Manual Ingest'];
+
     const newCase: PersistedCase = {
       id: body.id || `case-${Date.now()}`,
       organization_id: user.organizationId,
       user_id: user.userId,
       user_email: user.email,
       created_by: user.userId,
-      title: body.title || 'Manual Forensic Incident',
-      description: body.description || '',
-      status: body.status || 'OPEN',
-      severity: body.severity || 'MEDIUM',
-      threat_score: body.threat_score ?? 50,
-      classification: body.classification || 'Suspicious',
+      title,
+      description,
+      status,
+      severity,
+      threat_score: typeof body.threat_score === 'number' ? Math.max(0, Math.min(100, body.threat_score)) : 50,
+      classification: typeof body.classification === 'string' ? body.classification.trim().slice(0, 100) : 'Suspicious',
       created_at: new Date().toISOString(),
-      from_domain: body.from_domain || '',
-      origin_ip: body.origin_ip || '',
-      origin_country: body.origin_country || '',
-      tags: body.tags || ['Manual Ingest'],
-      assigned_user: body.assigned_user || user.email,
+      from_domain: typeof body.from_domain === 'string' ? body.from_domain.trim().slice(0, 253) : '',
+      origin_ip: typeof body.origin_ip === 'string' ? body.origin_ip.trim().slice(0, 64) : '',
+      origin_country: typeof body.origin_country === 'string' ? body.origin_country.trim().slice(0, 100) : '',
+      tags: rawTags,
+      assigned_user: typeof body.assigned_user === 'string' ? body.assigned_user.trim().slice(0, 100) : user.email,
       source: 'manual',
       raw_analysis: body.raw_analysis || null
     };
 
-    upsertPersistedCase(newCase);
+    await upsertPersistedCaseAsync(newCase);
     broadcastWebSocketEvent({ type: 'CASE_CREATED', case: newCase }, user.organizationId);
 
     await logAuditAction(
@@ -286,7 +326,7 @@ export function registerCasesRoutes(app: express.Express): void {
     const { caseId } = req.params;
     const user = (req as AuthenticatedRequest).user!;
 
-    const deleted = deletePersistedCase(caseId, user.organizationId);
+    const deleted = await deletePersistedCaseAsync(caseId, user.organizationId);
     if (!deleted) {
       return res.status(404).json({ error: `Case '${caseId}' not found or access denied.` });
     }
@@ -320,14 +360,28 @@ export function registerCasesRoutes(app: express.Express): void {
     }
 
     const { status, severity, title, description, assigned_user, tags } = req.body || {};
-    if (status) c.status = status;
-    if (severity) c.severity = severity;
-    if (title) c.title = title;
-    if (description) c.description = description;
-    if (assigned_user) c.assigned_user = assigned_user;
-    if (Array.isArray(tags)) c.tags = tags;
+    const validStatuses = ['OPEN', 'INVESTIGATING', 'QUARANTINED', 'RESOLVED', 'CLOSED'];
+    if (status && validStatuses.includes(String(status).toUpperCase())) {
+      c.status = String(status).toUpperCase();
+    }
+    const validSeverities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    if (severity && validSeverities.includes(String(severity).toUpperCase())) {
+      c.severity = String(severity).toUpperCase();
+    }
+    if (typeof title === 'string') {
+      c.title = title.trim().slice(0, 200);
+    }
+    if (typeof description === 'string') {
+      c.description = description.trim().slice(0, 10000);
+    }
+    if (typeof assigned_user === 'string') {
+      c.assigned_user = assigned_user.trim().slice(0, 100);
+    }
+    if (Array.isArray(tags)) {
+      c.tags = tags.filter((t: any) => typeof t === 'string').map((t: string) => t.trim().slice(0, 50)).slice(0, 20);
+    }
 
-    upsertPersistedCase(c);
+    await upsertPersistedCaseAsync(c);
     broadcastWebSocketEvent({ type: 'CASE_UPDATED', case: c, caseId }, user.organizationId);
 
     res.json(c);

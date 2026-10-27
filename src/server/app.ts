@@ -50,7 +50,11 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
             'https://*.cloudflare.com',
             'https://*.sentry.io',
             'https://www.googletagmanager.com',
-            'https://www.google-analytics.com'
+            'https://www.google-analytics.com',
+            'https://apis.google.com',
+            'https://*.googleapis.com',
+            'https://accounts.google.com',
+            'https://www.gstatic.com'
           ],
           styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
@@ -62,9 +66,21 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
             'wss:',
             'ws:',
             ...(process.env.SUPABASE_URL ? [process.env.SUPABASE_URL] : ['https://*.supabase.co']),
-            'https://challenges.cloudflare.com'
+            'https://challenges.cloudflare.com',
+            'https://identitytoolkit.googleapis.com',
+            'https://securetoken.googleapis.com',
+            'https://accounts.google.com',
+            'https://*.googleapis.com',
+            'https://tracexmail-l6c7.onrender.com'
           ],
-          frameSrc: ["'self'", 'https:', 'http:', 'https://challenges.cloudflare.com'],
+          frameSrc: [
+            "'self'",
+            'https:',
+            'http:',
+            'https://challenges.cloudflare.com',
+            'https://accounts.google.com',
+            'https://*.firebaseapp.com'
+          ],
           frameAncestors: ["'self'", 'https:', 'http:'],
           objectSrc: ["'none'"],
           baseUri: ["'self'"]
@@ -110,6 +126,8 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
         normalizedOrigin.includes('localhost') ||
         normalizedOrigin.includes('127.0.0.1') ||
         normalizedOrigin.endsWith('.run.app') ||
+        normalizedOrigin.endsWith('.vercel.app') ||
+        normalizedOrigin === 'https://tracexmail.vercel.app' ||
         envOrigins.includes('*') ||
         envOrigins.includes(normalizedOrigin) ||
         (siteUrl && normalizedOrigin === siteUrl.toLowerCase().trim());
@@ -192,7 +210,13 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
       fullPath.startsWith('/api/oauth/') ||
       fullPath === '/api/gmail/pubsub/push' ||
       fullPath === '/api/mail/m365/webhook' ||
-      (process.env.PUBLIC_ANALYZE_ENABLED === 'true' && fullPath.startsWith('/api/analyze'));
+      fullPath.startsWith('/api/testimonials') ||
+      fullPath.startsWith('/api/threat-intel/live-feed') ||
+      fullPath.startsWith('/api/threat-feeds/real-world') ||
+      fullPath === '/api/stats' ||
+      fullPath === '/api/v1/stats' ||
+      fullPath === '/api/stats/dashboard' ||
+      ((process.env.PUBLIC_ANALYZE_ENABLED === 'true' || process.env.ALLOW_PUBLIC_ANALYZE === 'true' || process.env.NODE_ENV !== 'production') && fullPath.startsWith('/api/analyze'));
 
     if (isPublic) {
       return next();

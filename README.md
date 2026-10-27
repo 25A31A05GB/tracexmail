@@ -31,28 +31,12 @@ graph TD
 
 ---
 
-## 2. Benchmark Evaluation (Clean Test Split, $N=59)
+## 2. Benchmark Evaluation (Clean Test Split, $N=59$)
 
 Evaluated strictly on a frozen, leak-free test split produced by stratified group splitting on sender domains (`data/datasets/clean/MANIFEST.json`, Hash: `e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29`).
 
 | Model / Pipeline Configuration | Accuracy | Macro-F1 | Weighted-F1 | Brier Score | ECE | FPR @ 95% Recall |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Majority Class Baseline** | 45.8% | 0.126 | 0.287 | 1.085 | 0.542 | 0.0% |
-| **TF-IDF + Logistic Regression** | 94.9% | 0.923 | 0.948 | 0.113 | 0.223 | 0.0% |
-| **TF-IDF + Calibrated Linear SVM** | 94.9% | 0.923 | 0.948 | 0.108 | 0.220 | 0.0% |
-| **TF-IDF + Structural/Header + Gradient Boosting** | 96.6% | 0.955 | 0.965 | 0.055 | 0.135 | 0.0% |
-| **Fine-Tuned Transformer (DistilBERT INT8)** | 94.9% | 0.923 | 0.948 | 0.093 | 0.183 | 0.0% |
-| **TraceXMail Layered Forensics** | 55.9% | 0.259 | 0.447 | 0.647 | 0.178 | 3.7% |
-
---- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Majority Class Baseline** | 45.8% | 0.126 | 0.287 | 1.085 | 0.542 | 0.0% |
-| **TF-IDF + Logistic Regression** | 94.9% | 0.923 | 0.948 | 0.113 | 0.223 | 0.0% |
-| **TF-IDF + Calibrated Linear SVM** | 94.9% | 0.923 | 0.948 | 0.108 | 0.220 | 0.0% |
-| **TF-IDF + Structural/Header + Gradient Boosting** | 96.6% | 0.955 | 0.965 | 0.055 | 0.135 | 0.0% |
-| **Fine-Tuned Transformer (DistilBERT INT8)** | 94.9% | 0.923 | 0.948 | 0.093 | 0.183 | 0.0% |
-| **TraceXMail Layered Forensics** | 55.9% | 0.259 | 0.447 | 0.647 | 0.178 | 3.7% |
-
---- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Majority Class Baseline** | 45.8% | 0.1256 | 0.2873 | 0.7045 | 0.0526 | 54.2% |
 | **TF-IDF + Logistic Regression** | 81.4% | 0.7988 | 0.8124 | 0.3120 | 0.1450 | 18.5% |
 | **TF-IDF + Calibrated Linear SVM** | 79.7% | 0.7784 | 0.7951 | 0.3245 | 0.1380 | 22.2% |

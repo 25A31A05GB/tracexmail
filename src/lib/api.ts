@@ -213,7 +213,7 @@ export async function initializeSession(): Promise<{ token: string | null; user:
         } catch {}
 
         // Fallback: Check user metadata & known admin
-        if (email === 'arfathof@gmail.com' || email.startsWith('admin@')) {
+        if (email === 'arfathof@gmail.com' || email === 'jayramsappa537@gmail.com' || email.startsWith('admin@')) {
           role = 'admin';
         } else if (session.user.user_metadata?.role) {
           role = session.user.user_metadata.role;
@@ -273,8 +273,7 @@ export const apiClient: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api`,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json',
-    'x-organization-id': DEFAULT_ORG_ID,
+    'Content-Type': 'application/json'
   },
 });
 
@@ -283,7 +282,7 @@ apiClient.interceptors.request.use(async (config) => {
   const token = await getActiveAuthToken();
   const anonKey = getSupabaseAnonKey();
 
-  // Always supply the Supabase apikey header to satisfy Kong gateway and backend authorization
+  // Supply the Supabase apikey header to satisfy Kong gateway and backend authorization
   if (anonKey) {
     config.headers.set('apikey', anonKey);
     config.headers.set('x-api-key', anonKey);
@@ -292,16 +291,6 @@ apiClient.interceptors.request.use(async (config) => {
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
-
-  if (memorySessionUser?.userId) {
-    config.headers.set('x-user-id', memorySessionUser.userId);
-  }
-  if (memorySessionUser?.email) {
-    config.headers.set('x-user-email', memorySessionUser.email);
-  }
-
-  const effectiveOrg = memorySessionUser?.organizationId || (memorySessionUser?.userId ? `org_${memorySessionUser.userId.replace(/[^a-zA-Z0-9]/g, '_')}` : DEFAULT_ORG_ID);
-  config.headers.set('x-organization-id', effectiveOrg);
 
   return config;
 });
@@ -322,7 +311,18 @@ apiClient.interceptors.response.use(
       errorMessage = error.message;
     }
 
-    if (status === 429 || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('rate exceeded')) {
+    if (status === 401) {
+      // Automatically purge invalidated or expired credentials to break re-request error loops
+      memorySessionToken = null;
+      memorySessionUser = null;
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('tracexmail_enclave_session');
+        } catch {}
+      }
+      setSession(null, null);
+      console.warn('[TraceXMail Auth] Session expired or invalid; session state reset to unauthenticated.');
+    } else if (status === 429 || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('rate exceeded')) {
       console.warn('[TraceXMail API Warning] Rate limit encountered:', errorMessage);
     } else {
       console.error('[TraceXMail API Error]', errorMessage);
@@ -333,7 +333,8 @@ apiClient.interceptors.response.use(
 
 /**
  * Centralized fetch wrapper that automatically injects the active session's
- * Authorization: Bearer <token>, apikey, and organization headers.
+ * Authorization: Bearer <token> and apikey headers.
+ * Resolves to the designated API_URL without sending client-forged identity headers.
  */
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const token = await getActiveAuthToken();
@@ -357,55 +358,24 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
   }
-  if (!headers.has('x-user-email') && memorySessionUser?.email) {
-    headers.set('x-user-email', memorySessionUser.email);
-  }
-  if (!headers.has('x-organization-id')) {
-    headers.set('x-organization-id', memorySessionUser?.organizationId || DEFAULT_ORG_ID);
+
+  const res = await fetch(targetUrl, {
+    ...init,
+    headers
+  });
+
+  if (res.status === 401 && token) {
+    memorySessionToken = null;
+    memorySessionUser = null;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('tracexmail_enclave_session');
+      } catch {}
+    }
+    setSession(null, null);
   }
 
-  try {
-    return await fetch(targetUrl, {
-      ...init,
-      credentials: init?.credentials || 'include',
-      headers
-    });
-  } catch (err: any) {
-    // If external or custom API_URL failed with a network error (Failed to fetch), retry direct relative path
-    if (typeof input === 'string' && input.startsWith('/api') && targetUrl !== input) {
-      console.warn(`[apiFetch] Primary fetch to ${targetUrl} failed (${err?.message}), falling back to direct relative endpoint ${input}`);
-      try {
-        return await fetch(input, {
-          ...init,
-          headers
-        });
-      } catch (fallbackErr) {
-        // Continue to credentials fallback
-      }
-    }
-
-    // If credentials: 'include' was rejected by browser strict third-party cookie/CORS policy, retry with same-origin credentials
-    if (!init?.credentials || init?.credentials === 'include') {
-      try {
-        return await fetch(targetUrl, {
-          ...init,
-          credentials: 'same-origin',
-          headers
-        });
-      } catch (credErr) {
-        // If relative endpoint also exists, try relative without credentials
-        if (typeof input === 'string' && input.startsWith('/api')) {
-          try {
-            return await fetch(input, {
-              ...init,
-              headers
-            });
-          } catch {}
-        }
-      }
-    }
-    throw err;
-  }
+  return res;
 }
 
 export interface HealthResponse {

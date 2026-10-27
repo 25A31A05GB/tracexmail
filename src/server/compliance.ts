@@ -15,6 +15,8 @@
  *   persistence, mitigating SQL injection dumps and unauthorized DBA access.
  */
 
+import fs from 'fs';
+import path from 'path';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -516,13 +518,29 @@ let processLocalEncryptionKey: string | null = null;
 export function resolveMasterSecret(): string {
   if (process.env.TOKEN_ENCRYPTION_KEY?.trim()) return process.env.TOKEN_ENCRYPTION_KEY.trim();
   if (process.env.ENCRYPTION_KEY?.trim()) return process.env.ENCRYPTION_KEY.trim();
+  if (process.env.JWT_SECRET?.trim()) return process.env.JWT_SECRET.trim();
 
   if (!processLocalEncryptionKey) {
-    processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
-    console.warn(
-      '[Encryption Fallback] TOKEN_ENCRYPTION_KEY is not set. Using ephemeral in-memory AES-256 key. ' +
-      'Data encrypted during this session will become undecryptable upon server restart.'
-    );
+    const dataDir = path.resolve(process.cwd(), 'data');
+    const secretPath = path.join(dataDir, '.dev_master_secret');
+    try {
+      if (fs.existsSync(secretPath)) {
+        const stored = fs.readFileSync(secretPath, 'utf8').trim();
+        if (stored && stored.length >= 32) {
+          processLocalEncryptionKey = stored;
+        }
+      }
+    } catch {}
+
+    if (!processLocalEncryptionKey) {
+      processLocalEncryptionKey = crypto.randomBytes(32).toString('hex');
+      try {
+        if (!fs.existsSync(dataDir)) {
+          fs.mkdirSync(dataDir, { recursive: true });
+        }
+        fs.writeFileSync(secretPath, processLocalEncryptionKey, { encoding: 'utf8' });
+      } catch {}
+    }
   }
   return processLocalEncryptionKey;
 }
@@ -648,6 +666,8 @@ export function signUserToken(payload: {
       sub: payload.userId,
       email: payload.email,
       organization_id: payload.organizationId,
+      organizationId: payload.organizationId,
+      org_id: payload.organizationId,
       role: payload.role
     },
     secret,
@@ -718,7 +738,7 @@ export function verifyUserToken(token: string): UserContext | null {
       return {
         userId: decoded.sub || 'user_anon',
         email: decoded.email || 'analyst@tracexmail.sec',
-        organizationId: decoded.organization_id || 'org_acme_soc_01',
+        organizationId: decoded.organization_id || decoded.organizationId || decoded.org_id || 'org_acme_soc_01',
         role: decoded.role as UserRole,
         authMethod: 'jwt'
       };
@@ -906,6 +926,7 @@ export function generateMockToken(user: {
     sub: user.userId,
     email: user.email,
     role: user.role,
+    organization_id: user.organizationId,
     org_id: user.organizationId,
     organizationId: user.organizationId,
     iat: Math.floor(Date.now() / 1000),

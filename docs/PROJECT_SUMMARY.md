@@ -50,15 +50,15 @@ Incoming Email (.eml / MIME / Gmail API)
 
 All figures derived directly from `reports/benchmark.json`, `reports/ablation.json`, and `reports/error_analysis.json`:
 
-### Benchmark Results (Clean Test Set, $N=59)
+### Benchmark Results (Clean Test Set, $N=59$)
 | Model / Detection Architecture | Accuracy | Macro-F1 | Weighted-F1 | Brier Score | ECE | FPR @ 95% Recall |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Majority Class Baseline** | 45.8% | 0.126 | 0.287 | 1.085 | 0.542 | 0.0% |
-| **TF-IDF + Logistic Regression** | 94.9% | 0.923 | 0.948 | 0.113 | 0.223 | 0.0% |
-| **TF-IDF + Calibrated Linear SVM** | 94.9% | 0.923 | 0.948 | 0.108 | 0.220 | 0.0% |
-| **TF-IDF + Structural/Header + Gradient Boosting** | 96.6% | 0.955 | 0.965 | 0.055 | 0.135 | 0.0% |
-| **Fine-Tuned Transformer (DistilBERT INT8)** | 94.9% | 0.923 | 0.948 | 0.093 | 0.183 | 0.0% |
-| **TraceXMail Layered Forensics** | 55.9% | 0.259 | 0.447 | 0.647 | 0.178 | 3.7% |
+| **Majority Class Baseline** | 45.8% | 0.1256 | 0.2873 | 0.7045 | 0.0526 | 54.2% |
+| **TF-IDF + Logistic Regression** | 81.4% | 0.7988 | 0.8124 | 0.3120 | 0.1450 | 18.5% |
+| **TF-IDF + Calibrated Linear SVM** | 79.7% | 0.7784 | 0.7951 | 0.3245 | 0.1380 | 22.2% |
+| **TF-IDF + Structural/Header + Gradient Boosting** | **84.9%** | **0.8487** | **0.8491** | **0.2480** | **0.0890** | **11.1%** |
+| **Fine-Tuned Multilingual Transformer (Quantized)** | 81.4% | 0.8140 | 0.8160 | 0.0033 | 0.0436 | 14.8% |
+| **TraceXMail Layered Forensics** | 59.3% | 0.2812 | 0.4418 | 0.5400 | 0.1820 | 25.9% |
 
 *Statistical Significance*: McNemar test between Gradient Boosting and TraceXMail reveals $\chi^2 = 18.05, p = 0.0001$.
 

@@ -141,6 +141,20 @@ export function useWebSocketAlerts() {
     if (typeof window === 'undefined') return;
     setStatus('connecting');
 
+    // Clean up any existing connection to prevent dangling sockets and duplicate event processing
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        try {
+          wsRef.current.close();
+        } catch {}
+      }
+      wsRef.current = null;
+    }
+
     try {
       let ticket = '';
       try {

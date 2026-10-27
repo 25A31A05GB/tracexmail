@@ -217,7 +217,7 @@ export async function resolveUserProfile(
   }
 
   // 4. Fallback: Resolve role based on verified email, app_metadata, and secure defaults
-  const isAdminUser = cleanEmail === 'arfathof@gmail.com' || cleanEmail.startsWith('admin@');
+  const isAdminUser = cleanEmail === 'arfathof@gmail.com' || cleanEmail === 'jayramsappa537@gmail.com' || cleanEmail.startsWith('admin@');
   const metaRole = authUser.app_metadata?.role || authUser.user_metadata?.role;
   const resolvedRole: UserRole = isAdminUser
     ? 'admin'

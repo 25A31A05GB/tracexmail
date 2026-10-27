@@ -274,9 +274,9 @@ function ensureDataDir(): void {
   }
 }
 
-function syncCaseToSupabase(caseItem: PersistedCase): void {
+export async function syncCaseToSupabase(caseItem: PersistedCase): Promise<boolean> {
   const supabase = getSupabaseAdminClient();
-  if (!supabase) return;
+  if (!supabase) return true;
 
   const orgId = caseItem.organization_id || DEFAULT_ORG_ID;
   const dbPayload = {
@@ -312,19 +312,17 @@ function syncCaseToSupabase(caseItem: PersistedCase): void {
     updated_at: new Date().toISOString()
   };
 
-  Promise.resolve(
-    supabase
-      .from('cases')
-      .upsert(dbPayload, { onConflict: 'id' })
-  )
-    .then(({ error }: any) => {
-      if (error) {
-        console.warn('[CaseStore] Supabase case upsert notice:', error.message);
-      }
-    })
-    .catch((err: any) => {
-      console.warn('[CaseStore] Supabase case upsert exception:', err?.message);
-    });
+  try {
+    const { error } = await supabase.from('cases').upsert(dbPayload, { onConflict: 'id' });
+    if (error) {
+      console.warn('[CaseStore] Supabase case upsert notice:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn('[CaseStore] Supabase case upsert exception:', err?.message);
+    return false;
+  }
 }
 
 export function loadCasesFromDisk(): Map<string, PersistedCase> {
@@ -421,7 +419,19 @@ export function upsertPersistedCase(caseItem: PersistedCase): PersistedCase {
   caseItem.organization_id = caseItem.organization_id || DEFAULT_ORG_ID;
   inMemoryStore.set(caseItem.id, caseItem);
   saveCasesToDisk(inMemoryStore);
-  syncCaseToSupabase(caseItem);
+  syncCaseToSupabase(caseItem).catch(() => {});
+  return caseItem;
+}
+
+export async function upsertPersistedCaseAsync(caseItem: PersistedCase): Promise<PersistedCase> {
+  if (!isInitialized) {
+    loadCasesFromDisk();
+    isInitialized = true;
+  }
+  caseItem.organization_id = caseItem.organization_id || DEFAULT_ORG_ID;
+  inMemoryStore.set(caseItem.id, caseItem);
+  saveCasesToDisk(inMemoryStore);
+  await syncCaseToSupabase(caseItem);
   return caseItem;
 }
 
@@ -443,6 +453,33 @@ export function deletePersistedCase(caseId: string, orgId?: string): boolean {
       let query = supabase.from('cases').delete().eq('id', caseId);
       if (orgId) query = query.eq('organization_id', orgId);
       Promise.resolve(query).then(() => {}).catch(() => {});
+    }
+  }
+  return existed;
+}
+
+export async function deletePersistedCaseAsync(caseId: string, orgId?: string): Promise<boolean> {
+  if (!isInitialized) {
+    loadCasesFromDisk();
+    isInitialized = true;
+  }
+  const existing = inMemoryStore.get(caseId);
+  if (existing && orgId && existing.organization_id && existing.organization_id !== orgId) {
+    return false; // Prevent unauthorized cross-org deletion
+  }
+
+  const existed = inMemoryStore.delete(caseId);
+  if (existed) {
+    saveCasesToDisk(inMemoryStore);
+    const supabase = getSupabaseAdminClient();
+    if (supabase) {
+      let query = supabase.from('cases').delete().eq('id', caseId);
+      if (orgId) query = query.eq('organization_id', orgId);
+      try {
+        await query;
+      } catch (err: any) {
+        console.warn('[CaseStore] Error deleting case from database:', err?.message);
+      }
     }
   }
   return existed;
