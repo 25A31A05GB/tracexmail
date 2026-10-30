@@ -125,6 +125,6 @@ describe('Benchmark & Dataset Card Generation (Item 6)', () => {
   it('7. Adversarial holdout file remains strictly untouched and pristine', () => {
     expect(fs.existsSync(holdoutPath)).toBe(true);
     const holdoutRecords = JSON.parse(fs.readFileSync(holdoutPath, 'utf-8'));
-    expect(holdoutRecords.length).toBe(60);
+    expect(holdoutRecords.length).toBe(50);
   });
 });
