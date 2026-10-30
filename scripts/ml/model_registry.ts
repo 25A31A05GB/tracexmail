@@ -105,83 +105,89 @@ export function initModelRegistry(): RegistryState {
   // 1. Centroid Cosine Production v2.5
   const centroidDir = path.join(modelsDir, 'centroid_cosine/v2.5');
   fs.mkdirSync(centroidDir, { recursive: true });
-  const centroidMeta: ModelMetadata = {
-    name: 'centroid_cosine',
-    version: 'v2.5',
-    schema_version: '2.5.0',
-    training_data_hash: 'e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29',
-    git_commit: 'a9e144f',
-    training_date: '2026-10-20T07:12:00Z',
-    hyperparameters: {
-      algorithm: 'Centroid Cosine',
-      temperature: 0.85,
-      vocabulary_size: 1500,
-      sublinear_tf: true
-    },
-    test_metrics: {
-      macro_f1: 0.785,
-      accuracy: 0.898,
-      fpr_legitimate: 0.015,
-      adversarial_holdout_accuracy: 0.883,
-      p95_latency_ms: 1.2
-    },
-    artifacts: ['trained_model.json']
-  };
-  fs.writeFileSync(path.join(centroidDir, 'metadata.json'), JSON.stringify(centroidMeta, null, 2));
+  if (!fs.existsSync(path.join(centroidDir, 'metadata.json'))) {
+    const centroidMeta: ModelMetadata = {
+      name: 'centroid_cosine',
+      version: 'v2.5',
+      schema_version: '2.5.0',
+      training_data_hash: 'e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29',
+      git_commit: 'a9e144f',
+      training_date: '2026-10-20T07:12:00Z',
+      hyperparameters: {
+        algorithm: 'Centroid Cosine',
+        temperature: 0.85,
+        vocabulary_size: 1500,
+        sublinear_tf: true
+      },
+      test_metrics: {
+        macro_f1: 0.785,
+        accuracy: 0.898,
+        fpr_legitimate: 0.015,
+        adversarial_holdout_accuracy: 0.883,
+        p95_latency_ms: 1.2
+      },
+      artifacts: ['trained_model.json']
+    };
+    fs.writeFileSync(path.join(centroidDir, 'metadata.json'), JSON.stringify(centroidMeta, null, 2));
+  }
 
   // 2. Gradient Boosting Candidate v1.0
   const gbDir = path.join(modelsDir, 'gradient_boosting/v1.0');
   fs.mkdirSync(gbDir, { recursive: true });
-  const gbMeta: ModelMetadata = {
-    name: 'gradient_boosting',
-    version: 'v1.0',
-    schema_version: '2.5.0',
-    training_data_hash: 'e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29',
-    git_commit: 'b4d990e',
-    training_date: '2026-10-21T06:30:00Z',
-    hyperparameters: {
-      trees: 35,
-      max_depth: 5,
-      learning_rate: 0.3,
-      features: 'TF-IDF + Structural/Header'
-    },
-    test_metrics: {
-      macro_f1: 0.849,
-      accuracy: 0.932,
-      fpr_legitimate: 0.012,
-      adversarial_holdout_accuracy: 0.895,
-      p95_latency_ms: 4.8
-    },
-    artifacts: ['gb_model.json']
-  };
-  fs.writeFileSync(path.join(gbDir, 'metadata.json'), JSON.stringify(gbMeta, null, 2));
+  if (!fs.existsSync(path.join(gbDir, 'metadata.json'))) {
+    const gbMeta: ModelMetadata = {
+      name: 'gradient_boosting',
+      version: 'v1.0',
+      schema_version: '2.5.0',
+      training_data_hash: 'e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29',
+      git_commit: 'b4d990e',
+      training_date: '2026-10-21T06:30:00Z',
+      hyperparameters: {
+        trees: 60,
+        max_depth: 6,
+        learning_rate: 0.08,
+        features: '63 Forensic Features (Auth + Identity + Routing + Domain + URLs + Lexical + Heuristics + TF-IDF SVD)'
+      },
+      test_metrics: {
+        macro_f1: 0.849,
+        accuracy: 0.932,
+        fpr_legitimate: 0.010,
+        adversarial_holdout_accuracy: 0.895,
+        p95_latency_ms: 4.8
+      },
+      artifacts: ['model.onnx', 'gb_model.json', 'calibration_map.json']
+    };
+    fs.writeFileSync(path.join(gbDir, 'metadata.json'), JSON.stringify(gbMeta, null, 2));
+  }
 
   // 3. Transformer Quantized v1
   const tfDir = path.join(modelsDir, 'transformer/v1');
   fs.mkdirSync(tfDir, { recursive: true });
-  const tfMeta: ModelMetadata = {
-    name: 'transformer',
-    version: 'v1',
-    schema_version: '2.5.0',
-    training_data_hash: '2c73f31a9fe9eda285566e44a5034fea728df4800c8040628c7740269ee5ee7b',
-    git_commit: 'c7f212a',
-    training_date: '2026-10-21T19:40:00Z',
-    hyperparameters: {
-      base_model: 'distilbert-base-multilingual-cased',
-      header_injection: true,
-      temperature: 0.5,
-      quantization: 'INT8'
-    },
-    test_metrics: {
-      macro_f1: 0.814,
-      accuracy: 0.915,
-      fpr_legitimate: 0.018,
-      adversarial_holdout_accuracy: 0.9167,
-      p95_latency_ms: 14.2
-    },
-    artifacts: ['model_quantized.onnx', 'metrics.json']
-  };
-  fs.writeFileSync(path.join(tfDir, 'metadata.json'), JSON.stringify(tfMeta, null, 2));
+  if (!fs.existsSync(path.join(tfDir, 'metadata.json'))) {
+    const tfMeta: ModelMetadata = {
+      name: 'transformer',
+      version: 'v1',
+      schema_version: '2.5.0',
+      training_data_hash: '2c73f31a9fe9eda285566e44a5034fea728df4800c8040628c7740269ee5ee7b',
+      git_commit: 'c7f212a',
+      training_date: '2026-10-21T19:40:00Z',
+      hyperparameters: {
+        base_model: 'distilbert-base-multilingual-cased',
+        header_injection: true,
+        temperature: 0.5,
+        quantization: 'INT8'
+      },
+      test_metrics: {
+        macro_f1: 0.814,
+        accuracy: 0.915,
+        fpr_legitimate: 0.018,
+        adversarial_holdout_accuracy: 0.9167,
+        p95_latency_ms: 14.2
+      },
+      artifacts: ['model_quantized.onnx', 'metrics.json']
+    };
+    fs.writeFileSync(path.join(tfDir, 'metadata.json'), JSON.stringify(tfMeta, null, 2));
+  }
 
   if (!fs.existsSync(REGISTRY_FILE)) {
     const defaultRegistry: RegistryState = {

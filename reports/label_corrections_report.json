@@ -1,0 +1,16 @@
+{
+  "applied_at": "2026-10-28T20:03:39.348Z",
+  "csv_file_read": "reports/label_audit.csv",
+  "total_rows_inspected": 150,
+  "blank_reviewed_rows": 150,
+  "confirmed_unchanged_rows": 0,
+  "corrections_applied_count": 0,
+  "adversarial_holdout_untouched": true,
+  "adversarial_holdout_sha256": "b84eedb23b112c81092ada551ad33c8690a7a0a3780d82f8bee7408883e104ac",
+  "corrections": [],
+  "updated_split_counts": {
+    "train": 2398,
+    "val": 428,
+    "test": 658
+  }
+}

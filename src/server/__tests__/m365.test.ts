@@ -9,7 +9,32 @@ import {
 } from '../mail/provider';
 import { recordIdempotentGmailProcessing } from '../queue/index';
 
-vi.mock('axios');
+vi.mock('axios', () => {
+  const mockAxiosInstance = {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    interceptors: {
+      request: { use: vi.fn(), eject: vi.fn() },
+      response: { use: vi.fn(), eject: vi.fn() },
+    },
+  };
+  const mockAxios: any = vi.fn(() => Promise.resolve({ data: {} }));
+  mockAxios.create = vi.fn(() => mockAxiosInstance);
+  mockAxios.get = vi.fn();
+  mockAxios.post = vi.fn();
+  mockAxios.patch = vi.fn();
+  mockAxios.delete = vi.fn();
+  mockAxios.interceptors = {
+    request: { use: vi.fn(), eject: vi.fn() },
+    response: { use: vi.fn(), eject: vi.fn() },
+  };
+  return {
+    default: mockAxios,
+    ...mockAxios,
+  };
+});
 
 describe('Microsoft 365 Mailbox Connector & Common MailProvider Interface', () => {
   let provider: MicrosoftGraphProvider;

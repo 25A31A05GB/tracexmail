@@ -1,0 +1,622 @@
+{
+  "model_name": "TraceXMail-GBM-Forensics",
+  "version": "v1.0",
+  "timestamp": "2026-10-29T19:45:00Z",
+  "pipeline_stage": "Item 2: Calibrated Gradient-Boosted Model Training",
+  "isolation_protocol": {
+    "test_split_untouched": true,
+    "test_split_sha256": "546abf635885235c278f2c025f5cec3e8b0ba326be11ebbc2db032cbfc840e0e",
+    "adversarial_holdout_untouched": true,
+    "adversarial_holdout_sha256": "9752514ef29a99aeb5dba67dda84027c10584f241474476fb6b6451b2526843c",
+    "zero_test_contamination": true
+  },
+  "dataset_summary": {
+    "train_records": 3077,
+    "val_records": 560,
+    "train_domains": 14,
+    "val_domains": 5,
+    "domain_disjoint": true,
+    "per_class_train": {
+      "Legitimate": 1050,
+      "Suspicious": 489,
+      "Impersonated": 489,
+      "Phishing": 560,
+      "Fraud-related": 489
+    },
+    "per_class_val": {
+      "Legitimate": 190,
+      "Suspicious": 90,
+      "Impersonated": 90,
+      "Phishing": 100,
+      "Fraud-related": 90
+    }
+  },
+  "feature_schema": {
+    "total_features": 63,
+    "feature_names": [
+      "auth_spf_pass",
+      "auth_spf_fail",
+      "auth_spf_softfail",
+      "auth_spf_none",
+      "auth_dkim_pass",
+      "auth_dkim_fail",
+      "auth_dkim_none",
+      "auth_dmarc_pass",
+      "auth_dmarc_fail",
+      "auth_dmarc_none",
+      "auth_aligned_pass",
+      "mismatch_reply_to",
+      "mismatch_return_path",
+      "brand_display_mismatch",
+      "brand_domain_aligned",
+      "is_lookalike_domain",
+      "is_punycode",
+      "lookalike_score",
+      "hop_count",
+      "hop_delay_mean_sec",
+      "hop_delay_max_sec",
+      "has_tor_relay",
+      "has_private_ip",
+      "has_vpn_or_proxy",
+      "max_hop_abuse_score",
+      "is_hosting_provider",
+      "domain_age_days",
+      "is_newly_registered",
+      "mx_missing",
+      "url_count",
+      "has_ip_in_url",
+      "has_high_entropy_url",
+      "has_suspicious_tld",
+      "attachment_count",
+      "has_executable_attachment",
+      "has_macro_or_archive_attachment",
+      "lex_urgency_score",
+      "lex_fear_threat_score",
+      "lex_authority_score",
+      "lex_financial_wire_score",
+      "lex_secrecy_score",
+      "lex_legitimate_work_score",
+      "pipeline_threat_score",
+      "pipeline_auth_risk",
+      "pipeline_domain_risk",
+      "pipeline_infra_risk",
+      "pipeline_heuristic_risk",
+      "tfidf_svd_0",
+      "tfidf_svd_1",
+      "tfidf_svd_2",
+      "tfidf_svd_3",
+      "tfidf_svd_4",
+      "tfidf_svd_5",
+      "tfidf_svd_6",
+      "tfidf_svd_7",
+      "tfidf_svd_8",
+      "tfidf_svd_9",
+      "tfidf_svd_10",
+      "tfidf_svd_11",
+      "tfidf_svd_12",
+      "tfidf_svd_13",
+      "tfidf_svd_14",
+      "tfidf_svd_15"
+    ],
+    "feature_groups": {
+      "authentication": 11,
+      "identity_mismatch": 7,
+      "infrastructure_routing": 8,
+      "domain_intelligence": 3,
+      "url_attachment": 7,
+      "linguistic_lexicons": 6,
+      "pipeline_heuristics": 5,
+      "tfidf_svd_latent": 16
+    }
+  },
+  "cross_validation": {
+    "n_splits": 5,
+    "strategy": "StratifiedGroupKFold",
+    "group_column": "fromDomain",
+    "folds": [
+      {
+        "fold": 1,
+        "train_samples": 2417,
+        "val_samples": 660,
+        "train_domains": 11,
+        "val_domains": 3,
+        "log_loss": 0.0012,
+        "macro_f1": 1.0
+      },
+      {
+        "fold": 2,
+        "train_samples": 2417,
+        "val_samples": 660,
+        "train_domains": 11,
+        "val_domains": 3,
+        "log_loss": 0.0005,
+        "macro_f1": 1.0
+      },
+      {
+        "fold": 3,
+        "train_samples": 2417,
+        "val_samples": 660,
+        "train_domains": 11,
+        "val_domains": 3,
+        "log_loss": 0.0005,
+        "macro_f1": 1.0
+      },
+      {
+        "fold": 4,
+        "train_samples": 2420,
+        "val_samples": 657,
+        "train_domains": 11,
+        "val_domains": 3,
+        "log_loss": 0.0008,
+        "macro_f1": 1.0
+      },
+      {
+        "fold": 5,
+        "train_samples": 2637,
+        "val_samples": 440,
+        "train_domains": 12,
+        "val_domains": 2,
+        "log_loss": 0.0005,
+        "macro_f1": 1.0
+      }
+    ],
+    "mean_macro_f1": 1.0,
+    "std_macro_f1": 0.0,
+    "mean_log_loss": 0.0007
+  },
+  "validation_tuning": {
+    "best_hyperparameters": {
+      "objective": "multiclass",
+      "num_class": 5,
+      "metric": "multi_logloss",
+      "n_estimators": 60,
+      "learning_rate": 0.08,
+      "num_leaves": 31,
+      "max_depth": 6,
+      "min_child_samples": 15,
+      "subsample": 0.85,
+      "colsample_bytree": 0.85,
+      "random_state": 42,
+      "verbosity": -1
+    },
+    "val_log_loss_raw": 0.0005,
+    "val_macro_f1_raw": 1.0
+  },
+  "calibration": {
+    "method": "isotonic",
+    "brier_score_raw": 0.0,
+    "brier_score_calibrated": 0.0,
+    "brier_improvement_percent": 100.0,
+    "ece_raw": 0.0005,
+    "ece_calibrated": 0.0,
+    "ece_improvement_percent": 100.0,
+    "calibration_bins": [
+      {
+        "bin_index": 0,
+        "bin_lower": 0.0,
+        "bin_upper": 0.1,
+        "sample_count": 0,
+        "avg_confidence": 0.05,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 1,
+        "bin_lower": 0.1,
+        "bin_upper": 0.2,
+        "sample_count": 0,
+        "avg_confidence": 0.15000000000000002,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 2,
+        "bin_lower": 0.2,
+        "bin_upper": 0.30000000000000004,
+        "sample_count": 0,
+        "avg_confidence": 0.25,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 3,
+        "bin_lower": 0.30000000000000004,
+        "bin_upper": 0.4,
+        "sample_count": 0,
+        "avg_confidence": 0.35000000000000003,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 4,
+        "bin_lower": 0.4,
+        "bin_upper": 0.5,
+        "sample_count": 0,
+        "avg_confidence": 0.45,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 5,
+        "bin_lower": 0.5,
+        "bin_upper": 0.6000000000000001,
+        "sample_count": 0,
+        "avg_confidence": 0.55,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 6,
+        "bin_lower": 0.6000000000000001,
+        "bin_upper": 0.7000000000000001,
+        "sample_count": 0,
+        "avg_confidence": 0.6500000000000001,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 7,
+        "bin_lower": 0.7000000000000001,
+        "bin_upper": 0.8,
+        "sample_count": 0,
+        "avg_confidence": 0.75,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 8,
+        "bin_lower": 0.8,
+        "bin_upper": 0.9,
+        "sample_count": 0,
+        "avg_confidence": 0.8500000000000001,
+        "accuracy": 0.0
+      },
+      {
+        "bin_index": 9,
+        "bin_lower": 0.9,
+        "bin_upper": 1.0,
+        "sample_count": 560,
+        "avg_confidence": 1.0,
+        "accuracy": 1.0
+      }
+    ]
+  },
+  "thresholds_and_operating_point": {
+    "target_legitimate_fpr": 0.01,
+    "actual_legitimate_fpr": 0.0,
+    "fpr_target_met": true,
+    "per_class_thresholds": {
+      "Legitimate": 0.2,
+      "Suspicious": 0.3,
+      "Impersonated": 0.3,
+      "Phishing": 0.35,
+      "Fraud-related": 0.35
+    },
+    "confusion_matrix": [
+      [
+        190,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        90,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        90,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        100,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        90
+      ]
+    ],
+    "classes": [
+      "Legitimate",
+      "Suspicious",
+      "Impersonated",
+      "Phishing",
+      "Fraud-related"
+    ],
+    "classification_report": {
+      "Legitimate": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 190.0
+      },
+      "Suspicious": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 90.0
+      },
+      "Impersonated": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 90.0
+      },
+      "Phishing": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 100.0
+      },
+      "Fraud-related": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 90.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 560.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 560.0
+      }
+    }
+  },
+  "shap_attributions": {
+    "method": "TreeSHAP (Lundberg et al.)",
+    "top_20_features": [
+      {
+        "rank": 1,
+        "feature": "auth_dkim_pass",
+        "mean_absolute_shap": 0.66246,
+        "class_impacts": {
+          "Legitimate": 3.302914296315515,
+          "Suspicious": 0.0024071413169381843,
+          "Impersonated": 0.0023545899034625914,
+          "Phishing": 0.002207755594398245,
+          "Fraud-related": 0.0024253939033981094
+        }
+      },
+      {
+        "rank": 2,
+        "feature": "max_hop_abuse_score",
+        "mean_absolute_shap": 0.46823,
+        "class_impacts": {
+          "Legitimate": 0.0002492809265176033,
+          "Suspicious": 0.0,
+          "Impersonated": 5.162149325965818e-07,
+          "Phishing": 2.3408271641516967,
+          "Fraud-related": 7.02760617032503e-05
+        }
+      },
+      {
+        "rank": 3,
+        "feature": "pipeline_heuristic_risk",
+        "mean_absolute_shap": 0.42592,
+        "class_impacts": {
+          "Legitimate": 0.0,
+          "Suspicious": 0.0,
+          "Impersonated": 2.5493216563715055e-05,
+          "Phishing": 0.2756577818428035,
+          "Fraud-related": 1.8539063741539281
+        }
+      },
+      {
+        "rank": 4,
+        "feature": "auth_dkim_fail",
+        "mean_absolute_shap": 0.38703,
+        "class_impacts": {
+          "Legitimate": 1.079464524143353e-06,
+          "Suspicious": 2.3270795431917506e-05,
+          "Impersonated": 1.9264853213809041,
+          "Phishing": 0.008637135998656198,
+          "Fraud-related": 5.183968246771346e-07
+        }
+      },
+      {
+        "rank": 5,
+        "feature": "auth_dmarc_none",
+        "mean_absolute_shap": 0.36855,
+        "class_impacts": {
+          "Legitimate": 0.0,
+          "Suspicious": 1.842742761319784,
+          "Impersonated": 1.3181725992000621e-06,
+          "Phishing": 0.0,
+          "Fraud-related": 0.0
+        }
+      },
+      {
+        "rank": 6,
+        "feature": "tfidf_svd_5",
+        "mean_absolute_shap": 0.14984,
+        "class_impacts": {
+          "Legitimate": 1.9929490234199527e-05,
+          "Suspicious": 3.052635463465958e-05,
+          "Impersonated": 1.503587465014218e-05,
+          "Phishing": 0.6787164833381567,
+          "Fraud-related": 0.07041316660712037
+        }
+      },
+      {
+        "rank": 7,
+        "feature": "tfidf_svd_10",
+        "mean_absolute_shap": 0.14234,
+        "class_impacts": {
+          "Legitimate": 0.0003872149045869964,
+          "Suspicious": 0.0010277448193179493,
+          "Impersonated": 0.00019235903156779993,
+          "Phishing": 0.4528665073504151,
+          "Fraud-related": 0.25724974679323437
+        }
+      },
+      {
+        "rank": 8,
+        "feature": "auth_dmarc_pass",
+        "mean_absolute_shap": 0.11452,
+        "class_impacts": {
+          "Legitimate": 0.5715352670741545,
+          "Suspicious": 0.00030016782007271856,
+          "Impersonated": 0.0,
+          "Phishing": 0.0002913579014760771,
+          "Fraud-related": 0.00045339900010014434
+        }
+      },
+      {
+        "rank": 9,
+        "feature": "tfidf_svd_11",
+        "mean_absolute_shap": 0.09971,
+        "class_impacts": {
+          "Legitimate": 4.211084996823437e-05,
+          "Suspicious": 0.4489144378386,
+          "Impersonated": 4.204314488101416e-05,
+          "Phishing": 0.04554475927261566,
+          "Fraud-related": 0.004019590248036645
+        }
+      },
+      {
+        "rank": 10,
+        "feature": "mismatch_return_path",
+        "mean_absolute_shap": 0.0905,
+        "class_impacts": {
+          "Legitimate": 6.160275740047844e-07,
+          "Suspicious": 1.954493945725648e-06,
+          "Impersonated": 0.4524900743810902,
+          "Phishing": 0.0,
+          "Fraud-related": 0.0
+        }
+      },
+      {
+        "rank": 11,
+        "feature": "tfidf_svd_9",
+        "mean_absolute_shap": 0.05782,
+        "class_impacts": {
+          "Legitimate": 4.34228554455474e-05,
+          "Suspicious": 0.0009105761599636719,
+          "Impersonated": 1.611581862531066e-05,
+          "Phishing": 0.00018560122811866168,
+          "Fraud-related": 0.2879660200660376
+        }
+      },
+      {
+        "rank": 12,
+        "feature": "pipeline_infra_risk",
+        "mean_absolute_shap": 0.0492,
+        "class_impacts": {
+          "Legitimate": 3.4855487950789865e-05,
+          "Suspicious": 4.4273441904480824e-07,
+          "Impersonated": 0.0,
+          "Phishing": 0.24591892375586535,
+          "Fraud-related": 2.1613071291123973e-05
+        }
+      },
+      {
+        "rank": 13,
+        "feature": "tfidf_svd_3",
+        "mean_absolute_shap": 0.03489,
+        "class_impacts": {
+          "Legitimate": 8.78003680877331e-05,
+          "Suspicious": 1.8751764416871253e-05,
+          "Impersonated": 3.842665831419959e-06,
+          "Phishing": 0.018298000496279776,
+          "Fraud-related": 0.1560318216319111
+        }
+      },
+      {
+        "rank": 14,
+        "feature": "tfidf_svd_12",
+        "mean_absolute_shap": 0.03114,
+        "class_impacts": {
+          "Legitimate": 0.0009209643020565279,
+          "Suspicious": 0.1532439761967577,
+          "Impersonated": 0.00036404264484573087,
+          "Phishing": 0.001141740944515196,
+          "Fraud-related": 3.6131735889343714e-05
+        }
+      },
+      {
+        "rank": 15,
+        "feature": "tfidf_svd_2",
+        "mean_absolute_shap": 0.03085,
+        "class_impacts": {
+          "Legitimate": 2.3346228241309482e-05,
+          "Suspicious": 8.414510315630844e-06,
+          "Impersonated": 1.646258505241512e-05,
+          "Phishing": 0.07259539002503054,
+          "Fraud-related": 0.0816065749785903
+        }
+      },
+      {
+        "rank": 16,
+        "feature": "pipeline_threat_score",
+        "mean_absolute_shap": 0.01471,
+        "class_impacts": {
+          "Legitimate": 8.412557363223206e-05,
+          "Suspicious": 3.83007129613896e-06,
+          "Impersonated": 6.8255713739554275e-06,
+          "Phishing": 0.07343641463473216,
+          "Fraud-related": 9.935326566076934e-06
+        }
+      },
+      {
+        "rank": 17,
+        "feature": "auth_dkim_none",
+        "mean_absolute_shap": 0.00768,
+        "class_impacts": {
+          "Legitimate": 3.5364587730635707e-10,
+          "Suspicious": 1.2139350803820936e-05,
+          "Impersonated": 0.028214227155699947,
+          "Phishing": 0.010186158070729577,
+          "Fraud-related": 3.920763972667638e-08
+        }
+      },
+      {
+        "rank": 18,
+        "feature": "tfidf_svd_6",
+        "mean_absolute_shap": 0.00704,
+        "class_impacts": {
+          "Legitimate": 1.6352767711340438e-05,
+          "Suspicious": 4.749509985676303e-06,
+          "Impersonated": 8.762019501743191e-05,
+          "Phishing": 0.02235274748260657,
+          "Fraud-related": 0.012735870429463747
+        }
+      },
+      {
+        "rank": 19,
+        "feature": "pipeline_auth_risk",
+        "mean_absolute_shap": 0.00689,
+        "class_impacts": {
+          "Legitimate": 0.0,
+          "Suspicious": 5.454056474704093e-06,
+          "Impersonated": 0.034427069503144433,
+          "Phishing": 0.0,
+          "Fraud-related": 2.1523248180913844e-07
+        }
+      },
+      {
+        "rank": 20,
+        "feature": "auth_spf_pass",
+        "mean_absolute_shap": 0.00552,
+        "class_impacts": {
+          "Legitimate": 5.000265381432249e-07,
+          "Suspicious": 4.5974103167011365e-07,
+          "Impersonated": 0.027579340580037387,
+          "Phishing": 0.0,
+          "Fraud-related": 1.446340876137849e-06
+        }
+      }
+    ]
+  }
+}

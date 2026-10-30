@@ -37,20 +37,6 @@ export const GMAIL_QUOTA_COSTS = {
   WATCH_STOP: 50
 } as const;
 
-export const SOC_LABELS = {
-  QUARANTINED: 'TraceXMail/Quarantined',
-  SUSPICIOUS: 'TraceXMail/Suspicious',
-  CLEAN: 'TraceXMail/Clean',
-  INVESTIGATING: 'TraceXMail/Investigating'
-} as const;
-
-export const SOC_LABEL_COLORS = {
-  [SOC_LABELS.QUARANTINED]: { backgroundColor: '#cc3a21', textColor: '#ffffff' },
-  [SOC_LABELS.SUSPICIOUS]: { backgroundColor: '#ffad46', textColor: '#ffffff' },
-  [SOC_LABELS.CLEAN]: { backgroundColor: '#16a765', textColor: '#ffffff' },
-  [SOC_LABELS.INVESTIGATING]: { backgroundColor: '#4986e7', textColor: '#ffffff' }
-} as const;
-
 // Token Bucket for Google's standard 250 quota units per second per user limit
 const gmailTokenBucket = new TokenBucket({
   capacity: 250,
@@ -422,8 +408,8 @@ export function getGmailStatus(userEmail?: string) {
     {
       scope: 'https://www.googleapis.com/auth/gmail.labels',
       shortName: 'gmail.labels',
-      category: 'SOC Label Hierarchy & Color Management',
-      description: 'Allows creating, configuring, and color-coding SOC triage labels (Quarantined, Suspicious, Clean, Investigating) inside the user mailbox.',
+      category: 'SOC Label Management',
+      description: 'Allows automated provisioning, styling, and management of SOC tags (TraceXMail/QUARANTINED, TraceXMail/Clean).',
       granted: isLabelsGranted,
       required: true,
       lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
@@ -431,8 +417,8 @@ export function getGmailStatus(userEmail?: string) {
     {
       scope: 'https://www.googleapis.com/auth/gmail.metadata',
       shortName: 'gmail.metadata',
-      category: 'High-Speed Delta Cursor Sync',
-      description: 'Enables high-frequency incremental historyId polling and low-quota header inspection without downloading full message payloads.',
+      category: 'Incremental Delta Sync',
+      description: 'Allows high-speed history cursor polling (users.history.list) and message header indexing with minimal quota consumption.',
       granted: isMetadataGranted,
       required: true,
       lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
@@ -440,8 +426,8 @@ export function getGmailStatus(userEmail?: string) {
     {
       scope: 'https://www.googleapis.com/auth/gmail.send',
       shortName: 'gmail.send',
-      category: 'Security Incident Escalation Dispatch',
-      description: 'Dispatches automated security incident alert emails directly to SOC analysts and impacted recipients upon confirmed threats.',
+      category: 'SOAR Automated Alerting',
+      description: 'Allows dispatching automated security breach notices, incident escalation briefings, and employee awareness warnings.',
       granted: isSendGranted,
       required: true,
       lastVerifiedAt: state.scopesGrantedAt || state.lastRefreshedAt
@@ -594,10 +580,7 @@ export function refreshOAuthPermissionsState(options?: {
 /**
  * Toggles a scope for testing/simulation of degraded permissions.
  */
-export function toggleOAuthScopeSimulation(
-  scopeName: 'gmail.readonly' | 'gmail.modify' | 'gmail.labels' | 'gmail.metadata' | 'gmail.send' | 'userinfo.email' | string,
-  grant: boolean
-): string[] {
+export function toggleOAuthScopeSimulation(scopeName: 'gmail.readonly' | 'gmail.modify' | 'gmail.labels' | 'gmail.metadata' | 'gmail.send' | 'userinfo.email', grant: boolean): string[] {
   const fullScope = scopeName.startsWith('http') ? scopeName : `https://www.googleapis.com/auth/${scopeName}`;
   if (grant) {
     if (!state.activeScopes.some(s => s.includes(scopeName))) {
@@ -893,14 +876,10 @@ export async function fetchGmailMessageRaw(messageId: string, accessToken?: stri
 }
 
 /**
- * Ensures a label exists in the user's real Gmail account.
+ * Ensures a quarantine label exists in the user's real Gmail account.
  * Creates it if not present and returns the label ID.
  */
-export async function ensureGmailLabel(
-  labelName: string,
-  accessToken?: string,
-  color?: { textColor: string; backgroundColor: string }
-): Promise<string | null> {
+export async function ensureGmailLabel(labelName: string, accessToken: string): Promise<string | null> {
   let token = accessToken || state.accessToken;
   if (!token || token === 'mock_oauth2_access_token_encrypted' || token.startsWith('mock_')) {
     return null;
@@ -945,14 +924,7 @@ export async function ensureGmailLabel(
       return existing.id;
     }
 
-    await acquireGmailQuota(GMAIL_QUOTA_COSTS.LABELS_CREATE, 'labels.create');
-
-    const labelColor = color || (SOC_LABEL_COLORS as any)[labelName] || {
-      textColor: '#ffffff',
-      backgroundColor: '#fb4c2f'
-    };
-
-    // 2. Create the label - attempt with color first
+    // 2. Create the label - attempt with known-supported Gmail label color first
     try {
       const createRes = await axios.post(
         'https://gmail.googleapis.com/gmail/v1/users/me/labels',
@@ -960,7 +932,10 @@ export async function ensureGmailLabel(
           name: labelName,
           labelListVisibility: 'labelShow',
           messageListVisibility: 'show',
-          color: labelColor
+          color: {
+            textColor: '#ffffff',
+            backgroundColor: '#fb4c2f'
+          }
         },
         {
           headers: {
@@ -994,122 +969,6 @@ export async function ensureGmailLabel(
   } catch (err: any) {
     console.warn(`[GmailLabel] Could not ensure label ${labelName}:`, extractGoogleApiError(err));
     return null;
-  }
-}
-
-/**
- * Ensures all SOC triage labels (TraceXMail/Quarantined, TraceXMail/Suspicious, TraceXMail/Clean, TraceXMail/Investigating)
- * exist in the user's Gmail mailbox with standardized color coding.
- */
-export async function ensureSocLabels(accessToken?: string): Promise<{
-  quarantined: string | null;
-  suspicious: string | null;
-  clean: string | null;
-  investigating: string | null;
-}> {
-  const token = accessToken || (await ensureFreshAccessToken());
-  if (!token || token.startsWith('mock_')) {
-    return { quarantined: null, suspicious: null, clean: null, investigating: null };
-  }
-
-  console.log('[GmailLabels] Ensuring SOC label hierarchy in mailbox...');
-  const [quarantined, suspicious, clean, investigating] = await Promise.all([
-    ensureGmailLabel(SOC_LABELS.QUARANTINED, token, SOC_LABEL_COLORS[SOC_LABELS.QUARANTINED]),
-    ensureGmailLabel(SOC_LABELS.SUSPICIOUS, token, SOC_LABEL_COLORS[SOC_LABELS.SUSPICIOUS]),
-    ensureGmailLabel(SOC_LABELS.CLEAN, token, SOC_LABEL_COLORS[SOC_LABELS.CLEAN]),
-    ensureGmailLabel(SOC_LABELS.INVESTIGATING, token, SOC_LABEL_COLORS[SOC_LABELS.INVESTIGATING])
-  ]);
-
-  return { quarantined, suspicious, clean, investigating };
-}
-
-/**
- * Dispatches an automated incident escalation email via the Gmail users.messages.send API.
- * Uses the authorized gmail.send scope to alert security personnel or recipients.
- */
-export async function sendIncidentEscalationEmail(params: {
-  to: string;
-  subject: string;
-  bodyHtml: string;
-  bodyText?: string;
-  caseId?: string;
-  threatScore?: number;
-  verdict?: string;
-  accessToken?: string;
-}): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  let token = params.accessToken || state.accessToken;
-  if (!token || token.startsWith('mock_')) {
-    return { success: false, error: 'Valid Gmail OAuth token required to send email.' };
-  }
-
-  try {
-    if (token === state.accessToken) {
-      const fresh = await ensureFreshAccessToken();
-      if (fresh) token = fresh;
-    }
-
-    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_SEND, 'messages.send');
-
-    const fromEmail = state.emailAddress || 'security-alert@tracexmail.sec';
-    const boundary = `----=_Part_TraceXMailAlert_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-
-    const rfcHeaders = [
-      `From: "TraceXMail Automated SOC" <${fromEmail}>`,
-      `To: ${params.to}`,
-      `Subject: ${params.subject}`,
-      `Date: ${new Date().toUTCString()}`,
-      `Message-ID: <alert-${params.caseId || Date.now()}-${crypto.randomUUID().slice(0, 8)}@tracexmail.sec>`,
-      'X-TraceXMail-Alert: true',
-      params.caseId ? `X-TraceXMail-Case: ${params.caseId}` : '',
-      typeof params.threatScore === 'number' ? `X-TraceXMail-Threat-Score: ${params.threatScore}` : '',
-      params.verdict ? `X-TraceXMail-Verdict: ${params.verdict}` : '',
-      'MIME-Version: 1.0',
-      `Content-Type: multipart/alternative; boundary="${boundary}"`
-    ].filter(Boolean).join('\r\n');
-
-    const plainText = params.bodyText || params.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    const multipart = [
-      `--${boundary}`,
-      'Content-Type: text/plain; charset="UTF-8"',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      plainText,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/html; charset="UTF-8"',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      params.bodyHtml,
-      '',
-      `--${boundary}--`
-    ].join('\r\n');
-
-    const rawEmail = rfcHeaders + '\r\n\r\n' + multipart;
-    const base64Url = Buffer.from(rawEmail, 'utf8')
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=+$/, '');
-
-    const res = await axios.post(
-      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
-      { raw: base64Url },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      }
-    );
-
-    const messageId = res.data?.id;
-    console.log(`[GmailSend] Automated SOC incident alert dispatched to ${params.to} (Message ID: ${messageId})`);
-    return { success: true, messageId };
-  } catch (err: any) {
-    const errorMsg = extractGoogleApiError(err);
-    console.warn(`[GmailSend] Failed sending incident escalation email to ${params.to}:`, errorMsg);
-    return { success: false, error: errorMsg };
   }
 }
 
@@ -2181,26 +2040,35 @@ export async function handlePubSubPush(body: any): Promise<{
       pushData = body;
     }
 
+    const previousHistoryId = state.historyId;
     const historyId = pushData.historyId || String(Date.now());
     const emailAddress = pushData.emailAddress || state.emailAddress || 'user@gmail.com';
 
     state.historyId = historyId;
     state.lastPolledAt = new Date().toISOString();
 
-    // Queue immediately for automated forensic analysis pipeline
-    queueEmailForAnalysis({
-      messageId: body?.message?.messageId || `pubsub_${historyId}`,
-      threadId: body?.threadId || body?.message?.threadId || pushData?.threadId,
-      source: 'pubsub_push',
-      emailAddress,
-      rawEml: body?.rawEmail,
-      deliveryStage: 'pre-delivery-hold'
+    // Trigger instant delta ingestion cycle using historyId cursor
+    runAutoSyncCycle().catch(err => {
+      console.warn('[GmailPush] Triggered auto-sync warning:', err?.message);
     });
+
+    // If body contains direct rawEmail payload, queue it immediately
+    if (body?.rawEmail) {
+      queueEmailForAnalysis({
+        messageId: body?.message?.messageId || `pubsub_${historyId}`,
+        threadId: body?.threadId || body?.message?.threadId || pushData?.threadId,
+        source: 'pubsub_push',
+        emailAddress,
+        rawEml: body?.rawEmail,
+        deliveryStage: 'pre-delivery-hold'
+      });
+    }
 
     // Emit event for real-time listeners
     gmailEvents.emit('inbound_mail_push', {
       emailAddress,
       historyId,
+      previousHistoryId,
       timestamp: new Date().toISOString()
     });
 
@@ -2772,135 +2640,156 @@ let autoSyncTimer: NodeJS.Timeout | null = null;
 let isSyncCycleActive = false;
 
 /**
- * Incremental Delta Cursor Sync Engine using Gmail users.history.list.
- * Efficiently fetches delta updates since startHistoryId, processes newly arrived messages,
- * applies SOC triage labels, and updates the historyId cursor.
+ * Fetches current mailbox profile metadata including latest historyId and total messages.
  */
-export async function syncGmailDeltaHistory(
-  startHistoryId?: string,
-  accessToken?: string
-): Promise<{ count: number; historyId: string | null; error?: string }> {
-  let token = accessToken || state.accessToken;
-  if (!token || token.startsWith('mock_')) {
-    return { count: 0, historyId: state.historyId, error: 'No live access token available' };
-  }
-
-  const effectiveStartHistoryId = startHistoryId || state.historyId;
+export async function fetchGmailProfile(accessToken?: string): Promise<{
+  emailAddress?: string;
+  messagesTotal?: number;
+  threadsTotal?: number;
+  historyId?: string;
+} | null> {
+  let token = accessToken || (await ensureFreshAccessToken());
+  if (!token || token.startsWith('mock_')) return null;
 
   try {
-    if (token === state.accessToken) {
-      const fresh = await ensureFreshAccessToken();
-      if (fresh) token = fresh;
-    }
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_GET_METADATA, 'users.getProfile');
+    const res = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${token}` },
+      timeout: 8000
+    });
+    return res.data;
+  } catch (err: any) {
+    console.warn('[GmailProfile] Error fetching profile:', extractGoogleApiError(err));
+    return null;
+  }
+}
 
-    // If no starting historyId, initialize from user's current mailbox profile
-    if (!effectiveStartHistoryId) {
-      const profileRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 8000
-      });
-      if (profileRes.data?.historyId) {
-        state.historyId = String(profileRes.data.historyId);
-        console.log(`[GmailDeltaSync] Initialized starting historyId cursor: ${state.historyId}`);
-      }
-      return { count: 0, historyId: state.historyId };
-    }
+/**
+ * Queries incremental message delta from the Gmail history API using a startHistoryId cursor.
+ * Implements high-efficiency delta ingestion without scanning the full mailbox.
+ */
+export async function fetchGmailHistoryDelta(
+  startHistoryId: string,
+  accessToken?: string
+): Promise<{
+  newMessages: Array<{ id: string; threadId: string }>;
+  latestHistoryId: string;
+  historyExpired?: boolean;
+}> {
+  let token = accessToken || (await ensureFreshAccessToken());
+  if (!token || token.startsWith('mock_')) {
+    return { newMessages: [], latestHistoryId: startHistoryId };
+  }
 
+  try {
     await acquireGmailQuota(GMAIL_QUOTA_COSTS.HISTORY_LIST, 'users.history.list');
 
-    let historyRes;
-    try {
-      historyRes = await axios.get(
-        `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${encodeURIComponent(effectiveStartHistoryId)}&historyTypes=messageAdded&maxResults=50`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }
-      );
-    } catch (apiErr: any) {
-      const statusCode = apiErr?.response?.status;
-      // 404 or 400 indicates startHistoryId is out of date or purged on Google servers
-      if (statusCode === 404 || statusCode === 400) {
-        console.warn(`[GmailDeltaSync] Cursor ${effectiveStartHistoryId} expired or invalid (HTTP ${statusCode}). Re-syncing cursor via profile...`);
-        const profileRes = await axios.get('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 8000
-        });
-        if (profileRes.data?.historyId) {
-          state.historyId = String(profileRes.data.historyId);
-        }
-        return { count: 0, historyId: state.historyId };
+    const res = await axios.get(
+      `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000
       }
-      throw apiErr;
-    }
+    );
 
-    const historyData = historyRes.data || {};
-    const newHistoryId = historyData.historyId ? String(historyData.historyId) : effectiveStartHistoryId;
-    state.historyId = newHistoryId;
-    state.lastPolledAt = new Date().toISOString();
+    const historyItems = res.data?.history || [];
+    const latestHistoryId = res.data?.historyId || startHistoryId;
+    const addedMessages: Array<{ id: string; threadId: string }> = [];
+    const seenIds = new Set<string>();
 
-    const historyRecords = Array.isArray(historyData.history) ? historyData.history : [];
-    const addedMessages: Array<{ id: string; threadId?: string }> = [];
-
-    for (const record of historyRecords) {
-      if (Array.isArray(record.messagesAdded)) {
-        for (const item of record.messagesAdded) {
-          if (item?.message?.id) {
+    for (const h of historyItems) {
+      if (Array.isArray(h.messagesAdded)) {
+        for (const item of h.messagesAdded) {
+          if (item?.message?.id && !seenIds.has(item.message.id)) {
+            seenIds.add(item.message.id);
             addedMessages.push({
               id: item.message.id,
-              threadId: item.message.threadId
+              threadId: item.message.threadId || item.message.id
             });
           }
         }
       }
     }
 
-    let processedCount = 0;
-    for (const msg of addedMessages) {
-      const alreadyProcessed = await isMessageAlreadyProcessed(msg.id, DEFAULT_ORG_ID);
-      if (alreadyProcessed) continue;
-
-      const raw = await fetchGmailMessageRaw(msg.id, token);
-      if (raw) {
-        processedCount++;
-        await markMessageProcessed({
-          messageId: msg.id,
-          threadId: msg.threadId,
-          orgId: DEFAULT_ORG_ID
-        });
-
-        queueEmailForAnalysis({
-          messageId: msg.id,
-          threadId: msg.threadId,
-          source: 'gmail_sync_loop',
-          emailAddress: state.emailAddress || undefined,
-          rawEml: raw,
-          deliveryStage: 'pre-delivery-hold'
-        });
-
-        // Trigger real-time push event for listeners & WebSocket broadcast
-        gmailEvents.emit('inbound_mail_push', {
-          emailAddress: state.emailAddress,
-          messageId: msg.id,
-          rawEmail: raw,
-          historyId: newHistoryId,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-
-    console.log(`[GmailDeltaSync] Delta cycle processed ${processedCount} new messages (Cursor: ${newHistoryId})`);
-    return { count: processedCount, historyId: newHistoryId };
+    return {
+      newMessages: addedMessages,
+      latestHistoryId: String(latestHistoryId)
+    };
   } catch (err: any) {
-    const errorMsg = extractGoogleApiError(err);
-    console.warn('[GmailDeltaSync] Delta sync error:', errorMsg);
-    return { count: 0, historyId: state.historyId, error: errorMsg };
+    const status = err?.response?.status;
+    if (status === 404) {
+      console.log(`[GmailHistory] History cursor ${startHistoryId} expired (HTTP 404). Full sync required.`);
+      return { newMessages: [], latestHistoryId: startHistoryId, historyExpired: true };
+    }
+    console.warn('[GmailHistory] Error querying history list:', extractGoogleApiError(err));
+    return { newMessages: [], latestHistoryId: startHistoryId };
   }
 }
 
 /**
- * Runs a single polling cycle to query and evaluate new unread emails from the connected Gmail account.
- * Guarantees message deduplication via persistent ledger and uses delta cursor when available.
+ * Sends an email message from the connected Gmail account using users.messages.send.
+ * Formats RFC 2822 multipart email with plain text and optional rich HTML.
+ */
+export async function sendGmailMessage(params: {
+  to: string;
+  subject: string;
+  body: string;
+  htmlBody?: string;
+  from?: string;
+  accessToken?: string;
+}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  let token = params.accessToken || (await ensureFreshAccessToken());
+  if (!token || token.startsWith('mock_')) {
+    return { success: false, error: 'Valid Gmail OAuth access token required to send email.' };
+  }
+
+  try {
+    await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_SEND, 'messages.send');
+
+    const boundary = `tracexmail_boundary_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const fromHeader = params.from || state.emailAddress || 'security-soc@tracexmail.sec';
+
+    const rfcMessage = [
+      `From: ${fromHeader}`,
+      `To: ${params.to}`,
+      `Subject: ${params.subject}`,
+      `Date: ${new Date().toUTCString()}`,
+      `MIME-Version: 1.0`,
+      params.htmlBody
+        ? `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${params.body}\r\n\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${params.htmlBody}\r\n\r\n--${boundary}--`
+        : `Content-Type: text/plain; charset=UTF-8\r\n\r\n${params.body}`
+    ].join('\r\n');
+
+    const base64UrlMessage = Buffer.from(rfcMessage, 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    const res = await axios.post(
+      'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      { raw: base64UrlMessage },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 12000
+      }
+    );
+
+    return { success: true, messageId: res.data?.id };
+  } catch (err: any) {
+    const errorMsg = extractGoogleApiError(err);
+    console.warn('[GmailSend] Failed sending email via Gmail API:', errorMsg);
+    return { success: false, error: errorMsg };
+  }
+}
+
+/**
+ * Runs a single polling cycle to query and evaluate new emails from the connected Gmail account.
+ * Supports incremental history delta sync (users.history.list) with automatic fallback to unread polling.
+ * Guarantees message deduplication via persistent ledger and immediately clears UNREAD state.
  */
 export async function runAutoSyncCycle(): Promise<{ count: number; error?: string }> {
   if (!state.isConnected) {
@@ -2923,34 +2812,43 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
 
     let fetchedCount = 0;
     if (isLiveToken) {
-      // 1. If we have a delta historyId, use high-speed delta cursor sync first
-      if (state.historyId) {
-        const deltaResult = await syncGmailDeltaHistory(state.historyId, state.accessToken || undefined);
-        fetchedCount = deltaResult.count;
-      }
+      try {
+        let messagesToProcess: Array<{ id: string; threadId?: string }> = [];
 
-      // 2. If no messages found via delta, or if initial cycle, verify recent unread inbox items
-      if (fetchedCount === 0) {
-        try {
+        // Check if we have an active historyId checkpoint for incremental delta sync
+        if (state.historyId && /^\d+$/.test(state.historyId)) {
+          const deltaResult = await fetchGmailHistoryDelta(state.historyId);
+          if (!deltaResult.historyExpired && deltaResult.newMessages.length > 0) {
+            messagesToProcess = deltaResult.newMessages;
+            state.historyId = deltaResult.latestHistoryId;
+          } else if (deltaResult.historyExpired) {
+            // Checkpoint expired: resync profile cursor
+            const profile = await fetchGmailProfile();
+            if (profile?.historyId) {
+              state.historyId = String(profile.historyId);
+            }
+          }
+        }
+
+        // If no delta messages found or no historyId yet, fallback to unread message scan
+        if (messagesToProcess.length === 0) {
           await acquireGmailQuota(GMAIL_QUOTA_COSTS.MESSAGES_LIST, 'messages.list.unread');
-
           let listResp;
           try {
             listResp = await axios.get(
-              'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+              'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=10',
               {
                 headers: { Authorization: `Bearer ${state.accessToken}` },
                 timeout: 8000
               }
             );
           } catch (apiErr: any) {
-            // Retry once on 401 Unauthorized by refreshing token
             if (apiErr?.response?.status === 401) {
               console.log('[GmailSyncLoop] Received 401 Unauthorized from Gmail API. Attempting token refresh...');
               const refreshRes = await refreshGmailAccessToken();
               if (refreshRes.success && state.accessToken) {
                 listResp = await axios.get(
-                  'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=5',
+                  'https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=10',
                   {
                     headers: { Authorization: `Bearer ${state.accessToken}` },
                     timeout: 8000
@@ -2964,75 +2862,84 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
             }
           }
 
-          const messages = listResp?.data?.messages || [];
-          for (const msg of messages) {
-            // Check persistent deduplication ledger
-            const alreadyProcessed = await isMessageAlreadyProcessed(msg.id, DEFAULT_ORG_ID);
-            if (alreadyProcessed) {
-              // Still ensure UNREAD label is removed so Gmail stops matching is:unread
-              if (state.accessToken) {
-                await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(() => {});
-              }
-              continue;
-            }
+          messagesToProcess = listResp?.data?.messages || [];
 
-            const raw = await fetchGmailMessageRaw(msg.id, state.accessToken || undefined);
-            if (raw) {
-              fetchedCount++;
-
-              // Record in deduplication ledger immediately
-              await markMessageProcessed({
-                messageId: msg.id,
-                threadId: msg.threadId,
-                orgId: DEFAULT_ORG_ID
-              });
-
-              // Queue immediately for automated forensic analysis
-              queueEmailForAnalysis({
-                messageId: msg.id,
-                threadId: msg.threadId,
-                source: 'gmail_sync_loop',
-                emailAddress: state.emailAddress || undefined,
-                rawEml: raw,
-                deliveryStage: 'pre-delivery-hold'
-              });
-
-              // Remove UNREAD label immediately so it stops matching is:unread on next cycle
-              if (state.accessToken) {
-                await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(err => {
-                  console.warn(`[GmailSyncLoop] Failed removing UNREAD label from message ${msg.id}:`, err?.message);
-                });
-              }
-
-              gmailEvents.emit('inbound_mail_push', {
-                emailAddress: state.emailAddress,
-                messageId: msg.id,
-                rawEmail: raw,
-                timestamp: new Date().toISOString()
-              });
+          // Initialize historyId from profile if not yet set
+          if (!state.historyId) {
+            const profile = await fetchGmailProfile();
+            if (profile?.historyId) {
+              state.historyId = String(profile.historyId);
             }
           }
-        } catch (apiErr: any) {
-          const errorDetail = extractGoogleApiError(apiErr);
-          if (
-            apiErr?.response?.status === 401 ||
-            String(errorDetail).includes('401') ||
-            String(errorDetail).includes('invalid authentication credentials')
-          ) {
-            if (!state.authExpired) {
-              state.authExpired = true;
-              state.isConnected = false;
-              state.authError = 'OAuth access token expired or invalid. Please reconnect Gmail.';
-              stopAutoSyncLoop();
-              gmailEvents.emit('gmail_auth_expired', {
-                timestamp: new Date().toISOString(),
-                error: errorDetail
-              });
-              console.warn('[GmailSyncLoop] Gmail OAuth token expired (401). Pausing auto-sync loop until reconnection.');
+        }
+
+        for (const msg of messagesToProcess) {
+          // Check persistent deduplication ledger
+          const alreadyProcessed = await isMessageAlreadyProcessed(msg.id, DEFAULT_ORG_ID);
+          if (alreadyProcessed) {
+            // Still ensure UNREAD label is removed so Gmail stops matching is:unread
+            if (state.accessToken) {
+              await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(() => {});
             }
-          } else {
-            console.warn('[GmailSyncLoop] Error fetching messages from Gmail API:', errorDetail);
+            continue;
           }
+
+          const raw = await fetchGmailMessageRaw(msg.id, state.accessToken || undefined);
+          if (raw) {
+            fetchedCount++;
+
+            // Record in deduplication ledger immediately
+            await markMessageProcessed({
+              messageId: msg.id,
+              threadId: msg.threadId,
+              orgId: DEFAULT_ORG_ID
+            });
+
+            // Queue immediately for automated forensic analysis
+            queueEmailForAnalysis({
+              messageId: msg.id,
+              threadId: msg.threadId,
+              source: 'gmail_sync_loop',
+              emailAddress: state.emailAddress || undefined,
+              rawEml: raw,
+              deliveryStage: 'pre-delivery-hold'
+            });
+
+            // Remove UNREAD label immediately so it stops matching is:unread on next cycle
+            if (state.accessToken) {
+              await modifyGmailMessageLabels(msg.id, [], ['UNREAD'], state.accessToken).catch(err => {
+                console.warn(`[GmailSyncLoop] Failed removing UNREAD label from message ${msg.id}:`, err?.message);
+              });
+            }
+
+            gmailEvents.emit('inbound_mail_push', {
+              emailAddress: state.emailAddress,
+              messageId: msg.id,
+              rawEmail: raw,
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
+      } catch (apiErr: any) {
+        const errorDetail = extractGoogleApiError(apiErr);
+        if (
+          apiErr?.response?.status === 401 ||
+          String(errorDetail).includes('401') ||
+          String(errorDetail).includes('invalid authentication credentials')
+        ) {
+          if (!state.authExpired) {
+            state.authExpired = true;
+            state.isConnected = false;
+            state.authError = 'OAuth access token expired or invalid. Please reconnect Gmail.';
+            stopAutoSyncLoop();
+            gmailEvents.emit('gmail_auth_expired', {
+              timestamp: new Date().toISOString(),
+              error: errorDetail
+            });
+            console.warn('[GmailSyncLoop] Gmail OAuth token expired (401). Pausing auto-sync loop until reconnection.');
+          }
+        } else {
+          console.warn('[GmailSyncLoop] Error fetching messages from Gmail API:', errorDetail);
         }
       }
     }
@@ -3040,7 +2947,6 @@ export async function runAutoSyncCycle(): Promise<{ count: number; error?: strin
     gmailEvents.emit('sync_cycle_completed', {
       timestamp: state.lastPolledAt,
       emailAddress: state.emailAddress,
-      historyId: state.historyId,
       fetchedCount
     });
 

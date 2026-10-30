@@ -1,0 +1,106 @@
+{
+  "timestamp": "2026-10-29T19:28:51.888Z",
+  "inputDatasetPath": "/app/applet/data/datasets/ingested_corpora.json",
+  "totalInitialRecords": 4400,
+  "exactDuplicatesRemoved": 0,
+  "nearDuplicatesRemoved": 0,
+  "totalCleanRecords": 4400,
+  "intraClassDuplicationRate": 0,
+  "dedupThreshold": 0.85,
+  "leakageThreshold": 0.8,
+  "domainDisjointnessVerified": true,
+  "overlappingDomainsAcrossSplits": [],
+  "crossSplitLeakageDetected": false,
+  "crossSplitLeakageCount": 0,
+  "maxCrossSplitSimilarity": 0.7355371900826446,
+  "adversarialHoldoutSha256Before": "9752514ef29a99aeb5dba67dda84027c10584f241474476fb6b6451b2526843c",
+  "adversarialHoldoutSha256After": "9752514ef29a99aeb5dba67dda84027c10584f241474476fb6b6451b2526843c",
+  "adversarialHoldoutUntouched": true,
+  "splits": {
+    "train": {
+      "recordCount": 3077,
+      "domainCount": 14,
+      "domains": [
+        "account-verify-update.net",
+        "amazon.com",
+        "apple.com",
+        "github.com",
+        "google.com",
+        "microsoft.com",
+        "okta.com",
+        "paypal.com",
+        "payroll-portal-auth.org",
+        "salesforce.com",
+        "secure-login-portal-01.com",
+        "slack.com",
+        "wire-fund-transfer.co",
+        "zoom.us"
+      ],
+      "perClassCounts": {
+        "Legitimate": 1050,
+        "Phishing": 560,
+        "Impersonated": 489,
+        "Fraud-related": 489,
+        "Suspicious": 489
+      },
+      "perCorpusCounts": {
+        "tracexmail_curated": 2028,
+        "nazario_phishing": 560,
+        "bec_wire_fraud": 489
+      }
+    },
+    "val": {
+      "recordCount": 560,
+      "domainCount": 5,
+      "domains": [
+        "bankofamerica.com",
+        "chase.com",
+        "citigroup.com",
+        "fidelity.com",
+        "stripe.com"
+      ],
+      "perClassCounts": {
+        "Legitimate": 190,
+        "Phishing": 100,
+        "Impersonated": 90,
+        "Fraud-related": 90,
+        "Suspicious": 90
+      },
+      "perCorpusCounts": {
+        "tracexmail_curated": 370,
+        "nazario_phishing": 100,
+        "bec_wire_fraud": 90
+      }
+    },
+    "test": {
+      "recordCount": 763,
+      "domainCount": 7,
+      "domains": [
+        "crypto-bonus-reward.top",
+        "evil-corp-phish.xyz",
+        "hr-benefits-review.cc",
+        "invoice-accounting-dept.info",
+        "office365-password-reset.pw",
+        "vendor-settlement.biz",
+        "wellsfargo.com"
+      ],
+      "perClassCounts": {
+        "Legitimate": 260,
+        "Phishing": 140,
+        "Impersonated": 121,
+        "Fraud-related": 121,
+        "Suspicious": 121
+      },
+      "perCorpusCounts": {
+        "tracexmail_curated": 502,
+        "nazario_phishing": 140,
+        "bec_wire_fraud": 121
+      }
+    }
+  },
+  "outputFiles": {
+    "trainPath": "/app/applet/data/datasets/train_split.json",
+    "valPath": "/app/applet/data/datasets/val_split.json",
+    "testPath": "/app/applet/data/datasets/test_split.json"
+  }
+}

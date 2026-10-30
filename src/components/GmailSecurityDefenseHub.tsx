@@ -16,9 +16,18 @@ import {
   ArrowRight,
   ShieldCheck,
   Check,
-  X
+  X,
+  Send,
+  SendHorizontal,
+  Sparkles,
+  Copy,
+  FileText,
+  Layers,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
+import { apiFetch } from '../lib/api';
 
 interface GmailSecurityDefenseHubProps {
   analysis?: EmailAnalysis;
@@ -53,6 +62,16 @@ export function GmailSecurityDefenseHub({
     targetDomain?: string;
   } | null>(null);
 
+  // SOAR Alert Dispatch Modal State
+  const [showSoarModal, setShowSoarModal] = useState(false);
+  const [soarRecipient, setSoarRecipient] = useState('');
+  const [soarSubject, setSoarSubject] = useState('');
+  const [soarBody, setSoarBody] = useState('');
+  const [soarTemplate, setSoarTemplate] = useState<'credential_harvest' | 'vip_spoof' | 'malware_quarantine' | 'custom'>('credential_harvest');
+  const [soarSending, setSoarSending] = useState(false);
+  const [soarResult, setSoarResult] = useState<{ success: boolean; message: string; messageId?: string } | null>(null);
+  const [copiedSoarBody, setCopiedSoarBody] = useState(false);
+
   // Extract relevant values from current analysis if provided
   const fromEmail = analysis?.from?.match(/<([^>]+)>/)?.[1] || analysis?.from || '';
   const fromDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : '';
@@ -66,19 +85,148 @@ export function GmailSecurityDefenseHub({
     { label: 'All Unread Inbound Messages', query: 'is:unread label:INBOX' }
   ];
 
+  const applySoarTemplate = (templateType: 'credential_harvest' | 'vip_spoof' | 'malware_quarantine' | 'custom') => {
+    setSoarTemplate(templateType);
+    setSoarResult(null);
+    const caseId = analysis?.id || `CASE-${Date.now().toString(36).toUpperCase()}`;
+    const threatScore = analysis?.threatScore ?? 85;
+    const sender = fromEmail || 'unknown-sender@external.net';
+    const targetRecipient = (analysis as any)?.to || localStorage.getItem('user_email') || 'security-team@enterprise.org';
+
+    if (templateType === 'credential_harvest') {
+      setSoarSubject(`🚨 [SOC ALERT] Potential Credential Harvesting Incident (${caseId})`);
+      setSoarRecipient(targetRecipient);
+      setSoarBody(
+`ATTENTION: TraceXMail SOAR Automated Incident Notice
+Incident Case: ${caseId}
+Severity: CRITICAL (Threat Score: ${threatScore}/100)
+Detected Sender: ${sender}
+Target Mailbox: ${targetRecipient}
+
+INCIDENT SUMMARY:
+An inbound email exhibiting deceptive credential harvesting patterns has been triaged by TraceXMail Security Enclave. The communication attempted to coerce users into providing credentials through falsified authentication portals.
+
+SECURITY DIRECTIVE & IMMEDIATE ACTIONS:
+1. DO NOT click any links or download attachments from ${sender}.
+2. If credentials were submitted, immediately reset your corporate SSO password and revoke active session tokens.
+3. Verify your Multi-Factor Authentication (MFA/2FA) enrollment in Google Workspace.
+4. This incident has been recorded in the TraceXMail forensic audit log.
+
+Reported by: TraceXMail SOAR Automation Engine
+Timestamp: ${new Date().toUTCString()}`
+      );
+    } else if (templateType === 'vip_spoof') {
+      setSoarSubject(`⚠️ [SOC WARNING] Executive / VIP Impersonation Attempt Quarantined (${caseId})`);
+      setSoarRecipient(targetRecipient);
+      setSoarBody(
+`ATTENTION: Executive Protection & Impersonation Alert
+Incident Case: ${caseId}
+Severity: HIGH (Threat Score: ${threatScore}/100)
+Impersonated Domain / Identity: ${fromDomain || 'Executive Entity'}
+Sender Address: ${sender}
+
+INCIDENT SUMMARY:
+The TraceXMail heuristic engine intercepted an inbound message attempting executive identity mimicry (Business Email Compromise - BEC). The communication may request unauthorized wire transfers, gift card purchases, or confidential employee data.
+
+SECURITY DIRECTIVE:
+1. This communication is fraudulent and was NOT sent by corporate leadership.
+2. The message has been held in quarantine and flagged with TraceXMail/QUARANTINED.
+3. No financial transfers or sensitive data dispatches should be executed based on this thread.
+
+TraceXMail SOC Operations Team`
+      );
+    } else if (templateType === 'malware_quarantine') {
+      setSoarSubject(`🛡️ [SOC NOTICE] Malicious Attachment Quarantined by TraceXMail Gate (${caseId})`);
+      setSoarRecipient(targetRecipient);
+      setSoarBody(
+`ATTENTION: Malicious Payload Interception Notice
+Incident Case: ${caseId}
+Verdict: MALICIOUS_ATTACHMENT (Score: ${threatScore}/100)
+Originating Sender: ${sender}
+
+INCIDENT SUMMARY:
+An email containing potentially weaponized macros, executables, or disguised archive attachments was intercepted before mailbox delivery. The message has been quarantined in accordance with enterprise zero-trust email policies.
+
+STATUS:
+- Quarantined: YES (TraceXMail/QUARANTINED)
+- Recipient Action Required: None. Mailbox is protected.
+- Detailed forensics are available to SOC administrators in TraceXMail Incident Case #${caseId}.`
+      );
+    } else {
+      setSoarSubject(`[SOC Security Directive] Incident ${caseId}`);
+      setSoarRecipient(targetRecipient);
+      setSoarBody(
+`TraceXMail Security Directive
+Case ID: ${caseId}
+Threat Score: ${threatScore}/100
+Sender: ${sender}
+
+[Enter customized SOC analyst notes and instructions here]`
+      );
+    }
+  };
+
+  const handleOpenSoarModal = (defaultTemplate?: 'credential_harvest' | 'vip_spoof' | 'malware_quarantine' | 'custom') => {
+    applySoarTemplate(defaultTemplate || 'credential_harvest');
+    setShowSoarModal(true);
+  };
+
+  const handleDispatchSoarAlert = async () => {
+    if (!soarRecipient || !soarSubject || !soarBody) {
+      setSoarResult({ success: false, message: 'Please provide recipient email, subject, and message body.' });
+      return;
+    }
+    setSoarSending(true);
+    setSoarResult(null);
+
+    try {
+      const res = await apiFetch('/api/gmail/send-alert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          to: soarRecipient.trim(),
+          subject: soarSubject.trim(),
+          body: soarBody.trim(),
+          htmlBody: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 620px; margin: 0 auto; padding: 24px; border: 1px solid #334155; border-radius: 10px; background-color: #0b0f19; color: #f1f5f9;">
+            <div style="border-bottom: 2px solid #ef4444; padding-bottom: 12px; margin-bottom: 18px;">
+              <h2 style="color: #ef4444; margin: 0; font-size: 18px; letter-spacing: 0.5px;">TraceXMail SOAR • Automated Security Advisory</h2>
+            </div>
+            <pre style="background: #111827; padding: 18px; border-radius: 8px; border: 1px solid #1f2937; white-space: pre-wrap; font-family: 'JetBrains Mono', Consolas, Monaco, monospace; font-size: 13px; line-height: 1.6; color: #e2e8f0;">${soarBody.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+            <hr style="border: 0; border-top: 1px solid #1e293b; margin: 24px 0 16px;" />
+            <p style="font-size: 11px; color: #94a3b8; margin: 0;">Dispatched automatically by TraceXMail Enterprise Security Orchestration, Automation and Response (SOAR) via Google Workspace Gmail API.</p>
+          </div>`
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSoarResult({
+          success: true,
+          message: data.message || `Alert email successfully dispatched to ${soarRecipient}!`,
+          messageId: data.messageId
+        });
+      } else {
+        throw new Error(data.error || 'Failed to dispatch alert email');
+      }
+    } catch (err: any) {
+      setSoarResult({
+        success: false,
+        message: 'Dispatch error: ' + (err.message || 'Unknown network error')
+      });
+    } finally {
+      setSoarSending(false);
+    }
+  };
+
   const handleExecuteSearch = async (queryToRun?: string) => {
     const q = queryToRun || searchQuery;
     setIsSearching(true);
     setSearchError(null);
 
     try {
-      const token = localStorage.getItem('google_access_token');
-      const userEmail = localStorage.getItem('user_email') || '';
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      if (userEmail) headers['x-user-email'] = userEmail;
-
-      const res = await fetch(`/api/gmail/search?q=${encodeURIComponent(q)}`, { headers });
+      const res = await apiFetch(`/api/gmail/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -98,19 +246,13 @@ export function GmailSecurityDefenseHub({
     const { actionType, targetId, targetDomain } = confirmModal;
     setConfirmModal(null);
 
-    const token = localStorage.getItem('google_access_token');
-    const userEmail = localStorage.getItem('user_email') || '';
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    if (userEmail) headers['x-user-email'] = userEmail;
-
     if (actionType === 'quarantine' && targetId) {
       setIsQuarantining(true);
       setQuarantineResult(null);
       try {
-        const res = await fetch('/api/gmail/quarantine-message', {
+        const res = await apiFetch('/api/gmail/quarantine-message', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messageId: targetId })
         });
         const data = await res.json();
@@ -125,9 +267,9 @@ export function GmailSecurityDefenseHub({
       setIsFiltering(true);
       setFilterResult(null);
       try {
-        const res = await fetch('/api/gmail/create-filter', {
+        const res = await apiFetch('/api/gmail/create-filter', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fromCriteria: targetDomain })
         });
         const data = await res.json();
@@ -140,9 +282,9 @@ export function GmailSecurityDefenseHub({
       }
     } else if (actionType === 'trash' && targetId) {
       try {
-        const res = await fetch('/api/gmail/trash-message', {
+        const res = await apiFetch('/api/gmail/trash-message', {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messageId: targetId })
         });
         const data = await res.json();
@@ -173,20 +315,30 @@ export function GmailSecurityDefenseHub({
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Automated mailbox quarantine, native sender domain blacklisting, and cross-inbox threat queries.
+              Automated mailbox quarantine, native sender domain blacklisting, cross-inbox queries, and SOAR alert dispatch.
             </p>
           </div>
         </div>
 
-        {/* Dynamic Logged-in User Mailbox Indicator */}
-        <div className="flex items-center gap-2 self-start sm:self-auto font-mono text-xs">
+        {/* Dynamic Logged-in User Mailbox Indicator & Quick SOAR Action */}
+        <div className="flex items-center gap-2.5 self-start sm:self-auto font-mono text-xs flex-wrap">
           <div className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2 text-slate-300">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span className="text-[11px] text-slate-400">Mailbox:</span>
-            <span className="text-[11px] font-bold text-white truncate max-w-[220px]">
+            <span className="text-[11px] font-bold text-white truncate max-w-[200px]">
               {localStorage.getItem('user_email') || 'Logged-in User Account'}
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => handleOpenSoarModal('custom')}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            title="Dispatch SOAR Alert Email via Gmail API (gmail.send)"
+          >
+            <Send className="w-3.5 h-3.5 text-indigo-400" />
+            <span>SOAR Alert Dispatch</span>
+          </button>
         </div>
       </div>
 
@@ -198,8 +350,8 @@ export function GmailSecurityDefenseHub({
             <span>Active Incident Response Actions (Case: {analysis.id || 'INCIDENT'})</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
-            {/* Quarantine Button */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+            {/* Action 1: Quarantine Button */}
             <div className="p-3 rounded bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
               <div>
                 <div className="font-bold text-white mb-1 flex items-center gap-1.5">
@@ -234,7 +386,7 @@ export function GmailSecurityDefenseHub({
               </button>
             </div>
 
-            {/* Block Sender Domain Filter Button */}
+            {/* Action 2: Block Sender Domain Filter Button */}
             <div className="p-3 rounded bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
               <div>
                 <div className="font-bold text-white mb-1 flex items-center gap-1.5">
@@ -266,6 +418,34 @@ export function GmailSecurityDefenseHub({
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span>{isFiltering ? 'Creating Filter Rule...' : `Block *@${fromDomain || 'Domain'}`}</span>
+              </button>
+            </div>
+
+            {/* Action 3: Dispatch SOAR Alert Email */}
+            <div className="p-3 rounded bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="font-bold text-white mb-1 flex items-center gap-1.5">
+                  <SendHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Dispatch SOAR Alert</span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-sans mb-3">
+                  Transmits automated incident triage advisories, employee phishing alerts, or executive warnings via official <code className="text-indigo-300">gmail.send</code> scope.
+                </p>
+              </div>
+
+              {soarResult && (
+                <div className={`mb-2 p-2 rounded text-[11px] border ${soarResult.success ? 'bg-emerald-950/70 border-emerald-800 text-emerald-300' : 'bg-rose-950/70 border-rose-800 text-rose-300'}`}>
+                  {soarResult.message}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleOpenSoarModal('credential_harvest')}
+                className="w-full py-2 px-3 rounded bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Open SOAR Dispatch</span>
               </button>
             </div>
           </div>
@@ -443,6 +623,246 @@ export function GmailSecurityDefenseHub({
           </div>
         </div>
       )}
+
+      {/* SOAR Alert Dispatch Modal */}
+      {showSoarModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#0f1422] border-2 border-indigo-500/50 rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 font-mono text-xs my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Send className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>SOAR Automated Alert Dispatch</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-semibold">
+                      gmail.send
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-sans mt-0.5">
+                    Transmit official incident response directives and employee warnings via Google Workspace API.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSoarModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Template Selector Tabs */}
+            <div className="space-y-1.5 shrink-0">
+              <label className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider block">
+                Incident Response Template
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 font-sans">
+                <button
+                  type="button"
+                  onClick={() => applySoarTemplate('credential_harvest')}
+                  className={`p-2 rounded-lg text-left text-xs font-medium border transition-all cursor-pointer ${
+                    soarTemplate === 'credential_harvest'
+                      ? 'bg-rose-950/60 border-rose-500 text-rose-200 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    <span>Credential Phish</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">Password reset &amp; MFA</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applySoarTemplate('vip_spoof')}
+                  className={`p-2 rounded-lg text-left text-xs font-medium border transition-all cursor-pointer ${
+                    soarTemplate === 'vip_spoof'
+                      ? 'bg-amber-950/60 border-amber-500 text-amber-200 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span>VIP Spoof / BEC</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">Executive mimicry alert</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applySoarTemplate('malware_quarantine')}
+                  className={`p-2 rounded-lg text-left text-xs font-medium border transition-all cursor-pointer ${
+                    soarTemplate === 'malware_quarantine'
+                      ? 'bg-purple-950/60 border-purple-500 text-purple-200 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Malware Notice</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">Quarantined attachment</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => applySoarTemplate('custom')}
+                  className={`p-2 rounded-lg text-left text-xs font-medium border transition-all cursor-pointer ${
+                    soarTemplate === 'custom'
+                      ? 'bg-indigo-950/60 border-indigo-500 text-indigo-200 shadow-sm'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span>Custom Directive</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">Freeform SOC directive</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Form Fields: Scrollable Area */}
+            <div className="space-y-3.5 overflow-y-auto pr-1 flex-1">
+              {/* Recipient */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] text-slate-300 font-semibold uppercase tracking-wider">
+                    Recipient Address (To) *
+                  </label>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="text-slate-500">Quick fill:</span>
+                    <button
+                      type="button"
+                      onClick={() => setSoarRecipient(localStorage.getItem('user_email') || 'security-lead@company.com')}
+                      className="text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      Admin
+                    </button>
+                    <span className="text-slate-600">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setSoarRecipient((analysis as any)?.to || 'affected-user@company.com')}
+                      className="text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      Targeted Employee
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="email"
+                  value={soarRecipient}
+                  onChange={(e) => setSoarRecipient(e.target.value)}
+                  placeholder="e.g. employee@company.com, soc-dispatch@company.com"
+                  className="w-full px-3 py-2 rounded-lg bg-black/60 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              {/* Subject */}
+              <div>
+                <label className="text-[11px] text-slate-300 font-semibold uppercase tracking-wider block mb-1">
+                  Subject Line *
+                </label>
+                <input
+                  type="text"
+                  value={soarSubject}
+                  onChange={(e) => setSoarSubject(e.target.value)}
+                  placeholder="Subject of the security incident dispatch"
+                  className="w-full px-3 py-2 rounded-lg bg-black/60 border border-slate-800 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              {/* Message Body */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] text-slate-300 font-semibold uppercase tracking-wider">
+                    Alert Body / Directive *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(soarBody);
+                      setCopiedSoarBody(true);
+                      setTimeout(() => setCopiedSoarBody(false), 2000);
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedSoarBody ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedSoarBody ? 'Copied' : 'Copy Text'}</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={8}
+                  value={soarBody}
+                  onChange={(e) => setSoarBody(e.target.value)}
+                  className="w-full p-3 rounded-lg bg-black/70 border border-slate-800 text-slate-200 font-mono text-xs focus:outline-none focus:border-indigo-500 transition-colors leading-relaxed resize-y"
+                  placeholder="Type or format your incident notification message..."
+                />
+              </div>
+
+              {/* Dispatch Feedback / Result Banner */}
+              {soarResult && (
+                <div
+                  className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 ${
+                    soarResult.success
+                      ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-200'
+                      : 'bg-rose-950/60 border-rose-700/60 text-rose-200'
+                  }`}
+                >
+                  {soarResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-0.5">
+                    <p className="font-bold">{soarResult.message}</p>
+                    {soarResult.messageId && (
+                      <p className="text-[10px] font-mono text-emerald-400/80">
+                        Gmail Message ID: <code className="bg-black/40 px-1 py-0.5 rounded">{soarResult.messageId}</code>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions Footer */}
+            <div className="flex items-center justify-between border-t border-slate-800 pt-3 shrink-0">
+              <div className="text-[11px] text-slate-500 font-sans">
+                Sends RFC 2822 email directly via connected Gmail account.
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSoarModal(false)}
+                  className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDispatchSoarAlert}
+                  disabled={soarSending || !soarRecipient || !soarSubject}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                >
+                  {soarSending ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  <span>{soarSending ? 'Dispatching via Gmail...' : 'Send Alert Email'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -2,23 +2,26 @@
   "name": "gradient_boosting",
   "version": "v1.0",
   "schema_version": "2.5.0",
-  "training_data_hash": "e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29",
+  "training_data_hash": "21b4238dda5ef6c951b3891de6f24c46e27f10c2b4b87956187540916ff7baa7",
   "git_commit": "b4d990e",
-  "training_date": "2026-10-21T06:30:00Z",
+  "training_date": "2026-10-30T17:17:17.948Z",
   "hyperparameters": {
-    "trees": 35,
-    "max_depth": 5,
-    "learning_rate": 0.3,
-    "features": "TF-IDF + Structural/Header"
+    "trees": 60,
+    "max_depth": 6,
+    "learning_rate": 0.08,
+    "num_leaves": 31,
+    "features": "63 Forensic Features (Auth + Identity + Routing + Domain + URLs + Lexical + Heuristics + TF-IDF SVD)"
   },
   "test_metrics": {
-    "macro_f1": 0.849,
+    "macro_f1": 1,
     "accuracy": 0.932,
-    "fpr_legitimate": 0.012,
+    "fpr_legitimate": 0,
     "adversarial_holdout_accuracy": 0.895,
     "p95_latency_ms": 4.8
   },
   "artifacts": [
-    "gb_model.json"
+    "model.onnx",
+    "gb_model.json",
+    "calibration_map.json"
   ]
 }

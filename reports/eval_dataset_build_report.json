@@ -1,0 +1,60 @@
+{
+  "timestamp": "2026-10-30T17:17:17.369Z",
+  "success": true,
+  "pipelineVersion": "1.0.0",
+  "sourceDataset": "/app/applet/data/datasets/ingested_corpora.json",
+  "adversarialHoldoutPath": "/app/applet/data/datasets/adversarial_holdout.json",
+  "adversarialHoldoutSha256": "9752514ef29a99aeb5dba67dda84027c10584f241474476fb6b6451b2526843c",
+  "adversarialHoldoutUntouched": true,
+  "totalCleanRecords": 4400,
+  "splits": {
+    "train": {
+      "count": 3077,
+      "domainCount": 14,
+      "perClass": {
+        "Legitimate": 1050,
+        "Phishing": 560,
+        "Impersonated": 489,
+        "Fraud-related": 489,
+        "Suspicious": 489
+      },
+      "allowTraining": true,
+      "path": "/app/applet/data/datasets/train_split.json"
+    },
+    "val": {
+      "count": 560,
+      "domainCount": 5,
+      "perClass": {
+        "Legitimate": 190,
+        "Phishing": 100,
+        "Impersonated": 90,
+        "Fraud-related": 90,
+        "Suspicious": 90
+      },
+      "allowTraining": false,
+      "path": "/app/applet/data/datasets/val_split.json"
+    },
+    "test": {
+      "count": 763,
+      "domainCount": 7,
+      "perClass": {
+        "Legitimate": 260,
+        "Phishing": 140,
+        "Impersonated": 121,
+        "Fraud-related": 121,
+        "Suspicious": 121
+      },
+      "allowTraining": false,
+      "path": "/app/applet/data/datasets/test_split.json"
+    }
+  },
+  "invariants": {
+    "domainDisjointnessPassed": true,
+    "overlappingDomainCount": 0,
+    "testContaminationDetected": false,
+    "leakingPairsCount": 0,
+    "minTotalRecordsPassed": true,
+    "minPerClassRecordsPassed": true,
+    "testSplitIsolatedFromTraining": true
+  }
+}

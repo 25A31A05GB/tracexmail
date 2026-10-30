@@ -1,13 +1,13 @@
 # TraceXMail Empirical Verified Resume Bullets (Prompt 33)
 
-Generated dynamically from empirical run reports on 2026-10-21T19:50:27.727Z.  
-**Source Datasets**: 353 clean, group-split records (59 test).  
-**Manifest Hash**: `e8d9444ca7f4caa6ab9f0dec84dd05077ebf0bfd19822edc8b1e268e50d23d29`  
+Generated dynamically from empirical run reports on 2026-10-28T20:10:56.570Z.  
+**Source Datasets**: 3484 clean, group-split records (658 test).  
+**Manifest Hash**: `aae3b5fc872d6c0e21f9e7304cbb9e061dd5edbb6e5dfcd775fbe81b14d69a7a`  
 
 ---
 
 ### Role 1: Machine Learning Engineer / Applied AI Scientist
-- **Engineered an end-to-end multi-class email forensic detection pipeline** categorizing threats across 5 distinct classes (*Legitimate, Suspicious, Impersonated, Phishing, Fraud-related*), achieving **84.9% Macro-F1** and **93.2% accuracy** on a leak-free, group-split test benchmark.
+- **Engineered an end-to-end multi-class email forensic detection pipeline** categorizing threats across 5 distinct classes (*Legitimate, Suspicious, Impersonated, Phishing, Fraud-related*), achieving **68.1% Macro-F1** and **69.2% accuracy** on a leak-free, group-split test benchmark.
 - **Eliminated evaluation data leakage** by implementing stratified group splitting on sender domains and word 5-shingle MinHash deduplication ($J > 0.85$), proving out-of-distribution generalization against zero-day phishing campaigns.
 - **Calibrated multi-class probability outputs** using post-hoc Temperature Scaling ($T=0.50$) fitted on validation splits, reducing Expected Calibration Error (ECE) from **0.2787 to 0.0436** and Brier score from **0.1034 to 0.0033**.
 - **Quantified explanation faithfulness via systematic deletion testing**, achieving an Area Under the Deletion Curve (AUDC) of **0.5553** vs **0.7604** on random features (1.369x faster confidence collapse), proving attributed signals are causally grounded.

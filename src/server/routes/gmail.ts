@@ -40,12 +40,12 @@ import {
   getIngestionQueue,
   getAutoSyncConfig,
   setAutoSyncConfig,
-  ensureSocLabels,
-  sendIncidentEscalationEmail,
-  syncGmailDeltaHistory,
-  SOC_LABELS
+  sendGmailMessage,
+  fetchGmailProfile,
+  fetchGmailHistoryDelta
 } from '../gmailService';
 import { parseRawEmailToAnalysis, verifyGooglePubSubPushToken } from '../forensicPipeline';
+import { getGmailSyncEngine } from '../gmail/syncEngine';
 import { logger } from '../logger';
 
 // Server-side OAuth state storage
@@ -756,82 +756,6 @@ export function registerGmailRoutes(app: express.Express): void {
     }
   });
 
-  // 15. SOC Label Setup & Colorization
-  app.post('/api/gmail/labels/setup', authenticatedLimiter, async (req: Request, res: Response) => {
-    try {
-      const authHeader = req.headers.authorization;
-      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
-      const freshStoredToken = await ensureFreshAccessToken();
-      const storedToken = freshStoredToken || getGmailAccessToken();
-      const token = req.body?.access_token || bearerToken || storedToken;
-
-      const labels = await ensureSocLabels(token);
-      res.json({
-        status: 'ok',
-        message: 'SOC triage labels verified and active in Gmail mailbox.',
-        labels,
-        definitions: SOC_LABELS
-      });
-    } catch (err: any) {
-      res.status(500).json({ status: 'error', error: err?.message || 'Failed ensuring SOC labels' });
-    }
-  });
-
-  // 16. Incremental Delta Cursor Sync
-  app.post('/api/gmail/sync-delta', authenticatedLimiter, async (req: Request, res: Response) => {
-    try {
-      const authHeader = req.headers.authorization;
-      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
-      const freshStoredToken = await ensureFreshAccessToken();
-      const storedToken = freshStoredToken || getGmailAccessToken();
-      const token = req.body?.access_token || bearerToken || storedToken;
-      const startHistoryId = req.body?.start_history_id || req.body?.historyId;
-
-      const delta = await syncGmailDeltaHistory(startHistoryId, token);
-      res.json({
-        status: 'ok',
-        processed_count: delta.count,
-        history_id: delta.historyId,
-        message: `Delta sync processed ${delta.count} new message(s). Cursor at ${delta.historyId || 'initial'}.`
-      });
-    } catch (err: any) {
-      res.status(500).json({ status: 'error', error: err?.message || 'Failed executing delta sync' });
-    }
-  });
-
-  // 17. Send Incident Escalation Alert Email
-  app.post('/api/gmail/send-alert', authenticatedLimiter, async (req: Request, res: Response) => {
-    try {
-      const { to, subject, body_html, bodyHtml, case_id, caseId, threat_score, threatScore, verdict } = req.body || {};
-      if (!to || !subject) {
-        return res.status(400).json({ error: 'Parameters "to" and "subject" are required.' });
-      }
-
-      const authHeader = req.headers.authorization;
-      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
-      const freshStoredToken = await ensureFreshAccessToken();
-      const storedToken = freshStoredToken || getGmailAccessToken();
-      const token = req.body?.access_token || bearerToken || storedToken;
-
-      const result = await sendIncidentEscalationEmail({
-        to,
-        subject,
-        bodyHtml: body_html || bodyHtml || `<p>TraceXMail Security Incident Escalation for Case ${case_id || caseId || 'N/A'}</p>`,
-        caseId: case_id || caseId,
-        threatScore: threat_score ?? threatScore,
-        verdict,
-        accessToken: token
-      });
-
-      if (!result.success) {
-        return res.status(500).json(result);
-      }
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ status: 'error', error: err?.message || 'Failed sending alert email' });
-    }
-  });
-
   // 15. Disconnect Gmail (RBAC: admin, analyst)
   app.post('/api/gmail/disconnect', gmailDisconnectLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req: Request, res: Response) => {
     try {
@@ -857,6 +781,116 @@ export function registerGmailRoutes(app: express.Express): void {
         message: 'Gmail connection force-cleared locally with warnings.',
         warning: err?.message || 'Partial cleanup warning'
       });
+    }
+  });
+
+  // 16. Send SOAR Alert / Notification Email (RBAC: admin, analyst)
+  app.post('/api/gmail/send-alert', authenticatedLimiter, requireAuth, requireRole(['admin', 'analyst']), async (req: Request, res: Response) => {
+    const { to, subject, body, htmlBody } = req.body || {};
+    if (!to || !subject || !body) {
+      return res.status(400).json({ error: 'to, subject, and body parameters are required' });
+    }
+    try {
+      const result = await sendGmailMessage({ to, subject, body, htmlBody });
+      if (!result.success) {
+        return res.status(502).json({ error: result.error || 'Failed to dispatch email via Gmail API' });
+      }
+      res.json({ success: true, messageId: result.messageId, message: `Alert email dispatched to ${to}` });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Error sending email' });
+    }
+  });
+
+  // 17. Mailbox Profile Metadata
+  app.get('/api/gmail/profile', authenticatedLimiter, async (_req: Request, res: Response) => {
+    try {
+      const profile = await fetchGmailProfile();
+      if (!profile) {
+        return res.status(503).json({ error: 'Mailbox profile unavailable or disconnected' });
+      }
+      res.json(profile);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed fetching mailbox profile' });
+    }
+  });
+
+  // 18. Incremental History Delta Query
+  app.get('/api/gmail/history/delta', authenticatedLimiter, async (req: Request, res: Response) => {
+    const startHistoryId = (req.query.startHistoryId as string) || (req.query.start_history_id as string);
+    if (!startHistoryId) {
+      return res.status(400).json({ error: 'startHistoryId parameter is required' });
+    }
+    try {
+      const delta = await fetchGmailHistoryDelta(startHistoryId);
+      res.json(delta);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed querying history delta' });
+    }
+  });
+
+  // 19. Sync Engine Status & Diagnostics
+  app.get('/api/gmail/sync-engine/status', publicLimiter, (_req: Request, res: Response) => {
+    const engine = getGmailSyncEngine();
+    res.json(engine.getStatus());
+  });
+
+  // 20. Trigger Incremental History Delta Sync via Sync Engine
+  app.post('/api/gmail/sync-engine/delta', authenticatedLimiter, async (req: Request, res: Response) => {
+    try {
+      const engine = getGmailSyncEngine();
+      const targetHistoryId = (req.body?.historyId as string) || (req.body?.targetHistoryId as string);
+      const result = await engine.syncHistoryDelta(targetHistoryId);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed running sync engine delta' });
+    }
+  });
+
+  // 21. Ensure and Colorize SOC Labels
+  app.post('/api/gmail/sync-engine/ensure-labels', authenticatedLimiter, async (_req: Request, res: Response) => {
+    try {
+      const engine = getGmailSyncEngine();
+      const labels = await engine.ensureSocLabels();
+      res.json({ success: true, labels: Object.fromEntries(labels) });
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed ensuring SOC labels' });
+    }
+  });
+
+  // 22. Execute SOC Label Quarantine via Sync Engine
+  app.post('/api/gmail/sync-engine/quarantine', authenticatedLimiter, async (req: Request, res: Response) => {
+    const { messageId, threatScore, verdict, subject, from, classification } = req.body;
+    if (!messageId) {
+      return res.status(400).json({ error: 'messageId is required' });
+    }
+    try {
+      const engine = getGmailSyncEngine();
+      const result = await engine.quarantineMessage({
+        messageId,
+        threatScore: Number(threatScore) || 85,
+        verdict: verdict || 'MALICIOUS',
+        subject,
+        from,
+        classification
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed quarantining message' });
+    }
+  });
+
+  // 23. Release Message from Quarantine via Sync Engine
+  app.post('/api/gmail/sync-engine/release', authenticatedLimiter, async (req: Request, res: Response) => {
+    const { messageId } = req.body;
+    if (!messageId) {
+      return res.status(400).json({ error: 'messageId is required' });
+    }
+    try {
+      const engine = getGmailSyncEngine();
+      const result = await engine.releaseFromQuarantine(messageId);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed releasing message' });
     }
   });
 }

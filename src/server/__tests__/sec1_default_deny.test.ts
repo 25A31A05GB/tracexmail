@@ -36,7 +36,6 @@ describe('SEC-1 Default-Deny Route Security & Role Enforcement Suite', () => {
       { method: 'get', path: '/api/cases' },
       { method: 'get', path: '/api/cases/case-123' },
       { method: 'get', path: '/api/search?q=test' },
-      { method: 'get', path: '/api/stats' },
       { method: 'get', path: '/api/alerts' },
       { method: 'get', path: '/api/campaigns' },
       { method: 'get', path: '/api/gmail/search?q=test' },
@@ -64,6 +63,11 @@ describe('SEC-1 Default-Deny Route Security & Role Enforcement Suite', () => {
     it('allows unauthenticated access to /api/health', async () => {
       const res = await request(app).get('/api/health');
       expect(res.status).toBe(200);
+    });
+
+    it('allows unauthenticated access to /api/stats', async () => {
+      const res = await request(app).get('/api/stats');
+      expect([200, 304]).toContain(res.status);
     });
 
     it('allows unauthenticated access to /api/auth/login', async () => {

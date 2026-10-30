@@ -1,0 +1,53 @@
+{
+  "generated_at": "2026-10-28T20:03:29.699Z",
+  "target_sample_size_per_class": 30,
+  "total_sampled": 150,
+  "classes": [
+    "Legitimate",
+    "Suspicious",
+    "Impersonated",
+    "Phishing",
+    "Fraud-related"
+  ],
+  "samples_per_class": {
+    "Legitimate": 30,
+    "Suspicious": 30,
+    "Impersonated": 30,
+    "Phishing": 30,
+    "Fraud-related": 30
+  },
+  "samples_per_split": {
+    "train": 100,
+    "val": 20,
+    "test": 30
+  },
+  "class_split_matrix": {
+    "Legitimate": {
+      "train": 17,
+      "val": 7,
+      "test": 6
+    },
+    "Suspicious": {
+      "train": 21,
+      "val": 4,
+      "test": 5
+    },
+    "Impersonated": {
+      "train": 19,
+      "val": 3,
+      "test": 8
+    },
+    "Phishing": {
+      "train": 24,
+      "val": 3,
+      "test": 3
+    },
+    "Fraud-related": {
+      "train": 19,
+      "val": 3,
+      "test": 8
+    }
+  },
+  "csv_file": "reports/label_audit.csv",
+  "instructions": "Open reports/label_audit.csv in an editor or spreadsheet. To correct a label, enter one of [Legitimate, Suspicious, Impersonated, Phishing, Fraud-related] in the reviewed_label column, and optionally provide reviewer_notes. To keep the existing label, leave reviewed_label blank. When finished, run: npx tsx scripts/ml/apply_label_corrections.ts"
+}

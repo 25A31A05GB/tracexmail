@@ -1,6 +1,9 @@
 {
   "name": "TraceXMail",
-  "description": "Email Forensics, Threat Intelligence, Header Analysis, Hop Traceroute & ML Phishing Detection Platform",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Enterprise Email Forensics, Threat Intelligence & ML Security Engine",
+  "version": "1.0.0",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
 }

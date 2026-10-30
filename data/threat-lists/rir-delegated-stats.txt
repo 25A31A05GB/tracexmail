@@ -406,7 +406,6 @@
 2.152.16.0/20|ES|ripencc
 2.152.42.0/23|ES|ripencc
 2.152.44.0/23|ES|ripencc
-2.152.46.0/24|ES|ripencc
 2.152.47.0/24|ES|ripencc
 2.152.48.0/21|ES|ripencc
 2.152.56.0/23|ES|ripencc
@@ -447,7 +446,6 @@
 2.152.240.0/22|ES|ripencc
 2.152.244.0/23|ES|ripencc
 2.152.247.0/24|ES|ripencc
-2.152.250.0/24|ES|ripencc
 2.153.0.0/16|AG|ripencc
 2.154.0.0/15|ES|ripencc
 2.156.0.0/14|IT|ripencc
@@ -5054,3 +5052,5 @@
 45.12.36.0/24|DK|ripencc
 45.12.37.0/24|DK|ripencc
 45.12.38.0/23|DK|ripencc
+45.12.40.0/22|HU|ripencc
+45.12.44.0/23|AT|ripencc

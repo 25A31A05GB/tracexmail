@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-10-29T19:03:50.585Z",
+  "totalRecordsProcessed": 1,
+  "piiSanitizationActive": true,
+  "metrics": {
+    "emailsHashed": 1,
+    "phoneNumbersRedacted": 0,
+    "namesRedacted": 0,
+    "financialIdsRedacted": 0
+  },
+  "sampleVerification": [
+    {
+      "id": "spamassassin_ham_file_1",
+      "fromDomain": "kernel.org",
+      "sanitizedFrom": "[NAME_REDACTED] <usr_253c90ac@kernel.org>",
+      "snippet": "So here is the next rc release. Everything looks fairly regular, mostly driver updates. Please test and report any regre"
+    }
+  ]
+}

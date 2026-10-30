@@ -1,0 +1,87 @@
+{
+  "method": "isotonic",
+  "brier_improvement_percent": 100,
+  "ece_improvement_percent": 100,
+  "bins": [
+    {
+      "bin_index": 0,
+      "bin_lower": 0,
+      "bin_upper": 0.1,
+      "sample_count": 0,
+      "avg_confidence": 0.05,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 1,
+      "bin_lower": 0.1,
+      "bin_upper": 0.2,
+      "sample_count": 0,
+      "avg_confidence": 0.15000000000000002,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 2,
+      "bin_lower": 0.2,
+      "bin_upper": 0.30000000000000004,
+      "sample_count": 0,
+      "avg_confidence": 0.25,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 3,
+      "bin_lower": 0.30000000000000004,
+      "bin_upper": 0.4,
+      "sample_count": 0,
+      "avg_confidence": 0.35000000000000003,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 4,
+      "bin_lower": 0.4,
+      "bin_upper": 0.5,
+      "sample_count": 0,
+      "avg_confidence": 0.45,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 5,
+      "bin_lower": 0.5,
+      "bin_upper": 0.6000000000000001,
+      "sample_count": 0,
+      "avg_confidence": 0.55,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 6,
+      "bin_lower": 0.6000000000000001,
+      "bin_upper": 0.7000000000000001,
+      "sample_count": 0,
+      "avg_confidence": 0.6500000000000001,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 7,
+      "bin_lower": 0.7000000000000001,
+      "bin_upper": 0.8,
+      "sample_count": 0,
+      "avg_confidence": 0.75,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 8,
+      "bin_lower": 0.8,
+      "bin_upper": 0.9,
+      "sample_count": 0,
+      "avg_confidence": 0.8500000000000001,
+      "accuracy": 0
+    },
+    {
+      "bin_index": 9,
+      "bin_lower": 0.9,
+      "bin_upper": 1,
+      "sample_count": 560,
+      "avg_confidence": 1,
+      "accuracy": 1
+    }
+  ]
+}

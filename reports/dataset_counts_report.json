@@ -1,0 +1,524 @@
+{
+  "timestamp": "2026-10-28T19:54:41.340Z",
+  "totalRecordsAcrossSplits": 3484,
+  "splits": {
+    "train": {
+      "total": 2398,
+      "percent": 68.83,
+      "domains": 54
+    },
+    "val": {
+      "total": 428,
+      "percent": 12.28,
+      "domains": 10
+    },
+    "test": {
+      "total": 658,
+      "percent": 18.89,
+      "domains": 18
+    },
+    "adversarial_holdout": {
+      "total": 60,
+      "sha256": "b84eedb23b112c81092ada551ad33c8690a7a0a3780d82f8bee7408883e104ac"
+    }
+  },
+  "targets": {
+    "totalRecordsTargetMet": true,
+    "totalRecordsTargetMin": 2000,
+    "totalRecordsActual": 3484,
+    "perClassTotalTargetMet": true,
+    "perClassTotalTargetMin": 200,
+    "allClassesMeetTestReliability": true,
+    "testReliabilityThreshold": 100
+  },
+  "perClassCounts": {
+    "Legitimate": {
+      "train": 530,
+      "val": 90,
+      "test": 138,
+      "total": 758,
+      "percentOfTotal": 21.76,
+      "testReliabilityStatus": "TRUSTED",
+      "testReliabilityNote": "Class 'Legitimate' has 138 test records (meets $\\ge 100$ threshold). Metrics are statistically reliable."
+    },
+    "Suspicious": {
+      "train": 495,
+      "val": 90,
+      "test": 135,
+      "total": 720,
+      "percentOfTotal": 20.67,
+      "testReliabilityStatus": "TRUSTED",
+      "testReliabilityNote": "Class 'Suspicious' has 135 test records (meets $\\ge 100$ threshold). Metrics are statistically reliable."
+    },
+    "Impersonated": {
+      "train": 495,
+      "val": 90,
+      "test": 135,
+      "total": 720,
+      "percentOfTotal": 20.67,
+      "testReliabilityStatus": "TRUSTED",
+      "testReliabilityNote": "Class 'Impersonated' has 135 test records (meets $\\ge 100$ threshold). Metrics are statistically reliable."
+    },
+    "Phishing": {
+      "train": 473,
+      "val": 90,
+      "test": 135,
+      "total": 698,
+      "percentOfTotal": 20.03,
+      "testReliabilityStatus": "TRUSTED",
+      "testReliabilityNote": "Class 'Phishing' has 135 test records (meets $\\ge 100$ threshold). Metrics are statistically reliable."
+    },
+    "Fraud-related": {
+      "train": 405,
+      "val": 68,
+      "test": 115,
+      "total": 588,
+      "percentOfTotal": 16.88,
+      "testReliabilityStatus": "TRUSTED",
+      "testReliabilityNote": "Class 'Fraud-related' has 115 test records (meets $\\ge 100$ threshold). Metrics are statistically reliable."
+    }
+  },
+  "perSourceCounts": {
+    "TraceXMail Curated Cloud Baseline": {
+      "train": 135,
+      "val": 0,
+      "test": 0,
+      "total": 135
+    },
+    "TraceXMail Curated Operations Baseline": {
+      "train": 90,
+      "val": 0,
+      "test": 0,
+      "total": 90
+    },
+    "TraceXMail Curated Network Baseline": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Curated Enterprise Baseline": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Curated SRE Baseline": {
+      "train": 90,
+      "val": 0,
+      "test": 0,
+      "total": 90
+    },
+    "TraceXMail Curated Developer Baseline": {
+      "train": 45,
+      "val": 45,
+      "test": 69,
+      "total": 159
+    },
+    "TraceXMail Curated Finance Baseline": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Curated Product Baseline": {
+      "train": 35,
+      "val": 0,
+      "test": 0,
+      "total": 35
+    },
+    "TraceXMail Suspicious Trademark Graymail": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Lead Generation": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Real Estate Outreach": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious FinOps Cold Outreach": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Webinar Outreach": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Collections Outreach": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Merch Marketing": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Crypto Graymail": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious AI Marketing": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Executive Recruitment": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Cold Outreach": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Apple)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Atlassian)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Bank of America)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Chase)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (CrowdStrike)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (DocuSign)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Dropbox)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (GitHub)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Google)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Microsoft)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Okta)": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Credential Harvest Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Cloud Phishing Corpus": {
+      "train": 90,
+      "val": 0,
+      "test": 45,
+      "total": 135
+    },
+    "TraceXMail Customs Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Compliance Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail HR Survey Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail MFA Harvesting Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Rogue OAuth Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Postal Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Quishing Phishing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Delivery Hold Phishing Corpus": {
+      "train": 23,
+      "val": 0,
+      "test": 0,
+      "total": 23
+    },
+    "TraceXMail Vendor Remittance Alteration Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail BEC Accounts Payable Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Subcontractor Payroll Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Settlement Escrow Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Executive Wire Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Treasury Wire Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail International Wire Fraud Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Supplier Remittance Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Treasury Clearing Corpus": {
+      "train": 45,
+      "val": 0,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Curated HR Baseline": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious Financial Outreach": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Suspicious SEO Marketing": {
+      "train": 0,
+      "val": 45,
+      "test": 45,
+      "total": 90
+    },
+    "TraceXMail Brand Lookalike Impersonation (PayPal)": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Slack)": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Document Phishing Corpus": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Security Trap Phishing Corpus": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Vendor Routing Corpus": {
+      "train": 0,
+      "val": 45,
+      "test": 0,
+      "total": 45
+    },
+    "TraceXMail Legal Escrow Wire Corpus": {
+      "train": 0,
+      "val": 23,
+      "test": 0,
+      "total": 23
+    },
+    "TraceXMail Curated Communications Baseline": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Curated DevOps Baseline": {
+      "train": 0,
+      "val": 0,
+      "test": 24,
+      "total": 24
+    },
+    "TraceXMail Suspicious Recruiting Outreach": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Suspicious Scraping Outreach": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Stripe)": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Wells Fargo)": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Brand Lookalike Impersonation (Zoom)": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail SSO Phishing Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Audio Phishing Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 45,
+      "total": 45
+    },
+    "TraceXMail Commercial Wire Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 23,
+      "total": 23
+    },
+    "TraceXMail BEC Executive Wire Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 23,
+      "total": 23
+    },
+    "TraceXMail Executive Gift Card Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 23,
+      "total": 23
+    },
+    "TraceXMail Payroll Rerouting Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 23,
+      "total": 23
+    },
+    "TraceXMail Supplier Invoice Fraud Corpus": {
+      "train": 0,
+      "val": 0,
+      "test": 23,
+      "total": 23
+    }
+  },
+  "perCorpusCounts": {
+    "tracexmail_curated": {
+      "train": 2398,
+      "val": 428,
+      "test": 658,
+      "total": 3484
+    }
+  },
+  "classesMarkedTooSmallToTrust": []
+}

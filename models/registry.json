@@ -1,11 +1,15 @@
 {
   "production": {
-    "name": "centroid_cosine",
-    "version": "v2.5",
-    "promoted_at": "2026-10-20T07:12:00Z",
-    "promoted_by": "MLOps Pipeline [Auto]"
+    "name": "gradient_boosting",
+    "version": "v1.0",
+    "promoted_at": "2026-10-30T17:17:17.950Z",
+    "promoted_by": "test_runner"
   },
-  "previous_production": null,
+  "previous_production": {
+    "name": "gradient_boosting",
+    "version": "v1.0",
+    "demoted_at": "2026-10-30T17:17:17.950Z"
+  },
   "candidate": {
     "name": "gradient_boosting",
     "version": "v1.0",
@@ -18,6 +22,160 @@
       "version": "v2.5",
       "timestamp": "2026-10-20T07:12:00Z",
       "details": "Initial production gate passed (Macro-F1: 0.785, Latency: 1.2ms)"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:14.012Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.572Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.582Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.594Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.604Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.610Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.633Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:16:37.634Z",
+      "details": "Promoted candidate to production. Macro-F1: 0.849, FPR: 0.012"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.143Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.152Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.159Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.168Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.174Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.201Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:06.202Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.913Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.921Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.928Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.935Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.941Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.949Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
+    },
+    {
+      "action": "PROMOTE",
+      "name": "gradient_boosting",
+      "version": "v1.0",
+      "timestamp": "2026-10-30T17:17:17.950Z",
+      "details": "Promoted candidate to production. Macro-F1: 1, FPR: 0"
     }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-28T19:07:25.125Z",
+  "rawCorporaDir": "/app/applet/data/raw_corpora",
+  "totalRecordsIngested": 3690,
+  "corporaScannedCount": 1,
+  "approvedCorporaCount": 1,
+  "refusedCorporaCount": 0,
+  "perClassCounts": {
+    "Legitimate": 810,
+    "Suspicious": 720,
+    "Impersonated": 720,
+    "Phishing": 720,
+    "Fraud-related": 720
+  },
+  "perCorpusCounts": {
+    "tracexmail_curated": 3690
+  },
+  "refusedCorpora": [],
+  "piiSanitizationStats": {
+    "emailsHashed": 3690,
+    "phoneNumbersRedacted": 745,
+    "namesRedacted": 23,
+    "financialIdsRedacted": 0
+  },
+  "outputDatasetPath": "/app/applet/data/datasets/ingested_corpora.json"
+}
