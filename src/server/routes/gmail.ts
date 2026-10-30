@@ -46,6 +46,7 @@ import {
 } from '../gmailService';
 import { parseRawEmailToAnalysis, verifyGooglePubSubPushToken } from '../forensicPipeline';
 import { getGmailSyncEngine } from '../gmail/syncEngine';
+import { getPubSubTopicService } from '../gmail/pubsubTopicService';
 import { logger } from '../logger';
 
 // Server-side OAuth state storage
@@ -597,28 +598,93 @@ export function registerGmailRoutes(app: express.Express): void {
     res.json(getSyncedEmails());
   });
 
-  // 11. Pub/Sub Push Interception Endpoint
-  app.post('/api/gmail/pubsub/push', publicLimiter, async (req: Request, res: Response) => {
+  // 11. Cloud Pub/Sub Push Notification Endpoint & Incremental historyId Delta Sync
+  app.post(['/api/gmail/push', '/api/gmail/pubsub/push'], publicLimiter, async (req: Request, res: Response) => {
     try {
-      const isAuthorized = await verifyGooglePubSubPushToken(req);
-      if (!isAuthorized) {
-        return res.status(401).json({ error: 'Unauthorized Cloud Pub/Sub push request' });
+      // 1. Validate 'x-goog-pubsub-token' header against 'process.env.PUBSUB_PUSH_TOKEN'
+      const expectedPushToken = process.env.PUBSUB_PUSH_TOKEN;
+      const pubsubHeaderToken = req.headers['x-goog-pubsub-token'] as string | undefined;
+      const queryToken = req.query.token as string | undefined;
+      const providedToken = pubsubHeaderToken || queryToken;
+
+      if (expectedPushToken) {
+        if (!providedToken) {
+          logger.warn('[PubSubPush] Unauthorized: Missing x-goog-pubsub-token header');
+          return res.status(401).json({
+            error: 'unauthorized',
+            message: 'Missing required x-goog-pubsub-token header'
+          });
+        }
+
+        const bufProvided = Buffer.from(providedToken);
+        const bufExpected = Buffer.from(expectedPushToken);
+
+        if (bufProvided.length !== bufExpected.length || !crypto.timingSafeEqual(bufProvided, bufExpected)) {
+          logger.warn('[PubSubPush] Forbidden: Invalid x-goog-pubsub-token header value');
+          return res.status(403).json({
+            error: 'forbidden',
+            message: 'Invalid x-goog-pubsub-token header'
+          });
+        }
+      } else {
+        // Fallback to verifyGooglePubSubPushToken (OIDC or dev allow)
+        const isAuthorized = await verifyGooglePubSubPushToken(req);
+        if (!isAuthorized) {
+          return res.status(401).json({ error: 'Unauthorized Cloud Pub/Sub push request' });
+        }
       }
 
+      // 2. Parse incoming Cloud Pub/Sub message payload
       const body = req.body || {};
       const message = body.message;
-      if (!message || !message.data) {
-        return res.status(200).send('OK');
+
+      let emailAddress: string = 'user@gmail.com';
+      let historyId: string | undefined = undefined;
+
+      if (message && message.data) {
+        // Cloud Pub/Sub standard push wrapper
+        try {
+          const decodedStr = Buffer.from(message.data, 'base64').toString('utf-8');
+          const pushPayload = JSON.parse(decodedStr);
+          if (pushPayload.emailAddress) emailAddress = pushPayload.emailAddress;
+          if (pushPayload.historyId) historyId = String(pushPayload.historyId);
+        } catch (parseErr: any) {
+          logger.warn({ error: parseErr?.message }, '[PubSubPush] Error parsing decoded message.data JSON');
+        }
+      } else if (body.emailAddress || body.historyId) {
+        // Direct webhook payload support
+        if (body.emailAddress) emailAddress = body.emailAddress;
+        if (body.historyId) historyId = String(body.historyId);
+      } else {
+        // Empty ping or non-data acknowledgment
+        return res.status(200).json({ status: 'ok', message: 'Acknowledged empty Pub/Sub message' });
       }
 
-      const decodedData = Buffer.from(message.data, 'base64').toString('utf-8');
-      const pushPayload = JSON.parse(decodedData);
+      logger.info({ emailAddress, historyId }, '[PubSubPush] Validated Pub/Sub notification. Triggering incremental historyId delta sync...');
 
-      const result = await handlePubSubPush(pushPayload);
-      res.status(200).json({ status: 'success', processed: result });
+      // 3. Trigger incremental historyId delta synchronization for the associated user
+      const syncEngine = getGmailSyncEngine();
+      const deltaResult = await syncEngine.syncHistoryDelta(historyId);
+
+      // Advance syncEngine push metrics and emit internal events
+      await syncEngine.handlePubSubPush(body);
+
+      // Synchronize with legacy handlePubSubPush for backward compatibility
+      await handlePubSubPush({ emailAddress, historyId }).catch(() => {});
+
+      return res.status(200).json({
+        status: 'success',
+        message: `Incremental delta synchronization completed for ${emailAddress}`,
+        emailAddress,
+        historyId: deltaResult.latestHistoryId || historyId,
+        messagesAddedCount: deltaResult.messagesAddedCount,
+        messagesProcessed: deltaResult.messagesProcessed,
+        cursorExpired: deltaResult.cursorExpired,
+        durationMs: deltaResult.durationMs
+      });
     } catch (err: any) {
       logger.error({ error: err?.message }, '[PubSubPush] Processing error');
-      res.status(200).send('OK');
+      return res.status(200).json({ status: 'error', error: err?.message });
     }
   });
 
@@ -891,6 +957,72 @@ export function registerGmailRoutes(app: express.Express): void {
       res.json(result);
     } catch (err: any) {
       res.status(500).json({ error: err?.message || 'Failed releasing message' });
+    }
+  });
+
+  // 24. Pub/Sub Topic Registration & Full Pipeline Setup
+  app.post('/api/gmail/pubsub/setup', authenticatedLimiter, async (req: Request, res: Response) => {
+    try {
+      const pubsubService = getPubSubTopicService();
+      const authHeader = req.headers.authorization;
+      const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+      const accessToken = req.body?.accessToken || bearerToken;
+
+      const result = await pubsubService.registerFullPubSubPipeline({
+        projectId: req.body?.projectId,
+        topicId: req.body?.topicId,
+        topicName: req.body?.topicName,
+        subscriptionId: req.body?.subscriptionId,
+        subscriptionName: req.body?.subscriptionName,
+        pushEndpointUrl: req.body?.pushEndpointUrl,
+        accessToken,
+        grantGmailPermissions: req.body?.grantGmailPermissions !== false,
+        createSubscription: req.body?.createSubscription !== false,
+        startWatchImmediately: req.body?.startWatchImmediately !== false,
+        labelIds: req.body?.labelIds || ['INBOX']
+      });
+
+      res.status(result.success ? 200 : 400).json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed setting up Pub/Sub pipeline' });
+    }
+  });
+
+  // 25. Pub/Sub Topic & Service Status
+  app.get('/api/gmail/pubsub/status', publicLimiter, (_req: Request, res: Response) => {
+    const pubsubService = getPubSubTopicService();
+    res.json(pubsubService.getState());
+  });
+
+  // 26. Verify & Repair IAM Policy for Gmail Push Service Account
+  app.post('/api/gmail/pubsub/verify-iam', authenticatedLimiter, async (req: Request, res: Response) => {
+    const topicName = req.body?.topicName || process.env.GMAIL_PUBSUB_TOPIC || 'projects/tracexmail-soc/topics/mailbox-watch';
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+    const accessToken = req.body?.accessToken || bearerToken;
+
+    try {
+      const pubsubService = getPubSubTopicService();
+      const result = await pubsubService.ensureGmailPublisherIam(topicName, accessToken);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed verifying Gmail Pub/Sub IAM policy' });
+    }
+  });
+
+  // 27. Publish Diagnostic Ping to Pub/Sub Topic
+  app.post('/api/gmail/pubsub/ping', authenticatedLimiter, async (req: Request, res: Response) => {
+    const topicName = req.body?.topicName || process.env.GMAIL_PUBSUB_TOPIC || 'projects/tracexmail-soc/topics/mailbox-watch';
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined;
+    const accessToken = req.body?.accessToken || bearerToken;
+
+    try {
+      const pubsubService = getPubSubTopicService();
+      const result = await pubsubService.publishDiagnosticPing(topicName, accessToken, req.body?.payload);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'Failed publishing diagnostic ping' });
     }
   });
 }

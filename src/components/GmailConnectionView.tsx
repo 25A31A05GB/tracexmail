@@ -44,6 +44,7 @@ import {
   X
 } from 'lucide-react';
 import { gmailPubSub, WatchSubscriptionState } from '../services/gmailPubSub';
+import { setupPubSubTopic, sendDiagnosticPing } from '../services/pubsubRegistration';
 import { GmailConfigStatus, OAuthScopesStatus } from './GmailConfigStatus';
 import { GoogleVerificationGuideModal } from './GoogleVerificationGuideModal';
 import { mapBackendCaseToAnalysis } from '../utils/parser';
@@ -218,6 +219,8 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
 
   const [topicName, setTopicName] = useState<string>('projects/tracexmail-enterprise/topics/inbox-watch');
+  const [provisioningPubSub, setProvisioningPubSub] = useState<boolean>(false);
+  const [pingingPubSub, setPingingPubSub] = useState<boolean>(false);
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
   const [settingUpLabels, setSettingUpLabels] = useState<boolean>(false);
   const [labelSetupResult, setLabelSetupResult] = useState<string | null>(null);
@@ -655,6 +658,41 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
       setErrorMsg('Renewal error: ' + err.message);
     } finally {
       setRenewingWatch(false);
+    }
+  };
+
+  const handleFullPubSubProvisioning = async () => {
+    setProvisioningPubSub(true);
+    setErrorMsg(null);
+    try {
+      const res = await setupPubSubTopic({ topicName });
+      if (res.success) {
+        setSyncResult(`⚡ ${res.message} (HistoryId: ${res.historyId || 'active'})`);
+        fetchStatus();
+      } else {
+        throw new Error(res.error || 'Failed to provision Pub/Sub topic and permissions');
+      }
+    } catch (err: any) {
+      setErrorMsg('Pub/Sub Setup Error: ' + err.message);
+    } finally {
+      setProvisioningPubSub(false);
+    }
+  };
+
+  const handlePubSubPing = async () => {
+    setPingingPubSub(true);
+    setErrorMsg(null);
+    try {
+      const res = await sendDiagnosticPing(topicName);
+      if (res.success) {
+        setSyncResult(`✓ Test diagnostic ping published successfully! MessageId: ${res.messageId}`);
+      } else {
+        throw new Error(res.error || 'Failed publishing diagnostic test ping');
+      }
+    } catch (err: any) {
+      setErrorMsg('Diagnostic Ping Error: ' + err.message);
+    } finally {
+      setPingingPubSub(false);
     }
   };
 
@@ -2791,14 +2829,52 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                   {status?.watch?.expiration ? `Subscription renews by: ${new Date(status.watch.expiration).toUTCString()}` : 'Standard 7-day auto-renewal period.'}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handleFullPubSubProvisioning}
+                    disabled={provisioningPubSub || startingWatch}
+                    className="bg-emerald-700/80 hover:bg-emerald-600 text-white border border-emerald-500/60 px-3 py-1.5 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="Ensures topic exists, grants roles/pubsub.publisher to gmail-api-push@system.gserviceaccount.com, and provisions push subscription"
+                  >
+                    {provisioningPubSub ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Provisioning GCP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                        <span>Auto-Provision Topic & IAM</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handlePubSubPing}
+                    disabled={pingingPubSub}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                    title="Publish test message to verify push webhook delivery"
+                  >
+                    {pingingPubSub ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Publishing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Diagnostic Ping</span>
+                      </>
+                    )}
+                  </button>
+
                   {status?.watch?.active ? (
                     <button
                       onClick={() => handleToggleWatch(false)}
                       disabled={startingWatch}
                       className="bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700/60 px-3 py-1.5 rounded text-xs font-semibold transition-colors cursor-pointer"
                     >
-                      {startingWatch ? 'Stopping...' : 'Stop Watch Subscription'}
+                      {startingWatch ? 'Stopping...' : 'Stop Watch'}
                     </button>
                   ) : (
                     <button
@@ -2806,7 +2882,7 @@ export function GmailConnectionView({ onNewCasesProcessed, onSelectAnalysis, onN
                       disabled={startingWatch}
                       className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1.5 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                     >
-                      {startingWatch ? 'Registering...' : 'Activate Gmail watch() API'}
+                      {startingWatch ? 'Registering...' : 'Activate watch()'}
                     </button>
                   )}
                 </div>

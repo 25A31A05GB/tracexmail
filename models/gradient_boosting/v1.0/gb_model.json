@@ -1,7 +1,7 @@
 {
   "model_name": "TraceXMail-GBM-Forensics",
   "version": "v1.0",
-  "exported_at": "2026-10-30T17:17:17.948Z",
+  "exported_at": "2026-10-30T17:37:55.164Z",
   "framework": "LightGBM / Scikit-Learn / ONNX",
   "schema_version": "2.5.0",
   "classes": [

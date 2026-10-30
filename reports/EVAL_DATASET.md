@@ -1,5 +1,5 @@
 # TraceXMail Evaluation Dataset Build Report (Item 1)
-**Generated:** 2026-10-30T17:17:17.369Z  
+**Generated:** 2026-10-30T17:37:52.487Z  
 **Status:** PASSED (VERIFIED)  
 **Adversarial Holdout Integrity:** UNTOUCHED (Verified SHA-256)  
 **SHA-256 Checksum:** `9752514ef29a99aeb5dba67dda84027c10584f241474476fb6b6451b2526843c`

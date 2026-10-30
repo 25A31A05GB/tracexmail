@@ -200,6 +200,14 @@ export class GmailSyncEngine extends EventEmitter {
   }
 
   /**
+   * Updates active watch cursor and lease expiration.
+   */
+  public updateWatchCheckpoint(historyId?: string, expirationMs?: number): void {
+    if (historyId) this.metrics.currentHistoryId = String(historyId);
+    if (expirationMs) this.metrics.activeWatchExpiration = expirationMs;
+  }
+
+  /**
    * Resolves the best available OAuth token: explicitly passed override,
    * fresh token from OAuth database, or environment fallback.
    */
