@@ -34,7 +34,8 @@ import {
   Mail,
   SlidersHorizontal,
   Crown,
-  X
+  X,
+  Home
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { ConnectionStatus } from '../hooks/useWebSocketAlerts';
@@ -79,6 +80,7 @@ interface SidebarProps {
   onStartTour?: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onNavigateLanding?: () => void;
 }
 
 export function Sidebar({
@@ -96,7 +98,8 @@ export function Sidebar({
   onOpenCommandPalette,
   onStartTour,
   isMobileOpen = false,
-  onCloseMobile
+  onCloseMobile,
+  onNavigateLanding
 }: SidebarProps) {
   const [engineHealth, setEngineHealth] = useState<'operational' | 'degraded' | 'checking'>('operational');
   const [latencyMs, setLatencyMs] = useState<number>(12);
@@ -832,6 +835,31 @@ export function Sidebar({
             )}
           </button>
         </div>
+
+        {/* Public Landing Link */}
+        {onNavigateLanding && !isDesktopCollapsed && (
+          <div className="px-3 pb-2">
+            <button
+              onClick={onNavigateLanding}
+              className="w-full flex items-center justify-center gap-2 py-1.5 px-2.5 rounded-md border border-[#3a352c] bg-[#1a1713] hover:bg-[#241f19] text-xs font-medium text-[#b9af9c] hover:text-[#ede6d8] transition-colors cursor-pointer"
+              title="Return to Public Landing Page"
+            >
+              <Home className="w-3.5 h-3.5 text-amber-400" />
+              <span>Public Landing Page</span>
+            </button>
+          </div>
+        )}
+        {onNavigateLanding && isDesktopCollapsed && (
+          <div className="pb-2 flex justify-center">
+            <button
+              onClick={onNavigateLanding}
+              className="p-2 rounded-md hover:bg-[#221e17] text-[#8a8070] hover:text-amber-400 border border-transparent hover:border-[#3a352c] transition-colors cursor-pointer"
+              title="Return to Public Landing Page"
+            >
+              <Home className="w-4 h-4 text-amber-400" />
+            </button>
+          </div>
+        )}
 
         {/* Public legal links & dynamic copyright (Only when expanded) */}
         {!isDesktopCollapsed && (

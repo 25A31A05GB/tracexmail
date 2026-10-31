@@ -2,6 +2,11 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AppGuard } from './components/AppGuard';
 import { Header } from './components/Header';
 import { Sidebar, NavTab } from './components/Sidebar';
+import { LandingView } from './components/LandingView';
+import { LegalPage, LegalPageType } from './components/LegalPage';
+import { KnowledgeBaseView } from './components/KnowledgeBaseView';
+
+// Console Views
 import { OverviewView } from './components/OverviewView';
 import { DashboardView } from './components/DashboardView';
 import { CasesView } from './components/CasesView';
@@ -22,6 +27,7 @@ import { UltimateBossAdminView } from './components/UltimateBossAdminView';
 import { AccountSettingsView } from './components/AccountSettingsView';
 
 // Modals & Overlays
+import { AuthModal } from './components/AuthModal';
 import { NewAnalysisModal } from './components/NewAnalysisModal';
 import { ReportModal } from './components/ReportModal';
 import { PrivacyComplianceModal } from './components/PrivacyComplianceModal';
@@ -42,10 +48,40 @@ import { EmailAnalysis } from './types';
 import { SAMPLE_ANALYSES, EMPTY_ANALYSIS } from './data/samples';
 import { CheckCircle2, ShieldCheck, Database } from 'lucide-react';
 
+const LEGAL_PATHS: Record<string, LegalPageType> = {
+  '/about': 'about',
+  '/privacy': 'privacy',
+  '/terms': 'terms',
+  '/cookies': 'cookies',
+  '/domains': 'domains',
+  '/contact': 'contact',
+  '/security': 'security',
+};
+
 export default function App() {
-  // Navigation & View Mode State
+  // Navigation & Page Routing State
+  const [currentPath, setCurrentPath] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname || '/';
+    }
+    return '/';
+  });
+
+  const [inConsole, setInConsole] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path === '/app' || path === '/console') return true;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'console' || params.get('tab')) return true;
+    }
+    return false; // Default to public Landing Page
+  });
+
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     try {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const queryTab = params?.get('tab');
+      if (queryTab) return queryTab as NavTab;
       const saved = localStorage.getItem('tracexmail_active_tab');
       if (saved) return saved as NavTab;
     } catch {}
@@ -70,6 +106,7 @@ export default function App() {
   });
 
   // Modal States
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isNewAnalysisModalOpen, setIsNewAnalysisModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
@@ -108,6 +145,46 @@ export default function App() {
     broadcastTestAlert,
     reconnect
   } = useWebSocketAlerts();
+
+  // Sync browser popstate (back/forward navigation)
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      setCurrentPath(path);
+      const params = new URLSearchParams(window.location.search);
+      if (path === '/app' || path === '/console' || params.get('view') === 'console' || params.get('tab')) {
+        setInConsole(true);
+      } else if (path === '/' && !params.get('view')) {
+        setInConsole(false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Navigation Handlers
+  const navigateToPath = useCallback((path: string) => {
+    setCurrentPath(path);
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', path);
+    }
+  }, []);
+
+  const handleOpenConsole = useCallback(() => {
+    setInConsole(true);
+    setCurrentPath('/app');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/app');
+    }
+  }, []);
+
+  const handleNavigateLanding = useCallback(() => {
+    setInConsole(false);
+    setCurrentPath('/');
+    if (typeof window !== 'undefined') {
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
 
   // Persist Active Tab
   useEffect(() => {
@@ -205,7 +282,7 @@ export default function App() {
     }
   }, [dismissToast]);
 
-  // Main Active View Renderer
+  // Main Active SOC View Renderer
   const renderActiveView = () => {
     switch (activeTab) {
       case 'overview':
@@ -435,6 +512,61 @@ export default function App() {
     }
   };
 
+  // Route 1: Legal Pages (/privacy, /terms, /cookies, /security, /contact, /about, /domains)
+  if (LEGAL_PATHS[currentPath]) {
+    return (
+      <AppGuard>
+        <LegalPage
+          type={LEGAL_PATHS[currentPath]}
+          onNavigateHome={handleNavigateLanding}
+          onNavigateToPath={navigateToPath}
+        />
+      </AppGuard>
+    );
+  }
+
+  // Route 2: Knowledge Base (/kb, /knowledge)
+  if (currentPath === '/kb' || currentPath === '/knowledge') {
+    return (
+      <AppGuard>
+        <KnowledgeBaseView
+          onNavigateHome={handleNavigateLanding}
+          onNavigateToPath={navigateToPath}
+        />
+      </AppGuard>
+    );
+  }
+
+  // Route 3: Public Landing Page (Default on root / unless user explicitly enters console)
+  if (!inConsole) {
+    return (
+      <AppGuard>
+        <LandingView
+          onOpenConsole={handleOpenConsole}
+          onOpenTrace={() => {
+            handleOpenConsole();
+            setIsNewAnalysisModalOpen(true);
+          }}
+          onSelectCase={(sample) => {
+            setCurrentAnalysis(sample);
+            handleOpenConsole();
+            setActiveTab('overview');
+          }}
+          onRequestAccess={() => setIsAuthModalOpen(true)}
+        />
+        {isAuthModalOpen && (
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            currentUser={user ? { userId: (user as any).id, email: (user as any).email || '', organizationId: profile?.organization_id || 'org_acme_soc_01', role } : null}
+          />
+        )}
+        <CookieConsentBanner />
+      </AppGuard>
+    );
+  }
+
+  // Route 4: Complete SOC Enclave Workspace (Console Mode)
   return (
     <AppGuard>
       <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#100e0c] text-[#ede6d8] font-sans antialiased selection:bg-amber-500/20 selection:text-amber-200">
@@ -463,6 +595,7 @@ export default function App() {
           onOpenShortcutsHelp={() => setIsShortcutsOpen(true)}
           onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
           isMobileSidebarOpen={isMobileSidebarOpen}
+          onNavigateLanding={handleNavigateLanding}
         />
 
         {/* Main Workspace Body */}
@@ -483,6 +616,7 @@ export default function App() {
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             isMobileOpen={isMobileSidebarOpen}
             onCloseMobile={() => setIsMobileSidebarOpen(false)}
+            onNavigateLanding={handleNavigateLanding}
           />
 
           {/* View Container */}
@@ -503,6 +637,14 @@ export default function App() {
         )}
 
         {/* Modals & Overlays */}
+        {isAuthModalOpen && (
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            currentUser={user ? { userId: (user as any).id, email: (user as any).email || '', organizationId: profile?.organization_id || 'org_acme_soc_01', role } : null}
+          />
+        )}
+
         {isNewAnalysisModalOpen && (
           <NewAnalysisModal
             isOpen={isNewAnalysisModalOpen}

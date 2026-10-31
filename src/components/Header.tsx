@@ -27,7 +27,8 @@ import {
   SlidersHorizontal,
   Lock,
   Menu,
-  X
+  X,
+  Home
 } from 'lucide-react';
 import { EmailAnalysis } from '../types';
 import { SAMPLE_ANALYSES } from '../data/samples';
@@ -71,6 +72,7 @@ interface HeaderProps {
   onSyncCases?: () => void | Promise<void>;
   inactivityRemainingSecs?: number;
   onLockWorkspace?: () => void;
+  onNavigateLanding?: () => void;
 }
 
 export function Header({
@@ -101,7 +103,8 @@ export function Header({
   isMobileSidebarOpen = false,
   onSyncCases,
   inactivityRemainingSecs,
-  onLockWorkspace
+  onLockWorkspace,
+  onNavigateLanding
 }: HeaderProps) {
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
@@ -218,13 +221,17 @@ export function Header({
           </button>
         )}
 
-        <div className="flex items-center gap-2">
+        <div 
+          className={`flex items-center gap-2 ${onNavigateLanding ? 'cursor-pointer group' : ''}`}
+          onClick={onNavigateLanding}
+          title={onNavigateLanding ? 'Return to Landing Page' : 'TraceXMail Cryptographic Core'}
+        >
           <TraceXLogo3D size="sm" title="TraceXMail Cryptographic Core" />
-          <span className="font-['Source_Serif_4',serif] font-bold text-sm tracking-tight text-[#ede6d8]">
+          <span className="font-['Source_Serif_4',serif] font-bold text-sm tracking-tight text-[#ede6d8] group-hover:text-amber-400 transition-colors">
             TraceXMail
           </span>
           {/* Integrated Auto-Sync / Auto-Refresh Control */}
-          <div className="hidden sm:flex items-center">
+          <div className="hidden sm:flex items-center" onClick={e => e.stopPropagation()}>
             <AutoRefreshControl onSyncCases={onSyncCases} />
           </div>
         </div>
@@ -241,6 +248,19 @@ export function Header({
 
       {/* Right: Consolidated Actions & Top-Right Account/Profile Menu */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+
+        {/* Public Landing Page Switcher */}
+        {onNavigateLanding && (
+          <button
+            type="button"
+            onClick={onNavigateLanding}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#1a1713] hover:bg-[#241f19] border border-[#342e26] text-xs font-medium text-[#b9af9c] hover:text-[#ede6d8] transition-colors cursor-pointer"
+            title="Return to Public Landing Page"
+          >
+            <Home className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Landing Page</span>
+          </button>
+        )}
 
         {/* Quick Global Search / Command Bar Trigger */}
         {onOpenCommandPalette && (
