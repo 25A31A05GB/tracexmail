@@ -259,10 +259,11 @@ export async function createApp(options?: { skipVite?: boolean }): Promise<expre
 
   // 9. Client SPA static files or Vite dev server
   const isVitest = Boolean(process.env.VITEST);
+  const isProduction = process.env.NODE_ENV === 'production';
   const distPath = path.join(process.cwd(), 'dist');
   const hasDist = fs.existsSync(path.join(distPath, 'index.html'));
 
-  if (!hasDist && !isVitest && !options?.skipVite) {
+  if (!isProduction && !isVitest && !options?.skipVite) {
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true, hmr: false },
       appType: 'spa'
